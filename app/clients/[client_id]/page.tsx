@@ -129,6 +129,37 @@ export default async function ClientDetailPage({
     )
     .orderBy(desc(assessmentResults.assessmentDate))
 
+  const asqResults = await db
+    .select({
+      assessmentResultId: assessmentResults.assessmentResultId,
+      assessmentDate: assessmentResults.assessmentDate,
+      score: assessmentResults.score,
+      acuteRiskRating: assessmentResults.acuteRiskRating,
+    })
+    .from(assessmentResults)
+    .innerJoin(
+      assessmentInstances,
+      eq(
+        assessmentResults.assessmentInstanceId,
+        assessmentInstances.assessmentInstanceId
+      )
+    )
+    .innerJoin(
+      assessmentDefinitions,
+      eq(
+        assessmentInstances.assessmentDefinitionId,
+        assessmentDefinitions.assessmentDefinitionId
+      )
+    )
+    .where(
+      and(
+        eq(assessmentResults.clientId, clientId),
+        eq(assessmentResults.practiceId, context.practiceId),
+        eq(assessmentDefinitions.assessmentCode, "ASQ")
+      )
+    )
+    .orderBy(desc(assessmentResults.assessmentDate))
+
   const savedReports = await db
     .select({
       simpleReportId: simpleReports.simpleReportId,
@@ -282,6 +313,14 @@ export default async function ClientDetailPage({
               />
             </div>
           </div>
+          <div className="border-t pt-6">
+            <p className="mb-3 text-sm font-medium text-muted-foreground">
+              Practitioner-administered
+            </p>
+            <Button asChild variant="outline">
+              <Link href={`/clients/${clientId}/asq/new`}>Administer ASQ</Link>
+            </Button>
+          </div>
         </CardContent>
       </Card>
 
@@ -336,6 +375,74 @@ export default async function ClientDetailPage({
                         <TableCell className="capitalize">
                           <Link href={resultHref} className="block hover:underline">
                             {result.severity}
+                          </Link>
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="mb-6">
+        <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <CardTitle>ASQ results</CardTitle>
+            <CardDescription>
+              Ask Suicide-Screening Questions — practitioner-administered.
+            </CardDescription>
+          </div>
+          <Button asChild variant="outline" size="sm">
+            <Link href={`/clients/${clientId}/asq/new`}>Administer ASQ</Link>
+          </Button>
+        </CardHeader>
+        <CardContent>
+          <div className="rounded-lg border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Score</TableHead>
+                  <TableHead>Acute Risk Rating</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {asqResults.length === 0 ? (
+                  <TableRow>
+                    <TableCell
+                      colSpan={3}
+                      className="h-20 text-center text-muted-foreground"
+                    >
+                      No ASQ results recorded yet.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  asqResults.map((result) => {
+                    const resultHref = `/clients/${clientId}/results/${result.assessmentResultId}`
+                    return (
+                      <TableRow
+                        key={result.assessmentResultId}
+                        className="hover:bg-muted/50"
+                      >
+                        <TableCell>
+                          <Link
+                            href={resultHref}
+                            className="block font-medium text-primary hover:underline"
+                          >
+                            {formatDate(result.assessmentDate)}
+                          </Link>
+                        </TableCell>
+                        <TableCell>
+                          <Link href={resultHref} className="block hover:underline">
+                            {result.score}
+                          </Link>
+                        </TableCell>
+                        <TableCell>
+                          <Link href={resultHref} className="block hover:underline">
+                            {result.acuteRiskRating ?? "—"}
                           </Link>
                         </TableCell>
                       </TableRow>

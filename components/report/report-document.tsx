@@ -1,9 +1,13 @@
-import type { ReportSnapshot } from "@/lib/reports/snapshot"
+import { REPORT_TITLE, type ReportSnapshot } from "@/lib/reports/snapshot"
 import {
+  getAsqResultsFromSnapshot,
   getGad7ResultsFromSnapshot,
   getPhq9ResultsFromSnapshot,
 } from "@/lib/reports/snapshot"
-import { ReportResultsTable } from "@/components/report/results-table"
+import {
+  ReportAsqResultsTable,
+  ReportResultsTable,
+} from "@/components/report/results-table"
 
 function formatDisplayDate(value: string | null) {
   if (!value) return "—"
@@ -39,6 +43,7 @@ export function ReportDocument({
 
   const phq9Results = getPhq9ResultsFromSnapshot(snapshot)
   const gad7Results = getGad7ResultsFromSnapshot(snapshot)
+  const asqResults = getAsqResultsFromSnapshot(snapshot)
 
   const clinicalSummary = snapshot.clinicalSummaryText?.trim() || "—"
   const recommendations = snapshot.recommendationsText?.trim() || "—"
@@ -48,7 +53,7 @@ export function ReportDocument({
       {/* 1. Header */}
       <header className="report-header space-y-4 border-b pb-4">
         <h2 className="text-2xl font-semibold tracking-tight">
-          {snapshot.reportTitle}
+          {REPORT_TITLE}
         </h2>
         <p className="text-sm text-muted-foreground">
           Generated {formatDisplayDate(snapshot.generatedAt)}
@@ -94,7 +99,14 @@ export function ReportDocument({
         className="report-results-gad7"
       />
 
-      {/* 5. Clinical summary */}
+      {/* 5. ASQ results */}
+      <ReportAsqResultsTable
+        results={asqResults}
+        emptyMessage="No ASQ results in this date range."
+        className="report-results-asq"
+      />
+
+      {/* 6. Clinical summary */}
       <section className="report-clinical-summary space-y-2">
         <h3 className="text-lg font-semibold">Clinical summary</h3>
         <p className="whitespace-pre-wrap text-sm leading-relaxed">
@@ -102,7 +114,7 @@ export function ReportDocument({
         </p>
       </section>
 
-      {/* 6. Recommendations */}
+      {/* 7. Recommendations */}
       <section className="report-recommendations space-y-2">
         <h3 className="text-lg font-semibold">Recommendations</h3>
         <p className="whitespace-pre-wrap text-sm leading-relaxed">
@@ -110,7 +122,7 @@ export function ReportDocument({
         </p>
       </section>
 
-      {/* 7. Signature */}
+      {/* 8. Signature */}
       <section className="report-signature">
         <p className="text-sm text-muted-foreground">Practitioner signature</p>
         <div className="mt-12 border-b border-foreground/40" />

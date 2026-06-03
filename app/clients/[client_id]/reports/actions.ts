@@ -15,6 +15,11 @@ import {
 } from "@/db/schema"
 import { requirePractitionerContext } from "@/lib/auth"
 import { db } from "@/lib/db"
+import {
+  GAD7_IMPAIRMENT_ELEMENT_KEY,
+  getFunctionalImpairmentLabelsByResultId,
+  PHQ9_IMPAIRMENT_ELEMENT_KEY,
+} from "@/lib/assessments/impairment"
 import type { ReportResultRow, ReportSnapshot } from "@/lib/reports/snapshot"
 import {
   resolveReportTitle,
@@ -26,6 +31,7 @@ export type ReportPreviewRow = ReportResultRow
 export type ReportRangePreview = {
   phq9Results: ReportPreviewRow[]
   gad7Results: ReportPreviewRow[]
+  asqResults: ReportPreviewRow[]
 }
 
 async function verifyClient(clientId: string, practiceId: string) {
@@ -54,7 +60,8 @@ async function fetchResultsForAssessment(
   practiceId: string,
   assessmentCode: string,
   rangeStart: Date,
-  rangeEnd: Date
+  rangeEnd: Date,
+  options?: { includeAcuteRisk?: boolean; impairmentElementKey?: string }
 ): Promise<ReportPreviewRow[]> {
   const rows = await db
     .select({
@@ -62,6 +69,7 @@ async function fetchResultsForAssessment(
       assessmentDate: assessmentResults.assessmentDate,
       score: assessmentResults.score,
       severity: assessmentResults.severity,
+      acuteRiskRating: assessmentResults.acuteRiskRating,
     })
     .from(assessmentResults)
     .innerJoin(
@@ -89,11 +97,20 @@ async function fetchResultsForAssessment(
     )
     .orderBy(desc(assessmentResults.assessmentDate))
 
+  const impairmentLabels = options?.impairmentElementKey
+    ? await getFunctionalImpairmentLabelsByResultId(
+        rows.map((row) => row.assessmentResultId),
+        options.impairmentElementKey
+      )
+    : new Map<string, string>()
+
   return rows.map((row) => ({
     assessmentResultId: row.assessmentResultId,
     date: row.assessmentDate.toISOString(),
     score: row.score,
     severity: row.severity,
+    functionalImpairmentLabel: impairmentLabels.get(row.assessmentResultId) ?? null,
+    acuteRiskRating: options?.includeAcuteRisk ? row.acuteRiskRating : undefined,
   }))
 }
 
@@ -106,14 +123,14 @@ export async function fetchReportResultsForRange(
 
   if (!dateRangeStart || !dateRangeEnd) {
     return {
-      preview: { phq9Results: [], gad7Results: [] },
+      preview: { phq9Results: [], gad7Results: [], asqResults: [] },
       error: "Please select a start and end date.",
     }
   }
 
   if (dateRangeStart > dateRangeEnd) {
     return {
-      preview: { phq9Results: [], gad7Results: [] },
+      preview: { phq9Results: [], gad7Results: [], asqResults: [] },
       error: "Start date must be on or before end date.",
     }
   }
@@ -121,7 +138,7 @@ export async function fetchReportResultsForRange(
   const client = await verifyClient(clientId, context.practiceId)
   if (!client) {
     return {
-      preview: { phq9Results: [], gad7Results: [] },
+      preview: { phq9Results: [], gad7Results: [], asqResults: [] },
       error: "Client not found.",
     }
   }
@@ -129,24 +146,34 @@ export async function fetchReportResultsForRange(
   const rangeStart = new Date(`${dateRangeStart}T00:00:00`)
   const rangeEnd = new Date(`${dateRangeEnd}T23:59:59.999`)
 
-  const [phq9Results, gad7Results] = await Promise.all([
+  const [phq9Results, gad7Results, asqResults] = await Promise.all([
     fetchResultsForAssessment(
       clientId,
       context.practiceId,
       "PHQ9",
       rangeStart,
-      rangeEnd
+      rangeEnd,
+      { impairmentElementKey: PHQ9_IMPAIRMENT_ELEMENT_KEY }
     ),
     fetchResultsForAssessment(
       clientId,
       context.practiceId,
       "GAD7",
       rangeStart,
-      rangeEnd
+      rangeEnd,
+      { impairmentElementKey: GAD7_IMPAIRMENT_ELEMENT_KEY }
+    ),
+    fetchResultsForAssessment(
+      clientId,
+      context.practiceId,
+      "ASQ",
+      rangeStart,
+      rangeEnd,
+      { includeAcuteRisk: true }
     ),
   ])
 
-  return { preview: { phq9Results, gad7Results } }
+  return { preview: { phq9Results, gad7Results, asqResults } }
 }
 
 /** @deprecated Use fetchReportResultsForRange */
@@ -170,6 +197,7 @@ async function buildSnapshot(
   dateRangeEnd: string,
   phq9Results: ReportPreviewRow[],
   gad7Results: ReportPreviewRow[],
+  asqResults: ReportPreviewRow[],
   clinicalSummaryText: string | null,
   recommendationsText: string | null
 ): Promise<ReportSnapshot | null> {
@@ -196,7 +224,7 @@ async function buildSnapshot(
   if (!practitioner || !practice) return null
 
   return {
-    reportTitle: resolveReportTitle(phq9Results.length, gad7Results.length),
+    reportTitle: resolveReportTitle(),
     generatedAt: new Date().toISOString(),
     client: {
       firstName: client.firstName,
@@ -214,6 +242,7 @@ async function buildSnapshot(
     dateRangeEnd,
     phq9Results,
     gad7Results,
+    asqResults,
     clinicalSummaryText,
     recommendationsText,
   }
@@ -262,6 +291,7 @@ export async function saveReportDraft(
     dateRangeEnd,
     preview.phq9Results,
     preview.gad7Results,
+    preview.asqResults,
     clinicalSummaryText,
     recommendationsText
   )

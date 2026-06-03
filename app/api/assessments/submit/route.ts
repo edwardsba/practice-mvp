@@ -121,6 +121,26 @@ export async function POST(request: Request) {
     )
   }
 
+  const activeElements = await db
+    .select({
+      assessmentElementId: assessmentElements.assessmentElementId,
+      dataType: assessmentElements.dataType,
+    })
+    .from(assessmentElements)
+    .where(
+      and(
+        eq(assessmentElements.assessmentDefinitionId, instance.assessmentDefinitionId),
+        eq(assessmentElements.isActive, true)
+      )
+    )
+
+  const dataTypeByElementId = new Map(
+    activeElements.map((row) => [row.assessmentElementId, row.dataType])
+  )
+  const requiredElementIds = new Set(
+    activeElements.map((row) => row.assessmentElementId)
+  )
+
   const optionRows = await db
     .select({
       assessmentElementId: assessmentOptions.assessmentElementId,
@@ -173,22 +193,11 @@ export async function POST(request: Request) {
       responseValue,
       scoreValue,
     })
-    totalScore += scoreValue
+
+    if (dataTypeByElementId.get(elementId) === "integer") {
+      totalScore += scoreValue
+    }
   }
-
-  const requiredElements = await db
-    .select({ assessmentElementId: assessmentElements.assessmentElementId })
-    .from(assessmentElements)
-    .where(
-      and(
-        eq(assessmentElements.assessmentDefinitionId, instance.assessmentDefinitionId),
-        eq(assessmentElements.isActive, true)
-      )
-    )
-
-  const requiredElementIds = new Set(
-    requiredElements.map((row) => row.assessmentElementId)
-  )
 
   if (
     responseRows.length !== requiredElementIds.size ||

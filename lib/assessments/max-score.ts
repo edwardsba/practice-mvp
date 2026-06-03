@@ -15,7 +15,8 @@ export async function getMaxScoreForAssessmentDefinition(
     .where(
       and(
         eq(assessmentElements.assessmentDefinitionId, assessmentDefinitionId),
-        eq(assessmentElements.isActive, true)
+        eq(assessmentElements.isActive, true),
+        eq(assessmentElements.dataType, "integer")
       )
     )
 

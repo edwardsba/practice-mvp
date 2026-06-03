@@ -29,6 +29,11 @@ import {
   assessmentResults,
   clients,
 } from "@/db/schema"
+import {
+  GAD7_IMPAIRMENT_ELEMENT_KEY,
+  getFunctionalImpairmentLabelForResult,
+  PHQ9_IMPAIRMENT_ELEMENT_KEY,
+} from "@/lib/assessments/impairment"
 import { getMaxScoreForAssessmentDefinition } from "@/lib/assessments/max-score"
 import { requirePractitionerContext } from "@/lib/auth"
 import { db } from "@/lib/db"
@@ -78,9 +83,11 @@ export default async function AssessmentResultDetailPage({
       assessmentInstanceId: assessmentResults.assessmentInstanceId,
       score: assessmentResults.score,
       severity: assessmentResults.severity,
+      acuteRiskRating: assessmentResults.acuteRiskRating,
       assessmentDate: assessmentResults.assessmentDate,
       status: assessmentResults.status,
       assessmentName: assessmentDefinitions.assessmentName,
+      assessmentCode: assessmentDefinitions.assessmentCode,
       assessmentDefinitionId: assessmentInstances.assessmentDefinitionId,
     })
     .from(assessmentResults)
@@ -111,9 +118,23 @@ export default async function AssessmentResultDetailPage({
     notFound()
   }
 
-  const maxScore = await getMaxScoreForAssessmentDefinition(
-    result.assessmentDefinitionId
-  )
+  const isAsq = result.assessmentCode === "ASQ"
+  const maxScore = isAsq
+    ? 5
+    : await getMaxScoreForAssessmentDefinition(result.assessmentDefinitionId)
+
+  let functionalImpairmentLabel: string | null = null
+  if (result.assessmentCode === "PHQ9") {
+    functionalImpairmentLabel = await getFunctionalImpairmentLabelForResult(
+      result.assessmentInstanceId,
+      PHQ9_IMPAIRMENT_ELEMENT_KEY
+    )
+  } else if (result.assessmentCode === "GAD7") {
+    functionalImpairmentLabel = await getFunctionalImpairmentLabelForResult(
+      result.assessmentInstanceId,
+      GAD7_IMPAIRMENT_ELEMENT_KEY
+    )
+  }
 
   const responses = await db
     .select({
@@ -141,7 +162,10 @@ export default async function AssessmentResultDetailPage({
       )
     )
     .where(
-      eq(assessmentResponses.assessmentInstanceId, result.assessmentInstanceId)
+      and(
+        eq(assessmentResponses.assessmentInstanceId, result.assessmentInstanceId),
+        eq(assessmentElements.dataType, "integer")
+      )
     )
     .orderBy(asc(assessmentElements.displayOrder))
 
@@ -175,9 +199,13 @@ export default async function AssessmentResultDetailPage({
       <Card className="mb-6">
         <CardHeader>
           <CardTitle>Summary</CardTitle>
-          <CardDescription>Total score and severity classification</CardDescription>
+          <CardDescription>
+            {isAsq
+              ? "Total score, screen outcome, and acute risk rating"
+              : "Total score and severity classification"}
+          </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-baseline sm:gap-6">
             <div>
               <p className="text-sm text-muted-foreground">Total score</p>
@@ -190,10 +218,26 @@ export default async function AssessmentResultDetailPage({
               </p>
             </div>
             <div className="sm:border-l sm:pl-6">
-              <p className="text-sm text-muted-foreground">Severity</p>
+              <p className="text-sm text-muted-foreground">
+                {isAsq ? "Screen outcome" : "Severity"}
+              </p>
               <p className="text-xl font-medium capitalize">{result.severity}</p>
             </div>
+            {isAsq && result.acuteRiskRating ? (
+              <div className="sm:border-l sm:pl-6">
+                <p className="text-sm text-muted-foreground">Acute risk rating</p>
+                <p className="text-xl font-medium">{result.acuteRiskRating}</p>
+              </div>
+            ) : null}
           </div>
+          {functionalImpairmentLabel ? (
+            <p className="text-sm">
+              <span className="font-medium text-muted-foreground">
+                Functional impairment:{" "}
+              </span>
+              {functionalImpairmentLabel}
+            </p>
+          ) : null}
         </CardContent>
       </Card>
 

@@ -7,8 +7,11 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "seed:phq9": "tsx db/seed-phq9.ts",
     "seed:gad7": "tsx db/seed-gad7.ts",
-    "db:battery": "tsx db/apply-battery-migration.ts"
+    "seed:asq": "tsx db/seed-asq.ts",
+    "db:battery": "tsx db/apply-battery-migration.ts",
+    "db:acute-risk": "tsx db/apply-acute-risk-migration.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.10.3",

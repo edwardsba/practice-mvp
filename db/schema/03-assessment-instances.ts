@@ -48,6 +48,7 @@ export const assessmentResults = pgTable('assessment_results', {
   practiceId: uuid('practice_id').notNull().references(() => practices.practiceId),
   score: integer('score').notNull(),
   severity: text('severity').notNull(),
+  acuteRiskRating: text('acute_risk_rating'),
   assessmentDate: timestamp('assessment_date', { withTimezone: true }).notNull().defaultNow(),
   status: text('status').notNull().default('scored'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),

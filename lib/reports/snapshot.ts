@@ -3,6 +3,8 @@ export type ReportResultRow = {
   date: string
   score: number
   severity: string
+  functionalImpairmentLabel?: string | null
+  acuteRiskRating?: string | null
 }
 
 export type ReportSnapshot = {
@@ -24,6 +26,7 @@ export type ReportSnapshot = {
   dateRangeEnd: string
   phq9Results: ReportResultRow[]
   gad7Results: ReportResultRow[]
+  asqResults: ReportResultRow[]
   /** @deprecated Legacy snapshots used a single results array */
   results?: ReportResultRow[]
   clinicalSummaryText: string | null
@@ -39,20 +42,19 @@ export function getGad7ResultsFromSnapshot(snapshot: ReportSnapshot): ReportResu
   return snapshot.gad7Results ?? []
 }
 
-export function formatReportType(reportType: string) {
-  if (reportType === "phq9_progress") return "PHQ-9 Progress"
-  if (reportType === "gad7_progress") return "GAD-7 Progress"
-  if (reportType === "combined_progress") return "Combined Progress"
-  return reportType.replace(/_/g, " ")
+export function getAsqResultsFromSnapshot(snapshot: ReportSnapshot): ReportResultRow[] {
+  return snapshot.asqResults ?? []
 }
 
-export function resolveReportTitle(
-  phq9Count: number,
-  gad7Count: number
-): string {
-  if (phq9Count > 0 && gad7Count > 0) return "Combined Progress Report"
-  if (gad7Count > 0) return "GAD-7 Progress Report"
-  return "PHQ-9 Progress Report"
+export const REPORT_TITLE = "Progress Report"
+
+/** Display label for report_type values stored in the database. */
+export function formatReportType(_reportType: string) {
+  return REPORT_TITLE
+}
+
+export function resolveReportTitle(): string {
+  return REPORT_TITLE
 }
 
 export function resolveReportType(
@@ -73,10 +75,13 @@ export function parseReportSnapshot(value: unknown): ReportSnapshot | null {
 
   const phq9Results = getPhq9ResultsFromSnapshot(raw)
   const gad7Results = getGad7ResultsFromSnapshot(raw)
+  const asqResults = getAsqResultsFromSnapshot(raw)
 
   return {
     ...raw,
+    reportTitle: REPORT_TITLE,
     phq9Results,
     gad7Results,
+    asqResults,
   }
 }

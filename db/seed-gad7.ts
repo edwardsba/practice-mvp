@@ -8,15 +8,13 @@ import {
   assessmentElements,
   assessmentOptions,
 } from "./schema"
+import {
+  IMPAIRMENT_OPTIONS,
+  IMPAIRMENT_QUESTION_TEXT,
+  LIKERT_RESPONSE_OPTIONS,
+} from "./seed-shared"
 
 config({ path: ".env.local" })
-
-const RESPONSE_OPTIONS = [
-  { label: "Not at all", value: "0", score: 0, order: 1 },
-  { label: "Several days", value: "1", score: 1, order: 2 },
-  { label: "More than half the days", value: "2", score: 2, order: 3 },
-  { label: "Nearly every day", value: "3", score: 3, order: 4 },
-] as const
 
 const GAD7_QUESTIONS = [
   "Feeling nervous, anxious, or on edge",
@@ -27,6 +25,49 @@ const GAD7_QUESTIONS = [
   "Becoming easily annoyed or irritable",
   "Feeling afraid as if something awful might happen",
 ] as const
+
+async function insertImpairmentElement(
+  db: ReturnType<typeof drizzle>,
+  definitionId: string
+) {
+  const [existing] = await db
+    .select({ assessmentElementId: assessmentElements.assessmentElementId })
+    .from(assessmentElements)
+    .where(eq(assessmentElements.elementKey, "gad7_impairment"))
+    .limit(1)
+
+  if (existing) {
+    console.log("GAD-7 impairment question already present — skipping.")
+    return
+  }
+
+  const [element] = await db
+    .insert(assessmentElements)
+    .values({
+      assessmentDefinitionId: definitionId,
+      elementKey: "gad7_impairment",
+      questionText: IMPAIRMENT_QUESTION_TEXT,
+      elementType: "radio",
+      dataType: "text",
+      displayOrder: 8,
+      isRequired: true,
+      isActive: true,
+    })
+    .returning({ assessmentElementId: assessmentElements.assessmentElementId })
+
+  await db.insert(assessmentOptions).values(
+    IMPAIRMENT_OPTIONS.map((option) => ({
+      assessmentElementId: element.assessmentElementId,
+      assessmentDefinitionId: definitionId,
+      optionLabel: option.label,
+      optionValue: option.value,
+      scoreValue: option.score,
+      displayOrder: option.order,
+    }))
+  )
+
+  console.log("GAD-7 impairment question added.")
+}
 
 async function main() {
   const connectionString = process.env.DATABASE_URL
@@ -44,7 +85,8 @@ async function main() {
     .limit(1)
 
   if (existing) {
-    console.log("GAD-7 assessment already seeded — skipping.")
+    console.log("GAD-7 assessment already seeded — checking impairment question.")
+    await insertImpairmentElement(db, existing.assessmentDefinitionId)
     await pool.end()
     return
   }
@@ -79,7 +121,7 @@ async function main() {
       .returning({ assessmentElementId: assessmentElements.assessmentElementId })
 
     await db.insert(assessmentOptions).values(
-      RESPONSE_OPTIONS.map((option) => ({
+      LIKERT_RESPONSE_OPTIONS.map((option) => ({
         assessmentElementId: element.assessmentElementId,
         assessmentDefinitionId: definition.assessmentDefinitionId,
         optionLabel: option.label,
@@ -90,7 +132,9 @@ async function main() {
     )
   }
 
-  console.log("GAD-7 assessment seeded successfully.")
+  await insertImpairmentElement(db, definition.assessmentDefinitionId)
+
+  console.log("GAD-7 assessment seeded successfully (7 items + impairment).")
   await pool.end()
 }
 

@@ -9,7 +9,10 @@ import {
   type SaveReportDraftState,
 } from "@/app/clients/[client_id]/reports/actions"
 import { ReportDocument } from "@/components/report/report-document"
-import { ReportResultsTable } from "@/components/report/results-table"
+import {
+  ReportAsqResultsTable,
+  ReportResultsTable,
+} from "@/components/report/results-table"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -35,6 +38,7 @@ export function ReportForm({
     ReportSnapshot,
     | "phq9Results"
     | "gad7Results"
+    | "asqResults"
     | "clinicalSummaryText"
     | "recommendationsText"
     | "dateRangeStart"
@@ -47,6 +51,7 @@ export function ReportForm({
   const [dateRangeEnd, setDateRangeEnd] = useState("")
   const [phq9Results, setPhq9Results] = useState<ReportPreviewRow[]>([])
   const [gad7Results, setGad7Results] = useState<ReportPreviewRow[]>([])
+  const [asqResults, setAsqResults] = useState<ReportPreviewRow[]>([])
   const [previewError, setPreviewError] = useState<string | null>(null)
   const [clinicalSummary, setClinicalSummary] = useState("")
   const [recommendations, setRecommendations] = useState("")
@@ -61,6 +66,7 @@ export function ReportForm({
       if (!start || !end) {
         setPhq9Results([])
         setGad7Results([])
+        setAsqResults([])
         setPreviewError(null)
         return
       }
@@ -73,6 +79,7 @@ export function ReportForm({
         )
         setPhq9Results(preview.phq9Results)
         setGad7Results(preview.gad7Results)
+        setAsqResults(preview.asqResults)
         setPreviewError(error ?? null)
       })
     },
@@ -97,12 +104,13 @@ export function ReportForm({
     dateRangeStart && dateRangeEnd
       ? {
           ...initialSnapshot,
-          reportTitle: resolveReportTitle(phq9Results.length, gad7Results.length),
+          reportTitle: resolveReportTitle(),
           generatedAt: new Date().toISOString(),
           dateRangeStart,
           dateRangeEnd,
           phq9Results,
           gad7Results,
+          asqResults,
           clinicalSummaryText: clinicalSummary,
           recommendationsText: recommendations,
         }
@@ -117,7 +125,7 @@ export function ReportForm({
           <CardHeader>
             <CardTitle>Date range</CardTitle>
             <CardDescription>
-              Select the period for PHQ-9 and GAD-7 results included in this report.
+              Select the period for PHQ-9, GAD-7, and ASQ results included in this report.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -170,6 +178,10 @@ export function ReportForm({
                   title="GAD-7 Results"
                   results={gad7Results}
                   emptyMessage="No GAD-7 results in this date range."
+                />
+                <ReportAsqResultsTable
+                  results={asqResults}
+                  emptyMessage="No ASQ results in this date range."
                 />
               </>
             )}

@@ -89,6 +89,7 @@ export function ReportDocument({
         results={phq9Results}
         emptyMessage="No PHQ-9 results in this date range."
         className="report-results-phq9"
+        showImpairment
       />
 
       {/* 4. GAD-7 results */}
@@ -97,6 +98,7 @@ export function ReportDocument({
         results={gad7Results}
         emptyMessage="No GAD-7 results in this date range."
         className="report-results-gad7"
+        showImpairment
       />
 
       {/* 5. ASQ results */}

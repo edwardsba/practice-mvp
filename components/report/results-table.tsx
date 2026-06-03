@@ -16,12 +16,16 @@ export function ReportResultsTable({
   results,
   emptyMessage,
   className,
+  showImpairment = false,
 }: {
   title: string
   results: ReportResultRow[]
   emptyMessage: string
   className?: string
+  showImpairment?: boolean
 }) {
+  const columnCount = showImpairment ? 4 : 3
+
   return (
     <section className={cn("report-results-section", className)}>
       <h3 className="mb-3 text-lg font-semibold">{title}</h3>
@@ -31,13 +35,18 @@ export function ReportResultsTable({
             <th className="h-10 px-2 text-left align-middle font-medium">Date</th>
             <th className="h-10 px-2 text-left align-middle font-medium">Score</th>
             <th className="h-10 px-2 text-left align-middle font-medium">Severity</th>
+            {showImpairment ? (
+              <th className="h-10 px-2 text-left align-middle font-medium">
+                Functional Impairment
+              </th>
+            ) : null}
           </tr>
         </thead>
         <tbody>
           {results.length === 0 ? (
             <tr className="border-b">
               <td
-                colSpan={3}
+                colSpan={columnCount}
                 className="p-2 py-8 text-center text-muted-foreground"
               >
                 {emptyMessage}
@@ -49,30 +58,17 @@ export function ReportResultsTable({
                 <td className="p-2 align-middle">{formatShortDate(row.date)}</td>
                 <td className="p-2 align-middle tabular-nums">{row.score}</td>
                 <td className="p-2 align-middle capitalize">{row.severity}</td>
+                {showImpairment ? (
+                  <td className="p-2 align-middle">
+                    {row.functionalImpairmentLabel ?? "—"}
+                  </td>
+                ) : null}
               </tr>
             ))
           )}
         </tbody>
       </table>
-      <ReportImpairmentNotes results={results} />
     </section>
-  )
-}
-
-function ReportImpairmentNotes({ results }: { results: ReportResultRow[] }) {
-  const withImpairment = results.filter((row) => row.functionalImpairmentLabel)
-  if (withImpairment.length === 0) return null
-
-  return (
-    <div className="report-impairment-notes mt-3 space-y-1 text-sm">
-      {withImpairment.map((row) => (
-        <p key={row.assessmentResultId}>
-          <span className="font-medium">Functional impairment</span>
-          {withImpairment.length > 1 ? ` (${formatShortDate(row.date)})` : null}:{" "}
-          {row.functionalImpairmentLabel}
-        </p>
-      ))}
-    </div>
   )
 }
 

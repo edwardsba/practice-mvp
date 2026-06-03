@@ -158,7 +158,10 @@ export function ReportForm({
         <Card>
           <CardHeader>
             <CardTitle>Results preview</CardTitle>
-            <CardDescription>Date | Score | Severity for each assessment</CardDescription>
+            <CardDescription>
+              PHQ-9 and GAD-7: Date | Score | Severity | Functional Impairment. ASQ:
+              Date | Score | Acute Risk Rating.
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-8">
             {!dateRangeStart || !dateRangeEnd ? (
@@ -173,11 +176,13 @@ export function ReportForm({
                   title="PHQ-9 Results"
                   results={phq9Results}
                   emptyMessage="No PHQ-9 results in this date range."
+                  showImpairment
                 />
                 <ReportResultsTable
                   title="GAD-7 Results"
                   results={gad7Results}
                   emptyMessage="No GAD-7 results in this date range."
+                  showImpairment
                 />
                 <ReportAsqResultsTable
                   results={asqResults}

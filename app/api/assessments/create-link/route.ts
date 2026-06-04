@@ -12,7 +12,8 @@ import {
 import { hashAssessmentToken } from "@/lib/assessments/token"
 import { getPractitionerContext } from "@/lib/auth"
 import { db } from "@/lib/db"
-import { sendQuestionnaireLinkEmail } from "@/lib/email/send-questionnaire-link"
+import { buildTemplateVariablesFromLinkResponse } from "@/lib/email/link-response"
+import { getQuestionnaireEmailContext } from "@/lib/email/practitioner-context"
 
 type CreateLinkBody = {
   client_id?: string
@@ -68,6 +69,17 @@ export async function POST(request: Request) {
 
   if (!client) {
     return NextResponse.json({ error: "Client not found." }, { status: 404 })
+  }
+
+  const emailContext = await getQuestionnaireEmailContext(
+    practiceId,
+    practitionerProfileId
+  )
+  if (!emailContext) {
+    return NextResponse.json(
+      { error: "Practice or practitioner not found." },
+      { status: 404 }
+    )
   }
 
   const [definition] = await db
@@ -150,29 +162,17 @@ export async function POST(request: Request) {
   }
 
   const linkUrl = `${appUrl}/q/${rawToken}`
-  const emailResult = await sendQuestionnaireLinkEmail({
-    to: client.email,
-    clientFirstName: client.firstName,
-    linkUrl,
-    expiresAt,
-  })
-
-  if (emailResult.sent) {
-    await db.insert(auditEvents).values({
-      practiceId,
-      userId: context.userId,
-      clientId,
-      eventType: "email.sent",
-      entityType: "assessment_access_link",
-      entityId: accessLinkId!,
-    })
-  }
 
   return NextResponse.json({
     link: linkUrl,
     expires_at: expiresAt.toISOString(),
-    emailSent: emailResult.sent,
-    emailReason: emailResult.sent ? undefined : emailResult.reason,
+    assessmentAccessLinkId: accessLinkId!,
     clientEmail: client.email?.trim() || null,
+    templateVariables: buildTemplateVariablesFromLinkResponse({
+      clientFirstName: client.firstName,
+      practiceName: emailContext.practiceName,
+      practitionerName: emailContext.practitionerName,
+      expiresAt,
+    }),
   })
 }

@@ -2,30 +2,31 @@
 
 import { useState } from "react"
 
+import { QuestionnaireLinkPanel } from "@/components/email/questionnaire-link-panel"
+import { SendEmailModal } from "@/components/email/send-email-modal"
 import { Button } from "@/components/ui/button"
-import {
-  getQuestionnaireLinkEmailStatusMessage,
-  type QuestionnaireLinkEmailReason,
-} from "@/lib/email/questionnaire-link-status"
+import type { QuestionnaireLinkApiResponse } from "@/lib/email/link-response"
+import type { QuestionnaireEmailTemplateVariables } from "@/lib/email/templates"
 
 type LinkResult = {
   link: string
   expires_at: string
-  emailSent: boolean
-  emailReason?: QuestionnaireLinkEmailReason
-  clientEmail?: string | null
+  clientEmail: string | null
+  assessmentAccessLinkId: string
+  templateVariables: QuestionnaireEmailTemplateVariables
 }
 
-function formatExpiry(iso: string) {
-  const date = new Date(iso)
-  if (Number.isNaN(date.getTime())) return iso
-  return date.toLocaleString("en-AU", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  })
+type EmailStatus = "no_email" | "sent" | "failed" | null
+
+function getStatusMessage(
+  status: EmailStatus,
+  clientEmail: string | null
+): string | null {
+  if (status === "no_email") return "No email on file"
+  if (status === "sent" && clientEmail) return `Email sent to ${clientEmail}`
+  if (status === "failed")
+    return "Email failed — copy link below and send manually"
+  return null
 }
 
 export function SendAssessmentButton({
@@ -46,12 +47,15 @@ export function SendAssessmentButton({
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<LinkResult | null>(null)
+  const [emailStatus, setEmailStatus] = useState<EmailStatus>(null)
+  const [modalOpen, setModalOpen] = useState(false)
   const [copied, setCopied] = useState(false)
 
   async function handleSend() {
     setLoading(true)
     setError(null)
     setCopied(false)
+    setEmailStatus(null)
 
     try {
       const response = await fetch("/api/assessments/create-link", {
@@ -64,7 +68,9 @@ export function SendAssessmentButton({
         }),
       })
 
-      const data = (await response.json()) as LinkResult & { error?: string }
+      const data = (await response.json()) as QuestionnaireLinkApiResponse & {
+        error?: string
+      }
 
       if (!response.ok) {
         setResult(null)
@@ -72,13 +78,21 @@ export function SendAssessmentButton({
         return
       }
 
-      setResult({
+      const linkResult: LinkResult = {
         link: data.link,
         expires_at: data.expires_at,
-        emailSent: data.emailSent,
-        emailReason: data.emailReason,
         clientEmail: data.clientEmail,
-      })
+        assessmentAccessLinkId: data.assessmentAccessLinkId,
+        templateVariables: data.templateVariables,
+      }
+
+      setResult(linkResult)
+
+      if (data.clientEmail) {
+        setModalOpen(true)
+      } else {
+        setEmailStatus("no_email")
+      }
     } catch {
       setResult(null)
       setError("Unable to create assessment link. Please try again.")
@@ -98,12 +112,8 @@ export function SendAssessmentButton({
     }
   }
 
-  const emailStatusMessage = result
-    ? getQuestionnaireLinkEmailStatusMessage(
-        result.emailSent,
-        result.emailReason,
-        result.clientEmail
-      )
+  const statusMessage = result
+    ? getStatusMessage(emailStatus, result.clientEmail)
     : null
 
   return (
@@ -135,23 +145,29 @@ export function SendAssessmentButton({
       ) : null}
 
       {result ? (
-        <div className="w-full rounded-lg border border-primary/20 bg-muted/40 p-4">
-          {emailStatusMessage ? (
-            <p className="mb-3 text-sm font-medium text-foreground">
-              {emailStatusMessage}
-            </p>
-          ) : null}
-          <p className="mb-2 text-sm font-medium">{linkHeading}</p>
-          <p className="mb-3 break-all rounded-md border bg-background px-3 py-2 font-mono text-sm">
-            {result.link}
-          </p>
-          <p className="mb-3 text-sm text-muted-foreground">
-            Expires: {formatExpiry(result.expires_at)}
-          </p>
-          <Button type="button" variant="outline" size="sm" onClick={handleCopy}>
-            {copied ? "Copied" : "Copy link"}
-          </Button>
-        </div>
+        <QuestionnaireLinkPanel
+          linkHeading={linkHeading}
+          link={result.link}
+          expiresAt={result.expires_at}
+          statusMessage={statusMessage}
+          onCopy={handleCopy}
+          copied={copied}
+          alignEnd={!compact}
+        />
+      ) : null}
+
+      {result?.clientEmail ? (
+        <SendEmailModal
+          open={modalOpen}
+          onOpenChange={setModalOpen}
+          to={result.clientEmail}
+          linkUrl={result.link}
+          assessmentAccessLinkId={result.assessmentAccessLinkId}
+          templateVariables={result.templateVariables}
+          onSendComplete={({ sent }) => {
+            setEmailStatus(sent ? "sent" : "failed")
+          }}
+        />
       ) : null}
     </div>
   )

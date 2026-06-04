@@ -39,6 +39,7 @@ export function ReportForm({
     | "phq9Results"
     | "gad7Results"
     | "asqResults"
+    | "assistResults"
     | "clinicalSummaryText"
     | "recommendationsText"
     | "dateRangeStart"
@@ -52,6 +53,7 @@ export function ReportForm({
   const [phq9Results, setPhq9Results] = useState<ReportPreviewRow[]>([])
   const [gad7Results, setGad7Results] = useState<ReportPreviewRow[]>([])
   const [asqResults, setAsqResults] = useState<ReportPreviewRow[]>([])
+  const [assistResults, setAssistResults] = useState<ReportPreviewRow[]>([])
   const [previewError, setPreviewError] = useState<string | null>(null)
   const [clinicalSummary, setClinicalSummary] = useState("")
   const [recommendations, setRecommendations] = useState("")
@@ -67,6 +69,7 @@ export function ReportForm({
         setPhq9Results([])
         setGad7Results([])
         setAsqResults([])
+        setAssistResults([])
         setPreviewError(null)
         return
       }
@@ -80,6 +83,7 @@ export function ReportForm({
         setPhq9Results(preview.phq9Results)
         setGad7Results(preview.gad7Results)
         setAsqResults(preview.asqResults)
+        setAssistResults(preview.assistResults)
         setPreviewError(error ?? null)
       })
     },
@@ -111,6 +115,7 @@ export function ReportForm({
           phq9Results,
           gad7Results,
           asqResults,
+          assistResults,
           clinicalSummaryText: clinicalSummary,
           recommendationsText: recommendations,
         }
@@ -125,7 +130,7 @@ export function ReportForm({
           <CardHeader>
             <CardTitle>Date range</CardTitle>
             <CardDescription>
-              Select the period for PHQ-9, GAD-7, and ASQ results included in this report.
+              Select the period for PHQ-9, GAD-7, ASQ, and ASSIST results included in this report.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -183,6 +188,13 @@ export function ReportForm({
                 <ReportAsqResultsTable
                   results={asqResults}
                   emptyMessage="No ASQ results in this date range."
+                />
+                <ReportResultsTable
+                  title="ASSIST Results"
+                  results={assistResults}
+                  emptyMessage="No ASSIST results in this date range."
+                  severityColumnLabel="Risk Level"
+                  capitalizeSeverity={false}
                 />
               </>
             )}

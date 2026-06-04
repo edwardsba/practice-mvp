@@ -10,6 +10,7 @@
     "seed:phq9": "tsx db/seed-phq9.ts",
     "seed:gad7": "tsx db/seed-gad7.ts",
     "seed:asq": "tsx db/seed-asq.ts",
+    "seed:assist": "tsx db/seed-assist.ts",
     "db:battery": "tsx db/apply-battery-migration.ts",
     "db:acute-risk": "tsx db/apply-acute-risk-migration.ts"
   },

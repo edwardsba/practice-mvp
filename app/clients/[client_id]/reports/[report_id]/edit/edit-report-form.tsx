@@ -62,6 +62,7 @@ export function EditReportForm({
   const [phq9Results, setPhq9Results] = useState<ReportPreviewRow[]>([])
   const [gad7Results, setGad7Results] = useState<ReportPreviewRow[]>([])
   const [asqResults, setAsqResults] = useState<ReportPreviewRow[]>([])
+  const [assistResults, setAssistResults] = useState<ReportPreviewRow[]>([])
   const [previewError, setPreviewError] = useState<string | null>(null)
   const [clinicalSummary, setClinicalSummary] = useState(
     initial.clinicalSummaryText ?? ""
@@ -81,6 +82,7 @@ export function EditReportForm({
         setPhq9Results([])
         setGad7Results([])
         setAsqResults([])
+        setAssistResults([])
         setPreviewError(null)
         return
       }
@@ -94,6 +96,7 @@ export function EditReportForm({
         setPhq9Results(preview.phq9Results)
         setGad7Results(preview.gad7Results)
         setAsqResults(preview.asqResults)
+        setAssistResults(preview.assistResults)
         setPreviewError(error ?? null)
       })
     },
@@ -182,6 +185,13 @@ export function EditReportForm({
               <ReportAsqResultsTable
                 results={asqResults}
                 emptyMessage="No ASQ results in this date range."
+              />
+              <ReportResultsTable
+                title="ASSIST Results"
+                results={assistResults}
+                emptyMessage="No ASSIST results in this date range."
+                severityColumnLabel="Risk Level"
+                capitalizeSeverity={false}
               />
             </>
           )}

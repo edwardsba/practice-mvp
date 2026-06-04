@@ -82,6 +82,7 @@ export async function updateReportDraft(
     preview.phq9Results,
     preview.gad7Results,
     preview.asqResults,
+    preview.assistResults,
     clinicalSummaryText,
     recommendationsText
   )

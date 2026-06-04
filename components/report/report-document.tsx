@@ -1,6 +1,7 @@
 import { REPORT_TITLE, type ReportSnapshot } from "@/lib/reports/snapshot"
 import {
   getAsqResultsFromSnapshot,
+  getAssistResultsFromSnapshot,
   getGad7ResultsFromSnapshot,
   getPhq9ResultsFromSnapshot,
 } from "@/lib/reports/snapshot"
@@ -47,6 +48,7 @@ export function ReportDocument({
   const phq9Results = getPhq9ResultsFromSnapshot(snapshot)
   const gad7Results = getGad7ResultsFromSnapshot(snapshot)
   const asqResults = getAsqResultsFromSnapshot(snapshot)
+  const assistResults = getAssistResultsFromSnapshot(snapshot)
 
   const clinicalSummary = snapshot.clinicalSummaryText?.trim() || "—"
   const recommendations = snapshot.recommendationsText?.trim() || "—"
@@ -111,6 +113,17 @@ export function ReportDocument({
           results={asqResults}
           emptyMessage="No ASQ results in this date range."
           className="report-results-asq"
+        />
+      ) : null}
+
+      {(!omitEmptySections || assistResults.length > 0) ? (
+        <ReportResultsTable
+          title="ASSIST results"
+          results={assistResults}
+          emptyMessage="No ASSIST results in this date range."
+          className="report-results-assist"
+          severityColumnLabel="Risk Level"
+          capitalizeSeverity={false}
         />
       ) : null}
 

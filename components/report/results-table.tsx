@@ -17,12 +17,16 @@ export function ReportResultsTable({
   emptyMessage,
   className,
   showImpairment = false,
+  severityColumnLabel = "Severity",
+  capitalizeSeverity = true,
 }: {
   title: string
   results: ReportResultRow[]
   emptyMessage: string
   className?: string
   showImpairment?: boolean
+  severityColumnLabel?: string
+  capitalizeSeverity?: boolean
 }) {
   const columnCount = showImpairment ? 4 : 3
 
@@ -34,7 +38,9 @@ export function ReportResultsTable({
           <tr className="border-b">
             <th className="h-10 px-2 text-left align-middle font-medium">Date</th>
             <th className="h-10 px-2 text-left align-middle font-medium">Score</th>
-            <th className="h-10 px-2 text-left align-middle font-medium">Severity</th>
+            <th className="h-10 px-2 text-left align-middle font-medium">
+              {severityColumnLabel}
+            </th>
             {showImpairment ? (
               <th className="h-10 px-2 text-left align-middle font-medium">
                 Functional Impairment
@@ -57,7 +63,15 @@ export function ReportResultsTable({
               <tr key={row.assessmentResultId} className="border-b">
                 <td className="p-2 align-middle">{formatShortDate(row.date)}</td>
                 <td className="p-2 align-middle tabular-nums">{row.score}</td>
-                <td className="p-2 align-middle capitalize">{row.severity}</td>
+                <td
+                  className={
+                    capitalizeSeverity
+                      ? "p-2 align-middle capitalize"
+                      : "p-2 align-middle"
+                  }
+                >
+                  {row.severity}
+                </td>
                 {showImpairment ? (
                   <td className="p-2 align-middle">
                     {row.functionalImpairmentLabel ?? "—"}

@@ -27,6 +27,7 @@ export type ReportSnapshot = {
   phq9Results: ReportResultRow[]
   gad7Results: ReportResultRow[]
   asqResults: ReportResultRow[]
+  assistResults: ReportResultRow[]
   /** @deprecated Legacy snapshots used a single results array */
   results?: ReportResultRow[]
   clinicalSummaryText: string | null
@@ -44,6 +45,10 @@ export function getGad7ResultsFromSnapshot(snapshot: ReportSnapshot): ReportResu
 
 export function getAsqResultsFromSnapshot(snapshot: ReportSnapshot): ReportResultRow[] {
   return snapshot.asqResults ?? []
+}
+
+export function getAssistResultsFromSnapshot(snapshot: ReportSnapshot): ReportResultRow[] {
+  return snapshot.assistResults ?? []
 }
 
 export const REPORT_TITLE = "Progress Report"
@@ -76,6 +81,7 @@ export function parseReportSnapshot(value: unknown): ReportSnapshot | null {
   const phq9Results = getPhq9ResultsFromSnapshot(raw)
   const gad7Results = getGad7ResultsFromSnapshot(raw)
   const asqResults = getAsqResultsFromSnapshot(raw)
+  const assistResults = getAssistResultsFromSnapshot(raw)
 
   return {
     ...raw,
@@ -83,5 +89,6 @@ export function parseReportSnapshot(value: unknown): ReportSnapshot | null {
     phq9Results,
     gad7Results,
     asqResults,
+    assistResults,
   }
 }

@@ -32,6 +32,7 @@ export type ReportRangePreview = {
   phq9Results: ReportPreviewRow[]
   gad7Results: ReportPreviewRow[]
   asqResults: ReportPreviewRow[]
+  assistResults: ReportPreviewRow[]
 }
 
 async function verifyClient(clientId: string, practiceId: string) {
@@ -123,14 +124,14 @@ export async function fetchReportResultsForRange(
 
   if (!dateRangeStart || !dateRangeEnd) {
     return {
-      preview: { phq9Results: [], gad7Results: [], asqResults: [] },
+      preview: { phq9Results: [], gad7Results: [], asqResults: [], assistResults: [] },
       error: "Please select a start and end date.",
     }
   }
 
   if (dateRangeStart > dateRangeEnd) {
     return {
-      preview: { phq9Results: [], gad7Results: [], asqResults: [] },
+      preview: { phq9Results: [], gad7Results: [], asqResults: [], assistResults: [] },
       error: "Start date must be on or before end date.",
     }
   }
@@ -138,7 +139,7 @@ export async function fetchReportResultsForRange(
   const client = await verifyClient(clientId, context.practiceId)
   if (!client) {
     return {
-      preview: { phq9Results: [], gad7Results: [], asqResults: [] },
+      preview: { phq9Results: [], gad7Results: [], asqResults: [], assistResults: [] },
       error: "Client not found.",
     }
   }
@@ -146,7 +147,7 @@ export async function fetchReportResultsForRange(
   const rangeStart = new Date(`${dateRangeStart}T00:00:00`)
   const rangeEnd = new Date(`${dateRangeEnd}T23:59:59.999`)
 
-  const [phq9Results, gad7Results, asqResults] = await Promise.all([
+  const [phq9Results, gad7Results, asqResults, assistResults] = await Promise.all([
     fetchResultsForAssessment(
       clientId,
       context.practiceId,
@@ -171,9 +172,16 @@ export async function fetchReportResultsForRange(
       rangeEnd,
       { includeAcuteRisk: true }
     ),
+    fetchResultsForAssessment(
+      clientId,
+      context.practiceId,
+      "ASSIST",
+      rangeStart,
+      rangeEnd
+    ),
   ])
 
-  return { preview: { phq9Results, gad7Results, asqResults } }
+  return { preview: { phq9Results, gad7Results, asqResults, assistResults } }
 }
 
 /** @deprecated Use fetchReportResultsForRange */
@@ -198,6 +206,7 @@ export async function buildSnapshot(
   phq9Results: ReportPreviewRow[],
   gad7Results: ReportPreviewRow[],
   asqResults: ReportPreviewRow[],
+  assistResults: ReportPreviewRow[],
   clinicalSummaryText: string | null,
   recommendationsText: string | null
 ): Promise<ReportSnapshot | null> {
@@ -243,6 +252,7 @@ export async function buildSnapshot(
     phq9Results,
     gad7Results,
     asqResults,
+    assistResults,
     clinicalSummaryText,
     recommendationsText,
   }
@@ -292,6 +302,7 @@ export async function saveReportDraft(
     preview.phq9Results,
     preview.gad7Results,
     preview.asqResults,
+    preview.assistResults,
     clinicalSummaryText,
     recommendationsText
   )

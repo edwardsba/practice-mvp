@@ -1,17 +1,24 @@
-import { and, count, eq } from "drizzle-orm"
+import { and, eq, max } from "drizzle-orm"
 
-import { assessmentElements } from "@/db/schema"
+import { assessmentElements, assessmentOptions } from "@/db/schema"
 import { db } from "@/lib/db"
 
-/** Maximum score value per question (Not at all = 0 … Nearly every day = 3). */
-const MAX_SCORE_PER_ELEMENT = 3
-
+/** Sum of each scored element's highest option score_value (integer elements only). */
 export async function getMaxScoreForAssessmentDefinition(
   assessmentDefinitionId: string
 ): Promise<number> {
-  const [row] = await db
-    .select({ elementCount: count() })
-    .from(assessmentElements)
+  const rows = await db
+    .select({
+      maxScore: max(assessmentOptions.scoreValue),
+    })
+    .from(assessmentOptions)
+    .innerJoin(
+      assessmentElements,
+      eq(
+        assessmentOptions.assessmentElementId,
+        assessmentElements.assessmentElementId
+      )
+    )
     .where(
       and(
         eq(assessmentElements.assessmentDefinitionId, assessmentDefinitionId),
@@ -19,6 +26,7 @@ export async function getMaxScoreForAssessmentDefinition(
         eq(assessmentElements.dataType, "integer")
       )
     )
+    .groupBy(assessmentOptions.assessmentElementId)
 
-  return Number(row?.elementCount ?? 0) * MAX_SCORE_PER_ELEMENT
+  return rows.reduce((total, row) => total + Number(row.maxScore ?? 0), 0)
 }

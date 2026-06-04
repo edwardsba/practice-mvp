@@ -160,6 +160,37 @@ export default async function ClientDetailPage({
     )
     .orderBy(desc(assessmentResults.assessmentDate))
 
+  const assistResults = await db
+    .select({
+      assessmentResultId: assessmentResults.assessmentResultId,
+      assessmentDate: assessmentResults.assessmentDate,
+      score: assessmentResults.score,
+      severity: assessmentResults.severity,
+    })
+    .from(assessmentResults)
+    .innerJoin(
+      assessmentInstances,
+      eq(
+        assessmentResults.assessmentInstanceId,
+        assessmentInstances.assessmentInstanceId
+      )
+    )
+    .innerJoin(
+      assessmentDefinitions,
+      eq(
+        assessmentInstances.assessmentDefinitionId,
+        assessmentDefinitions.assessmentDefinitionId
+      )
+    )
+    .where(
+      and(
+        eq(assessmentResults.clientId, clientId),
+        eq(assessmentResults.practiceId, context.practiceId),
+        eq(assessmentDefinitions.assessmentCode, "ASSIST")
+      )
+    )
+    .orderBy(desc(assessmentResults.assessmentDate))
+
   const savedReports = await db
     .select({
       simpleReportId: simpleReports.simpleReportId,
@@ -314,6 +345,14 @@ export default async function ClientDetailPage({
                 linkHeading="GAD-7 questionnaire link — send this to your client"
                 compact
               />
+              <SendAssessmentButton
+                clientId={clientId}
+                practitionerProfileId={context.practitionerProfileId}
+                assessmentCode="ASSIST"
+                buttonLabel="Send ASSIST"
+                linkHeading="ASSIST questionnaire link — send this to your client"
+                compact
+              />
             </div>
           </div>
           <div className="border-t pt-6">
@@ -458,7 +497,7 @@ export default async function ClientDetailPage({
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="mb-6">
         <CardHeader>
           <CardTitle>GAD-7 results</CardTitle>
           <CardDescription>
@@ -507,6 +546,69 @@ export default async function ClientDetailPage({
                           </Link>
                         </TableCell>
                         <TableCell className="capitalize">
+                          <Link href={resultHref} className="block hover:underline">
+                            {result.severity}
+                          </Link>
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>ASSIST results</CardTitle>
+          <CardDescription>
+            Assessment history ordered by most recent first.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="rounded-lg border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Score</TableHead>
+                  <TableHead>Risk Level</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {assistResults.length === 0 ? (
+                  <TableRow>
+                    <TableCell
+                      colSpan={3}
+                      className="h-20 text-center text-muted-foreground"
+                    >
+                      No ASSIST results recorded yet.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  assistResults.map((result) => {
+                    const resultHref = `/clients/${clientId}/results/${result.assessmentResultId}`
+                    return (
+                      <TableRow
+                        key={result.assessmentResultId}
+                        className="hover:bg-muted/50"
+                      >
+                        <TableCell>
+                          <Link
+                            href={resultHref}
+                            className="block font-medium text-primary hover:underline"
+                          >
+                            {formatDate(result.assessmentDate)}
+                          </Link>
+                        </TableCell>
+                        <TableCell>
+                          <Link href={resultHref} className="block hover:underline">
+                            {result.score}
+                          </Link>
+                        </TableCell>
+                        <TableCell>
                           <Link href={resultHref} className="block hover:underline">
                             {result.severity}
                           </Link>

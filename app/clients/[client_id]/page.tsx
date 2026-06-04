@@ -193,8 +193,11 @@ export default async function ClientDetailPage({
       </div>
 
       <Card className="mb-6">
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Client details</CardTitle>
+          <Button variant="outline" size="sm" asChild>
+            <Link href={`/clients/${clientId}/edit`}>Edit Client</Link>
+          </Button>
         </CardHeader>
         <CardContent>
           <dl className="grid gap-3 sm:grid-cols-2">

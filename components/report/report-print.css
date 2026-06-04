@@ -89,7 +89,7 @@
     width: 100% !important;
     border-collapse: collapse !important;
     border: none !important;
-    border-top: 2px solid #000 !important;
+    border-top: 1px solid #333 !important;
     font-size: 10pt;
     overflow: visible !important;
     background: transparent !important;
@@ -116,7 +116,7 @@
     border-left: none !important;
     border-right: none !important;
     border-top: none !important;
-    border-bottom: 2px solid #000 !important;
+    border-bottom: 1px solid #333 !important;
     background: transparent !important;
     font-weight: 700 !important;
     text-align: left !important;
@@ -130,7 +130,7 @@
     border-left: none !important;
     border-right: none !important;
     border-top: none !important;
-    border-bottom: 1px solid #ccc !important;
+    border-bottom: 1px solid #e0e0e0 !important;
     background: transparent !important;
     font-weight: 400 !important;
     text-align: left !important;
@@ -139,7 +139,7 @@
   }
 
   .report-document .report-results-table tbody tr:last-child td {
-    border-bottom: 1px solid #000 !important;
+    border-bottom: 1px solid #333 !important;
   }
 
   .report-document .report-clinical-summary,

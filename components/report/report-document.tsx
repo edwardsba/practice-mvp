@@ -33,9 +33,12 @@ function formatShortDate(value: string) {
 export function ReportDocument({
   snapshot,
   readOnly = false,
+  omitEmptySections = false,
 }: {
   snapshot: ReportSnapshot
   readOnly?: boolean
+  /** Saved/printed reports: hide assessment sections with no rows. */
+  omitEmptySections?: boolean
 }) {
   const practitionerLine = [snapshot.practitioner.title, snapshot.practitioner.fullName]
     .filter(Boolean)
@@ -83,30 +86,33 @@ export function ReportDocument({
         {formatShortDate(snapshot.dateRangeEnd)}
       </section>
 
-      {/* 3. PHQ-9 results */}
-      <ReportResultsTable
-        title="PHQ-9 results"
-        results={phq9Results}
-        emptyMessage="No PHQ-9 results in this date range."
-        className="report-results-phq9"
-        showImpairment
-      />
+      {(!omitEmptySections || phq9Results.length > 0) ? (
+        <ReportResultsTable
+          title="PHQ-9 results"
+          results={phq9Results}
+          emptyMessage="No PHQ-9 results in this date range."
+          className="report-results-phq9"
+          showImpairment
+        />
+      ) : null}
 
-      {/* 4. GAD-7 results */}
-      <ReportResultsTable
-        title="GAD-7 results"
-        results={gad7Results}
-        emptyMessage="No GAD-7 results in this date range."
-        className="report-results-gad7"
-        showImpairment
-      />
+      {(!omitEmptySections || gad7Results.length > 0) ? (
+        <ReportResultsTable
+          title="GAD-7 results"
+          results={gad7Results}
+          emptyMessage="No GAD-7 results in this date range."
+          className="report-results-gad7"
+          showImpairment
+        />
+      ) : null}
 
-      {/* 5. ASQ results */}
-      <ReportAsqResultsTable
-        results={asqResults}
-        emptyMessage="No ASQ results in this date range."
-        className="report-results-asq"
-      />
+      {(!omitEmptySections || asqResults.length > 0) ? (
+        <ReportAsqResultsTable
+          results={asqResults}
+          emptyMessage="No ASQ results in this date range."
+          className="report-results-asq"
+        />
+      ) : null}
 
       {/* 6. Clinical summary */}
       <section className="report-clinical-summary space-y-2">

@@ -61,7 +61,7 @@ export function SavedReportView({
       </div>
 
       <div id="report-print-area" className="report-print-area">
-        <ReportDocument snapshot={snapshot} readOnly />
+        <ReportDocument snapshot={snapshot} readOnly omitEmptySections />
       </div>
     </div>
   )

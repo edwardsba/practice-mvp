@@ -13,6 +13,7 @@ import {
 import { hashAssessmentToken } from "@/lib/assessments/token"
 import { getPractitionerContext } from "@/lib/auth"
 import { db } from "@/lib/db"
+import { sendQuestionnaireLinkEmail } from "@/lib/email/send-questionnaire-link"
 
 type CreateBatteryBody = {
   client_id?: string
@@ -52,7 +53,11 @@ export async function POST(request: Request) {
   const practiceId = context.practiceId
 
   const [client] = await db
-    .select({ clientId: clients.clientId })
+    .select({
+      clientId: clients.clientId,
+      email: clients.email,
+      firstName: clients.firstName,
+    })
     .from(clients)
     .where(
       and(
@@ -73,11 +78,7 @@ export async function POST(request: Request) {
       assessmentCode: assessmentDefinitions.assessmentCode,
     })
     .from(assessmentDefinitions)
-    .where(
-      and(
-        eq(assessmentDefinitions.isActive, true)
-      )
-    )
+    .where(and(eq(assessmentDefinitions.isActive, true)))
 
   const phq9Definition = definitions.find((d) => d.assessmentCode === "PHQ9")
   const gad7Definition = definitions.find((d) => d.assessmentCode === "GAD7")
@@ -102,6 +103,8 @@ export async function POST(request: Request) {
   const phq9TokenHash = hashAssessmentToken(phq9RawToken)
   const gad7TokenHash = hashAssessmentToken(gad7RawToken)
   const expiresAt = new Date(Date.now() + LINK_TTL_MS)
+
+  let phq9AccessLinkId: string
 
   try {
     await db.transaction(async (tx) => {
@@ -155,6 +158,8 @@ export async function POST(request: Request) {
           assessmentAccessLinkId: assessmentAccessLinks.assessmentAccessLinkId,
         })
 
+      phq9AccessLinkId = phq9Link.assessmentAccessLinkId
+
       const [battery] = await tx
         .insert(batteryInstances)
         .values({
@@ -179,17 +184,37 @@ export async function POST(request: Request) {
         entityId: battery.batteryInstanceId,
       })
     })
-
-    const link = `${appUrl}/q/${phq9RawToken}?battery=${encodeURIComponent(gad7RawToken)}`
-
-    return NextResponse.json({
-      link,
-      expires_at: expiresAt.toISOString(),
-    })
   } catch {
     return NextResponse.json(
       { error: "Unable to create pre-session questionnaire link. Please try again." },
       { status: 500 }
     )
   }
+
+  const linkUrl = `${appUrl}/q/${phq9RawToken}?battery=${encodeURIComponent(gad7RawToken)}`
+  const emailResult = await sendQuestionnaireLinkEmail({
+    to: client.email,
+    clientFirstName: client.firstName,
+    linkUrl,
+    expiresAt,
+  })
+
+  if (emailResult.sent) {
+    await db.insert(auditEvents).values({
+      practiceId,
+      userId: context.userId,
+      clientId,
+      eventType: "email.sent",
+      entityType: "assessment_access_link",
+      entityId: phq9AccessLinkId!,
+    })
+  }
+
+  return NextResponse.json({
+    link: linkUrl,
+    expires_at: expiresAt.toISOString(),
+    emailSent: emailResult.sent,
+    emailReason: emailResult.sent ? undefined : emailResult.reason,
+    clientEmail: client.email?.trim() || null,
+  })
 }

@@ -3,10 +3,17 @@
 import { useState } from "react"
 
 import { Button } from "@/components/ui/button"
+import {
+  getQuestionnaireLinkEmailStatusMessage,
+  type QuestionnaireLinkEmailReason,
+} from "@/lib/email/questionnaire-link-status"
 
 type LinkResult = {
   link: string
   expires_at: string
+  emailSent: boolean
+  emailReason?: QuestionnaireLinkEmailReason
+  clientEmail?: string | null
 }
 
 function formatExpiry(iso: string) {
@@ -65,7 +72,13 @@ export function SendAssessmentButton({
         return
       }
 
-      setResult({ link: data.link, expires_at: data.expires_at })
+      setResult({
+        link: data.link,
+        expires_at: data.expires_at,
+        emailSent: data.emailSent,
+        emailReason: data.emailReason,
+        clientEmail: data.clientEmail,
+      })
     } catch {
       setResult(null)
       setError("Unable to create assessment link. Please try again.")
@@ -84,6 +97,14 @@ export function SendAssessmentButton({
       setError("Could not copy link to clipboard.")
     }
   }
+
+  const emailStatusMessage = result
+    ? getQuestionnaireLinkEmailStatusMessage(
+        result.emailSent,
+        result.emailReason,
+        result.clientEmail
+      )
+    : null
 
   return (
     <div
@@ -115,6 +136,11 @@ export function SendAssessmentButton({
 
       {result ? (
         <div className="w-full rounded-lg border border-primary/20 bg-muted/40 p-4">
+          {emailStatusMessage ? (
+            <p className="mb-3 text-sm font-medium text-foreground">
+              {emailStatusMessage}
+            </p>
+          ) : null}
           <p className="mb-2 text-sm font-medium">{linkHeading}</p>
           <p className="mb-3 break-all rounded-md border bg-background px-3 py-2 font-mono text-sm">
             {result.link}

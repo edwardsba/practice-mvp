@@ -3,10 +3,17 @@
 import { useState } from "react"
 
 import { Button } from "@/components/ui/button"
+import {
+  getQuestionnaireLinkEmailStatusMessage,
+  type QuestionnaireLinkEmailReason,
+} from "@/lib/email/questionnaire-link-status"
 
 type LinkResult = {
   link: string
   expires_at: string
+  emailSent: boolean
+  emailReason?: QuestionnaireLinkEmailReason
+  clientEmail?: string | null
 }
 
 function formatExpiry(iso: string) {
@@ -58,7 +65,13 @@ export function SendBatteryButton({
         return
       }
 
-      setResult({ link: data.link, expires_at: data.expires_at })
+      setResult({
+        link: data.link,
+        expires_at: data.expires_at,
+        emailSent: data.emailSent,
+        emailReason: data.emailReason,
+        clientEmail: data.clientEmail,
+      })
     } catch {
       setResult(null)
       setError("Unable to create pre-session questionnaire link. Please try again.")
@@ -78,6 +91,14 @@ export function SendBatteryButton({
     }
   }
 
+  const emailStatusMessage = result
+    ? getQuestionnaireLinkEmailStatusMessage(
+        result.emailSent,
+        result.emailReason,
+        result.clientEmail
+      )
+    : null
+
   return (
     <div className="space-y-4">
       <Button type="button" onClick={handleSend} disabled={loading} size="lg">
@@ -92,6 +113,11 @@ export function SendBatteryButton({
 
       {result ? (
         <div className="rounded-lg border border-primary/20 bg-muted/40 p-4">
+          {emailStatusMessage ? (
+            <p className="mb-3 text-sm font-medium text-foreground">
+              {emailStatusMessage}
+            </p>
+          ) : null}
           <p className="mb-2 text-sm font-medium">
             Pre-Session Questionnaire link — send this to your client
           </p>

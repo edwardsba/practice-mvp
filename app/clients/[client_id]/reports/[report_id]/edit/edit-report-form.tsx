@@ -157,10 +157,6 @@ export function EditReportForm({
       <Card>
         <CardHeader>
           <CardTitle>Results preview</CardTitle>
-          <CardDescription>
-            PHQ-9 and GAD-7: Date | Score | Severity | Functional Impairment. ASQ:
-            Date | Score | Acute Risk Rating.
-          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-8">
           {!dateRangeStart || !dateRangeEnd ? (

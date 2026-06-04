@@ -190,7 +190,7 @@ export async function fetchPhq9ResultsForRange(
   return { results: preview.phq9Results, error }
 }
 
-async function buildSnapshot(
+export async function buildSnapshot(
   clientId: string,
   context: Awaited<ReturnType<typeof requirePractitionerContext>>,
   dateRangeStart: string,

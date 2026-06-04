@@ -81,12 +81,18 @@
     margin-bottom: 1.25rem;
   }
 
+  /*
+   * APA 7th edition table rules (horizontal borders only).
+   */
   .report-document .report-results-table {
     display: table !important;
     width: 100% !important;
     border-collapse: collapse !important;
+    border: none !important;
+    border-top: 2px solid #000 !important;
     font-size: 10pt;
     overflow: visible !important;
+    background: transparent !important;
   }
 
   .report-document .report-results-table thead {
@@ -100,14 +106,40 @@
   .report-document .report-results-table tr {
     display: table-row !important;
     break-inside: avoid;
+    border: none !important;
+    background: transparent !important;
   }
 
-  .report-document .report-results-table th,
+  .report-document .report-results-table th {
+    display: table-cell !important;
+    border: none !important;
+    border-left: none !important;
+    border-right: none !important;
+    border-top: none !important;
+    border-bottom: 2px solid #000 !important;
+    background: transparent !important;
+    font-weight: 700 !important;
+    text-align: left !important;
+    padding: 6px 8px 6px 0;
+    white-space: normal !important;
+  }
+
   .report-document .report-results-table td {
     display: table-cell !important;
-    border: 1px solid #ccc;
-    padding: 6px 8px;
+    border: none !important;
+    border-left: none !important;
+    border-right: none !important;
+    border-top: none !important;
+    border-bottom: 1px solid #ccc !important;
+    background: transparent !important;
+    font-weight: 400 !important;
+    text-align: left !important;
+    padding: 6px 8px 6px 0;
     white-space: normal !important;
+  }
+
+  .report-document .report-results-table tbody tr:last-child td {
+    border-bottom: 1px solid #000 !important;
   }
 
   .report-document .report-clinical-summary,

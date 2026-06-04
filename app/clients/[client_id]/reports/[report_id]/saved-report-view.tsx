@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import { useActionState } from "react"
 
 import { finaliseReport, type FinaliseReportState } from "@/app/clients/[client_id]/reports/[report_id]/actions"
@@ -38,11 +39,18 @@ export function SavedReportView({
         {isFinalised ? (
           <Badge variant="success">Finalised</Badge>
         ) : (
-          <form action={formAction}>
-            <Button type="submit" disabled={pending}>
-              {pending ? "Finalising…" : "Finalise"}
+          <>
+            <form action={formAction}>
+              <Button type="submit" disabled={pending}>
+                {pending ? "Finalising…" : "Finalise"}
+              </Button>
+            </form>
+            <Button variant="outline" asChild>
+              <Link href={`/clients/${clientId}/reports/${reportId}/edit`}>
+                Edit Report
+              </Link>
             </Button>
-          </form>
+          </>
         )}
         <Button type="button" variant="outline" onClick={handlePrint}>
           Print / Save as PDF

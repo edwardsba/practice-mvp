@@ -20,9 +20,6 @@ import { Button } from "@/components/ui/button"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { cn } from "@/lib/utils"
 
-const INSTRUCTION =
-  "Over the last 2 weeks, how often have you been bothered by any of the following problems?"
-
 const STANDALONE_CONFIRMATION =
   "Thank you. Your responses have been submitted."
 
@@ -62,6 +59,7 @@ function writeStoredResponses(token: string, responses: Record<string, string>) 
 export function QuestionnaireForm({
   token,
   assessmentName,
+  instructionText,
   questions,
   batteryNextToken,
   batteryNav,
@@ -199,7 +197,9 @@ export function QuestionnaireForm({
     <div className="mx-auto w-full max-w-lg px-4 py-8 pb-16">
       <header className="mb-8 space-y-3">
         <h1 className="text-2xl font-semibold tracking-tight">{assessmentName}</h1>
-        <p className="text-sm leading-relaxed text-muted-foreground">{INSTRUCTION}</p>
+        <p className="text-sm leading-relaxed text-muted-foreground">
+          {instructionText}
+        </p>
       </header>
 
       <form onSubmit={handleFormSubmit} className="space-y-8">

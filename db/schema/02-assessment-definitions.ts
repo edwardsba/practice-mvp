@@ -17,6 +17,7 @@ export const assessmentDefinitions = pgTable('assessment_definitions', {
 export const assessmentElements = pgTable('assessment_elements', {
   assessmentElementId: uuid('assessment_element_id').primaryKey().defaultRandom(),
   assessmentDefinitionId: uuid('assessment_definition_id').notNull().references(() => assessmentDefinitions.assessmentDefinitionId),
+  assessmentInstanceId: uuid('assessment_instance_id'),
   elementKey: text('element_key').notNull().unique(),
   questionText: text('question_text').notNull(),
   elementType: text('element_type').notNull().default('radio'),

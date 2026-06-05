@@ -11,6 +11,7 @@ import {
   fetchReportResultsForRange,
   type ReportPreviewRow,
 } from "@/app/clients/[client_id]/reports/actions"
+import { ReportBtpResultsTable } from "@/components/report/btp-results-table"
 import {
   ReportAsqResultsTable,
   ReportResultsTable,
@@ -62,6 +63,9 @@ export function EditReportForm({
   const [gad7Results, setGad7Results] = useState<ReportPreviewRow[]>([])
   const [asqResults, setAsqResults] = useState<ReportPreviewRow[]>([])
   const [assistResults, setAssistResults] = useState<ReportPreviewRow[]>([])
+  const [btpResults, setBtpResults] = useState<
+    import("@/lib/reports/snapshot").BtpReportResultRow[]
+  >([])
   const [previewError, setPreviewError] = useState<string | null>(null)
   const [clinicalSummary, setClinicalSummary] = useState(
     initial.clinicalSummaryText ?? ""
@@ -82,6 +86,7 @@ export function EditReportForm({
         setGad7Results([])
         setAsqResults([])
         setAssistResults([])
+        setBtpResults([])
         setPreviewError(null)
         return
       }
@@ -96,6 +101,7 @@ export function EditReportForm({
         setGad7Results(preview.gad7Results)
         setAsqResults(preview.asqResults)
         setAssistResults(preview.assistResults)
+        setBtpResults(preview.btpResults)
         setPreviewError(error ?? null)
       })
     },
@@ -188,6 +194,10 @@ export function EditReportForm({
                 emptyMessage="No ASSIST results in this date range."
                 severityColumnLabel="Risk Level"
                 capitalizeSeverity={false}
+              />
+              <ReportBtpResultsTable
+                results={btpResults}
+                emptyMessage="No Behavioural Targets Progress results in this date range."
               />
             </>
           )}

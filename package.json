@@ -11,6 +11,8 @@
     "seed:gad7": "tsx db/seed-gad7.ts",
     "seed:asq": "tsx db/seed-asq.ts",
     "seed:assist": "tsx db/seed-assist.ts",
+    "seed:btp": "tsx db/seed-btp.ts",
+    "db:btp": "tsx db/apply-btp-migration.ts",
     "db:battery": "tsx db/apply-battery-migration.ts",
     "db:acute-risk": "tsx db/apply-acute-risk-migration.ts",
     "db:treatment-plans": "tsx db/apply-treatment-plans-migration.ts",

@@ -169,7 +169,8 @@ async function processPreSessionBatteries(
         row.practiceId
       )
       const assessmentCodes = batteryCodesFromTreatmentPlan(
-        treatmentPlan?.ongoingAssessmentsJson
+        treatmentPlan?.ongoingAssessmentsJson,
+        treatmentPlan?.behaviouralTargetItems ?? []
       )
 
       const batteryResult = await createBatteryInstance({

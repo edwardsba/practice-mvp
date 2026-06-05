@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, integer, timestamp } from 'drizzle-orm/pg-core'
+import { jsonb, pgTable, uuid, text, integer, timestamp } from 'drizzle-orm/pg-core'
 import { assessmentDefinitions } from './02-assessment-definitions'
 import { clients, practices, practitionerProfiles } from './01-core'
 
@@ -9,6 +9,7 @@ export const assessmentInstances = pgTable('assessment_instances', {
   practiceId: uuid('practice_id').notNull().references(() => practices.practiceId),
   practitionerProfileId: uuid('practitioner_profile_id').notNull().references(() => practitionerProfiles.practitionerProfileId),
   status: text('status').notNull().default('assigned'),
+  instanceElementsJson: jsonb('instance_elements_json'),
   assignedAt: timestamp('assigned_at', { withTimezone: true }).notNull().defaultNow(),
   submittedAt: timestamp('submitted_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
@@ -49,7 +50,7 @@ export const assessmentResults = pgTable('assessment_results', {
   clientId: uuid('client_id').notNull().references(() => clients.clientId),
   practiceId: uuid('practice_id').notNull().references(() => practices.practiceId),
   score: integer('score').notNull(),
-  severity: text('severity').notNull(),
+  severity: text('severity'),
   acuteRiskRating: text('acute_risk_rating'),
   assessmentDate: timestamp('assessment_date', { withTimezone: true }).notNull().defaultNow(),
   status: text('status').notNull().default('scored'),

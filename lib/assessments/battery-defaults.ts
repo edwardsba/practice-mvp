@@ -13,13 +13,22 @@ export type BatteryAssessmentChip = {
 }
 
 export function getDefaultBatteryAssessments(
-  ongoingAssessments: OngoingAssessmentsJson | null | undefined
+  ongoingAssessments: OngoingAssessmentsJson | null | undefined,
+  behaviouralTargetItems: string[] = []
 ): BatteryAssessmentChip[] {
+  const hasBehaviouralTargets = behaviouralTargetItems.length > 0
+  const availableCodes = BATTERY_ASSESSMENT_CODES.filter(
+    (code) => code !== "BTP" || hasBehaviouralTargets
+  )
+
   if (!ongoingAssessments) {
-    return BATTERY_ASSESSMENT_CODES.map((code) => ({
+    return availableCodes.map((code) => ({
       code,
       label: BATTERY_ASSESSMENT_LABELS[code],
-      selected: DEFAULT_BATTERY_CODES.includes(code),
+      selected:
+        code === "BTP"
+          ? hasBehaviouralTargets
+          : DEFAULT_BATTERY_CODES.includes(code),
     }))
   }
 
@@ -29,9 +38,11 @@ export function getDefaultBatteryAssessments(
 
   const usePlanSelections = phq9 || gad7 || assist
 
-  return BATTERY_ASSESSMENT_CODES.map((code) => {
+  return availableCodes.map((code) => {
     let selected = false
-    if (!usePlanSelections) {
+    if (code === "BTP") {
+      selected = hasBehaviouralTargets
+    } else if (!usePlanSelections) {
       selected = DEFAULT_BATTERY_CODES.includes(code)
     } else if (code === "PHQ9") {
       selected = phq9
@@ -56,7 +67,10 @@ export function selectedBatteryCodes(
 }
 
 export function batteryCodesFromTreatmentPlan(
-  ongoingAssessments: OngoingAssessmentsJson | null | undefined
+  ongoingAssessments: OngoingAssessmentsJson | null | undefined,
+  behaviouralTargetItems: string[] = []
 ): BatteryAssessmentCode[] {
-  return selectedBatteryCodes(getDefaultBatteryAssessments(ongoingAssessments))
+  return selectedBatteryCodes(
+    getDefaultBatteryAssessments(ongoingAssessments, behaviouralTargetItems)
+  )
 }

@@ -9,6 +9,7 @@ import {
   type SaveReportDraftState,
 } from "@/app/clients/[client_id]/reports/actions"
 import { ReportDocument } from "@/components/report/report-document"
+import { ReportBtpResultsTable } from "@/components/report/btp-results-table"
 import {
   ReportAsqResultsTable,
   ReportResultsTable,
@@ -39,6 +40,7 @@ export function ReportForm({
     | "gad7Results"
     | "asqResults"
     | "assistResults"
+    | "btpResults"
     | "clinicalSummaryText"
     | "recommendationsText"
     | "dateRangeStart"
@@ -53,6 +55,9 @@ export function ReportForm({
   const [gad7Results, setGad7Results] = useState<ReportPreviewRow[]>([])
   const [asqResults, setAsqResults] = useState<ReportPreviewRow[]>([])
   const [assistResults, setAssistResults] = useState<ReportPreviewRow[]>([])
+  const [btpResults, setBtpResults] = useState<
+    import("@/lib/reports/snapshot").BtpReportResultRow[]
+  >([])
   const [previewError, setPreviewError] = useState<string | null>(null)
   const [clinicalSummary, setClinicalSummary] = useState("")
   const [recommendations, setRecommendations] = useState("")
@@ -69,6 +74,7 @@ export function ReportForm({
         setGad7Results([])
         setAsqResults([])
         setAssistResults([])
+        setBtpResults([])
         setPreviewError(null)
         return
       }
@@ -83,6 +89,7 @@ export function ReportForm({
         setGad7Results(preview.gad7Results)
         setAsqResults(preview.asqResults)
         setAssistResults(preview.assistResults)
+        setBtpResults(preview.btpResults)
         setPreviewError(error ?? null)
       })
     },
@@ -115,6 +122,7 @@ export function ReportForm({
           gad7Results,
           asqResults,
           assistResults,
+          btpResults,
           clinicalSummaryText: clinicalSummary,
           recommendationsText: recommendations,
         }
@@ -191,6 +199,10 @@ export function ReportForm({
                   emptyMessage="No ASSIST results in this date range."
                   severityColumnLabel="Risk Level"
                   capitalizeSeverity={false}
+                />
+                <ReportBtpResultsTable
+                  results={btpResults}
+                  emptyMessage="No Behavioural Targets Progress results in this date range."
                 />
               </>
             )}

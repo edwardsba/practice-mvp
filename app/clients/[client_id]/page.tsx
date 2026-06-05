@@ -34,6 +34,7 @@ import {
   loadEmergencyContacts,
 } from "@/lib/crisis-plans/load"
 import { getDefaultBatteryAssessments } from "@/lib/assessments/battery-defaults"
+import { loadLatestBtpResultForClient } from "@/lib/assessments/btp-results"
 import {
   formatAppointmentDate,
   formatAppointmentTime,
@@ -220,7 +221,7 @@ export default async function ClientDetailPage({
     )
     .orderBy(desc(simpleReports.createdAt))
 
-  const [activeTreatmentPlan, activeCrisisPlan, emailContext, nextAppointment] =
+  const [activeTreatmentPlan, activeCrisisPlan, emailContext, nextAppointment, latestBtpResult] =
     await Promise.all([
       loadActiveTreatmentPlanSummary(clientId, context.practiceId),
       loadActiveCrisisPlanSummary(clientId, context.practiceId),
@@ -229,6 +230,7 @@ export default async function ClientDetailPage({
         context.practitionerProfileId
       ),
       loadNextAppointmentForClient(clientId, context.practiceId),
+      loadLatestBtpResultForClient(clientId, context.practiceId),
     ])
 
   const clientEmail = client.email?.trim() || null
@@ -243,7 +245,8 @@ export default async function ClientDetailPage({
     : null
 
   const defaultBatteryAssessments = getDefaultBatteryAssessments(
-    activeTreatmentPlan?.ongoingAssessmentsJson
+    activeTreatmentPlan?.ongoingAssessmentsJson,
+    activeTreatmentPlan?.behaviouralTargetItems ?? []
   )
 
   let emergencyContacts: Awaited<ReturnType<typeof loadEmergencyContacts>> = []
@@ -550,6 +553,45 @@ export default async function ClientDetailPage({
               <Link href={`/clients/${clientId}/asq/new`}>Administer ASQ</Link>
             </Button>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle>Behavioural Targets Progress</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {!latestBtpResult ? (
+            <p className="text-sm text-muted-foreground">
+              No BTP results recorded yet.
+            </p>
+          ) : (
+            <div className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                Most recent: {formatDate(latestBtpResult.assessmentDate)}
+              </p>
+              <div className="rounded-lg border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Target</TableHead>
+                      <TableHead>Score</TableHead>
+                      <TableHead>Rating</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {latestBtpResult.targets.map((target) => (
+                      <TableRow key={target.target}>
+                        <TableCell>{target.target}</TableCell>
+                        <TableCell>{target.score}</TableCell>
+                        <TableCell>{target.ratingLabel}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 

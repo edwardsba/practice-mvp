@@ -1,4 +1,4 @@
-import { and, asc, eq } from "drizzle-orm"
+import { and, asc, eq, inArray } from "drizzle-orm"
 
 import {
   assessmentAccessLinks,
@@ -22,8 +22,23 @@ export type QuestionnaireQuestion = {
   options: QuestionnaireOption[]
 }
 
+const PHQ9_STYLE_INSTRUCTION =
+  "Over the last 2 weeks, how often have you been bothered by any of the following problems?"
+
+const BTP_INSTRUCTION =
+  "Over the last 2 weeks, choose the answer that best describes you."
+
+export function questionnaireInstructionForCode(assessmentCode: string): string {
+  if (assessmentCode === "BTP") {
+    return BTP_INSTRUCTION
+  }
+
+  return PHQ9_STYLE_INSTRUCTION
+}
+
 export type QuestionnaireData = {
   assessmentName: string
+  instructionText: string
   questions: QuestionnaireQuestion[]
 }
 
@@ -41,6 +56,44 @@ function isLinkUsable(
   }
 
   return allowSubmitted && accessStatus === "submitted"
+}
+
+async function loadElementsForInstance(
+  assessmentCode: string,
+  assessmentDefinitionId: string,
+  assessmentInstanceId: string
+) {
+  if (assessmentCode === "BTP") {
+    return db
+      .select({
+        assessmentElementId: assessmentElements.assessmentElementId,
+        questionText: assessmentElements.questionText,
+        displayOrder: assessmentElements.displayOrder,
+      })
+      .from(assessmentElements)
+      .where(
+        and(
+          eq(assessmentElements.assessmentInstanceId, assessmentInstanceId),
+          eq(assessmentElements.isActive, true)
+        )
+      )
+      .orderBy(asc(assessmentElements.displayOrder))
+  }
+
+  return db
+    .select({
+      assessmentElementId: assessmentElements.assessmentElementId,
+      questionText: assessmentElements.questionText,
+      displayOrder: assessmentElements.displayOrder,
+    })
+    .from(assessmentElements)
+    .where(
+      and(
+        eq(assessmentElements.assessmentDefinitionId, assessmentDefinitionId),
+        eq(assessmentElements.isActive, true)
+      )
+    )
+    .orderBy(asc(assessmentElements.displayOrder))
 }
 
 export async function loadQuestionnaireForToken(
@@ -88,6 +141,7 @@ export async function loadQuestionnaireForToken(
 
   const [instance] = await db
     .select({
+      assessmentInstanceId: assessmentInstances.assessmentInstanceId,
       assessmentDefinitionId: assessmentInstances.assessmentDefinitionId,
     })
     .from(assessmentInstances)
@@ -103,6 +157,7 @@ export async function loadQuestionnaireForToken(
   const [definition] = await db
     .select({
       assessmentName: assessmentDefinitions.assessmentName,
+      assessmentCode: assessmentDefinitions.assessmentCode,
     })
     .from(assessmentDefinitions)
     .where(
@@ -114,33 +169,27 @@ export async function loadQuestionnaireForToken(
     return { ok: false }
   }
 
-  const elements = await db
-    .select({
-      assessmentElementId: assessmentElements.assessmentElementId,
-      questionText: assessmentElements.questionText,
-      displayOrder: assessmentElements.displayOrder,
-    })
-    .from(assessmentElements)
-    .where(
-      and(
-        eq(assessmentElements.assessmentDefinitionId, instance.assessmentDefinitionId),
-        eq(assessmentElements.isActive, true)
-      )
-    )
-    .orderBy(asc(assessmentElements.displayOrder))
+  const elements = await loadElementsForInstance(
+    definition.assessmentCode,
+    instance.assessmentDefinitionId,
+    instance.assessmentInstanceId
+  )
 
-  const options = await db
-    .select({
-      assessmentElementId: assessmentOptions.assessmentElementId,
-      optionLabel: assessmentOptions.optionLabel,
-      optionValue: assessmentOptions.optionValue,
-      displayOrder: assessmentOptions.displayOrder,
-    })
-    .from(assessmentOptions)
-    .where(
-      eq(assessmentOptions.assessmentDefinitionId, instance.assessmentDefinitionId)
-    )
-    .orderBy(asc(assessmentOptions.displayOrder))
+  const elementIds = elements.map((element) => element.assessmentElementId)
+
+  const options =
+    elementIds.length > 0
+      ? await db
+          .select({
+            assessmentElementId: assessmentOptions.assessmentElementId,
+            optionLabel: assessmentOptions.optionLabel,
+            optionValue: assessmentOptions.optionValue,
+            displayOrder: assessmentOptions.displayOrder,
+          })
+          .from(assessmentOptions)
+          .where(inArray(assessmentOptions.assessmentElementId, elementIds))
+          .orderBy(asc(assessmentOptions.displayOrder))
+      : []
 
   const optionsByElement = new Map<string, QuestionnaireOption[]>()
   for (const option of options) {
@@ -155,7 +204,7 @@ export async function loadQuestionnaireForToken(
     options: optionsByElement.get(element.assessmentElementId) ?? [],
   }))
 
-  if (questions.some((q) => q.options.length === 0)) {
+  if (questions.length === 0 || questions.some((q) => q.options.length === 0)) {
     return { ok: false }
   }
 
@@ -163,6 +212,7 @@ export async function loadQuestionnaireForToken(
     ok: true,
     data: {
       assessmentName: definition.assessmentName,
+      instructionText: questionnaireInstructionForCode(definition.assessmentCode),
       questions,
     },
   }

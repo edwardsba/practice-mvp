@@ -1,7 +1,9 @@
+import { ReportBtpResultsTable } from "@/components/report/btp-results-table"
 import { REPORT_TITLE, type ReportSnapshot } from "@/lib/reports/snapshot"
 import {
   getAsqResultsFromSnapshot,
   getAssistResultsFromSnapshot,
+  getBtpResultsFromSnapshot,
   getGad7ResultsFromSnapshot,
   getPhq9ResultsFromSnapshot,
 } from "@/lib/reports/snapshot"
@@ -49,6 +51,7 @@ export function ReportDocument({
   const gad7Results = getGad7ResultsFromSnapshot(snapshot)
   const asqResults = getAsqResultsFromSnapshot(snapshot)
   const assistResults = getAssistResultsFromSnapshot(snapshot)
+  const btpResults = getBtpResultsFromSnapshot(snapshot)
 
   const clinicalSummary = snapshot.clinicalSummaryText?.trim() || "—"
   const recommendations = snapshot.recommendationsText?.trim() || "—"
@@ -124,6 +127,14 @@ export function ReportDocument({
           className="report-results-assist"
           severityColumnLabel="Risk Level"
           capitalizeSeverity={false}
+        />
+      ) : null}
+
+      {(!omitEmptySections || btpResults.length > 0) ? (
+        <ReportBtpResultsTable
+          results={btpResults}
+          emptyMessage="No Behavioural Targets Progress results in this date range."
+          className="report-results-btp"
         />
       ) : null}
 

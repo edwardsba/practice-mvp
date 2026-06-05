@@ -11,9 +11,10 @@ import {
 } from "@/db/schema"
 import {
   isBatteryAssessmentCode,
-  normalizeBatteryCodes,
   type BatteryAssessmentCode,
 } from "@/lib/assessments/battery-codes"
+import { createBtpInstanceElements } from "@/lib/assessments/btp"
+import { resolveBatteryChainCodes } from "@/lib/assessments/resolve-battery-chain"
 import { hashAssessmentToken } from "@/lib/assessments/token"
 import { db } from "@/lib/db"
 import { buildTemplateVariablesFromLinkResponse } from "@/lib/email/link-response"
@@ -47,11 +48,17 @@ export async function createBatteryInstance(
   const clientId = params.clientId.trim()
   const practiceId = params.practiceId.trim()
   const practitionerProfileId = params.practitionerProfileId.trim()
-  const requestedCodes = normalizeBatteryCodes(params.assessmentCodes)
 
   if (!clientId || !practitionerProfileId) {
     return { ok: false, error: "client_id and practitioner_profile_id are required." }
   }
+
+  const { codes: requestedCodes, behaviouralTargets } =
+    await resolveBatteryChainCodes(
+      clientId,
+      practiceId,
+      params.assessmentCodes
+    )
 
   if (requestedCodes.length === 0) {
     return { ok: false, error: "At least one valid assessment code is required." }
@@ -145,6 +152,15 @@ export async function createBatteryInstance(
           })
 
         item.instanceId = instance.assessmentInstanceId
+
+        if (item.code === "BTP") {
+          await createBtpInstanceElements(
+            instance.assessmentInstanceId,
+            behaviouralTargets,
+            definition.assessmentDefinitionId,
+            tx
+          )
+        }
 
         const [link] = await tx
           .insert(assessmentAccessLinks)

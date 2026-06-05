@@ -20,7 +20,12 @@ import {
   getFunctionalImpairmentLabelsByResultId,
   PHQ9_IMPAIRMENT_ELEMENT_KEY,
 } from "@/lib/assessments/impairment"
-import type { ReportResultRow, ReportSnapshot } from "@/lib/reports/snapshot"
+import { loadBtpResultsForDateRange } from "@/lib/assessments/btp-results"
+import type {
+  BtpReportResultRow,
+  ReportResultRow,
+  ReportSnapshot,
+} from "@/lib/reports/snapshot"
 import {
   resolveReportTitle,
   resolveReportType,
@@ -33,6 +38,7 @@ export type ReportRangePreview = {
   gad7Results: ReportPreviewRow[]
   asqResults: ReportPreviewRow[]
   assistResults: ReportPreviewRow[]
+  btpResults: BtpReportResultRow[]
 }
 
 async function verifyClient(clientId: string, practiceId: string) {
@@ -124,14 +130,26 @@ export async function fetchReportResultsForRange(
 
   if (!dateRangeStart || !dateRangeEnd) {
     return {
-      preview: { phq9Results: [], gad7Results: [], asqResults: [], assistResults: [] },
+      preview: {
+        phq9Results: [],
+        gad7Results: [],
+        asqResults: [],
+        assistResults: [],
+        btpResults: [],
+      },
       error: "Please select a start and end date.",
     }
   }
 
   if (dateRangeStart > dateRangeEnd) {
     return {
-      preview: { phq9Results: [], gad7Results: [], asqResults: [], assistResults: [] },
+      preview: {
+        phq9Results: [],
+        gad7Results: [],
+        asqResults: [],
+        assistResults: [],
+        btpResults: [],
+      },
       error: "Start date must be on or before end date.",
     }
   }
@@ -139,7 +157,13 @@ export async function fetchReportResultsForRange(
   const client = await verifyClient(clientId, context.practiceId)
   if (!client) {
     return {
-      preview: { phq9Results: [], gad7Results: [], asqResults: [], assistResults: [] },
+      preview: {
+        phq9Results: [],
+        gad7Results: [],
+        asqResults: [],
+        assistResults: [],
+        btpResults: [],
+      },
       error: "Client not found.",
     }
   }
@@ -147,7 +171,8 @@ export async function fetchReportResultsForRange(
   const rangeStart = new Date(`${dateRangeStart}T00:00:00`)
   const rangeEnd = new Date(`${dateRangeEnd}T23:59:59.999`)
 
-  const [phq9Results, gad7Results, asqResults, assistResults] = await Promise.all([
+  const [phq9Results, gad7Results, asqResults, assistResults, btpSummaries] =
+    await Promise.all([
     fetchResultsForAssessment(
       clientId,
       context.practiceId,
@@ -179,9 +204,18 @@ export async function fetchReportResultsForRange(
       rangeStart,
       rangeEnd
     ),
+    loadBtpResultsForDateRange(clientId, context.practiceId, rangeStart, rangeEnd),
   ])
 
-  return { preview: { phq9Results, gad7Results, asqResults, assistResults } }
+  const btpResults: BtpReportResultRow[] = btpSummaries.map((result) => ({
+    assessmentResultId: result.assessmentResultId,
+    date: result.assessmentDate.toISOString(),
+    targets: result.targets,
+  }))
+
+  return {
+    preview: { phq9Results, gad7Results, asqResults, assistResults, btpResults },
+  }
 }
 
 /** @deprecated Use fetchReportResultsForRange */
@@ -207,6 +241,7 @@ export async function buildSnapshot(
   gad7Results: ReportPreviewRow[],
   asqResults: ReportPreviewRow[],
   assistResults: ReportPreviewRow[],
+  btpResults: BtpReportResultRow[],
   clinicalSummaryText: string | null,
   recommendationsText: string | null
 ): Promise<ReportSnapshot | null> {
@@ -253,6 +288,7 @@ export async function buildSnapshot(
     gad7Results,
     asqResults,
     assistResults,
+    btpResults,
     clinicalSummaryText,
     recommendationsText,
   }
@@ -303,6 +339,7 @@ export async function saveReportDraft(
     preview.gad7Results,
     preview.asqResults,
     preview.assistResults,
+    preview.btpResults,
     clinicalSummaryText,
     recommendationsText
   )

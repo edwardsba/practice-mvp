@@ -1,4 +1,4 @@
-import { and, eq, inArray } from "drizzle-orm"
+import { and, eq, inArray, isNull } from "drizzle-orm"
 import { NextResponse } from "next/server"
 
 import {
@@ -116,6 +116,8 @@ export async function POST(request: Request) {
     )
   }
 
+  const isBtp = definition.assessmentCode === "BTP"
+
   const elementIds = Object.keys(responses)
   if (elementIds.length === 0) {
     return NextResponse.json(
@@ -131,10 +133,22 @@ export async function POST(request: Request) {
     })
     .from(assessmentElements)
     .where(
-      and(
-        eq(assessmentElements.assessmentDefinitionId, instance.assessmentDefinitionId),
-        eq(assessmentElements.isActive, true)
-      )
+      isBtp
+        ? and(
+            eq(
+              assessmentElements.assessmentInstanceId,
+              instance.assessmentInstanceId
+            ),
+            eq(assessmentElements.isActive, true)
+          )
+        : and(
+            eq(
+              assessmentElements.assessmentDefinitionId,
+              instance.assessmentDefinitionId
+            ),
+            eq(assessmentElements.isActive, true),
+            isNull(assessmentElements.assessmentInstanceId)
+          )
     )
 
   const dataTypeByElementId = new Map(
@@ -197,7 +211,7 @@ export async function POST(request: Request) {
       scoreValue,
     })
 
-    if (dataTypeByElementId.get(elementId) === "integer") {
+    if (!isBtp && dataTypeByElementId.get(elementId) === "integer") {
       totalScore += scoreValue
     }
   }
@@ -228,7 +242,10 @@ export async function POST(request: Request) {
     }
   }
 
-  const severity = severityFromAssessmentCode(definition.assessmentCode, totalScore)
+  const severity = isBtp
+    ? null
+    : severityFromAssessmentCode(definition.assessmentCode, totalScore)
+  const resultScore = isBtp ? 0 : totalScore
   const now = new Date()
 
   try {
@@ -282,7 +299,7 @@ export async function POST(request: Request) {
         await tx
           .update(assessmentResults)
           .set({
-            score: totalScore,
+            score: resultScore,
             severity,
             assessmentDate: now,
           })
@@ -350,7 +367,7 @@ export async function POST(request: Request) {
             assessmentInstanceId: instance.assessmentInstanceId,
             clientId: instance.clientId,
             practiceId: instance.practiceId,
-            score: totalScore,
+            score: resultScore,
             severity,
             assessmentDate: now,
           })

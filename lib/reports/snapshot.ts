@@ -2,9 +2,21 @@ export type ReportResultRow = {
   assessmentResultId: string
   date: string
   score: number
-  severity: string
+  severity: string | null
   functionalImpairmentLabel?: string | null
   acuteRiskRating?: string | null
+}
+
+export type BtpReportTargetRow = {
+  target: string
+  score: number
+  ratingLabel: string
+}
+
+export type BtpReportResultRow = {
+  assessmentResultId: string
+  date: string
+  targets: BtpReportTargetRow[]
 }
 
 export type ReportSnapshot = {
@@ -28,6 +40,7 @@ export type ReportSnapshot = {
   gad7Results: ReportResultRow[]
   asqResults: ReportResultRow[]
   assistResults: ReportResultRow[]
+  btpResults: BtpReportResultRow[]
   /** @deprecated Legacy snapshots used a single results array */
   results?: ReportResultRow[]
   clinicalSummaryText: string | null
@@ -49,6 +62,10 @@ export function getAsqResultsFromSnapshot(snapshot: ReportSnapshot): ReportResul
 
 export function getAssistResultsFromSnapshot(snapshot: ReportSnapshot): ReportResultRow[] {
   return snapshot.assistResults ?? []
+}
+
+export function getBtpResultsFromSnapshot(snapshot: ReportSnapshot): BtpReportResultRow[] {
+  return snapshot.btpResults ?? []
 }
 
 export const REPORT_TITLE = "Progress Report"
@@ -82,6 +99,7 @@ export function parseReportSnapshot(value: unknown): ReportSnapshot | null {
   const gad7Results = getGad7ResultsFromSnapshot(raw)
   const asqResults = getAsqResultsFromSnapshot(raw)
   const assistResults = getAssistResultsFromSnapshot(raw)
+  const btpResults = getBtpResultsFromSnapshot(raw)
 
   return {
     ...raw,
@@ -90,5 +108,6 @@ export function parseReportSnapshot(value: unknown): ReportSnapshot | null {
     gad7Results,
     asqResults,
     assistResults,
+    btpResults,
   }
 }

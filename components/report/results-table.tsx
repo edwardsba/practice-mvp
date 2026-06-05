@@ -70,7 +70,7 @@ export function ReportResultsTable({
                       : "p-2 align-middle"
                   }
                 >
-                  {row.severity}
+                  {row.severity ?? "—"}
                 </td>
                 {showImpairment ? (
                   <td className="p-2 align-middle">

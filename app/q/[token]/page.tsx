@@ -1,5 +1,6 @@
 import { InvalidLink } from "@/app/q/[token]/invalid-link"
 import { QuestionnaireForm } from "@/app/q/[token]/questionnaire-form"
+import { loadBatteryNavContext } from "@/lib/assessments/battery-nav"
 import { loadQuestionnaireForToken } from "@/lib/assessments/load-questionnaire"
 
 export default async function AssessmentQuestionnairePage({
@@ -16,7 +17,13 @@ export default async function AssessmentQuestionnairePage({
     return <InvalidLink />
   }
 
-  const result = await loadQuestionnaireForToken(token)
+  const trimmedBattery = batteryNextToken?.trim() || undefined
+  const batteryNav = await loadBatteryNavContext(token, trimmedBattery)
+  const allowSubmitted = batteryNav.isBatteryStep
+
+  const result = await loadQuestionnaireForToken(token, {
+    allowSubmitted,
+  })
 
   if (!result.ok) {
     return <InvalidLink />
@@ -25,7 +32,8 @@ export default async function AssessmentQuestionnairePage({
   return (
     <QuestionnaireForm
       token={token}
-      batteryNextToken={batteryNextToken?.trim() || undefined}
+      batteryNextToken={trimmedBattery}
+      batteryNav={batteryNav}
       {...result.data}
     />
   )

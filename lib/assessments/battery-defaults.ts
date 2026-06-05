@@ -1,0 +1,56 @@
+import {
+  BATTERY_ASSESSMENT_CODES,
+  BATTERY_ASSESSMENT_LABELS,
+  DEFAULT_BATTERY_CODES,
+  type BatteryAssessmentCode,
+} from "@/lib/assessments/battery-codes"
+import type { OngoingAssessmentsJson } from "@/lib/treatment-plans/types"
+
+export type BatteryAssessmentChip = {
+  code: BatteryAssessmentCode
+  label: string
+  selected: boolean
+}
+
+export function getDefaultBatteryAssessments(
+  ongoingAssessments: OngoingAssessmentsJson | null | undefined
+): BatteryAssessmentChip[] {
+  if (!ongoingAssessments) {
+    return BATTERY_ASSESSMENT_CODES.map((code) => ({
+      code,
+      label: BATTERY_ASSESSMENT_LABELS[code],
+      selected: DEFAULT_BATTERY_CODES.includes(code),
+    }))
+  }
+
+  const phq9 = ongoingAssessments.phq9
+  const gad7 = ongoingAssessments.gad7
+  const assist = ongoingAssessments.assist
+
+  const usePlanSelections = phq9 || gad7 || assist
+
+  return BATTERY_ASSESSMENT_CODES.map((code) => {
+    let selected = false
+    if (!usePlanSelections) {
+      selected = DEFAULT_BATTERY_CODES.includes(code)
+    } else if (code === "PHQ9") {
+      selected = phq9
+    } else if (code === "GAD7") {
+      selected = gad7
+    } else {
+      selected = assist
+    }
+
+    return {
+      code,
+      label: BATTERY_ASSESSMENT_LABELS[code],
+      selected,
+    }
+  })
+}
+
+export function selectedBatteryCodes(
+  assessments: BatteryAssessmentChip[]
+): BatteryAssessmentCode[] {
+  return assessments.filter((item) => item.selected).map((item) => item.code)
+}

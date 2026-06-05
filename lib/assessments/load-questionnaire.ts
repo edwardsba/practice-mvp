@@ -27,12 +27,25 @@ export type QuestionnaireData = {
   questions: QuestionnaireQuestion[]
 }
 
-function isLinkUsable(accessStatus: string, expiresAt: Date) {
-  return accessStatus === "active" && expiresAt.getTime() > Date.now()
+function isLinkUsable(
+  accessStatus: string,
+  expiresAt: Date,
+  allowSubmitted = false
+) {
+  if (expiresAt.getTime() <= Date.now()) {
+    return false
+  }
+
+  if (accessStatus === "active") {
+    return true
+  }
+
+  return allowSubmitted && accessStatus === "submitted"
 }
 
 export async function loadQuestionnaireForToken(
-  rawToken: string
+  rawToken: string,
+  loadOptions?: { allowSubmitted?: boolean }
 ): Promise<{ ok: true; data: QuestionnaireData } | { ok: false }> {
   const tokenHash = hashAssessmentToken(rawToken)
 
@@ -42,7 +55,14 @@ export async function loadQuestionnaireForToken(
     .where(eq(assessmentAccessLinks.tokenHash, tokenHash))
     .limit(1)
 
-  if (!accessLink || !isLinkUsable(accessLink.accessStatus, accessLink.expiresAt)) {
+  if (
+    !accessLink ||
+    !isLinkUsable(
+      accessLink.accessStatus,
+      accessLink.expiresAt,
+      loadOptions?.allowSubmitted
+    )
+  ) {
     return { ok: false }
   }
 

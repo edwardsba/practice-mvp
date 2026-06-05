@@ -10,6 +10,12 @@ import {
   batteryInstances,
   clients,
 } from "@/db/schema"
+import {
+  DEFAULT_BATTERY_CODES,
+  isBatteryAssessmentCode,
+  normalizeBatteryCodes,
+  type BatteryAssessmentCode,
+} from "@/lib/assessments/battery-codes"
 import { hashAssessmentToken } from "@/lib/assessments/token"
 import { getPractitionerContext } from "@/lib/auth"
 import { db } from "@/lib/db"
@@ -19,6 +25,7 @@ import { getQuestionnaireEmailContext } from "@/lib/email/practitioner-context"
 type CreateBatteryBody = {
   client_id?: string
   practitioner_profile_id?: string
+  assessment_codes?: string[]
 }
 
 const BATTERY_CODE = "PRE_SESSION"
@@ -39,10 +46,20 @@ export async function POST(request: Request) {
 
   const clientId = body.client_id?.trim()
   const practitionerProfileId = body.practitioner_profile_id?.trim()
+  const requestedCodes = body.assessment_codes?.length
+    ? normalizeBatteryCodes(body.assessment_codes)
+    : DEFAULT_BATTERY_CODES
 
   if (!clientId || !practitionerProfileId) {
     return NextResponse.json(
       { error: "client_id and practitioner_profile_id are required." },
+      { status: 400 }
+    )
+  }
+
+  if (requestedCodes.length === 0) {
+    return NextResponse.json(
+      { error: "At least one valid assessment code is required." },
       { status: 400 }
     )
   }
@@ -90,16 +107,21 @@ export async function POST(request: Request) {
       assessmentCode: assessmentDefinitions.assessmentCode,
     })
     .from(assessmentDefinitions)
-    .where(and(eq(assessmentDefinitions.isActive, true)))
+    .where(eq(assessmentDefinitions.isActive, true))
 
-  const phq9Definition = definitions.find((d) => d.assessmentCode === "PHQ9")
-  const gad7Definition = definitions.find((d) => d.assessmentCode === "GAD7")
+  const definitionByCode = new Map(
+    definitions
+      .filter((row) => isBatteryAssessmentCode(row.assessmentCode))
+      .map((row) => [row.assessmentCode as BatteryAssessmentCode, row])
+  )
 
-  if (!phq9Definition || !gad7Definition) {
-    return NextResponse.json(
-      { error: "PHQ-9 or GAD-7 assessment definitions are not available." },
-      { status: 404 }
-    )
+  for (const code of requestedCodes) {
+    if (!definitionByCode.has(code)) {
+      return NextResponse.json(
+        { error: `${code} assessment definition is not available.` },
+        { status: 404 }
+      )
+    }
   }
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "")
@@ -110,91 +132,116 @@ export async function POST(request: Request) {
     )
   }
 
-  const phq9RawToken = randomBytes(32).toString("hex")
-  const gad7RawToken = randomBytes(32).toString("hex")
-  const phq9TokenHash = hashAssessmentToken(phq9RawToken)
-  const gad7TokenHash = hashAssessmentToken(gad7RawToken)
   const expiresAt = new Date(Date.now() + LINK_TTL_MS)
+  const chain = requestedCodes.map((code) => ({
+    code,
+    rawToken: randomBytes(32).toString("hex"),
+    tokenHash: "",
+    instanceId: "",
+    accessLinkId: "",
+  }))
 
-  let phq9AccessLinkId: string
+  for (const item of chain) {
+    item.tokenHash = hashAssessmentToken(item.rawToken)
+  }
+
+  let firstAccessLinkId: string
 
   try {
     await db.transaction(async (tx) => {
-      const [phq9Instance] = await tx
-        .insert(assessmentInstances)
-        .values({
-          assessmentDefinitionId: phq9Definition.assessmentDefinitionId,
-          clientId,
+      for (let index = 0; index < chain.length; index++) {
+        const item = chain[index]
+        const definition = definitionByCode.get(item.code)!
+
+        const [instance] = await tx
+          .insert(assessmentInstances)
+          .values({
+            assessmentDefinitionId: definition.assessmentDefinitionId,
+            clientId,
+            practiceId,
+            practitionerProfileId,
+            status: "assigned",
+          })
+          .returning({
+            assessmentInstanceId: assessmentInstances.assessmentInstanceId,
+          })
+
+        item.instanceId = instance.assessmentInstanceId
+
+        const [link] = await tx
+          .insert(assessmentAccessLinks)
+          .values({
+            assessmentInstanceId: instance.assessmentInstanceId,
+            practiceId,
+            clientId,
+            tokenHash: item.tokenHash,
+            expiresAt,
+            accessStatus: "active",
+          })
+          .returning({
+            assessmentAccessLinkId: assessmentAccessLinks.assessmentAccessLinkId,
+          })
+
+        item.accessLinkId = link.assessmentAccessLinkId
+      }
+
+      for (let index = 0; index < chain.length - 1; index++) {
+        const item = chain[index]
+        const nextItem = chain[index + 1]
+        await tx
+          .update(assessmentAccessLinks)
+          .set({
+            nextAccessLinkId: nextItem.accessLinkId,
+            nextRawToken: nextItem.rawToken,
+            updatedAt: new Date(),
+          })
+          .where(
+            eq(
+              assessmentAccessLinks.assessmentAccessLinkId,
+              item.accessLinkId
+            )
+          )
+      }
+
+      firstAccessLinkId = chain[0].accessLinkId
+
+      const phq9 = chain.find((item) => item.code === "PHQ9")
+      const gad7 = chain.find((item) => item.code === "GAD7")
+
+      if (phq9 && gad7) {
+        const [battery] = await tx
+          .insert(batteryInstances)
+          .values({
+            practiceId,
+            clientId,
+            practitionerProfileId,
+            batteryCode: BATTERY_CODE,
+            phq9InstanceId: phq9.instanceId,
+            gad7InstanceId: gad7.instanceId,
+            phq9LinkId: phq9.accessLinkId,
+            gad7LinkId: gad7.accessLinkId,
+            status: "assigned",
+          })
+          .returning({ batteryInstanceId: batteryInstances.batteryInstanceId })
+
+        await tx.insert(auditEvents).values({
           practiceId,
-          practitionerProfileId,
-          status: "assigned",
-        })
-        .returning({ assessmentInstanceId: assessmentInstances.assessmentInstanceId })
-
-      const [gad7Instance] = await tx
-        .insert(assessmentInstances)
-        .values({
-          assessmentDefinitionId: gad7Definition.assessmentDefinitionId,
+          userId: context.userId,
           clientId,
-          practiceId,
-          practitionerProfileId,
-          status: "assigned",
+          eventType: "battery.created",
+          entityType: "battery_instance",
+          entityId: battery.batteryInstanceId,
         })
-        .returning({ assessmentInstanceId: assessmentInstances.assessmentInstanceId })
-
-      const [phq9Link] = await tx
-        .insert(assessmentAccessLinks)
-        .values({
-          assessmentInstanceId: phq9Instance.assessmentInstanceId,
+      } else {
+        await tx.insert(auditEvents).values({
           practiceId,
+          userId: context.userId,
           clientId,
-          tokenHash: phq9TokenHash,
-          expiresAt,
-          accessStatus: "active",
+          eventType: "battery.created",
+          entityType: "assessment_access_link",
+          entityId: firstAccessLinkId!,
         })
-        .returning({
-          assessmentAccessLinkId: assessmentAccessLinks.assessmentAccessLinkId,
-        })
-
-      const [gad7Link] = await tx
-        .insert(assessmentAccessLinks)
-        .values({
-          assessmentInstanceId: gad7Instance.assessmentInstanceId,
-          practiceId,
-          clientId,
-          tokenHash: gad7TokenHash,
-          expiresAt,
-          accessStatus: "active",
-        })
-        .returning({
-          assessmentAccessLinkId: assessmentAccessLinks.assessmentAccessLinkId,
-        })
-
-      phq9AccessLinkId = phq9Link.assessmentAccessLinkId
-
-      const [battery] = await tx
-        .insert(batteryInstances)
-        .values({
-          practiceId,
-          clientId,
-          practitionerProfileId,
-          batteryCode: BATTERY_CODE,
-          phq9InstanceId: phq9Instance.assessmentInstanceId,
-          gad7InstanceId: gad7Instance.assessmentInstanceId,
-          phq9LinkId: phq9Link.assessmentAccessLinkId,
-          gad7LinkId: gad7Link.assessmentAccessLinkId,
-          status: "assigned",
-        })
-        .returning({ batteryInstanceId: batteryInstances.batteryInstanceId })
-
-      await tx.insert(auditEvents).values({
-        practiceId,
-        userId: context.userId,
-        clientId,
-        eventType: "battery.created",
-        entityType: "battery_instance",
-        entityId: battery.batteryInstanceId,
-      })
+      }
     })
   } catch {
     return NextResponse.json(
@@ -203,12 +250,16 @@ export async function POST(request: Request) {
     )
   }
 
-  const linkUrl = `${appUrl}/q/${phq9RawToken}?battery=${encodeURIComponent(gad7RawToken)}`
+  const first = chain[0]
+  const second = chain[1]
+  const linkUrl = second
+    ? `${appUrl}/q/${first.rawToken}?battery=${encodeURIComponent(second.rawToken)}`
+    : `${appUrl}/q/${first.rawToken}`
 
   return NextResponse.json({
     link: linkUrl,
     expires_at: expiresAt.toISOString(),
-    assessmentAccessLinkId: phq9AccessLinkId!,
+    assessmentAccessLinkId: firstAccessLinkId!,
     clientEmail: client.email?.trim() || null,
     templateVariables: buildTemplateVariablesFromLinkResponse({
       clientFirstName: client.firstName,

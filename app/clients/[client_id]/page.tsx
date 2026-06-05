@@ -33,9 +33,12 @@ import {
   loadActiveCrisisPlanSummary,
   loadEmergencyContacts,
 } from "@/lib/crisis-plans/load"
+import { getDefaultBatteryAssessments } from "@/lib/assessments/battery-defaults"
 import { loadActiveTreatmentPlanSummary } from "@/lib/treatment-plans/load"
 import { requirePractitionerContext } from "@/lib/auth"
 import { db } from "@/lib/db"
+import { buildTemplateVariablesFromLinkResponse } from "@/lib/email/link-response"
+import { getQuestionnaireEmailContext } from "@/lib/email/practitioner-context"
 
 function formatDate(value: Date | string | null) {
   if (!value) return "—"
@@ -212,10 +215,26 @@ export default async function ClientDetailPage({
     )
     .orderBy(desc(simpleReports.createdAt))
 
-  const [activeTreatmentPlan, activeCrisisPlan] = await Promise.all([
+  const [activeTreatmentPlan, activeCrisisPlan, emailContext] = await Promise.all([
     loadActiveTreatmentPlanSummary(clientId, context.practiceId),
     loadActiveCrisisPlanSummary(clientId, context.practiceId),
+    getQuestionnaireEmailContext(context.practiceId, context.practitionerProfileId),
   ])
+
+  const clientEmail = client.email?.trim() || null
+  const estimatedExpiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+  const questionnaireTemplateVariables = emailContext
+    ? buildTemplateVariablesFromLinkResponse({
+        clientFirstName: client.firstName,
+        practiceName: emailContext.practiceName,
+        practitionerName: emailContext.practitionerName,
+        expiresAt: estimatedExpiry,
+      })
+    : null
+
+  const defaultBatteryAssessments = getDefaultBatteryAssessments(
+    activeTreatmentPlan?.ongoingAssessmentsJson
+  )
 
   let emergencyContacts: Awaited<ReturnType<typeof loadEmergencyContacts>> = []
   try {
@@ -449,41 +468,51 @@ export default async function ClientDetailPage({
           <CardTitle>Send questionnaires</CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
-          <SendBatteryButton
-            clientId={clientId}
-            practitionerProfileId={context.practitionerProfileId}
-          />
-          <div className="border-t pt-6">
-            <p className="mb-3 text-sm font-medium text-muted-foreground">
-              Send individual assessment
-            </p>
-            <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap">
-              <SendAssessmentButton
+          {questionnaireTemplateVariables ? (
+            <>
+              <SendBatteryButton
                 clientId={clientId}
                 practitionerProfileId={context.practitionerProfileId}
-                assessmentCode="PHQ9"
-                buttonLabel="Send PHQ-9"
-                linkHeading="PHQ-9 questionnaire link — send this to your client"
-                compact
+                clientEmail={clientEmail}
+                templateVariables={questionnaireTemplateVariables}
+                defaultAssessments={defaultBatteryAssessments}
               />
-              <SendAssessmentButton
-                clientId={clientId}
-                practitionerProfileId={context.practitionerProfileId}
-                assessmentCode="GAD7"
-                buttonLabel="Send GAD-7"
-                linkHeading="GAD-7 questionnaire link — send this to your client"
-                compact
-              />
-              <SendAssessmentButton
-                clientId={clientId}
-                practitionerProfileId={context.practitionerProfileId}
-                assessmentCode="ASSIST"
-                buttonLabel="Send ASSIST"
-                linkHeading="ASSIST questionnaire link — send this to your client"
-                compact
-              />
-            </div>
-          </div>
+              <div className="border-t pt-6">
+                <p className="mb-3 text-sm font-medium text-muted-foreground">
+                  Send individual assessment
+                </p>
+                <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap">
+                  <SendAssessmentButton
+                    clientId={clientId}
+                    practitionerProfileId={context.practitionerProfileId}
+                    assessmentCode="PHQ9"
+                    buttonLabel="Send PHQ-9"
+                    clientEmail={clientEmail}
+                    templateVariables={questionnaireTemplateVariables}
+                    compact
+                  />
+                  <SendAssessmentButton
+                    clientId={clientId}
+                    practitionerProfileId={context.practitionerProfileId}
+                    assessmentCode="GAD7"
+                    buttonLabel="Send GAD-7"
+                    clientEmail={clientEmail}
+                    templateVariables={questionnaireTemplateVariables}
+                    compact
+                  />
+                  <SendAssessmentButton
+                    clientId={clientId}
+                    practitionerProfileId={context.practitionerProfileId}
+                    assessmentCode="ASSIST"
+                    buttonLabel="Send ASSIST"
+                    clientEmail={clientEmail}
+                    templateVariables={questionnaireTemplateVariables}
+                    compact
+                  />
+                </div>
+              </div>
+            </>
+          ) : null}
           <div className="border-t pt-6">
             <p className="mb-3 text-sm font-medium text-muted-foreground">
               Practitioner-administered

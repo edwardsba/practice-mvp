@@ -15,34 +15,54 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import {
+  selectedBatteryCodes,
+  type BatteryAssessmentChip,
+} from "@/lib/assessments/battery-defaults"
+import type { QuestionnaireLinkApiResponse } from "@/lib/email/link-response"
+import {
   buildResolvedEmailBodies,
   EMAIL_TEMPLATE_VARIABLE_CHIPS,
+  formatQuestionnaireExpiryDate,
   getDefaultEmailDraft,
   type QuestionnaireEmailTemplateVariables,
 } from "@/lib/email/templates"
+import { cn } from "@/lib/utils"
+
+type AssessmentChip = {
+  code: string
+  label: string
+  selected: boolean
+}
 
 export function SendEmailModal({
   open,
   onOpenChange,
   to,
-  linkUrl,
-  assessmentAccessLinkId,
   templateVariables,
+  clientId,
+  practitionerProfileId,
+  mode,
+  assessmentCode,
+  assessments: initialAssessments,
   onSendComplete,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   to: string
-  linkUrl: string
-  assessmentAccessLinkId: string
   templateVariables: QuestionnaireEmailTemplateVariables
-  onSendComplete: (result: { sent: boolean }) => void
+  clientId: string
+  practitionerProfileId: string
+  mode: "battery" | "individual"
+  assessmentCode?: string
+  assessments?: AssessmentChip[]
+  onSendComplete: (result: { sent: boolean; email: string }) => void
 }) {
   const messageRef = useRef<HTMLTextAreaElement>(null)
   const [subject, setSubject] = useState("")
   const [message, setMessage] = useState("")
   const [sending, setSending] = useState(false)
   const [sendError, setSendError] = useState<string | null>(null)
+  const [assessmentChips, setAssessmentChips] = useState<AssessmentChip[]>([])
 
   useEffect(() => {
     if (!open) return
@@ -52,7 +72,23 @@ export function SendEmailModal({
     setMessage(draft.message)
     setSendError(null)
     setSending(false)
-  }, [open, templateVariables])
+    setAssessmentChips(
+      initialAssessments?.map((item) => ({ ...item })) ?? []
+    )
+  }, [open, templateVariables, initialAssessments])
+
+  function toggleAssessment(code: string) {
+    setAssessmentChips((current) => {
+      const selectedCount = current.filter((item) => item.selected).length
+      const target = current.find((item) => item.code === code)
+      if (!target) return current
+      if (target.selected && selectedCount <= 1) return current
+
+      return current.map((item) =>
+        item.code === code ? { ...item, selected: !item.selected } : item
+      )
+    })
+  }
 
   function insertVariable(variable: string) {
     const el = messageRef.current
@@ -73,18 +109,70 @@ export function SendEmailModal({
     })
   }
 
+  async function createQuestionnaireLink(): Promise<QuestionnaireLinkApiResponse> {
+    if (mode === "battery") {
+      const codes = selectedBatteryCodes(
+        assessmentChips as BatteryAssessmentChip[]
+      )
+      const response = await fetch("/api/assessments/create-battery", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          client_id: clientId,
+          practitioner_profile_id: practitionerProfileId,
+          assessment_codes: codes,
+        }),
+      })
+      const data = (await response.json()) as QuestionnaireLinkApiResponse & {
+        error?: string
+      }
+      if (!response.ok) {
+        throw new Error(
+          data.error ?? "Unable to create pre-session questionnaire link."
+        )
+      }
+      return data
+    }
+
+    const response = await fetch("/api/assessments/create-link", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        client_id: clientId,
+        practitioner_profile_id: practitionerProfileId,
+        assessment_code: assessmentCode,
+      }),
+    })
+    const data = (await response.json()) as QuestionnaireLinkApiResponse & {
+      error?: string
+    }
+    if (!response.ok) {
+      throw new Error(data.error ?? "Unable to create assessment link.")
+    }
+    return data
+  }
+
   async function handleSend() {
     setSending(true)
     setSendError(null)
 
-    const { subject: resolvedSubject, htmlBody, textBody } = buildResolvedEmailBodies(
-      message,
-      subject,
-      linkUrl,
-      templateVariables
-    )
-
     try {
+      const linkData = await createQuestionnaireLink()
+      const resolvedVariables: QuestionnaireEmailTemplateVariables = {
+        ...linkData.templateVariables,
+        expiry_date: formatQuestionnaireExpiryDate(
+          new Date(linkData.expires_at)
+        ),
+      }
+
+      const { subject: resolvedSubject, htmlBody, textBody } =
+        buildResolvedEmailBodies(
+          message,
+          subject,
+          linkData.link,
+          resolvedVariables
+        )
+
       const response = await fetch("/api/email/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -93,7 +181,7 @@ export function SendEmailModal({
           subject: resolvedSubject,
           htmlBody,
           textBody,
-          assessmentAccessLinkId,
+          assessmentAccessLinkId: linkData.assessmentAccessLinkId,
         }),
       })
 
@@ -101,19 +189,23 @@ export function SendEmailModal({
 
       if (!response.ok || !data.sent) {
         setSendError(data.error ?? "Unable to send email.")
-        onSendComplete({ sent: false })
+        onSendComplete({ sent: false, email: to })
         return
       }
 
       onOpenChange(false)
-      onSendComplete({ sent: true })
-    } catch {
-      setSendError("Unable to send email.")
-      onSendComplete({ sent: false })
+      onSendComplete({ sent: true, email: to })
+    } catch (error) {
+      setSendError(
+        error instanceof Error ? error.message : "Unable to send email."
+      )
+      onSendComplete({ sent: false, email: to })
     } finally {
       setSending(false)
     }
   }
+
+  const showAssessmentChips = mode === "battery" && assessmentChips.length > 0
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -121,12 +213,35 @@ export function SendEmailModal({
         <DialogHeader>
           <DialogTitle>Send questionnaire email</DialogTitle>
           <DialogDescription>
-            Review and edit the email before sending. Changes are not saved for next
-            time.
+            Review and edit the email before sending. Changes are not saved for
+            next time.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
+          {showAssessmentChips ? (
+            <div className="space-y-2">
+              <p className="text-sm font-medium">Assessments</p>
+              <div className="flex flex-wrap gap-2">
+                {assessmentChips.map((chip) => (
+                  <Button
+                    key={chip.code}
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => toggleAssessment(chip.code)}
+                    className={cn(
+                      chip.selected &&
+                        "border-primary bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground"
+                    )}
+                  >
+                    {chip.label}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
           <div className="space-y-2">
             <Label htmlFor="email_to">To</Label>
             <Input

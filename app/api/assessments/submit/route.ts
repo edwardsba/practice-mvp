@@ -12,10 +12,11 @@ import {
   auditEvents,
 } from "@/db/schema"
 import {
-  completeBatteryIfGad7Link,
+  buildNextQuestionnaireUrl,
+  completeBatteryIfLastLink,
   markBatteryInProgress,
   validateBatteryNextToken,
-} from "@/lib/assessments/battery"
+} from "@/lib/assessments/battery-chain"
 import { severityFromAssessmentCode } from "@/lib/assessments/severity"
 import { hashAssessmentToken } from "@/lib/assessments/token"
 import { db } from "@/lib/db"
@@ -64,14 +65,16 @@ export async function POST(request: Request) {
     )
   }
 
-  if (accessLink.accessStatus === "submitted") {
-    return NextResponse.json(
-      { error: "This questionnaire has already been submitted." },
-      { status: 400 }
-    )
-  }
+  const isResubmit = accessLink.accessStatus === "submitted"
 
-  if (!isLinkSubmittable(accessLink.accessStatus, accessLink.expiresAt)) {
+  if (isResubmit) {
+    if (accessLink.expiresAt.getTime() <= Date.now()) {
+      return NextResponse.json(
+        { error: "This link is no longer valid." },
+        { status: 400 }
+      )
+    }
+  } else if (!isLinkSubmittable(accessLink.accessStatus, accessLink.expiresAt)) {
     return NextResponse.json(
       { error: "This link is no longer valid." },
       { status: 400 }
@@ -214,7 +217,8 @@ export async function POST(request: Request) {
       accessLink.assessmentAccessLinkId,
       instance.clientId,
       instance.practiceId,
-      batteryNextToken
+      batteryNextToken,
+      { allowSubmittedNext: isResubmit }
     )
     if (!batteryValid) {
       return NextResponse.json(
@@ -229,80 +233,161 @@ export async function POST(request: Request) {
 
   try {
     await db.transaction(async (tx) => {
-      await tx.insert(assessmentResponses).values(
-        responseRows.map((row) => ({
-          assessmentInstanceId: instance.assessmentInstanceId,
-          assessmentElementId: row.assessmentElementId,
-          clientId: instance.clientId,
-          practiceId: instance.practiceId,
-          responseValue: row.responseValue,
-          scoreValue: row.scoreValue,
-        }))
-      )
+      if (isResubmit) {
+        for (const row of responseRows) {
+          const [existing] = await tx
+            .select({
+              assessmentResponseId: assessmentResponses.assessmentResponseId,
+            })
+            .from(assessmentResponses)
+            .where(
+              and(
+                eq(
+                  assessmentResponses.assessmentInstanceId,
+                  instance.assessmentInstanceId
+                ),
+                eq(
+                  assessmentResponses.assessmentElementId,
+                  row.assessmentElementId
+                )
+              )
+            )
+            .limit(1)
 
-      await tx
-        .update(assessmentInstances)
-        .set({
-          status: "submitted",
-          submittedAt: now,
-          updatedAt: now,
-        })
-        .where(
-          eq(assessmentInstances.assessmentInstanceId, instance.assessmentInstanceId)
-        )
+          if (existing) {
+            await tx
+              .update(assessmentResponses)
+              .set({
+                responseValue: row.responseValue,
+                scoreValue: row.scoreValue,
+              })
+              .where(
+                eq(
+                  assessmentResponses.assessmentResponseId,
+                  existing.assessmentResponseId
+                )
+              )
+          } else {
+            await tx.insert(assessmentResponses).values({
+              assessmentInstanceId: instance.assessmentInstanceId,
+              assessmentElementId: row.assessmentElementId,
+              clientId: instance.clientId,
+              practiceId: instance.practiceId,
+              responseValue: row.responseValue,
+              scoreValue: row.scoreValue,
+            })
+          }
+        }
 
-      await tx
-        .update(assessmentAccessLinks)
-        .set({
-          accessStatus: "submitted",
-          submittedAt: now,
-          updatedAt: now,
-        })
-        .where(
-          eq(
-            assessmentAccessLinks.assessmentAccessLinkId,
-            accessLink.assessmentAccessLinkId
+        await tx
+          .update(assessmentResults)
+          .set({
+            score: totalScore,
+            severity,
+            assessmentDate: now,
+          })
+          .where(
+            eq(
+              assessmentResults.assessmentInstanceId,
+              instance.assessmentInstanceId
+            )
           )
+
+        await tx
+          .update(assessmentInstances)
+          .set({
+            updatedAt: now,
+          })
+          .where(
+            eq(
+              assessmentInstances.assessmentInstanceId,
+              instance.assessmentInstanceId
+            )
+          )
+      } else {
+        await tx.insert(assessmentResponses).values(
+          responseRows.map((row) => ({
+            assessmentInstanceId: instance.assessmentInstanceId,
+            assessmentElementId: row.assessmentElementId,
+            clientId: instance.clientId,
+            practiceId: instance.practiceId,
+            responseValue: row.responseValue,
+            scoreValue: row.scoreValue,
+          }))
         )
 
-      const [result] = await tx
-        .insert(assessmentResults)
-        .values({
-          assessmentInstanceId: instance.assessmentInstanceId,
-          clientId: instance.clientId,
+        await tx
+          .update(assessmentInstances)
+          .set({
+            status: "submitted",
+            submittedAt: now,
+            updatedAt: now,
+          })
+          .where(
+            eq(
+              assessmentInstances.assessmentInstanceId,
+              instance.assessmentInstanceId
+            )
+          )
+
+        await tx
+          .update(assessmentAccessLinks)
+          .set({
+            accessStatus: "submitted",
+            submittedAt: now,
+            updatedAt: now,
+          })
+          .where(
+            eq(
+              assessmentAccessLinks.assessmentAccessLinkId,
+              accessLink.assessmentAccessLinkId
+            )
+          )
+
+        const [result] = await tx
+          .insert(assessmentResults)
+          .values({
+            assessmentInstanceId: instance.assessmentInstanceId,
+            clientId: instance.clientId,
+            practiceId: instance.practiceId,
+            score: totalScore,
+            severity,
+            assessmentDate: now,
+          })
+          .returning({ assessmentResultId: assessmentResults.assessmentResultId })
+
+        await tx.insert(auditEvents).values({
           practiceId: instance.practiceId,
-          score: totalScore,
-          severity,
-          assessmentDate: now,
+          clientId: instance.clientId,
+          eventType: "assessment.submitted",
+          entityType: "assessment_instance",
+          entityId: instance.assessmentInstanceId,
         })
-        .returning({ assessmentResultId: assessmentResults.assessmentResultId })
 
-      await tx.insert(auditEvents).values({
-        practiceId: instance.practiceId,
-        clientId: instance.clientId,
-        eventType: "assessment.submitted",
-        entityType: "assessment_instance",
-        entityId: instance.assessmentInstanceId,
-      })
-
-      await tx.insert(auditEvents).values({
-        practiceId: instance.practiceId,
-        clientId: instance.clientId,
-        eventType: "assessment_result.scored",
-        entityType: "assessment_result",
-        entityId: result.assessmentResultId,
-      })
+        await tx.insert(auditEvents).values({
+          practiceId: instance.practiceId,
+          clientId: instance.clientId,
+          eventType: "assessment_result.scored",
+          entityType: "assessment_result",
+          entityId: result.assessmentResultId,
+        })
+      }
     })
 
     if (batteryNextToken) {
-      await markBatteryInProgress(accessLink.assessmentAccessLinkId)
+      if (!isResubmit) {
+        await markBatteryInProgress(accessLink.assessmentAccessLinkId)
+      }
+      const nextUrl =
+        (await buildNextQuestionnaireUrl(accessLink.assessmentAccessLinkId)) ??
+        `/q/${batteryNextToken}`
       return NextResponse.json({
         success: true,
-        nextUrl: `/q/${batteryNextToken}`,
+        nextUrl,
       })
     }
 
-    const batteryComplete = await completeBatteryIfGad7Link(
+    const batteryComplete = await completeBatteryIfLastLink(
       accessLink.assessmentAccessLinkId,
       instance.clientId,
       instance.practiceId

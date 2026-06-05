@@ -1,8 +1,17 @@
 "use client"
 
 import { useRouter } from "next/navigation"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 
+import type { BatteryNavContext } from "@/lib/assessments/battery-nav"
+import {
+  currentQuestionnaireUrl,
+  extractTokenFromQuestionnairePath,
+  readBatteryForwardUrl,
+  readBatteryPreviousUrl,
+  writeBatteryForwardUrl,
+  writeBatteryPreviousUrl,
+} from "@/lib/assessments/battery-session"
 import type {
   QuestionnaireData,
   QuestionnaireQuestion,
@@ -20,6 +29,8 @@ const STANDALONE_CONFIRMATION =
 const BATTERY_CONFIRMATION =
   "Thank you. Your Pre-Session Questionnaire is complete."
 
+const BATTERY_RESPONSES_KEY_PREFIX = "battery-responses:"
+
 type SubmitResponse = {
   success?: boolean
   error?: string
@@ -27,39 +38,88 @@ type SubmitResponse = {
   batteryComplete?: boolean
 }
 
+function storageKey(token: string) {
+  return `${BATTERY_RESPONSES_KEY_PREFIX}${token}`
+}
+
+function readStoredResponses(token: string): Record<string, string> {
+  if (typeof window === "undefined") return {}
+  try {
+    const raw = sessionStorage.getItem(storageKey(token))
+    if (!raw) return {}
+    const parsed = JSON.parse(raw) as Record<string, string>
+    return parsed && typeof parsed === "object" ? parsed : {}
+  } catch {
+    return {}
+  }
+}
+
+function writeStoredResponses(token: string, responses: Record<string, string>) {
+  if (typeof window === "undefined") return
+  sessionStorage.setItem(storageKey(token), JSON.stringify(responses))
+}
+
 export function QuestionnaireForm({
   token,
   assessmentName,
   questions,
   batteryNextToken,
+  batteryNav,
 }: QuestionnaireData & {
   token: string
   batteryNextToken?: string
+  batteryNav: BatteryNavContext
 }) {
   const router = useRouter()
   const [responses, setResponses] = useState<Record<string, string>>({})
+  const [previousUrl, setPreviousUrl] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [confirmationMessage, setConfirmationMessage] = useState<string | null>(
     null
   )
 
+  useEffect(() => {
+    setResponses(readStoredResponses(token))
+    setPreviousUrl(readBatteryPreviousUrl(token))
+    setError(null)
+    setConfirmationMessage(null)
+  }, [token])
+
   function setAnswer(elementId: string, value: string) {
-    setResponses((prev) => ({ ...prev, [elementId]: value }))
+    setResponses((prev) => {
+      const next = { ...prev, [elementId]: value }
+      writeStoredResponses(token, next)
+      return next
+    })
   }
 
-  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    setError(null)
-
+  function validateResponses() {
     const unanswered = questions.filter((q) => !responses[q.elementId])
     if (unanswered.length > 0) {
       setError("Please answer all questions before submitting.")
-      return
+      return false
     }
+    return true
+  }
+
+  function rememberBatteryNavigation(nextUrl: string) {
+    const nextToken = extractTokenFromQuestionnairePath(nextUrl)
+    if (!nextToken) return
+
+    const currentUrl = currentQuestionnaireUrl()
+    writeBatteryPreviousUrl(nextToken, currentUrl)
+    writeBatteryForwardUrl(token, nextUrl)
+  }
+
+  async function submitCurrentStep(advance: boolean) {
+    setError(null)
+    if (!validateResponses()) return
 
     setLoading(true)
     try {
+      writeStoredResponses(token, responses)
+
       const payload: {
         token: string
         responses: Record<string, string>
@@ -83,8 +143,16 @@ export function QuestionnaireForm({
         return
       }
 
-      if (data.nextUrl) {
-        router.push(data.nextUrl)
+      if (advance) {
+        const forwardUrl = readBatteryForwardUrl(token)
+        const navigateUrl = forwardUrl ?? data.nextUrl
+        if (!navigateUrl) return
+
+        if (!forwardUrl && data.nextUrl) {
+          rememberBatteryNavigation(data.nextUrl)
+        }
+
+        router.push(navigateUrl)
         return
       }
 
@@ -97,6 +165,25 @@ export function QuestionnaireForm({
       setLoading(false)
     }
   }
+
+  function handlePrevious() {
+    const targetUrl = previousUrl ?? readBatteryPreviousUrl(token)
+    if (!targetUrl) return
+
+    writeStoredResponses(token, responses)
+    setError(null)
+    router.push(targetUrl)
+  }
+
+  async function handleFormSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    await submitCurrentStep(batteryNav.isBatteryStep && !batteryNav.isLastInBattery)
+  }
+
+  const showPrevious = batteryNav.isBatteryStep && Boolean(previousUrl)
+  const showNext =
+    batteryNav.isBatteryStep && !batteryNav.isLastInBattery
+  const submitLabel = showNext ? "Next Page →" : "Submit"
 
   if (confirmationMessage) {
     return (
@@ -115,7 +202,7 @@ export function QuestionnaireForm({
         <p className="text-sm leading-relaxed text-muted-foreground">{INSTRUCTION}</p>
       </header>
 
-      <form onSubmit={handleSubmit} className="space-y-8">
+      <form onSubmit={handleFormSubmit} className="space-y-8">
         {questions.map((question, index) => (
           <QuestionBlock
             key={question.elementId}
@@ -132,9 +219,32 @@ export function QuestionnaireForm({
           </p>
         ) : null}
 
-        <Button type="submit" className="w-full" size="lg" disabled={loading}>
-          {loading ? "Submitting…" : "Submit responses"}
-        </Button>
+        <div
+          className={cn(
+            "flex gap-3",
+            showPrevious ? "justify-between" : "justify-end"
+          )}
+        >
+          {showPrevious ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="lg"
+              onClick={handlePrevious}
+              disabled={loading}
+            >
+              ← Previous
+            </Button>
+          ) : null}
+          <Button
+            type="submit"
+            size="lg"
+            disabled={loading}
+            className={showPrevious ? undefined : "w-full"}
+          >
+            {loading ? "Submitting…" : submitLabel}
+          </Button>
+        </div>
       </form>
     </div>
   )

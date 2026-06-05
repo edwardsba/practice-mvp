@@ -2,7 +2,10 @@ import { and, desc, eq } from "drizzle-orm"
 
 import { clients, treatmentPlans } from "@/db/schema"
 import { rowToTreatmentPlan } from "@/lib/treatment-plans/serialize"
-import type { TreatmentPlanRow } from "@/lib/treatment-plans/types"
+import type {
+  OngoingAssessmentsJson,
+  TreatmentPlanRow,
+} from "@/lib/treatment-plans/types"
 import { db } from "@/lib/db"
 
 export async function loadTreatmentPlanForPractice(
@@ -58,6 +61,18 @@ function parseBehaviouralTargetItems(value: unknown): string[] {
   return items.map((item) => String(item).trim()).filter(Boolean)
 }
 
+function parseOngoingAssessments(
+  value: unknown
+): OngoingAssessmentsJson | null {
+  if (!value || typeof value !== "object") return null
+  const row = value as Partial<OngoingAssessmentsJson>
+  return {
+    phq9: Boolean(row.phq9),
+    gad7: Boolean(row.gad7),
+    assist: Boolean(row.assist),
+  }
+}
+
 export async function loadActiveTreatmentPlanSummary(
   clientId: string,
   practiceId: string
@@ -69,6 +84,7 @@ export async function loadActiveTreatmentPlanSummary(
       startDate: treatmentPlans.startDate,
       therapeuticTarget: treatmentPlans.therapeuticTarget,
       behaviouralTargetsJson: treatmentPlans.behaviouralTargetsJson,
+      ongoingAssessmentsJson: treatmentPlans.ongoingAssessmentsJson,
     })
     .from(treatmentPlans)
     .where(
@@ -87,6 +103,7 @@ export async function loadActiveTreatmentPlanSummary(
     behaviouralTargetItems: parseBehaviouralTargetItems(
       row.behaviouralTargetsJson
     ),
+    ongoingAssessmentsJson: parseOngoingAssessments(row.ongoingAssessmentsJson),
   }
 }
 

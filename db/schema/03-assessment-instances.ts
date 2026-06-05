@@ -26,6 +26,8 @@ export const assessmentAccessLinks = pgTable('assessment_access_links', {
   openedAt: timestamp('opened_at', { withTimezone: true }),
   submittedAt: timestamp('submitted_at', { withTimezone: true }),
   failedAttemptCount: integer('failed_attempt_count').notNull().default(0),
+  nextAccessLinkId: uuid('next_access_link_id'),
+  nextRawToken: text('next_raw_token'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 })

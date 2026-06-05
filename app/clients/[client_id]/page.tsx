@@ -29,6 +29,7 @@ import {
   simpleReports,
 } from "@/db/schema"
 import { formatReportType } from "@/lib/reports/snapshot"
+import { loadActiveTreatmentPlanSummary } from "@/lib/treatment-plans/load"
 import { requirePractitionerContext } from "@/lib/auth"
 import { db } from "@/lib/db"
 
@@ -207,6 +208,11 @@ export default async function ClientDetailPage({
     )
     .orderBy(desc(simpleReports.createdAt))
 
+  const activeTreatmentPlan = await loadActiveTreatmentPlanSummary(
+    clientId,
+    context.practiceId
+  )
+
   return (
     <AppShell>
       <div className="mb-6">
@@ -245,6 +251,79 @@ export default async function ClientDetailPage({
               <dd className="font-medium">{formatDate(client.dateOfBirth)}</dd>
             </div>
           </dl>
+        </CardContent>
+      </Card>
+
+      <Card className="mb-6">
+        <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <CardTitle>Treatment plan</CardTitle>
+            <CardDescription>
+              Structured treatment planning for this client.
+            </CardDescription>
+          </div>
+          {!activeTreatmentPlan ? (
+            <Button asChild size="sm">
+              <Link href={`/clients/${clientId}/treatment-plan/new`}>
+                Create treatment plan
+              </Link>
+            </Button>
+          ) : (
+            <Button asChild variant="outline" size="sm">
+              <Link
+                href={`/clients/${clientId}/treatment-plan/${activeTreatmentPlan.treatmentPlanId}`}
+              >
+                View / Edit
+              </Link>
+            </Button>
+          )}
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {!activeTreatmentPlan ? (
+            <p className="text-sm text-muted-foreground">No treatment plan</p>
+          ) : (
+            <dl className="grid gap-3 sm:grid-cols-3">
+              <div>
+                <dt className="text-sm text-muted-foreground">Start date</dt>
+                <dd className="font-medium">
+                  {formatDate(activeTreatmentPlan.startDate)}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-sm text-muted-foreground">
+                  Therapeutic target
+                </dt>
+                <dd className="font-medium">
+                  {activeTreatmentPlan.therapeuticTarget?.trim() || "—"}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-sm text-muted-foreground">Version</dt>
+                <dd className="font-medium">
+                  v{activeTreatmentPlan.versionNumber}
+                </dd>
+              </div>
+            </dl>
+          )}
+
+          {activeTreatmentPlan ? (
+            <div className="border-t pt-4">
+              <p className="mb-2 text-sm font-medium">Behavioural targets</p>
+              {activeTreatmentPlan.behaviouralTargetItems.length > 0 ? (
+                <ul className="list-inside list-disc space-y-1 text-sm">
+                  {activeTreatmentPlan.behaviouralTargetItems.map(
+                    (target, index) => (
+                      <li key={`${index}-${target}`}>{target}</li>
+                    )
+                  )}
+                </ul>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  No behavioural targets set
+                </p>
+              )}
+            </div>
+          ) : null}
         </CardContent>
       </Card>
 

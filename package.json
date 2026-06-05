@@ -12,7 +12,8 @@
     "seed:asq": "tsx db/seed-asq.ts",
     "seed:assist": "tsx db/seed-assist.ts",
     "db:battery": "tsx db/apply-battery-migration.ts",
-    "db:acute-risk": "tsx db/apply-acute-risk-migration.ts"
+    "db:acute-risk": "tsx db/apply-acute-risk-migration.ts",
+    "db:treatment-plans": "tsx db/apply-treatment-plans-migration.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.10.3",

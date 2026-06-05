@@ -48,5 +48,6 @@ export async function updatePractice(
     .where(eq(practices.practiceId, context.practiceId))
 
   revalidatePath("/practice")
+  revalidatePath("/practice/edit")
   return { success: true }
 }

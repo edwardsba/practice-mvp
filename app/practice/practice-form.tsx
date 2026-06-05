@@ -1,21 +1,21 @@
 "use client"
 
+import Link from "next/link"
 import { useActionState } from "react"
 
+import {
+  updatePractice,
+  type PracticeFormState,
+} from "@/app/practice/actions"
 import { Button } from "@/components/ui/button"
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import {
-  updatePractice,
-  type PracticeFormState,
-} from "@/app/practice/actions"
 
 type Practice = {
   practiceName: string
@@ -34,15 +34,12 @@ export function PracticeForm({ practice }: { practice: Practice }) {
   )
 
   return (
-    <Card>
+    <Card className="max-w-xl">
       <CardHeader>
         <CardTitle>Practice details</CardTitle>
-        <CardDescription>
-          Information shown on reports and client communications.
-        </CardDescription>
       </CardHeader>
       <CardContent>
-        <form action={formAction} className="max-w-xl space-y-4">
+        <form action={formAction} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="practice_name">Practice name</Label>
             <Input
@@ -87,14 +84,21 @@ export function PracticeForm({ practice }: { practice: Practice }) {
             />
           </div>
           {state.error ? (
-            <p className="text-sm text-destructive">{state.error}</p>
+            <p className="text-sm text-destructive" role="alert">
+              {state.error}
+            </p>
           ) : null}
           {state.success ? (
             <p className="text-sm text-emerald-700">Practice details saved.</p>
           ) : null}
-          <Button type="submit" disabled={pending}>
-            {pending ? "Saving…" : "Save changes"}
-          </Button>
+          <div className="flex flex-wrap gap-3">
+            <Button type="submit" disabled={pending}>
+              {pending ? "Saving…" : "Save changes"}
+            </Button>
+            <Button type="button" variant="outline" asChild>
+              <Link href="/practice">Cancel</Link>
+            </Button>
+          </div>
         </form>
       </CardContent>
     </Card>

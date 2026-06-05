@@ -9,7 +9,6 @@ import { Badge } from "@/components/ui/badge"
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
@@ -105,9 +104,6 @@ export default async function CrisisPlanViewPage({
       <Card className="mt-6">
         <CardHeader>
           <CardTitle>Version history</CardTitle>
-          <CardDescription>
-            All crisis plan versions for this client.
-          </CardDescription>
         </CardHeader>
         <CardContent>
           <ul className="space-y-2">

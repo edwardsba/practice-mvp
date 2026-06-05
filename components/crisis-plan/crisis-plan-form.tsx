@@ -12,7 +12,6 @@ import { Button } from "@/components/ui/button"
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
@@ -98,9 +97,6 @@ export function CrisisPlanForm({
       <Card>
         <CardHeader>
           <CardTitle>Emergency contacts</CardTitle>
-          <CardDescription>
-            Contacts saved to the client record when you save this plan.
-          </CardDescription>
         </CardHeader>
         <CardContent>
           <EmergencyContactsFormFields
@@ -113,7 +109,6 @@ export function CrisisPlanForm({
       <Card>
         <CardHeader>
           <CardTitle>Emergency numbers</CardTitle>
-          <CardDescription>Select all that apply.</CardDescription>
         </CardHeader>
         <CardContent>
           <MultiSelectSectionFields

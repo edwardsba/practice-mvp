@@ -8,7 +8,6 @@ import { Button } from "@/components/ui/button"
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
@@ -199,11 +198,6 @@ export default async function AssessmentResultDetailPage({
       <Card className="mb-6">
         <CardHeader>
           <CardTitle>Summary</CardTitle>
-          <CardDescription>
-            {isAsq
-              ? "Total score, screen outcome, and acute risk rating"
-              : "Total score and severity classification"}
-          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-baseline sm:gap-6">
@@ -244,9 +238,6 @@ export default async function AssessmentResultDetailPage({
       <Card>
         <CardHeader>
           <CardTitle>Question responses</CardTitle>
-          <CardDescription>
-            Individual item scores for this assessment
-          </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="rounded-lg border">

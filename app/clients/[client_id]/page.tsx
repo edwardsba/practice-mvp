@@ -10,7 +10,6 @@ import { Button } from "@/components/ui/button"
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
@@ -277,13 +276,8 @@ export default async function ClientDetailPage({
       </Card>
 
       <Card className="mb-6">
-        <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <CardTitle>Treatment plan</CardTitle>
-            <CardDescription>
-              Structured treatment planning for this client.
-            </CardDescription>
-          </div>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle>Treatment plan</CardTitle>
           {!activeTreatmentPlan ? (
             <Button asChild size="sm">
               <Link href={`/clients/${clientId}/treatment-plan/new`}>
@@ -350,13 +344,8 @@ export default async function ClientDetailPage({
       </Card>
 
       <Card className="mb-6">
-        <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <CardTitle>Crisis plan</CardTitle>
-            <CardDescription>
-              Client-facing crisis plan for print and email.
-            </CardDescription>
-          </div>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle>Crisis plan</CardTitle>
           {!activeCrisisPlan ? (
             <Button asChild size="sm">
               <Link href={`/clients/${clientId}/crisis-plan/new`}>
@@ -398,9 +387,6 @@ export default async function ClientDetailPage({
       <Card className="mb-6">
         <CardHeader>
           <CardTitle>Reports</CardTitle>
-          <CardDescription>
-            Saved progress reports for this client.
-          </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="rounded-lg border">
@@ -461,10 +447,6 @@ export default async function ClientDetailPage({
       <Card className="mb-6">
         <CardHeader>
           <CardTitle>Send questionnaires</CardTitle>
-          <CardDescription>
-            Send the combined pre-session battery (PHQ-9 then GAD-7) or an
-            individual assessment.
-          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <SendBatteryButton
@@ -516,9 +498,6 @@ export default async function ClientDetailPage({
       <Card className="mb-6">
         <CardHeader>
           <CardTitle>PHQ-9 results</CardTitle>
-          <CardDescription>
-            Assessment history ordered by most recent first.
-          </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="rounded-lg border">
@@ -577,13 +556,8 @@ export default async function ClientDetailPage({
       </Card>
 
       <Card className="mb-6">
-        <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <CardTitle>ASQ results</CardTitle>
-            <CardDescription>
-              Ask Suicide-Screening Questions — practitioner-administered.
-            </CardDescription>
-          </div>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle>ASQ results</CardTitle>
           <Button asChild variant="outline" size="sm">
             <Link href={`/clients/${clientId}/asq/new`}>Administer ASQ</Link>
           </Button>
@@ -647,9 +621,6 @@ export default async function ClientDetailPage({
       <Card className="mb-6">
         <CardHeader>
           <CardTitle>GAD-7 results</CardTitle>
-          <CardDescription>
-            Assessment history ordered by most recent first.
-          </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="rounded-lg border">
@@ -710,9 +681,6 @@ export default async function ClientDetailPage({
       <Card>
         <CardHeader>
           <CardTitle>ASSIST results</CardTitle>
-          <CardDescription>
-            Assessment history ordered by most recent first.
-          </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="rounded-lg border">

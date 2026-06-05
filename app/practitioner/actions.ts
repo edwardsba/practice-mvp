@@ -57,5 +57,6 @@ export async function updatePractitionerProfile(
     )
 
   revalidatePath("/practitioner")
+  revalidatePath("/practitioner/edit")
   return { success: true }
 }

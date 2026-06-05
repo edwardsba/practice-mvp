@@ -19,7 +19,6 @@ import { Button } from "@/components/ui/button"
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
@@ -126,9 +125,6 @@ export function EditReportForm({
       <Card>
         <CardHeader>
           <CardTitle>Date range</CardTitle>
-          <CardDescription>
-            Changing the date range will refresh assessment results in this report.
-          </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid gap-4 sm:grid-cols-2">

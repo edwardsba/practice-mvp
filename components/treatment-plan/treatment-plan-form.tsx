@@ -12,7 +12,6 @@ import { Button } from "@/components/ui/button"
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
@@ -66,7 +65,6 @@ export function TreatmentPlanForm({
       <Card>
         <CardHeader>
           <CardTitle>Meta details</CardTitle>
-          <CardDescription>Plan start and end dates.</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2">
@@ -93,9 +91,6 @@ export function TreatmentPlanForm({
       <Card>
         <CardHeader>
           <CardTitle>Therapeutic targets</CardTitle>
-          <CardDescription>
-            Primary therapeutic focus and measurable behavioural targets.
-          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="space-y-2">
@@ -117,7 +112,6 @@ export function TreatmentPlanForm({
       <Card>
         <CardHeader>
           <CardTitle>Ongoing assessments</CardTitle>
-          <CardDescription>Select all that apply.</CardDescription>
         </CardHeader>
         <CardContent>
           <OngoingAssessmentsFields value={ongoing} />
@@ -127,7 +121,6 @@ export function TreatmentPlanForm({
       <Card>
         <CardHeader>
           <CardTitle>Risk management</CardTitle>
-          <CardDescription>Select all that apply.</CardDescription>
         </CardHeader>
         <CardContent>
           <MultiSelectSectionFields
@@ -141,7 +134,6 @@ export function TreatmentPlanForm({
       <Card>
         <CardHeader>
           <CardTitle>Support services</CardTitle>
-          <CardDescription>Select all that apply.</CardDescription>
         </CardHeader>
         <CardContent>
           <MultiSelectSectionFields
@@ -155,7 +147,6 @@ export function TreatmentPlanForm({
       <Card>
         <CardHeader>
           <CardTitle>Psychoeducation</CardTitle>
-          <CardDescription>Select all that apply.</CardDescription>
         </CardHeader>
         <CardContent>
           <MultiSelectSectionFields
@@ -169,7 +160,6 @@ export function TreatmentPlanForm({
       <Card>
         <CardHeader>
           <CardTitle>Case formulation</CardTitle>
-          <CardDescription>Select all that apply.</CardDescription>
         </CardHeader>
         <CardContent>
           <MultiSelectSectionFields
@@ -183,7 +173,6 @@ export function TreatmentPlanForm({
       <Card>
         <CardHeader>
           <CardTitle>Alternate responses</CardTitle>
-          <CardDescription>Select all that apply.</CardDescription>
         </CardHeader>
         <CardContent>
           <MultiSelectSectionFields
@@ -197,7 +186,6 @@ export function TreatmentPlanForm({
       <Card>
         <CardHeader>
           <CardTitle>Quality of life</CardTitle>
-          <CardDescription>Select all that apply.</CardDescription>
         </CardHeader>
         <CardContent>
           <MultiSelectSectionFields

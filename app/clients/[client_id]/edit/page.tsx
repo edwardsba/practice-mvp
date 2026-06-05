@@ -8,7 +8,6 @@ import { Button } from "@/components/ui/button"
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
@@ -61,9 +60,6 @@ export default async function EditClientPage({
       <Card className="max-w-xl">
         <CardHeader>
           <CardTitle>Client details</CardTitle>
-          <CardDescription>
-            Update contact information and demographics for this client.
-          </CardDescription>
         </CardHeader>
         <CardContent>
           <EditClientForm clientId={clientId} client={client} />

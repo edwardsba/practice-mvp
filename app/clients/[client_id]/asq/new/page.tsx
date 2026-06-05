@@ -8,7 +8,6 @@ import { Button } from "@/components/ui/button"
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
@@ -64,9 +63,6 @@ export default async function AdministerAsqPage({
       <Card>
         <CardHeader>
           <CardTitle>Ask Suicide-Screening Questions</CardTitle>
-          <CardDescription>
-            Practitioner-administered screening. All five questions are required.
-          </CardDescription>
         </CardHeader>
         <CardContent>
           <AsqForm clientId={clientId} clientName={clientName} questions={questions} />

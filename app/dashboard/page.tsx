@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button"
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
@@ -20,9 +19,6 @@ export default function DashboardPage() {
         <Card>
           <CardHeader>
             <CardTitle>Clients</CardTitle>
-            <CardDescription>
-              View and manage client records for your practice.
-            </CardDescription>
           </CardHeader>
           <CardContent>
             <Button asChild>
@@ -32,14 +28,11 @@ export default function DashboardPage() {
         </Card>
         <Card>
           <CardHeader>
-            <CardTitle>Practice Settings</CardTitle>
-            <CardDescription>
-              Update practice details, contact information, and timezone.
-            </CardDescription>
+            <CardTitle>Practice</CardTitle>
           </CardHeader>
           <CardContent>
             <Button variant="outline" asChild>
-              <Link href="/practice">Practice Settings</Link>
+              <Link href="/practice">Practice</Link>
             </Button>
           </CardContent>
         </Card>

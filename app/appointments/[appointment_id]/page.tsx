@@ -14,6 +14,7 @@ import {
   formatAppointmentDuration,
   formatAppointmentStatus,
   formatAppointmentTime,
+  formatAutomationTimestamp,
   formatClientNameLastFirst,
 } from "@/lib/appointments/format"
 import { loadAppointmentForPractice } from "@/lib/appointments/load"
@@ -106,6 +107,22 @@ export default async function AppointmentDetailPage({
               <dt className="text-sm text-muted-foreground">Notes</dt>
               <dd className="font-medium whitespace-pre-wrap">
                 {appointment.notes?.trim() || "—"}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-sm text-muted-foreground">Reminder</dt>
+              <dd className="font-medium">
+                {appointment.reminderSentAt
+                  ? `Reminder sent: ${formatAutomationTimestamp(appointment.reminderSentAt)}`
+                  : "Reminder not yet sent"}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-sm text-muted-foreground">Pre-session battery</dt>
+              <dd className="font-medium">
+                {appointment.preSessionBatterySentAt
+                  ? `Pre-session battery sent: ${formatAutomationTimestamp(appointment.preSessionBatterySentAt)}`
+                  : "Pre-session battery not yet sent"}
               </dd>
             </div>
           </dl>

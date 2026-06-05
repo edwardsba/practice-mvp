@@ -1,6 +1,7 @@
 import Link from "next/link"
 
 import { AppointmentsFilter } from "@/app/appointments/appointments-filter"
+import { TestAutomationsButton } from "@/app/appointments/test-automations-button"
 import { AppShell } from "@/components/app-shell"
 import { Button } from "@/components/ui/button"
 import {
@@ -49,9 +50,14 @@ export default async function AppointmentsPage({
     <AppShell>
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-2xl font-semibold tracking-tight">Appointments</h1>
-        <Button asChild>
-          <Link href="/appointments/new">Add Appointment</Link>
-        </Button>
+        <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-start">
+          {process.env.NODE_ENV === "development" ? (
+            <TestAutomationsButton />
+          ) : null}
+          <Button asChild>
+            <Link href="/appointments/new">Add Appointment</Link>
+          </Button>
+        </div>
       </div>
 
       <div className="mb-6">

@@ -54,3 +54,9 @@ export function selectedBatteryCodes(
 ): BatteryAssessmentCode[] {
   return assessments.filter((item) => item.selected).map((item) => item.code)
 }
+
+export function batteryCodesFromTreatmentPlan(
+  ongoingAssessments: OngoingAssessmentsJson | null | undefined
+): BatteryAssessmentCode[] {
+  return selectedBatteryCodes(getDefaultBatteryAssessments(ongoingAssessments))
+}

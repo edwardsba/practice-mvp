@@ -6,12 +6,79 @@ import { revalidatePath } from "next/cache"
 
 import { appointments, auditEvents, clients } from "@/db/schema"
 import { parseAppointmentFormData } from "@/lib/appointments/parse-form"
+import type { AppointmentAutomationSummary } from "@/lib/appointments/run-automations"
 import { loadAppointmentForPractice } from "@/lib/appointments/load"
 import { requirePractitionerContext } from "@/lib/auth"
 import { db } from "@/lib/db"
 
 export type AppointmentFormState = {
   error?: string
+}
+
+export type TestAutomationsState = {
+  error?: string
+  result?: AppointmentAutomationSummary
+}
+
+export async function testAppointmentAutomations(): Promise<TestAutomationsState> {
+  if (process.env.NODE_ENV !== "development") {
+    return { error: "Test automations are only available in development." }
+  }
+
+  const cronSecret = process.env.CRON_SECRET
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "")
+
+  if (!cronSecret || !appUrl) {
+    return { error: "CRON_SECRET or NEXT_PUBLIC_APP_URL is not configured." }
+  }
+
+  try {
+    const response = await fetch(`${appUrl}/api/cron/appointment-automations`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${cronSecret}`,
+      },
+      cache: "no-store",
+    })
+
+    const contentType = response.headers.get("content-type") ?? ""
+
+    if (!contentType.includes("application/json")) {
+      const text = await response.text()
+      const preview = text.slice(0, 120).replace(/\s+/g, " ")
+      return {
+        error: `Expected JSON but received ${contentType || "unknown content"} (${response.status}). ${preview}`,
+      }
+    }
+
+    const payload = (await response.json()) as AppointmentAutomationSummary & {
+      error?: string
+    }
+
+    if (!response.ok) {
+      return {
+        error:
+          payload.error ??
+          `Automation request failed with status ${response.status}.`,
+      }
+    }
+
+    const result: AppointmentAutomationSummary = {
+      reminders_sent: payload.reminders_sent ?? 0,
+      batteries_sent: payload.batteries_sent ?? 0,
+      errors: payload.errors ?? [],
+    }
+    revalidatePath("/appointments")
+    revalidatePath("/appointments", "page")
+    return { result }
+  } catch (error) {
+    return {
+      error:
+        error instanceof Error
+          ? error.message
+          : "Unable to run appointment automations.",
+    }
+  }
 }
 
 async function verifyClientInPractice(clientId: string, practiceId: string) {

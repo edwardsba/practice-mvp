@@ -53,6 +53,8 @@ export async function loadAppointmentForPractice(
       location: appointments.location,
       status: appointments.status,
       notes: appointments.notes,
+      reminderSentAt: appointments.reminderSentAt,
+      preSessionBatterySentAt: appointments.preSessionBatterySentAt,
       clientFirstName: clients.firstName,
       clientLastName: clients.lastName,
     })

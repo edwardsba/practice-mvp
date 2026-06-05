@@ -1,7 +1,32 @@
+import { addDays, format } from "date-fns"
+import { toZonedTime } from "date-fns-tz"
+
 import { APPOINTMENT_STATUS_LABELS, type AppointmentStatus } from "@/lib/appointments/constants"
 
+export const SYDNEY_TIMEZONE = "Australia/Sydney"
+
 export function todayDateString(): string {
-  return new Date().toLocaleDateString("en-CA")
+  return format(toZonedTime(new Date(), SYDNEY_TIMEZONE), "yyyy-MM-dd")
+}
+
+export function sydneyDatePlusDays(days: number): string {
+  const sydneyNow = toZonedTime(new Date(), SYDNEY_TIMEZONE)
+  return format(addDays(sydneyNow, days), "yyyy-MM-dd")
+}
+
+export function formatAutomationTimestamp(value: Date | string | null): string {
+  if (!value) return ""
+  const date = value instanceof Date ? value : new Date(value)
+  if (Number.isNaN(date.getTime())) return String(value)
+  return date.toLocaleString("en-AU", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+    timeZone: SYDNEY_TIMEZONE,
+  })
 }
 
 export function formatAppointmentDate(value: string | Date | null): string {

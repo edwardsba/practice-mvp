@@ -1,0 +1,125 @@
+@media print {
+  @page {
+    size: A4;
+    margin: 18mm 16mm 22mm;
+  }
+
+  body {
+    background: white !important;
+    color: #111 !important;
+    font-size: 11pt;
+    line-height: 1.45;
+  }
+
+  .min-h-full > header,
+  .no-print {
+    display: none !important;
+  }
+
+  main {
+    max-width: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  .session-note-print-area {
+    display: block !important;
+    overflow: visible !important;
+  }
+
+  .session-note-document {
+    display: block !important;
+    max-width: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+    overflow: visible !important;
+  }
+
+  .session-note-document .session-note-header {
+    display: block !important;
+    break-inside: avoid;
+    break-after: avoid;
+    padding-bottom: 1rem;
+    margin-bottom: 0;
+    border-bottom: 1px solid #ccc;
+  }
+
+  .session-note-document h2 {
+    font-size: 16pt;
+    color: #111 !important;
+  }
+
+  .session-note-document h3 {
+    font-size: 12pt;
+    color: #111 !important;
+    break-after: avoid;
+  }
+
+  .session-note-document .session-note-section {
+    display: block !important;
+    break-inside: auto;
+    margin-top: 1.25rem;
+    margin-bottom: 1.25rem;
+  }
+
+  .session-note-document .report-results-table {
+    display: table !important;
+    width: 100% !important;
+    border-collapse: collapse !important;
+    border: none !important;
+    border-top: 1px solid #333 !important;
+    font-size: 10pt;
+    overflow: visible !important;
+    background: transparent !important;
+  }
+
+  .session-note-document .report-results-table thead {
+    display: table-header-group !important;
+  }
+
+  .session-note-document .report-results-table tbody {
+    display: table-row-group !important;
+  }
+
+  .session-note-document .report-results-table tr {
+    display: table-row !important;
+    break-inside: avoid;
+    border: none !important;
+    background: transparent !important;
+  }
+
+  .session-note-document .report-results-table th {
+    display: table-cell !important;
+    border: none !important;
+    border-bottom: 1px solid #333 !important;
+    background: transparent !important;
+    font-weight: 700 !important;
+    text-align: left !important;
+    padding: 6px 8px 6px 0;
+  }
+
+  .session-note-document .report-results-table td {
+    display: table-cell !important;
+    border: none !important;
+    border-bottom: 1px solid #e0e0e0 !important;
+    background: transparent !important;
+    padding: 6px 8px 6px 0;
+  }
+
+  .session-note-document .report-results-table tbody tr:last-child td {
+    border-bottom: 1px solid #333 !important;
+  }
+
+  .session-note-document .session-note-signature {
+    display: block !important;
+    break-inside: avoid;
+    margin-top: 2rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid #ccc;
+  }
+
+  .session-note-document .text-muted-foreground {
+    color: #444 !important;
+  }
+}

@@ -19,6 +19,7 @@ import {
 } from "@/lib/appointments/format"
 import { loadAppointmentForPractice } from "@/lib/appointments/load"
 import { requirePractitionerContext } from "@/lib/auth"
+import { loadSessionNoteForAppointment } from "@/lib/session-notes/load"
 
 export default async function AppointmentDetailPage({
   params,
@@ -28,10 +29,10 @@ export default async function AppointmentDetailPage({
   const { appointment_id: appointmentId } = await params
   const context = await requirePractitionerContext()
 
-  const appointment = await loadAppointmentForPractice(
-    appointmentId,
-    context.practiceId
-  )
+  const [appointment, linkedSessionNote] = await Promise.all([
+    loadAppointmentForPractice(appointmentId, context.practiceId),
+    loadSessionNoteForAppointment(appointmentId, context.practiceId),
+  ])
 
   if (!appointment) {
     notFound()
@@ -50,9 +51,26 @@ export default async function AppointmentDetailPage({
         </Button>
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <h1 className="text-2xl font-semibold tracking-tight">Appointment</h1>
-          <Button asChild variant="outline">
-            <Link href={`/appointments/${appointmentId}/edit`}>Edit</Link>
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            {linkedSessionNote ? (
+              <Button asChild variant="default">
+                <Link href={`/session-notes/${linkedSessionNote.sessionNoteId}`}>
+                  View Session Note
+                </Link>
+              </Button>
+            ) : (
+              <Button asChild variant="default">
+                <Link
+                  href={`/session-notes/new?appointment_id=${appointmentId}&client_id=${appointment.clientId}`}
+                >
+                  Create Session Note
+                </Link>
+              </Button>
+            )}
+            <Button asChild variant="outline">
+              <Link href={`/appointments/${appointmentId}/edit`}>Edit</Link>
+            </Button>
+          </div>
         </div>
       </div>
 

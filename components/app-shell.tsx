@@ -7,6 +7,7 @@ const navItems = [
   { href: "/dashboard", label: "Dashboard" },
   { href: "/clients", label: "Clients" },
   { href: "/appointments", label: "Appointments" },
+  { href: "/session-notes", label: "Session Notes" },
   { href: "/practice", label: "Practice" },
   { href: "/practitioner", label: "Profile" },
 ]

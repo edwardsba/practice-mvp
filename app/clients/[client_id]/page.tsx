@@ -40,6 +40,11 @@ import {
   formatAppointmentTime,
 } from "@/lib/appointments/format"
 import { loadNextAppointmentForClient } from "@/lib/appointments/load"
+import {
+  formatSessionNoteDate,
+  formatSessionNoteStatus,
+} from "@/lib/session-notes/format"
+import { loadLatestSessionNoteForClient } from "@/lib/session-notes/load"
 import { loadActiveTreatmentPlanSummary } from "@/lib/treatment-plans/load"
 import { requirePractitionerContext } from "@/lib/auth"
 import { db } from "@/lib/db"
@@ -221,17 +226,24 @@ export default async function ClientDetailPage({
     )
     .orderBy(desc(simpleReports.createdAt))
 
-  const [activeTreatmentPlan, activeCrisisPlan, emailContext, nextAppointment, latestBtpResult] =
-    await Promise.all([
-      loadActiveTreatmentPlanSummary(clientId, context.practiceId),
-      loadActiveCrisisPlanSummary(clientId, context.practiceId),
-      getQuestionnaireEmailContext(
-        context.practiceId,
-        context.practitionerProfileId
-      ),
-      loadNextAppointmentForClient(clientId, context.practiceId),
-      loadLatestBtpResultForClient(clientId, context.practiceId),
-    ])
+  const [
+    activeTreatmentPlan,
+    activeCrisisPlan,
+    emailContext,
+    nextAppointment,
+    latestBtpResult,
+    latestSessionNote,
+  ] = await Promise.all([
+    loadActiveTreatmentPlanSummary(clientId, context.practiceId),
+    loadActiveCrisisPlanSummary(clientId, context.practiceId),
+    getQuestionnaireEmailContext(
+      context.practiceId,
+      context.practitionerProfileId
+    ),
+    loadNextAppointmentForClient(clientId, context.practiceId),
+    loadLatestBtpResultForClient(clientId, context.practiceId),
+    loadLatestSessionNoteForClient(clientId, context.practiceId),
+  ])
 
   const clientEmail = client.email?.trim() || null
   const estimatedExpiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
@@ -316,6 +328,48 @@ export default async function ClientDetailPage({
               </dd>
             </div>
           </dl>
+        </CardContent>
+      </Card>
+
+      <Card className="mb-6">
+        <CardHeader className="flex flex-row items-center justify-between gap-4">
+          <CardTitle>Session Notes</CardTitle>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" size="sm" asChild>
+              <Link href={`/session-notes?client_id=${clientId}`}>
+                View all
+              </Link>
+            </Button>
+            <Button size="sm" asChild>
+              <Link href={`/session-notes/new?client_id=${clientId}`}>
+                New Session Note
+              </Link>
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {!latestSessionNote ? (
+            <p className="text-sm text-muted-foreground">
+              No session notes yet.
+            </p>
+          ) : (
+            <div className="flex flex-col gap-2 text-sm sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="font-medium">
+                  {formatSessionNoteDate(latestSessionNote.sessionDate)}
+                </p>
+                <p className="text-muted-foreground">
+                  {formatSessionNoteStatus(latestSessionNote.status)}
+                </p>
+              </div>
+              <Link
+                href={`/session-notes/${latestSessionNote.sessionNoteId}`}
+                className="text-primary hover:underline"
+              >
+                View session note
+              </Link>
+            </div>
+          )}
         </CardContent>
       </Card>
 

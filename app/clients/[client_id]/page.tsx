@@ -5,6 +5,7 @@ import { and, desc, eq } from "drizzle-orm"
 import { AppShell } from "@/components/app-shell"
 import { SendAssessmentButton } from "@/app/clients/[client_id]/send-assessment-button"
 import { SendBatteryButton } from "@/app/clients/[client_id]/send-battery-button"
+import { EmergencyContactsSection } from "@/components/emergency-contacts/emergency-contacts-section"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -29,6 +30,10 @@ import {
   simpleReports,
 } from "@/db/schema"
 import { formatReportType } from "@/lib/reports/snapshot"
+import {
+  loadActiveCrisisPlanSummary,
+  loadEmergencyContacts,
+} from "@/lib/crisis-plans/load"
 import { loadActiveTreatmentPlanSummary } from "@/lib/treatment-plans/load"
 import { requirePractitionerContext } from "@/lib/auth"
 import { db } from "@/lib/db"
@@ -208,10 +213,20 @@ export default async function ClientDetailPage({
     )
     .orderBy(desc(simpleReports.createdAt))
 
-  const activeTreatmentPlan = await loadActiveTreatmentPlanSummary(
-    clientId,
-    context.practiceId
-  )
+  const [activeTreatmentPlan, activeCrisisPlan] = await Promise.all([
+    loadActiveTreatmentPlanSummary(clientId, context.practiceId),
+    loadActiveCrisisPlanSummary(clientId, context.practiceId),
+  ])
+
+  let emergencyContacts: Awaited<ReturnType<typeof loadEmergencyContacts>> = []
+  try {
+    emergencyContacts = await loadEmergencyContacts(
+      clientId,
+      context.practiceId
+    )
+  } catch {
+    emergencyContacts = []
+  }
 
   return (
     <AppShell>
@@ -252,6 +267,13 @@ export default async function ClientDetailPage({
             </div>
           </dl>
         </CardContent>
+      </Card>
+
+      <Card className="mb-6">
+        <EmergencyContactsSection
+          clientId={clientId}
+          contacts={emergencyContacts}
+        />
       </Card>
 
       <Card className="mb-6">
@@ -324,6 +346,52 @@ export default async function ClientDetailPage({
               )}
             </div>
           ) : null}
+        </CardContent>
+      </Card>
+
+      <Card className="mb-6">
+        <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <CardTitle>Crisis plan</CardTitle>
+            <CardDescription>
+              Client-facing crisis plan for print and email.
+            </CardDescription>
+          </div>
+          {!activeCrisisPlan ? (
+            <Button asChild size="sm">
+              <Link href={`/clients/${clientId}/crisis-plan/new`}>
+                Create crisis plan
+              </Link>
+            </Button>
+          ) : (
+            <Button asChild variant="outline" size="sm">
+              <Link
+                href={`/clients/${clientId}/crisis-plan/${activeCrisisPlan.crisisPlanId}`}
+              >
+                View / Edit
+              </Link>
+            </Button>
+          )}
+        </CardHeader>
+        <CardContent>
+          {!activeCrisisPlan ? (
+            <p className="text-sm text-muted-foreground">No crisis plan</p>
+          ) : (
+            <dl className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <dt className="text-sm text-muted-foreground">Date of plan</dt>
+                <dd className="font-medium">
+                  {formatDate(activeCrisisPlan.dateOfPlan)}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-sm text-muted-foreground">Version</dt>
+                <dd className="font-medium">
+                  v{activeCrisisPlan.versionNumber}
+                </dd>
+              </div>
+            </dl>
+          )}
         </CardContent>
       </Card>
 

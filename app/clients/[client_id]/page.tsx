@@ -34,6 +34,11 @@ import {
   loadEmergencyContacts,
 } from "@/lib/crisis-plans/load"
 import { getDefaultBatteryAssessments } from "@/lib/assessments/battery-defaults"
+import {
+  formatAppointmentDate,
+  formatAppointmentTime,
+} from "@/lib/appointments/format"
+import { loadNextAppointmentForClient } from "@/lib/appointments/load"
 import { loadActiveTreatmentPlanSummary } from "@/lib/treatment-plans/load"
 import { requirePractitionerContext } from "@/lib/auth"
 import { db } from "@/lib/db"
@@ -215,11 +220,16 @@ export default async function ClientDetailPage({
     )
     .orderBy(desc(simpleReports.createdAt))
 
-  const [activeTreatmentPlan, activeCrisisPlan, emailContext] = await Promise.all([
-    loadActiveTreatmentPlanSummary(clientId, context.practiceId),
-    loadActiveCrisisPlanSummary(clientId, context.practiceId),
-    getQuestionnaireEmailContext(context.practiceId, context.practitionerProfileId),
-  ])
+  const [activeTreatmentPlan, activeCrisisPlan, emailContext, nextAppointment] =
+    await Promise.all([
+      loadActiveTreatmentPlanSummary(clientId, context.practiceId),
+      loadActiveCrisisPlanSummary(clientId, context.practiceId),
+      getQuestionnaireEmailContext(
+        context.practiceId,
+        context.practitionerProfileId
+      ),
+      loadNextAppointmentForClient(clientId, context.practiceId),
+    ])
 
   const clientEmail = client.email?.trim() || null
   const estimatedExpiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
@@ -282,6 +292,25 @@ export default async function ClientDetailPage({
             <div>
               <dt className="text-sm text-muted-foreground">Date of birth</dt>
               <dd className="font-medium">{formatDate(client.dateOfBirth)}</dd>
+            </div>
+            <div className="sm:col-span-2">
+              <dt className="text-sm text-muted-foreground">Next appointment</dt>
+              <dd className="font-medium">
+                {nextAppointment ? (
+                  <Link
+                    href={`/appointments/${nextAppointment.appointmentId}`}
+                    className="text-primary hover:underline"
+                  >
+                    {formatAppointmentDate(nextAppointment.appointmentDate)} at{" "}
+                    {formatAppointmentTime(nextAppointment.appointmentTime)}
+                    {nextAppointment.location?.trim()
+                      ? ` — ${nextAppointment.location.trim()}`
+                      : ""}
+                  </Link>
+                ) : (
+                  "No upcoming appointment"
+                )}
+              </dd>
             </div>
           </dl>
         </CardContent>

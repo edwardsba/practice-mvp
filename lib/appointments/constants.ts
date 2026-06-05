@@ -1,0 +1,36 @@
+export const APPOINTMENT_STATUSES = [
+  "scheduled",
+  "confirmed",
+  "cancelled",
+  "completed",
+] as const
+
+export type AppointmentStatus = (typeof APPOINTMENT_STATUSES)[number]
+
+export const APPOINTMENT_STATUS_LABELS: Record<AppointmentStatus, string> = {
+  scheduled: "Scheduled",
+  confirmed: "Confirmed",
+  cancelled: "Cancelled",
+  completed: "Completed",
+}
+
+export const APPOINTMENT_DURATIONS = [50, 80, 110] as const
+
+export type AppointmentDuration = (typeof APPOINTMENT_DURATIONS)[number]
+
+export const APPOINTMENT_FILTER_VALUES = ["upcoming", "past", "all"] as const
+
+export type AppointmentFilter = (typeof APPOINTMENT_FILTER_VALUES)[number]
+
+export function buildAppointmentTimeOptions(): string[] {
+  const options: string[] = []
+  for (let hour = 7; hour <= 20; hour++) {
+    for (let minute = 0; minute < 60; minute += 15) {
+      if (hour === 20 && minute > 0) break
+      options.push(
+        `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}:00`
+      )
+    }
+  }
+  return options
+}

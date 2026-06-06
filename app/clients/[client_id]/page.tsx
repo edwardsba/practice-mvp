@@ -332,48 +332,6 @@ export default async function ClientDetailPage({
       </Card>
 
       <Card className="mb-6">
-        <CardHeader className="flex flex-row items-center justify-between gap-4">
-          <CardTitle>Session Notes</CardTitle>
-          <div className="flex flex-wrap gap-2">
-            <Button variant="outline" size="sm" asChild>
-              <Link href={`/session-notes?client_id=${clientId}`}>
-                View all
-              </Link>
-            </Button>
-            <Button size="sm" asChild>
-              <Link href={`/session-notes/new?client_id=${clientId}`}>
-                New Session Note
-              </Link>
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {!latestSessionNote ? (
-            <p className="text-sm text-muted-foreground">
-              No session notes yet.
-            </p>
-          ) : (
-            <div className="flex flex-col gap-2 text-sm sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p className="font-medium">
-                  {formatSessionNoteDate(latestSessionNote.sessionDate)}
-                </p>
-                <p className="text-muted-foreground">
-                  {formatSessionNoteStatus(latestSessionNote.status)}
-                </p>
-              </div>
-              <Link
-                href={`/session-notes/${latestSessionNote.sessionNoteId}`}
-                className="text-primary hover:underline"
-              >
-                View session note
-              </Link>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      <Card className="mb-6">
         <EmergencyContactsSection
           clientId={clientId}
           contacts={emergencyContacts}
@@ -491,66 +449,6 @@ export default async function ClientDetailPage({
 
       <Card className="mb-6">
         <CardHeader>
-          <CardTitle>Reports</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="rounded-lg border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Date created</TableHead>
-                  <TableHead>Report type</TableHead>
-                  <TableHead>Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {savedReports.length === 0 ? (
-                  <TableRow>
-                    <TableCell
-                      colSpan={3}
-                      className="h-20 text-center text-muted-foreground"
-                    >
-                      No reports yet. Create a report to get started.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  savedReports.map((report) => (
-                    <TableRow key={report.simpleReportId}>
-                      <TableCell>
-                        <Link
-                          href={`/clients/${clientId}/reports/${report.simpleReportId}`}
-                          className="font-medium text-primary hover:underline"
-                        >
-                          {formatDate(report.createdAt)}
-                        </Link>
-                      </TableCell>
-                      <TableCell>
-                        <Link
-                          href={`/clients/${clientId}/reports/${report.simpleReportId}`}
-                          className="hover:underline"
-                        >
-                          {formatReportType(report.reportType)}
-                        </Link>
-                      </TableCell>
-                      <TableCell className="capitalize">
-                        <Link
-                          href={`/clients/${clientId}/reports/${report.simpleReportId}`}
-                          className="hover:underline"
-                        >
-                          {report.reportStatus}
-                        </Link>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card className="mb-6">
-        <CardHeader>
           <CardTitle>Send questionnaires</CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -606,6 +504,108 @@ export default async function ClientDetailPage({
             <Button asChild variant="outline">
               <Link href={`/clients/${clientId}/asq/new`}>Administer ASQ</Link>
             </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="mb-6">
+        <CardHeader className="flex flex-row items-center justify-between gap-4">
+          <CardTitle>Session Notes</CardTitle>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" size="sm" asChild>
+              <Link href={`/session-notes?client_id=${clientId}`}>
+                View all
+              </Link>
+            </Button>
+            <Button size="sm" asChild>
+              <Link href={`/session-notes/new?client_id=${clientId}`}>
+                New Session Note
+              </Link>
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {!latestSessionNote ? (
+            <p className="text-sm text-muted-foreground">
+              No session notes yet.
+            </p>
+          ) : (
+            <div className="flex flex-col gap-2 text-sm sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="font-medium">
+                  {formatSessionNoteDate(latestSessionNote.sessionDate)}
+                </p>
+                <p className="text-muted-foreground">
+                  {formatSessionNoteStatus(latestSessionNote.status)}
+                </p>
+              </div>
+              <Link
+                href={`/session-notes/${latestSessionNote.sessionNoteId}`}
+                className="text-primary hover:underline"
+              >
+                View session note
+              </Link>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle>Reports</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="rounded-lg border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Date created</TableHead>
+                  <TableHead>Report type</TableHead>
+                  <TableHead>Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {savedReports.length === 0 ? (
+                  <TableRow>
+                    <TableCell
+                      colSpan={3}
+                      className="h-20 text-center text-muted-foreground"
+                    >
+                      No reports yet. Create a report to get started.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  savedReports.map((report) => (
+                    <TableRow key={report.simpleReportId}>
+                      <TableCell>
+                        <Link
+                          href={`/clients/${clientId}/reports/${report.simpleReportId}`}
+                          className="font-medium text-primary hover:underline"
+                        >
+                          {formatDate(report.createdAt)}
+                        </Link>
+                      </TableCell>
+                      <TableCell>
+                        <Link
+                          href={`/clients/${clientId}/reports/${report.simpleReportId}`}
+                          className="hover:underline"
+                        >
+                          {formatReportType(report.reportType)}
+                        </Link>
+                      </TableCell>
+                      <TableCell className="capitalize">
+                        <Link
+                          href={`/clients/${clientId}/reports/${report.simpleReportId}`}
+                          className="hover:underline"
+                        >
+                          {report.reportStatus}
+                        </Link>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
           </div>
         </CardContent>
       </Card>
@@ -697,69 +697,6 @@ export default async function ClientDetailPage({
                         <TableCell className="capitalize">
                           <Link href={resultHref} className="block hover:underline">
                             {result.severity}
-                          </Link>
-                        </TableCell>
-                      </TableRow>
-                    )
-                  })
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card className="mb-6">
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>ASQ results</CardTitle>
-          <Button asChild variant="outline" size="sm">
-            <Link href={`/clients/${clientId}/asq/new`}>Administer ASQ</Link>
-          </Button>
-        </CardHeader>
-        <CardContent>
-          <div className="rounded-lg border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Score</TableHead>
-                  <TableHead>Acute Risk Rating</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {asqResults.length === 0 ? (
-                  <TableRow>
-                    <TableCell
-                      colSpan={3}
-                      className="h-20 text-center text-muted-foreground"
-                    >
-                      No ASQ results recorded yet.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  asqResults.map((result) => {
-                    const resultHref = `/clients/${clientId}/results/${result.assessmentResultId}`
-                    return (
-                      <TableRow
-                        key={result.assessmentResultId}
-                        className="hover:bg-muted/50"
-                      >
-                        <TableCell>
-                          <Link
-                            href={resultHref}
-                            className="block font-medium text-primary hover:underline"
-                          >
-                            {formatDate(result.assessmentDate)}
-                          </Link>
-                        </TableCell>
-                        <TableCell>
-                          <Link href={resultHref} className="block hover:underline">
-                            {result.score}
-                          </Link>
-                        </TableCell>
-                        <TableCell>
-                          <Link href={resultHref} className="block hover:underline">
-                            {result.acuteRiskRating ?? "—"}
                           </Link>
                         </TableCell>
                       </TableRow>
@@ -880,6 +817,69 @@ export default async function ClientDetailPage({
                         <TableCell>
                           <Link href={resultHref} className="block hover:underline">
                             {result.severity}
+                          </Link>
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="mb-6">
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle>ASQ results</CardTitle>
+          <Button asChild variant="outline" size="sm">
+            <Link href={`/clients/${clientId}/asq/new`}>Administer ASQ</Link>
+          </Button>
+        </CardHeader>
+        <CardContent>
+          <div className="rounded-lg border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Score</TableHead>
+                  <TableHead>Acute Risk Rating</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {asqResults.length === 0 ? (
+                  <TableRow>
+                    <TableCell
+                      colSpan={3}
+                      className="h-20 text-center text-muted-foreground"
+                    >
+                      No ASQ results recorded yet.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  asqResults.map((result) => {
+                    const resultHref = `/clients/${clientId}/results/${result.assessmentResultId}`
+                    return (
+                      <TableRow
+                        key={result.assessmentResultId}
+                        className="hover:bg-muted/50"
+                      >
+                        <TableCell>
+                          <Link
+                            href={resultHref}
+                            className="block font-medium text-primary hover:underline"
+                          >
+                            {formatDate(result.assessmentDate)}
+                          </Link>
+                        </TableCell>
+                        <TableCell>
+                          <Link href={resultHref} className="block hover:underline">
+                            {result.score}
+                          </Link>
+                        </TableCell>
+                        <TableCell>
+                          <Link href={resultHref} className="block hover:underline">
+                            {result.acuteRiskRating ?? "—"}
                           </Link>
                         </TableCell>
                       </TableRow>

@@ -45,6 +45,7 @@ export type SessionNoteAssessmentResult = {
 
 export type SessionNoteAsqResult = {
   assessmentResultId: string
+  assessmentDate: Date
   score: number
   acuteRiskRating: string | null
 } | null
@@ -349,6 +350,7 @@ async function loadAsqForSession(
 
   return {
     assessmentResultId: match.assessmentResultId,
+    assessmentDate: match.assessmentDate,
     score: match.score,
     acuteRiskRating: match.acuteRiskRating,
   }

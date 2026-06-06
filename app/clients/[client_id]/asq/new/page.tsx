@@ -18,10 +18,13 @@ import { db } from "@/lib/db"
 
 export default async function AdministerAsqPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ client_id: string }>
+  searchParams: Promise<{ returnTo?: string }>
 }) {
   const { client_id: clientId } = await params
+  const { returnTo } = await searchParams
   const context = await requirePractitionerContext()
 
   const [client] = await db
@@ -54,7 +57,7 @@ export default async function AdministerAsqPage({
     <AppShell>
       <div className="mb-6">
         <Button variant="ghost" size="sm" asChild className="mb-2 -ml-2">
-          <Link href={`/clients/${clientId}`}>← Back to client</Link>
+          <Link href={returnTo ?? `/clients/${clientId}`}>← Back to client</Link>
         </Button>
         <h1 className="text-2xl font-semibold tracking-tight">Administer ASQ</h1>
         <p className="mt-1 text-sm text-muted-foreground">{clientName}</p>

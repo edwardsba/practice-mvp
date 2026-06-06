@@ -64,7 +64,7 @@ export default async function SessionNoteViewPage({
 
   return (
     <AppShell>
-      <div className="mb-6">
+      <div className="mb-6 no-print">
         <Button variant="ghost" size="sm" asChild className="mb-2 -ml-2">
           <Link href={`/clients/${note.clientId}`}>← Back to client</Link>
         </Button>

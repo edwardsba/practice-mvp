@@ -7,9 +7,16 @@ import { AppShell } from "@/components/app-shell"
 import { Button } from "@/components/ui/button"
 import { requirePractitionerContext } from "@/lib/auth"
 
-export default async function NewAppointmentPage() {
+export default async function NewAppointmentPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ date?: string; time?: string }>
+}) {
   await requirePractitionerContext()
+  const { date, time } = await searchParams
   const clients = await getActiveClients()
+  const prefilledTime =
+    time && /^\d{2}:\d{2}$/.test(time) ? `${time}:00` : time
 
   return (
     <AppShell>
@@ -25,6 +32,19 @@ export default async function NewAppointmentPage() {
       <AppointmentForm
         action={createAppointment}
         clients={clients}
+        initialValues={
+          date && /^\d{4}-\d{2}-\d{2}$/.test(date)
+            ? {
+                clientId: "",
+                appointmentDate: date,
+                appointmentTime: prefilledTime ?? "",
+                durationMinutes: 50,
+                location: null,
+                status: "scheduled",
+                notes: null,
+              }
+            : undefined
+        }
         submitLabel="Save appointment"
         cancelHref="/appointments"
       />

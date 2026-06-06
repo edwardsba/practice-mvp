@@ -1,9 +1,48 @@
-import { and, asc, eq, gte, lt } from "drizzle-orm"
+import { and, asc, eq, gte, lte, lt } from "drizzle-orm"
 
 import { appointments, clients } from "@/db/schema"
 import type { AppointmentFilter } from "@/lib/appointments/constants"
 import { todayDateString } from "@/lib/appointments/format"
 import { db } from "@/lib/db"
+
+export type CalendarAppointment = {
+  appointmentId: string
+  clientId: string
+  appointmentDate: string
+  appointmentTime: string
+  durationMinutes: number
+  clientFirstName: string
+  clientLastName: string
+}
+
+export async function loadAppointmentsForPractitionerInRange(
+  practiceId: string,
+  practitionerProfileId: string,
+  startDate: string,
+  endDate: string
+): Promise<CalendarAppointment[]> {
+  return db
+    .select({
+      appointmentId: appointments.appointmentId,
+      clientId: appointments.clientId,
+      appointmentDate: appointments.appointmentDate,
+      appointmentTime: appointments.appointmentTime,
+      durationMinutes: appointments.durationMinutes,
+      clientFirstName: clients.firstName,
+      clientLastName: clients.lastName,
+    })
+    .from(appointments)
+    .innerJoin(clients, eq(appointments.clientId, clients.clientId))
+    .where(
+      and(
+        eq(appointments.practiceId, practiceId),
+        eq(appointments.practitionerProfileId, practitionerProfileId),
+        gte(appointments.appointmentDate, startDate),
+        lte(appointments.appointmentDate, endDate)
+      )
+    )
+    .orderBy(asc(appointments.appointmentDate), asc(appointments.appointmentTime))
+}
 
 export async function loadAppointmentsForPractice(
   practiceId: string,

@@ -1,0 +1,2702 @@
+{
+  "id": "305ad3f5-dfd7-4fd4-8338-742ff2b0bed7",
+  "prevId": "bc9b836a-56b4-4a56-bff0-30c576a755a6",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.clients": {
+      "name": "clients",
+      "schema": "",
+      "columns": {
+        "client_id": {
+          "name": "client_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "practice_id": {
+          "name": "practice_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "first_name": {
+          "name": "first_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "last_name": {
+          "name": "last_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "date_of_birth": {
+          "name": "date_of_birth",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "email": {
+          "name": "email",
+          "type": "citext",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "phone": {
+          "name": "phone",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "clients_practice_id_practices_practice_id_fk": {
+          "name": "clients_practice_id_practices_practice_id_fk",
+          "tableFrom": "clients",
+          "tableTo": "practices",
+          "columnsFrom": [
+            "practice_id"
+          ],
+          "columnsTo": [
+            "practice_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.practices": {
+      "name": "practices",
+      "schema": "",
+      "columns": {
+        "practice_id": {
+          "name": "practice_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "practice_name": {
+          "name": "practice_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "timezone": {
+          "name": "timezone",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'Australia/Sydney'"
+        },
+        "address": {
+          "name": "address",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "phone": {
+          "name": "phone",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "email": {
+          "name": "email",
+          "type": "citext",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.practitioner_profiles": {
+      "name": "practitioner_profiles",
+      "schema": "",
+      "columns": {
+        "practitioner_profile_id": {
+          "name": "practitioner_profile_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "practice_id": {
+          "name": "practice_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "title": {
+          "name": "title",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "full_name": {
+          "name": "full_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "registration_number": {
+          "name": "registration_number",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "registration_body": {
+          "name": "registration_body",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "practitioner_profiles_user_id_users_user_id_fk": {
+          "name": "practitioner_profiles_user_id_users_user_id_fk",
+          "tableFrom": "practitioner_profiles",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "user_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "practitioner_profiles_practice_id_practices_practice_id_fk": {
+          "name": "practitioner_profiles_practice_id_practices_practice_id_fk",
+          "tableFrom": "practitioner_profiles",
+          "tableTo": "practices",
+          "columnsFrom": [
+            "practice_id"
+          ],
+          "columnsTo": [
+            "practice_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.users": {
+      "name": "users",
+      "schema": "",
+      "columns": {
+        "user_id": {
+          "name": "user_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "email": {
+          "name": "email",
+          "type": "citext",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "full_name": {
+          "name": "full_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "role": {
+          "name": "role",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'practitioner'"
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "users_email_unique": {
+          "name": "users_email_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "email"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.assessment_definitions": {
+      "name": "assessment_definitions",
+      "schema": "",
+      "columns": {
+        "assessment_definition_id": {
+          "name": "assessment_definition_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "assessment_code": {
+          "name": "assessment_code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "assessment_name": {
+          "name": "assessment_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "assessment_type": {
+          "name": "assessment_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'psychometric_assessment'"
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "scoring_enabled": {
+          "name": "scoring_enabled",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "client_completable": {
+          "name": "client_completable",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "practitioner_completable": {
+          "name": "practitioner_completable",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "assessment_definitions_assessment_code_unique": {
+          "name": "assessment_definitions_assessment_code_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "assessment_code"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.assessment_elements": {
+      "name": "assessment_elements",
+      "schema": "",
+      "columns": {
+        "assessment_element_id": {
+          "name": "assessment_element_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "assessment_definition_id": {
+          "name": "assessment_definition_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "assessment_instance_id": {
+          "name": "assessment_instance_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "element_key": {
+          "name": "element_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "question_text": {
+          "name": "question_text",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "element_type": {
+          "name": "element_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'radio'"
+        },
+        "data_type": {
+          "name": "data_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'integer'"
+        },
+        "display_order": {
+          "name": "display_order",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "is_required": {
+          "name": "is_required",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "assessment_elements_assessment_definition_id_assessment_definitions_assessment_definition_id_fk": {
+          "name": "assessment_elements_assessment_definition_id_assessment_definitions_assessment_definition_id_fk",
+          "tableFrom": "assessment_elements",
+          "tableTo": "assessment_definitions",
+          "columnsFrom": [
+            "assessment_definition_id"
+          ],
+          "columnsTo": [
+            "assessment_definition_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "assessment_elements_element_key_unique": {
+          "name": "assessment_elements_element_key_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "element_key"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.assessment_options": {
+      "name": "assessment_options",
+      "schema": "",
+      "columns": {
+        "assessment_option_id": {
+          "name": "assessment_option_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "assessment_element_id": {
+          "name": "assessment_element_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "assessment_definition_id": {
+          "name": "assessment_definition_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "option_label": {
+          "name": "option_label",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "option_value": {
+          "name": "option_value",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "score_value": {
+          "name": "score_value",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "display_order": {
+          "name": "display_order",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "assessment_options_assessment_element_id_assessment_elements_assessment_element_id_fk": {
+          "name": "assessment_options_assessment_element_id_assessment_elements_assessment_element_id_fk",
+          "tableFrom": "assessment_options",
+          "tableTo": "assessment_elements",
+          "columnsFrom": [
+            "assessment_element_id"
+          ],
+          "columnsTo": [
+            "assessment_element_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "assessment_options_assessment_definition_id_assessment_definitions_assessment_definition_id_fk": {
+          "name": "assessment_options_assessment_definition_id_assessment_definitions_assessment_definition_id_fk",
+          "tableFrom": "assessment_options",
+          "tableTo": "assessment_definitions",
+          "columnsFrom": [
+            "assessment_definition_id"
+          ],
+          "columnsTo": [
+            "assessment_definition_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.assessment_access_links": {
+      "name": "assessment_access_links",
+      "schema": "",
+      "columns": {
+        "assessment_access_link_id": {
+          "name": "assessment_access_link_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "assessment_instance_id": {
+          "name": "assessment_instance_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "practice_id": {
+          "name": "practice_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "client_id": {
+          "name": "client_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "token_hash": {
+          "name": "token_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "access_status": {
+          "name": "access_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'active'"
+        },
+        "opened_at": {
+          "name": "opened_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "submitted_at": {
+          "name": "submitted_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "failed_attempt_count": {
+          "name": "failed_attempt_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "next_access_link_id": {
+          "name": "next_access_link_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "next_raw_token": {
+          "name": "next_raw_token",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "assessment_access_links_assessment_instance_id_assessment_instances_assessment_instance_id_fk": {
+          "name": "assessment_access_links_assessment_instance_id_assessment_instances_assessment_instance_id_fk",
+          "tableFrom": "assessment_access_links",
+          "tableTo": "assessment_instances",
+          "columnsFrom": [
+            "assessment_instance_id"
+          ],
+          "columnsTo": [
+            "assessment_instance_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "assessment_access_links_practice_id_practices_practice_id_fk": {
+          "name": "assessment_access_links_practice_id_practices_practice_id_fk",
+          "tableFrom": "assessment_access_links",
+          "tableTo": "practices",
+          "columnsFrom": [
+            "practice_id"
+          ],
+          "columnsTo": [
+            "practice_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "assessment_access_links_client_id_clients_client_id_fk": {
+          "name": "assessment_access_links_client_id_clients_client_id_fk",
+          "tableFrom": "assessment_access_links",
+          "tableTo": "clients",
+          "columnsFrom": [
+            "client_id"
+          ],
+          "columnsTo": [
+            "client_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "assessment_access_links_token_hash_unique": {
+          "name": "assessment_access_links_token_hash_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "token_hash"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.assessment_instances": {
+      "name": "assessment_instances",
+      "schema": "",
+      "columns": {
+        "assessment_instance_id": {
+          "name": "assessment_instance_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "assessment_definition_id": {
+          "name": "assessment_definition_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "client_id": {
+          "name": "client_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "practice_id": {
+          "name": "practice_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "practitioner_profile_id": {
+          "name": "practitioner_profile_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'assigned'"
+        },
+        "instance_elements_json": {
+          "name": "instance_elements_json",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "assigned_at": {
+          "name": "assigned_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "submitted_at": {
+          "name": "submitted_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "assessment_instances_assessment_definition_id_assessment_definitions_assessment_definition_id_fk": {
+          "name": "assessment_instances_assessment_definition_id_assessment_definitions_assessment_definition_id_fk",
+          "tableFrom": "assessment_instances",
+          "tableTo": "assessment_definitions",
+          "columnsFrom": [
+            "assessment_definition_id"
+          ],
+          "columnsTo": [
+            "assessment_definition_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "assessment_instances_client_id_clients_client_id_fk": {
+          "name": "assessment_instances_client_id_clients_client_id_fk",
+          "tableFrom": "assessment_instances",
+          "tableTo": "clients",
+          "columnsFrom": [
+            "client_id"
+          ],
+          "columnsTo": [
+            "client_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "assessment_instances_practice_id_practices_practice_id_fk": {
+          "name": "assessment_instances_practice_id_practices_practice_id_fk",
+          "tableFrom": "assessment_instances",
+          "tableTo": "practices",
+          "columnsFrom": [
+            "practice_id"
+          ],
+          "columnsTo": [
+            "practice_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "assessment_instances_practitioner_profile_id_practitioner_profiles_practitioner_profile_id_fk": {
+          "name": "assessment_instances_practitioner_profile_id_practitioner_profiles_practitioner_profile_id_fk",
+          "tableFrom": "assessment_instances",
+          "tableTo": "practitioner_profiles",
+          "columnsFrom": [
+            "practitioner_profile_id"
+          ],
+          "columnsTo": [
+            "practitioner_profile_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.assessment_responses": {
+      "name": "assessment_responses",
+      "schema": "",
+      "columns": {
+        "assessment_response_id": {
+          "name": "assessment_response_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "assessment_instance_id": {
+          "name": "assessment_instance_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "assessment_element_id": {
+          "name": "assessment_element_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "client_id": {
+          "name": "client_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "practice_id": {
+          "name": "practice_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "response_value": {
+          "name": "response_value",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "score_value": {
+          "name": "score_value",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "assessment_responses_assessment_instance_id_assessment_instances_assessment_instance_id_fk": {
+          "name": "assessment_responses_assessment_instance_id_assessment_instances_assessment_instance_id_fk",
+          "tableFrom": "assessment_responses",
+          "tableTo": "assessment_instances",
+          "columnsFrom": [
+            "assessment_instance_id"
+          ],
+          "columnsTo": [
+            "assessment_instance_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "assessment_responses_client_id_clients_client_id_fk": {
+          "name": "assessment_responses_client_id_clients_client_id_fk",
+          "tableFrom": "assessment_responses",
+          "tableTo": "clients",
+          "columnsFrom": [
+            "client_id"
+          ],
+          "columnsTo": [
+            "client_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "assessment_responses_practice_id_practices_practice_id_fk": {
+          "name": "assessment_responses_practice_id_practices_practice_id_fk",
+          "tableFrom": "assessment_responses",
+          "tableTo": "practices",
+          "columnsFrom": [
+            "practice_id"
+          ],
+          "columnsTo": [
+            "practice_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.assessment_results": {
+      "name": "assessment_results",
+      "schema": "",
+      "columns": {
+        "assessment_result_id": {
+          "name": "assessment_result_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "assessment_instance_id": {
+          "name": "assessment_instance_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "client_id": {
+          "name": "client_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "practice_id": {
+          "name": "practice_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "score": {
+          "name": "score",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "severity": {
+          "name": "severity",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "acute_risk_rating": {
+          "name": "acute_risk_rating",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "assessment_date": {
+          "name": "assessment_date",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'scored'"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "assessment_results_assessment_instance_id_assessment_instances_assessment_instance_id_fk": {
+          "name": "assessment_results_assessment_instance_id_assessment_instances_assessment_instance_id_fk",
+          "tableFrom": "assessment_results",
+          "tableTo": "assessment_instances",
+          "columnsFrom": [
+            "assessment_instance_id"
+          ],
+          "columnsTo": [
+            "assessment_instance_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "assessment_results_client_id_clients_client_id_fk": {
+          "name": "assessment_results_client_id_clients_client_id_fk",
+          "tableFrom": "assessment_results",
+          "tableTo": "clients",
+          "columnsFrom": [
+            "client_id"
+          ],
+          "columnsTo": [
+            "client_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "assessment_results_practice_id_practices_practice_id_fk": {
+          "name": "assessment_results_practice_id_practices_practice_id_fk",
+          "tableFrom": "assessment_results",
+          "tableTo": "practices",
+          "columnsFrom": [
+            "practice_id"
+          ],
+          "columnsTo": [
+            "practice_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.audit_events": {
+      "name": "audit_events",
+      "schema": "",
+      "columns": {
+        "audit_event_id": {
+          "name": "audit_event_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "practice_id": {
+          "name": "practice_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "client_id": {
+          "name": "client_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "event_type": {
+          "name": "event_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "entity_type": {
+          "name": "entity_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "entity_id": {
+          "name": "entity_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "actor_metadata_json": {
+          "name": "actor_metadata_json",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "audit_events_practice_id_practices_practice_id_fk": {
+          "name": "audit_events_practice_id_practices_practice_id_fk",
+          "tableFrom": "audit_events",
+          "tableTo": "practices",
+          "columnsFrom": [
+            "practice_id"
+          ],
+          "columnsTo": [
+            "practice_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "audit_events_client_id_clients_client_id_fk": {
+          "name": "audit_events_client_id_clients_client_id_fk",
+          "tableFrom": "audit_events",
+          "tableTo": "clients",
+          "columnsFrom": [
+            "client_id"
+          ],
+          "columnsTo": [
+            "client_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.simple_reports": {
+      "name": "simple_reports",
+      "schema": "",
+      "columns": {
+        "simple_report_id": {
+          "name": "simple_report_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "client_id": {
+          "name": "client_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "practice_id": {
+          "name": "practice_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "practitioner_profile_id": {
+          "name": "practitioner_profile_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "report_type": {
+          "name": "report_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'phq9_progress'"
+        },
+        "date_range_start": {
+          "name": "date_range_start",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "date_range_end": {
+          "name": "date_range_end",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "values_snapshot_json": {
+          "name": "values_snapshot_json",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "clinical_summary_text": {
+          "name": "clinical_summary_text",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "recommendations_text": {
+          "name": "recommendations_text",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "report_status": {
+          "name": "report_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'draft'"
+        },
+        "finalised_at": {
+          "name": "finalised_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "simple_reports_client_id_clients_client_id_fk": {
+          "name": "simple_reports_client_id_clients_client_id_fk",
+          "tableFrom": "simple_reports",
+          "tableTo": "clients",
+          "columnsFrom": [
+            "client_id"
+          ],
+          "columnsTo": [
+            "client_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "simple_reports_practice_id_practices_practice_id_fk": {
+          "name": "simple_reports_practice_id_practices_practice_id_fk",
+          "tableFrom": "simple_reports",
+          "tableTo": "practices",
+          "columnsFrom": [
+            "practice_id"
+          ],
+          "columnsTo": [
+            "practice_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "simple_reports_practitioner_profile_id_practitioner_profiles_practitioner_profile_id_fk": {
+          "name": "simple_reports_practitioner_profile_id_practitioner_profiles_practitioner_profile_id_fk",
+          "tableFrom": "simple_reports",
+          "tableTo": "practitioner_profiles",
+          "columnsFrom": [
+            "practitioner_profile_id"
+          ],
+          "columnsTo": [
+            "practitioner_profile_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.battery_instances": {
+      "name": "battery_instances",
+      "schema": "",
+      "columns": {
+        "battery_instance_id": {
+          "name": "battery_instance_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "practice_id": {
+          "name": "practice_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "client_id": {
+          "name": "client_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "practitioner_profile_id": {
+          "name": "practitioner_profile_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "battery_code": {
+          "name": "battery_code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'PRE_SESSION'"
+        },
+        "phq9_instance_id": {
+          "name": "phq9_instance_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "gad7_instance_id": {
+          "name": "gad7_instance_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "phq9_link_id": {
+          "name": "phq9_link_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "gad7_link_id": {
+          "name": "gad7_link_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'assigned'"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "battery_instances_practice_id_practices_practice_id_fk": {
+          "name": "battery_instances_practice_id_practices_practice_id_fk",
+          "tableFrom": "battery_instances",
+          "tableTo": "practices",
+          "columnsFrom": [
+            "practice_id"
+          ],
+          "columnsTo": [
+            "practice_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "battery_instances_client_id_clients_client_id_fk": {
+          "name": "battery_instances_client_id_clients_client_id_fk",
+          "tableFrom": "battery_instances",
+          "tableTo": "clients",
+          "columnsFrom": [
+            "client_id"
+          ],
+          "columnsTo": [
+            "client_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "battery_instances_practitioner_profile_id_practitioner_profiles_practitioner_profile_id_fk": {
+          "name": "battery_instances_practitioner_profile_id_practitioner_profiles_practitioner_profile_id_fk",
+          "tableFrom": "battery_instances",
+          "tableTo": "practitioner_profiles",
+          "columnsFrom": [
+            "practitioner_profile_id"
+          ],
+          "columnsTo": [
+            "practitioner_profile_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "battery_instances_phq9_instance_id_assessment_instances_assessment_instance_id_fk": {
+          "name": "battery_instances_phq9_instance_id_assessment_instances_assessment_instance_id_fk",
+          "tableFrom": "battery_instances",
+          "tableTo": "assessment_instances",
+          "columnsFrom": [
+            "phq9_instance_id"
+          ],
+          "columnsTo": [
+            "assessment_instance_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "battery_instances_gad7_instance_id_assessment_instances_assessment_instance_id_fk": {
+          "name": "battery_instances_gad7_instance_id_assessment_instances_assessment_instance_id_fk",
+          "tableFrom": "battery_instances",
+          "tableTo": "assessment_instances",
+          "columnsFrom": [
+            "gad7_instance_id"
+          ],
+          "columnsTo": [
+            "assessment_instance_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "battery_instances_phq9_link_id_assessment_access_links_assessment_access_link_id_fk": {
+          "name": "battery_instances_phq9_link_id_assessment_access_links_assessment_access_link_id_fk",
+          "tableFrom": "battery_instances",
+          "tableTo": "assessment_access_links",
+          "columnsFrom": [
+            "phq9_link_id"
+          ],
+          "columnsTo": [
+            "assessment_access_link_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "battery_instances_gad7_link_id_assessment_access_links_assessment_access_link_id_fk": {
+          "name": "battery_instances_gad7_link_id_assessment_access_links_assessment_access_link_id_fk",
+          "tableFrom": "battery_instances",
+          "tableTo": "assessment_access_links",
+          "columnsFrom": [
+            "gad7_link_id"
+          ],
+          "columnsTo": [
+            "assessment_access_link_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.treatment_plans": {
+      "name": "treatment_plans",
+      "schema": "",
+      "columns": {
+        "treatment_plan_id": {
+          "name": "treatment_plan_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "client_id": {
+          "name": "client_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "practice_id": {
+          "name": "practice_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "practitioner_profile_id": {
+          "name": "practitioner_profile_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "version_number": {
+          "name": "version_number",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "start_date": {
+          "name": "start_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "end_date": {
+          "name": "end_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "therapeutic_target": {
+          "name": "therapeutic_target",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "behavioural_targets_json": {
+          "name": "behavioural_targets_json",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ongoing_assessments_json": {
+          "name": "ongoing_assessments_json",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "risk_management_json": {
+          "name": "risk_management_json",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "support_services_json": {
+          "name": "support_services_json",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "psychoeducation_json": {
+          "name": "psychoeducation_json",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "case_formulation_json": {
+          "name": "case_formulation_json",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "alternate_responses_json": {
+          "name": "alternate_responses_json",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "quality_of_life_json": {
+          "name": "quality_of_life_json",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "treatment_plans_client_id_clients_client_id_fk": {
+          "name": "treatment_plans_client_id_clients_client_id_fk",
+          "tableFrom": "treatment_plans",
+          "tableTo": "clients",
+          "columnsFrom": [
+            "client_id"
+          ],
+          "columnsTo": [
+            "client_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "treatment_plans_practice_id_practices_practice_id_fk": {
+          "name": "treatment_plans_practice_id_practices_practice_id_fk",
+          "tableFrom": "treatment_plans",
+          "tableTo": "practices",
+          "columnsFrom": [
+            "practice_id"
+          ],
+          "columnsTo": [
+            "practice_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "treatment_plans_practitioner_profile_id_practitioner_profiles_practitioner_profile_id_fk": {
+          "name": "treatment_plans_practitioner_profile_id_practitioner_profiles_practitioner_profile_id_fk",
+          "tableFrom": "treatment_plans",
+          "tableTo": "practitioner_profiles",
+          "columnsFrom": [
+            "practitioner_profile_id"
+          ],
+          "columnsTo": [
+            "practitioner_profile_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.client_emergency_contacts": {
+      "name": "client_emergency_contacts",
+      "schema": "",
+      "columns": {
+        "contact_id": {
+          "name": "contact_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "client_id": {
+          "name": "client_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "practice_id": {
+          "name": "practice_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "role": {
+          "name": "role",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "phone": {
+          "name": "phone",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "display_order": {
+          "name": "display_order",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "client_emergency_contacts_client_id_clients_client_id_fk": {
+          "name": "client_emergency_contacts_client_id_clients_client_id_fk",
+          "tableFrom": "client_emergency_contacts",
+          "tableTo": "clients",
+          "columnsFrom": [
+            "client_id"
+          ],
+          "columnsTo": [
+            "client_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "client_emergency_contacts_practice_id_practices_practice_id_fk": {
+          "name": "client_emergency_contacts_practice_id_practices_practice_id_fk",
+          "tableFrom": "client_emergency_contacts",
+          "tableTo": "practices",
+          "columnsFrom": [
+            "practice_id"
+          ],
+          "columnsTo": [
+            "practice_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.crisis_plans": {
+      "name": "crisis_plans",
+      "schema": "",
+      "columns": {
+        "crisis_plan_id": {
+          "name": "crisis_plan_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "client_id": {
+          "name": "client_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "practice_id": {
+          "name": "practice_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "practitioner_profile_id": {
+          "name": "practitioner_profile_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "version_number": {
+          "name": "version_number",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "date_of_plan": {
+          "name": "date_of_plan",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "emergency_numbers_json": {
+          "name": "emergency_numbers_json",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "doing_well_json": {
+          "name": "doing_well_json",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "stay_well_json": {
+          "name": "stay_well_json",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "becoming_unwell_json": {
+          "name": "becoming_unwell_json",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "get_better_json": {
+          "name": "get_better_json",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "unwell_json": {
+          "name": "unwell_json",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "crisis_response_json": {
+          "name": "crisis_response_json",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "pdf_storage_path": {
+          "name": "pdf_storage_path",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "crisis_plans_client_id_clients_client_id_fk": {
+          "name": "crisis_plans_client_id_clients_client_id_fk",
+          "tableFrom": "crisis_plans",
+          "tableTo": "clients",
+          "columnsFrom": [
+            "client_id"
+          ],
+          "columnsTo": [
+            "client_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "crisis_plans_practice_id_practices_practice_id_fk": {
+          "name": "crisis_plans_practice_id_practices_practice_id_fk",
+          "tableFrom": "crisis_plans",
+          "tableTo": "practices",
+          "columnsFrom": [
+            "practice_id"
+          ],
+          "columnsTo": [
+            "practice_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "crisis_plans_practitioner_profile_id_practitioner_profiles_practitioner_profile_id_fk": {
+          "name": "crisis_plans_practitioner_profile_id_practitioner_profiles_practitioner_profile_id_fk",
+          "tableFrom": "crisis_plans",
+          "tableTo": "practitioner_profiles",
+          "columnsFrom": [
+            "practitioner_profile_id"
+          ],
+          "columnsTo": [
+            "practitioner_profile_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.appointments": {
+      "name": "appointments",
+      "schema": "",
+      "columns": {
+        "appointment_id": {
+          "name": "appointment_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "client_id": {
+          "name": "client_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "practice_id": {
+          "name": "practice_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "practitioner_profile_id": {
+          "name": "practitioner_profile_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "appointment_date": {
+          "name": "appointment_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "appointment_time": {
+          "name": "appointment_time",
+          "type": "time",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "duration_minutes": {
+          "name": "duration_minutes",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 50
+        },
+        "location": {
+          "name": "location",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'scheduled'"
+        },
+        "notes": {
+          "name": "notes",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "reminder_sent_at": {
+          "name": "reminder_sent_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "pre_session_battery_sent_at": {
+          "name": "pre_session_battery_sent_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "appointments_client_id_clients_client_id_fk": {
+          "name": "appointments_client_id_clients_client_id_fk",
+          "tableFrom": "appointments",
+          "tableTo": "clients",
+          "columnsFrom": [
+            "client_id"
+          ],
+          "columnsTo": [
+            "client_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "appointments_practice_id_practices_practice_id_fk": {
+          "name": "appointments_practice_id_practices_practice_id_fk",
+          "tableFrom": "appointments",
+          "tableTo": "practices",
+          "columnsFrom": [
+            "practice_id"
+          ],
+          "columnsTo": [
+            "practice_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "appointments_practitioner_profile_id_practitioner_profiles_practitioner_profile_id_fk": {
+          "name": "appointments_practitioner_profile_id_practitioner_profiles_practitioner_profile_id_fk",
+          "tableFrom": "appointments",
+          "tableTo": "practitioner_profiles",
+          "columnsFrom": [
+            "practitioner_profile_id"
+          ],
+          "columnsTo": [
+            "practitioner_profile_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.session_notes": {
+      "name": "session_notes",
+      "schema": "",
+      "columns": {
+        "session_note_id": {
+          "name": "session_note_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "client_id": {
+          "name": "client_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "practice_id": {
+          "name": "practice_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "practitioner_profile_id": {
+          "name": "practitioner_profile_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "appointment_id": {
+          "name": "appointment_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "battery_instance_id": {
+          "name": "battery_instance_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "session_date": {
+          "name": "session_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "session_time": {
+          "name": "session_time",
+          "type": "time",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "practitioner_notes": {
+          "name": "practitioner_notes",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'draft'"
+        },
+        "finalised_at": {
+          "name": "finalised_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "session_notes_client_id_clients_client_id_fk": {
+          "name": "session_notes_client_id_clients_client_id_fk",
+          "tableFrom": "session_notes",
+          "tableTo": "clients",
+          "columnsFrom": [
+            "client_id"
+          ],
+          "columnsTo": [
+            "client_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "session_notes_practice_id_practices_practice_id_fk": {
+          "name": "session_notes_practice_id_practices_practice_id_fk",
+          "tableFrom": "session_notes",
+          "tableTo": "practices",
+          "columnsFrom": [
+            "practice_id"
+          ],
+          "columnsTo": [
+            "practice_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "session_notes_practitioner_profile_id_practitioner_profiles_practitioner_profile_id_fk": {
+          "name": "session_notes_practitioner_profile_id_practitioner_profiles_practitioner_profile_id_fk",
+          "tableFrom": "session_notes",
+          "tableTo": "practitioner_profiles",
+          "columnsFrom": [
+            "practitioner_profile_id"
+          ],
+          "columnsTo": [
+            "practitioner_profile_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "session_notes_appointment_id_appointments_appointment_id_fk": {
+          "name": "session_notes_appointment_id_appointments_appointment_id_fk",
+          "tableFrom": "session_notes",
+          "tableTo": "appointments",
+          "columnsFrom": [
+            "appointment_id"
+          ],
+          "columnsTo": [
+            "appointment_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "session_notes_battery_instance_id_battery_instances_battery_instance_id_fk": {
+          "name": "session_notes_battery_instance_id_battery_instances_battery_instance_id_fk",
+          "tableFrom": "session_notes",
+          "tableTo": "battery_instances",
+          "columnsFrom": [
+            "battery_instance_id"
+          ],
+          "columnsTo": [
+            "battery_instance_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.professional_organisation_links": {
+      "name": "professional_organisation_links",
+      "schema": "",
+      "columns": {
+        "link_id": {
+          "name": "link_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "professional_id": {
+          "name": "professional_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "organisation_id": {
+          "name": "organisation_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "medicare_provider_number": {
+          "name": "medicare_provider_number",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "direct_phone": {
+          "name": "direct_phone",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "direct_email": {
+          "name": "direct_email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "direct_secure_messaging": {
+          "name": "direct_secure_messaging",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "professional_organisation_links_professional_id_professionals_professional_id_fk": {
+          "name": "professional_organisation_links_professional_id_professionals_professional_id_fk",
+          "tableFrom": "professional_organisation_links",
+          "tableTo": "professionals",
+          "columnsFrom": [
+            "professional_id"
+          ],
+          "columnsTo": [
+            "professional_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "professional_organisation_links_organisation_id_professional_organisations_organisation_id_fk": {
+          "name": "professional_organisation_links_organisation_id_professional_organisations_organisation_id_fk",
+          "tableFrom": "professional_organisation_links",
+          "tableTo": "professional_organisations",
+          "columnsFrom": [
+            "organisation_id"
+          ],
+          "columnsTo": [
+            "organisation_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.professional_organisations": {
+      "name": "professional_organisations",
+      "schema": "",
+      "columns": {
+        "organisation_id": {
+          "name": "organisation_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "practice_id": {
+          "name": "practice_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "organisation_name": {
+          "name": "organisation_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "street_address": {
+          "name": "street_address",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "postal_address": {
+          "name": "postal_address",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "phone": {
+          "name": "phone",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "fax": {
+          "name": "fax",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "claims_email": {
+          "name": "claims_email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "secure_messaging": {
+          "name": "secure_messaging",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "website": {
+          "name": "website",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "organisation_type": {
+          "name": "organisation_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "professional_organisations_practice_id_practices_practice_id_fk": {
+          "name": "professional_organisations_practice_id_practices_practice_id_fk",
+          "tableFrom": "professional_organisations",
+          "tableTo": "practices",
+          "columnsFrom": [
+            "practice_id"
+          ],
+          "columnsTo": [
+            "practice_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.professionals": {
+      "name": "professionals",
+      "schema": "",
+      "columns": {
+        "professional_id": {
+          "name": "professional_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "practice_id": {
+          "name": "practice_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "first_name": {
+          "name": "first_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "last_name": {
+          "name": "last_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "title": {
+          "name": "title",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "profession_id": {
+          "name": "profession_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "professionals_practice_id_practices_practice_id_fk": {
+          "name": "professionals_practice_id_practices_practice_id_fk",
+          "tableFrom": "professionals",
+          "tableTo": "practices",
+          "columnsFrom": [
+            "practice_id"
+          ],
+          "columnsTo": [
+            "practice_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "professionals_profession_id_professions_profession_id_fk": {
+          "name": "professionals_profession_id_professions_profession_id_fk",
+          "tableFrom": "professionals",
+          "tableTo": "professions",
+          "columnsFrom": [
+            "profession_id"
+          ],
+          "columnsTo": [
+            "profession_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.professions": {
+      "name": "professions",
+      "schema": "",
+      "columns": {
+        "profession_id": {
+          "name": "profession_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "practice_id": {
+          "name": "practice_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "profession_name": {
+          "name": "profession_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "professions_practice_id_practices_practice_id_fk": {
+          "name": "professions_practice_id_practices_practice_id_fk",
+          "tableFrom": "professions",
+          "tableTo": "practices",
+          "columnsFrom": [
+            "practice_id"
+          ],
+          "columnsTo": [
+            "practice_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {},
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

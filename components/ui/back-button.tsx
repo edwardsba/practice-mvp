@@ -4,7 +4,13 @@ import { useRouter } from "next/navigation"
 
 import { Button } from "@/components/ui/button"
 
-export function BackButton({ fallbackHref }: { fallbackHref: string }) {
+export function BackButton({
+  fallbackHref: _fallbackHref,
+  label: _label,
+}: {
+  fallbackHref: string
+  label?: string
+}) {
   const router = useRouter()
   return (
     <Button

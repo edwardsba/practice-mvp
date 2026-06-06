@@ -170,7 +170,7 @@ export function buildCalendarUrl(
 }
 
 export function newAppointmentUrl(date: string, time?: string): string {
-  const params = new URLSearchParams({ date })
+  const params = new URLSearchParams({ date, returnTo: "/calendar" })
   if (time) {
     params.set("time", time)
   }

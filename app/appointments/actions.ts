@@ -98,6 +98,7 @@ async function verifyClientInPractice(clientId: string, practiceId: string) {
 }
 
 export async function createAppointment(
+  returnTo: string | undefined,
   _prevState: AppointmentFormState,
   formData: FormData
 ): Promise<AppointmentFormState> {
@@ -150,8 +151,9 @@ export async function createAppointment(
   }
 
   revalidatePath("/appointments")
+  revalidatePath("/calendar")
   revalidatePath(`/clients/${parsed.clientId}`)
-  redirect("/appointments")
+  redirect(returnTo ?? "/appointments")
 }
 
 export async function updateAppointment(

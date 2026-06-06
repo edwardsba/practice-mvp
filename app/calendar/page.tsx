@@ -40,7 +40,9 @@ export default async function CalendarPage({
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-2xl font-semibold tracking-tight">Calendar</h1>
         <Button asChild>
-          <Link href="/appointments/new">New Appointment</Link>
+          <Link href="/appointments/new?returnTo=/calendar">
+            New Appointment
+          </Link>
         </Button>
       </div>
 

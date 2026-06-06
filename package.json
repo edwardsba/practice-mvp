@@ -17,7 +17,8 @@
     "db:acute-risk": "tsx db/apply-acute-risk-migration.ts",
     "db:treatment-plans": "tsx db/apply-treatment-plans-migration.ts",
     "db:crisis-plans": "tsx db/apply-crisis-plans-migration.ts",
-    "db:session-notes": "tsx db/apply-session-notes-migration.ts"
+    "db:session-notes": "tsx db/apply-session-notes-migration.ts",
+    "db:contacts": "tsx db/apply-contacts-migration.ts"
   },
   "dependencies": {
     "@react-pdf/renderer": "^4.5.1",

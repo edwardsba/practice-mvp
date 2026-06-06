@@ -156,6 +156,7 @@ export async function createAppointment(
 
 export async function updateAppointment(
   appointmentId: string,
+  returnTo: string | undefined,
   _prevState: AppointmentFormState,
   formData: FormData
 ): Promise<AppointmentFormState> {
@@ -225,5 +226,5 @@ export async function updateAppointment(
   if (parsed.clientId !== existing.clientId) {
     revalidatePath(`/clients/${existing.clientId}`)
   }
-  redirect("/appointments")
+  redirect(returnTo ?? "/appointments")
 }

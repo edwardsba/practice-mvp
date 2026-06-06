@@ -11,6 +11,7 @@ import {
 } from "@/lib/calendar/time-slots"
 import type { CalendarAppointment } from "@/lib/appointments/load"
 import { todayDateString } from "@/lib/appointments/format"
+import { appendReturnTo } from "@/lib/navigation/back"
 import { cn } from "@/lib/utils"
 
 const WEEKDAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
@@ -80,7 +81,10 @@ export function CalendarMonthView({
                     {dayAppointments.map((appointment) => (
                       <Link
                         key={appointment.appointmentId}
-                        href={`/appointments/${appointment.appointmentId}`}
+                        href={appendReturnTo(
+                          `/appointments/${appointment.appointmentId}`,
+                          "/calendar"
+                        )}
                         className="block truncate rounded-md border border-primary/20 bg-primary/10 px-2 py-1 text-xs font-medium text-primary hover:bg-primary/15"
                       >
                         {formatAppointmentClientName(appointment)}

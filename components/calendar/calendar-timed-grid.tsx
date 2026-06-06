@@ -10,6 +10,7 @@ import {
 } from "@/lib/calendar/time-slots"
 import type { CalendarAppointment } from "@/lib/appointments/load"
 import { todayDateString } from "@/lib/appointments/format"
+import { appendReturnTo } from "@/lib/navigation/back"
 import { cn } from "@/lib/utils"
 
 function AppointmentBlock({
@@ -21,7 +22,10 @@ function AppointmentBlock({
 }) {
   return (
     <Link
-      href={`/appointments/${appointment.appointmentId}`}
+      href={appendReturnTo(
+        `/appointments/${appointment.appointmentId}`,
+        "/calendar"
+      )}
       className="flex h-full min-h-0 flex-col justify-center rounded-md border border-primary/20 bg-primary/10 px-2 py-1 text-xs font-medium text-primary hover:bg-primary/15"
       style={{ minHeight: rowSpan * CALENDAR_SLOT_HEIGHT_PX - 4 }}
     >

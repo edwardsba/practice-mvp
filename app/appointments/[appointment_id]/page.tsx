@@ -19,7 +19,7 @@ import {
 } from "@/lib/appointments/format"
 import { loadAppointmentForPractice } from "@/lib/appointments/load"
 import { requirePractitionerContext } from "@/lib/auth"
-import { resolveBackNavigation } from "@/lib/navigation/back"
+import { appendReturnTo, resolveBackNavigation } from "@/lib/navigation/back"
 import { loadSessionNoteForAppointment } from "@/lib/session-notes/load"
 
 export default async function AppointmentDetailPage({
@@ -77,7 +77,14 @@ export default async function AppointmentDetailPage({
               </Button>
             )}
             <Button asChild variant="outline">
-              <Link href={`/appointments/${appointmentId}/edit`}>Edit</Link>
+              <Link
+                href={appendReturnTo(
+                  `/appointments/${appointmentId}/edit`,
+                  `/appointments/${appointmentId}`
+                )}
+              >
+                Edit
+              </Link>
             </Button>
           </div>
         </div>

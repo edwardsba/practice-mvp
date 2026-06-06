@@ -8,13 +8,17 @@ import { AppShell } from "@/components/app-shell"
 import { Button } from "@/components/ui/button"
 import { loadAppointmentForPractice } from "@/lib/appointments/load"
 import { requirePractitionerContext } from "@/lib/auth"
+import { resolveBackNavigation } from "@/lib/navigation/back"
 
 export default async function EditAppointmentPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ appointment_id: string }>
+  searchParams: Promise<{ returnTo?: string }>
 }) {
   const { appointment_id: appointmentId } = await params
+  const { returnTo } = await searchParams
   const context = await requirePractitionerContext()
 
   const [appointment, clients] = await Promise.all([
@@ -27,12 +31,17 @@ export default async function EditAppointmentPage({
   }
 
   const clientName = `${appointment.clientFirstName} ${appointment.clientLastName}`
+  const back = resolveBackNavigation(
+    returnTo,
+    "/appointments",
+    "← Back to appointments"
+  )
 
   return (
     <AppShell>
       <div className="mb-6">
         <Button variant="ghost" size="sm" asChild className="mb-2 -ml-2">
-          <Link href="/appointments">← Back to appointments</Link>
+          <Link href={back.href}>{back.label}</Link>
         </Button>
         <h1 className="text-2xl font-semibold tracking-tight">
           Edit appointment
@@ -41,7 +50,7 @@ export default async function EditAppointmentPage({
       </div>
 
       <AppointmentForm
-        action={updateAppointment.bind(null, appointmentId)}
+        action={updateAppointment.bind(null, appointmentId, returnTo)}
         clients={clients}
         initialValues={{
           clientId: appointment.clientId,

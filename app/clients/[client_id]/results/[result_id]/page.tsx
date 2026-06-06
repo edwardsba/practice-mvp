@@ -36,6 +36,7 @@ import {
 import { getMaxScoreForAssessmentDefinition } from "@/lib/assessments/max-score"
 import { requirePractitionerContext } from "@/lib/auth"
 import { db } from "@/lib/db"
+import { resolveBackNavigation } from "@/lib/navigation/back"
 
 function formatDate(value: Date | string | null) {
   if (!value) return "—"
@@ -51,10 +52,13 @@ function formatDate(value: Date | string | null) {
 
 export default async function AssessmentResultDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ client_id: string; result_id: string }>
+  searchParams: Promise<{ returnTo?: string }>
 }) {
   const { client_id: clientId, result_id: resultId } = await params
+  const { returnTo } = await searchParams
   const context = await requirePractitionerContext()
 
   const [client] = await db
@@ -169,12 +173,17 @@ export default async function AssessmentResultDetailPage({
     .orderBy(asc(assessmentElements.displayOrder))
 
   const clientName = `${client.firstName} ${client.lastName}`
+  const back = resolveBackNavigation(
+    returnTo,
+    `/clients/${clientId}`,
+    "← Back to client"
+  )
 
   return (
     <AppShell>
       <div className="mb-6">
         <Button variant="ghost" size="sm" asChild className="mb-2 -ml-2">
-          <Link href={`/clients/${clientId}`}>← Back to client</Link>
+          <Link href={back.href}>{back.label}</Link>
         </Button>
         <h1 className="text-2xl font-semibold tracking-tight">{clientName}</h1>
       </div>

@@ -17,6 +17,7 @@ import {
   verifyClientInPractice,
 } from "@/lib/treatment-plans/load"
 import { requirePractitionerContext } from "@/lib/auth"
+import { appendReturnTo, resolveBackNavigation } from "@/lib/navigation/back"
 
 function formatVersionDate(value: Date) {
   return value.toLocaleDateString("en-AU", {
@@ -28,10 +29,13 @@ function formatVersionDate(value: Date) {
 
 export default async function TreatmentPlanViewPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ client_id: string; plan_id: string }>
+  searchParams: Promise<{ returnTo?: string }>
 }) {
   const { client_id: clientId, plan_id: planId } = await params
+  const { returnTo } = await searchParams
   const context = await requirePractitionerContext()
 
   const client = await verifyClientInPractice(clientId, context.practiceId)
@@ -54,12 +58,17 @@ export default async function TreatmentPlanViewPage({
   )
 
   const clientName = `${client.firstName} ${client.lastName}`
+  const back = resolveBackNavigation(
+    returnTo,
+    `/clients/${clientId}`,
+    "← Back to client"
+  )
 
   return (
     <AppShell>
       <div className="mb-6">
         <Button variant="ghost" size="sm" asChild className="mb-2 -ml-2">
-          <Link href={`/clients/${clientId}`}>← Back to client</Link>
+          <Link href={back.href}>{back.label}</Link>
         </Button>
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
@@ -110,7 +119,14 @@ export default async function TreatmentPlanViewPage({
               {versions.map((version) => (
                 <li key={version.treatmentPlanId}>
                   <Link
-                    href={`/clients/${clientId}/treatment-plan/${version.treatmentPlanId}`}
+                    href={
+                      returnTo
+                        ? appendReturnTo(
+                            `/clients/${clientId}/treatment-plan/${version.treatmentPlanId}`,
+                            returnTo
+                          )
+                        : `/clients/${clientId}/treatment-plan/${version.treatmentPlanId}`
+                    }
                     className={`text-sm hover:underline ${
                       version.isActive
                         ? "font-semibold text-primary"

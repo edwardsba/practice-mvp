@@ -15,6 +15,7 @@ import { clients } from "@/db/schema"
 import { loadAsqQuestionnaire } from "@/lib/assessments/load-asq"
 import { requirePractitionerContext } from "@/lib/auth"
 import { db } from "@/lib/db"
+import { resolveBackNavigation } from "@/lib/navigation/back"
 
 export default async function AdministerAsqPage({
   params,
@@ -52,12 +53,17 @@ export default async function AdministerAsqPage({
   }
 
   const clientName = `${client.firstName} ${client.lastName}`
+  const back = resolveBackNavigation(
+    returnTo,
+    `/clients/${clientId}`,
+    "← Back to client"
+  )
 
   return (
     <AppShell>
       <div className="mb-6">
         <Button variant="ghost" size="sm" asChild className="mb-2 -ml-2">
-          <Link href={returnTo ?? `/clients/${clientId}`}>← Back to client</Link>
+          <Link href={back.href}>{back.label}</Link>
         </Button>
         <h1 className="text-2xl font-semibold tracking-tight">Administer ASQ</h1>
         <p className="mt-1 text-sm text-muted-foreground">{clientName}</p>

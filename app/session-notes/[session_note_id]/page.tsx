@@ -20,6 +20,7 @@ import {
   formatSessionNoteDate,
   formatSessionNoteTime,
 } from "@/lib/session-notes/format"
+import { appendReturnTo } from "@/lib/navigation/back"
 import { loadSessionNoteViewContext } from "@/lib/session-notes/load-context"
 import { loadSessionNoteForPractice } from "@/lib/session-notes/load"
 
@@ -59,6 +60,7 @@ export default async function SessionNoteViewPage({
     note.clientLastName
   )
   const isDraft = note.status === "draft"
+  const sessionNoteReturnTo = `/session-notes/${sessionNoteId}`
 
   return (
     <AppShell>
@@ -176,7 +178,10 @@ export default async function SessionNoteViewPage({
                       </Table>
                     </div>
                     <Link
-                      href={`/clients/${note.clientId}/results/${result.assessmentResultId}`}
+                      href={appendReturnTo(
+                        `/clients/${note.clientId}/results/${result.assessmentResultId}`,
+                        sessionNoteReturnTo
+                      )}
                       className="mt-2 inline-block text-sm text-primary hover:underline"
                     >
                       View full result
@@ -206,7 +211,10 @@ export default async function SessionNoteViewPage({
                       <TableRow className="hover:bg-muted/50">
                         <TableCell>
                           <Link
-                            href={`/clients/${note.clientId}/results/${viewContext.asqResult.assessmentResultId}`}
+                            href={appendReturnTo(
+                              `/clients/${note.clientId}/results/${viewContext.asqResult.assessmentResultId}`,
+                              sessionNoteReturnTo
+                            )}
                             className="block font-medium text-primary hover:underline"
                           >
                             {formatSessionNoteDate(
@@ -225,7 +233,12 @@ export default async function SessionNoteViewPage({
                 </div>
               ) : (
                 <Button asChild variant="outline" size="sm">
-                  <Link href={`/clients/${note.clientId}/asq/new?returnTo=/session-notes/${sessionNoteId}`}>
+                  <Link
+                    href={appendReturnTo(
+                      `/clients/${note.clientId}/asq/new`,
+                      sessionNoteReturnTo
+                    )}
+                  >
                     Administer ASQ
                   </Link>
                 </Button>
@@ -245,7 +258,10 @@ export default async function SessionNoteViewPage({
                       : "Not updated"}
                   </p>
                   <Link
-                    href={`/clients/${note.clientId}/crisis-plan/${viewContext.crisisPlan.crisisPlanId}`}
+                    href={appendReturnTo(
+                      `/clients/${note.clientId}/crisis-plan/${viewContext.crisisPlan.crisisPlanId}`,
+                      sessionNoteReturnTo
+                    )}
                     className="text-primary hover:underline"
                   >
                     View crisis plan
@@ -274,7 +290,10 @@ export default async function SessionNoteViewPage({
         <CollapsibleSection title="Next Appointment">
           {viewContext.nextAppointment ? (
             <Link
-              href={`/appointments/${viewContext.nextAppointment.appointmentId}`}
+              href={appendReturnTo(
+                `/appointments/${viewContext.nextAppointment.appointmentId}`,
+                sessionNoteReturnTo
+              )}
               className="text-sm text-primary hover:underline"
             >
               {viewContext.nextAppointment.label}

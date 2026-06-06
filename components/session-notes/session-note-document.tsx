@@ -60,23 +60,25 @@ function AssessmentBlock({ result }: { result: SessionNoteAssessmentResult }) {
   }
 
   return (
-    <div className="space-y-1 text-sm">
-      <p>
-        <span className="font-medium">Score:</span> {result.score}
-        {result.maxScore != null ? ` / ${result.maxScore}` : null}
-      </p>
-      {result.severity ? (
-        <p>
-          <span className="font-medium">Severity:</span> {result.severity}
-        </p>
-      ) : null}
-      {result.functionalImpairmentLabel ? (
-        <p>
-          <span className="font-medium">Functional Impairment:</span>{" "}
-          {result.functionalImpairmentLabel}
-        </p>
-      ) : null}
-    </div>
+    <table className="report-results-table w-full text-sm">
+      <thead>
+        <tr>
+          <th>Score</th>
+          <th>Severity</th>
+          <th>Functional Impairment</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>
+            {result.score}
+            {result.maxScore != null ? ` / ${result.maxScore}` : ""}
+          </td>
+          <td className="capitalize">{result.severity ?? "—"}</td>
+          <td>{result.functionalImpairmentLabel ?? "—"}</td>
+        </tr>
+      </tbody>
+    </table>
   )
 }
 
@@ -132,24 +134,22 @@ export function SessionNoteDocument({
               {formatSessionNoteTime(sessionTime)}
             </dd>
           </div>
-          <div className="sm:col-span-2">
-            <dt className="font-medium text-muted-foreground">
-              Therapeutic target
-            </dt>
-            <dd>{therapeuticTarget || "No treatment plan"}</dd>
-          </div>
         </dl>
       </header>
 
       <section className="session-note-section pt-4">
-        <h3 className="mb-2 text-base font-semibold">
-          Behavioural Targets Progress
-        </h3>
+        <h3 className="mb-2 text-base font-semibold">Treatment Plan</h3>
+        <div className="mb-3">
+          <p className="text-sm font-medium text-muted-foreground">
+            Therapeutic target
+          </p>
+          <p className="text-sm">{therapeuticTarget || "No treatment plan"}</p>
+        </div>
         <BtpTable targets={btpTargets} />
       </section>
 
       <section className="session-note-section">
-        <h3 className="mb-3 text-base font-semibold">Assessment Results</h3>
+        <h3 className="mb-3 text-base font-semibold">Ongoing Assessments</h3>
         <div className="space-y-4">
           {assessments.map((result) => (
             <div key={result.code}>
@@ -161,17 +161,25 @@ export function SessionNoteDocument({
       </section>
 
       <section className="session-note-section">
-        <h3 className="mb-2 text-base font-semibold">Risk</h3>
+        <h3 className="mb-2 text-base font-semibold">Risk Assessment</h3>
         <div className="space-y-3 text-sm">
           <div>
             <p className="font-medium">ASQ</p>
             {asqResult ? (
-              <p>
-                Score: {asqResult.score}
-                {asqResult.acuteRiskRating
-                  ? ` — Acute risk: ${asqResult.acuteRiskRating}`
-                  : null}
-              </p>
+              <table className="report-results-table w-full text-sm">
+                <thead>
+                  <tr>
+                    <th>Score</th>
+                    <th>Acute Risk Rating</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>{asqResult.score}</td>
+                    <td>{asqResult.acuteRiskRating ?? "—"}</td>
+                  </tr>
+                </tbody>
+              </table>
             ) : (
               <p className="text-muted-foreground">No ASQ administered this session.</p>
             )}

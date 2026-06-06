@@ -19,7 +19,6 @@ import {
 } from "@/lib/appointments/format"
 import { loadAppointmentForPractice } from "@/lib/appointments/load"
 import { requirePractitionerContext } from "@/lib/auth"
-import { appendReturnTo, resolveBackNavigation } from "@/lib/navigation/back"
 import { loadSessionNoteForAppointment } from "@/lib/session-notes/load"
 
 export default async function AppointmentDetailPage({
@@ -46,17 +45,17 @@ export default async function AppointmentDetailPage({
     appointment.clientFirstName,
     appointment.clientLastName
   )
-  const back = resolveBackNavigation(
-    returnTo,
-    "/appointments",
-    "← Back to appointments"
-  )
+  const backHref = returnTo ?? "/appointments"
+  const backLabel =
+    returnTo === "/calendar"
+      ? "← Back to calendar"
+      : "← Back to appointments"
 
   return (
     <AppShell>
       <div className="mb-6">
         <Button variant="ghost" size="sm" asChild className="mb-2 -ml-2">
-          <Link href={back.href}>{back.label}</Link>
+          <Link href={backHref}>{backLabel}</Link>
         </Button>
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <h1 className="text-2xl font-semibold tracking-tight">Appointment</h1>
@@ -78,10 +77,7 @@ export default async function AppointmentDetailPage({
             )}
             <Button asChild variant="outline">
               <Link
-                href={appendReturnTo(
-                  `/appointments/${appointmentId}/edit`,
-                  `/appointments/${appointmentId}`
-                )}
+                href={`/appointments/${appointmentId}/edit?returnTo=${returnTo ?? "/appointments"}`}
               >
                 Edit
               </Link>

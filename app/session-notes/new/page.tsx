@@ -3,7 +3,7 @@ import Link from "next/link"
 import { createSessionNote } from "@/app/session-notes/actions"
 import { getActiveClients } from "@/app/clients/actions"
 import { AppShell } from "@/components/app-shell"
-import { Button } from "@/components/ui/button"
+import { BackButton } from "@/components/ui/back-button"
 import { SessionNoteForm } from "@/components/session-notes/session-note-form"
 import { todayDateString } from "@/lib/appointments/format"
 import { loadAppointmentForPractice } from "@/lib/appointments/load"
@@ -31,9 +31,10 @@ export default async function NewSessionNotePage({
   return (
     <AppShell>
       <div className="mb-6">
-        <Button variant="ghost" size="sm" asChild className="mb-2 -ml-2">
-          <Link href="/session-notes">← Back to session notes</Link>
-        </Button>
+        <BackButton
+          fallbackHref="/session-notes"
+          label="← Back to session notes"
+        />
         <h1 className="text-2xl font-semibold tracking-tight">
           New Session Note
         </h1>

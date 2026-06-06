@@ -4,7 +4,7 @@ import { notFound, redirect } from "next/navigation"
 import { updateSessionNote } from "@/app/session-notes/actions"
 import { getActiveClients } from "@/app/clients/actions"
 import { AppShell } from "@/components/app-shell"
-import { Button } from "@/components/ui/button"
+import { BackButton } from "@/components/ui/back-button"
 import { SessionNoteForm } from "@/components/session-notes/session-note-form"
 import { requirePractitionerContext } from "@/lib/auth"
 import { loadSessionNoteForPractice } from "@/lib/session-notes/load"
@@ -36,11 +36,10 @@ export default async function EditSessionNotePage({
   return (
     <AppShell>
       <div className="mb-6">
-        <Button variant="ghost" size="sm" asChild className="mb-2 -ml-2">
-          <Link href={`/session-notes/${sessionNoteId}`}>
-            ← Back to session note
-          </Link>
-        </Button>
+        <BackButton
+          fallbackHref={`/session-notes/${sessionNoteId}`}
+          label="← Back to session note"
+        />
         <h1 className="text-2xl font-semibold tracking-tight">
           Edit Session Note
         </h1>

@@ -8,7 +8,6 @@ import { AppShell } from "@/components/app-shell"
 import { Button } from "@/components/ui/button"
 import { loadAppointmentForPractice } from "@/lib/appointments/load"
 import { requirePractitionerContext } from "@/lib/auth"
-import { resolveBackNavigation } from "@/lib/navigation/back"
 
 export default async function EditAppointmentPage({
   params,
@@ -31,17 +30,12 @@ export default async function EditAppointmentPage({
   }
 
   const clientName = `${appointment.clientFirstName} ${appointment.clientLastName}`
-  const back = resolveBackNavigation(
-    returnTo,
-    "/appointments",
-    "← Back to appointments"
-  )
 
   return (
     <AppShell>
       <div className="mb-6">
         <Button variant="ghost" size="sm" asChild className="mb-2 -ml-2">
-          <Link href={back.href}>{back.label}</Link>
+          <Link href={`/appointments/${appointmentId}`}>← Back</Link>
         </Button>
         <h1 className="text-2xl font-semibold tracking-tight">
           Edit appointment

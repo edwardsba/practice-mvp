@@ -226,5 +226,9 @@ export async function updateAppointment(
   if (parsed.clientId !== existing.clientId) {
     revalidatePath(`/clients/${existing.clientId}`)
   }
-  redirect(returnTo ?? "/appointments")
+  redirect(
+    returnTo
+      ? `/appointments/${appointmentId}?returnTo=${returnTo}`
+      : `/appointments/${appointmentId}`
+  )
 }

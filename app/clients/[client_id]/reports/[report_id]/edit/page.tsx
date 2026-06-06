@@ -4,7 +4,7 @@ import { and, eq } from "drizzle-orm"
 
 import { EditReportForm } from "@/app/clients/[client_id]/reports/[report_id]/edit/edit-report-form"
 import { AppShell } from "@/components/app-shell"
-import { Button } from "@/components/ui/button"
+import { BackButton } from "@/components/ui/back-button"
 import { clients, simpleReports } from "@/db/schema"
 import { requirePractitionerContext } from "@/lib/auth"
 import { db } from "@/lib/db"
@@ -67,11 +67,10 @@ export default async function EditReportPage({
   return (
     <AppShell>
       <div className="mb-6">
-        <Button variant="ghost" size="sm" asChild className="mb-2 -ml-2">
-          <Link href={`/clients/${clientId}/reports/${reportId}`}>
-            ← Back to report
-          </Link>
-        </Button>
+        <BackButton
+          fallbackHref={`/clients/${clientId}/reports/${reportId}`}
+          label="← Back to report"
+        />
         <h1 className="text-2xl font-semibold tracking-tight">Edit report</h1>
         <p className="mt-1 text-muted-foreground">{clientName}</p>
       </div>

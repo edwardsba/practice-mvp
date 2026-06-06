@@ -5,6 +5,7 @@ import { AppShell } from "@/components/app-shell"
 import { CollapsibleSection } from "@/components/session-notes/collapsible-section"
 import { SessionNoteActions } from "@/components/session-notes/session-note-actions"
 import { SessionNoteDocument } from "@/components/session-notes/session-note-document"
+import { BackButton } from "@/components/ui/back-button"
 import { Button } from "@/components/ui/button"
 import {
   Table,
@@ -20,7 +21,6 @@ import {
   formatSessionNoteDate,
   formatSessionNoteTime,
 } from "@/lib/session-notes/format"
-import { appendReturnTo } from "@/lib/navigation/back"
 import { loadSessionNoteViewContext } from "@/lib/session-notes/load-context"
 import { loadSessionNoteForPractice } from "@/lib/session-notes/load"
 
@@ -60,14 +60,14 @@ export default async function SessionNoteViewPage({
     note.clientLastName
   )
   const isDraft = note.status === "draft"
-  const sessionNoteReturnTo = `/session-notes/${sessionNoteId}`
 
   return (
     <AppShell>
       <div className="mb-6 no-print">
-        <Button variant="ghost" size="sm" asChild className="mb-2 -ml-2">
-          <Link href={`/clients/${note.clientId}`}>← Back to client</Link>
-        </Button>
+        <BackButton
+          fallbackHref={`/clients/${note.clientId}`}
+          label="← Back to client"
+        />
         <h1 className="text-2xl font-semibold tracking-tight">Session Note</h1>
       </div>
 
@@ -178,10 +178,7 @@ export default async function SessionNoteViewPage({
                       </Table>
                     </div>
                     <Link
-                      href={appendReturnTo(
-                        `/clients/${note.clientId}/results/${result.assessmentResultId}`,
-                        sessionNoteReturnTo
-                      )}
+                      href={`/clients/${note.clientId}/results/${result.assessmentResultId}`}
                       className="mt-2 inline-block text-sm text-primary hover:underline"
                     >
                       View full result
@@ -211,10 +208,7 @@ export default async function SessionNoteViewPage({
                       <TableRow className="hover:bg-muted/50">
                         <TableCell>
                           <Link
-                            href={appendReturnTo(
-                              `/clients/${note.clientId}/results/${viewContext.asqResult.assessmentResultId}`,
-                              sessionNoteReturnTo
-                            )}
+                            href={`/clients/${note.clientId}/results/${viewContext.asqResult.assessmentResultId}`}
                             className="block font-medium text-primary hover:underline"
                           >
                             {formatSessionNoteDate(
@@ -233,12 +227,7 @@ export default async function SessionNoteViewPage({
                 </div>
               ) : (
                 <Button asChild variant="outline" size="sm">
-                  <Link
-                    href={appendReturnTo(
-                      `/clients/${note.clientId}/asq/new`,
-                      sessionNoteReturnTo
-                    )}
-                  >
+                  <Link href={`/clients/${note.clientId}/asq/new`}>
                     Administer ASQ
                   </Link>
                 </Button>
@@ -258,10 +247,7 @@ export default async function SessionNoteViewPage({
                       : "Not updated"}
                   </p>
                   <Link
-                    href={appendReturnTo(
-                      `/clients/${note.clientId}/crisis-plan/${viewContext.crisisPlan.crisisPlanId}`,
-                      sessionNoteReturnTo
-                    )}
+                    href={`/clients/${note.clientId}/crisis-plan/${viewContext.crisisPlan.crisisPlanId}`}
                     className="text-primary hover:underline"
                   >
                     View crisis plan
@@ -290,10 +276,7 @@ export default async function SessionNoteViewPage({
         <CollapsibleSection title="Next Appointment">
           {viewContext.nextAppointment ? (
             <Link
-              href={appendReturnTo(
-                `/appointments/${viewContext.nextAppointment.appointmentId}`,
-                sessionNoteReturnTo
-              )}
+              href={`/appointments/${viewContext.nextAppointment.appointmentId}`}
               className="text-sm text-primary hover:underline"
             >
               {viewContext.nextAppointment.label}

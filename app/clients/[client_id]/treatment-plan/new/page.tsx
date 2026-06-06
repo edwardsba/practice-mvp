@@ -4,7 +4,7 @@ import { notFound } from "next/navigation"
 import { createTreatmentPlan } from "@/app/clients/[client_id]/treatment-plan/actions"
 import { TreatmentPlanForm } from "@/components/treatment-plan/treatment-plan-form"
 import { AppShell } from "@/components/app-shell"
-import { Button } from "@/components/ui/button"
+import { BackButton } from "@/components/ui/back-button"
 import { verifyClientInPractice } from "@/lib/treatment-plans/load"
 import { requirePractitionerContext } from "@/lib/auth"
 
@@ -26,9 +26,10 @@ export default async function NewTreatmentPlanPage({
   return (
     <AppShell>
       <div className="mb-6">
-        <Button variant="ghost" size="sm" asChild className="mb-2 -ml-2">
-          <Link href={`/clients/${clientId}`}>← Back to client</Link>
-        </Button>
+        <BackButton
+          fallbackHref={`/clients/${clientId}`}
+          label="← Back to client"
+        />
         <h1 className="text-2xl font-semibold tracking-tight">
           Create treatment plan
         </h1>

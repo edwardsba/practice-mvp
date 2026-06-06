@@ -4,7 +4,7 @@ import { notFound } from "next/navigation"
 
 import { AsqForm } from "@/app/clients/[client_id]/asq/new/asq-form"
 import { AppShell } from "@/components/app-shell"
-import { Button } from "@/components/ui/button"
+import { BackButton } from "@/components/ui/back-button"
 import {
   Card,
   CardContent,
@@ -15,17 +15,12 @@ import { clients } from "@/db/schema"
 import { loadAsqQuestionnaire } from "@/lib/assessments/load-asq"
 import { requirePractitionerContext } from "@/lib/auth"
 import { db } from "@/lib/db"
-import { resolveBackNavigation } from "@/lib/navigation/back"
-
 export default async function AdministerAsqPage({
   params,
-  searchParams,
 }: {
   params: Promise<{ client_id: string }>
-  searchParams: Promise<{ returnTo?: string }>
 }) {
   const { client_id: clientId } = await params
-  const { returnTo } = await searchParams
   const context = await requirePractitionerContext()
 
   const [client] = await db
@@ -53,18 +48,14 @@ export default async function AdministerAsqPage({
   }
 
   const clientName = `${client.firstName} ${client.lastName}`
-  const back = resolveBackNavigation(
-    returnTo,
-    `/clients/${clientId}`,
-    "← Back to client"
-  )
 
   return (
     <AppShell>
       <div className="mb-6">
-        <Button variant="ghost" size="sm" asChild className="mb-2 -ml-2">
-          <Link href={back.href}>{back.label}</Link>
-        </Button>
+        <BackButton
+          fallbackHref={`/clients/${clientId}`}
+          label="← Back to client"
+        />
         <h1 className="text-2xl font-semibold tracking-tight">Administer ASQ</h1>
         <p className="mt-1 text-sm text-muted-foreground">{clientName}</p>
       </div>

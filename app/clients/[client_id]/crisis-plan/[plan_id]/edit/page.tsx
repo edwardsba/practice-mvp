@@ -4,7 +4,7 @@ import { notFound } from "next/navigation"
 import { createCrisisPlanVersion } from "@/app/clients/[client_id]/crisis-plan/actions"
 import { CrisisPlanForm } from "@/components/crisis-plan/crisis-plan-form"
 import { AppShell } from "@/components/app-shell"
-import { Button } from "@/components/ui/button"
+import { BackButton } from "@/components/ui/back-button"
 import { Badge } from "@/components/ui/badge"
 import {
   loadCrisisPlanForPractice,
@@ -41,11 +41,10 @@ export default async function EditCrisisPlanPage({
   return (
     <AppShell>
       <div className="mb-6">
-        <Button variant="ghost" size="sm" asChild className="mb-2 -ml-2">
-          <Link href={`/clients/${clientId}/crisis-plan/${planId}`}>
-            ← Back to crisis plan
-          </Link>
-        </Button>
+        <BackButton
+          fallbackHref={`/clients/${clientId}/crisis-plan/${planId}`}
+          label="← Back to crisis plan"
+        />
         <div className="flex flex-wrap items-center gap-2">
           <h1 className="text-2xl font-semibold tracking-tight">
             Edit crisis plan

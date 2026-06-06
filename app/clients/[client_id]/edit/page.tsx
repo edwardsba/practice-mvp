@@ -4,7 +4,7 @@ import { and, eq } from "drizzle-orm"
 
 import { EditClientForm } from "@/app/clients/[client_id]/edit/edit-client-form"
 import { AppShell } from "@/components/app-shell"
-import { Button } from "@/components/ui/button"
+import { BackButton } from "@/components/ui/back-button"
 import {
   Card,
   CardContent,
@@ -50,9 +50,10 @@ export default async function EditClientPage({
   return (
     <AppShell>
       <div className="mb-6">
-        <Button variant="ghost" size="sm" asChild className="mb-2 -ml-2">
-          <Link href={`/clients/${clientId}`}>← Back to client</Link>
-        </Button>
+        <BackButton
+          fallbackHref={`/clients/${clientId}`}
+          label="← Back to client"
+        />
         <h1 className="text-2xl font-semibold tracking-tight">Edit client</h1>
         <p className="mt-1 text-muted-foreground">{clientName}</p>
       </div>

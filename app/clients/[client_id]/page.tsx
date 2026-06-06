@@ -6,6 +6,7 @@ import { AppShell } from "@/components/app-shell"
 import { SendAssessmentButton } from "@/app/clients/[client_id]/send-assessment-button"
 import { SendBatteryButton } from "@/app/clients/[client_id]/send-battery-button"
 import { EmergencyContactsSection } from "@/components/emergency-contacts/emergency-contacts-section"
+import { BackButton } from "@/components/ui/back-button"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -274,9 +275,7 @@ export default async function ClientDetailPage({
   return (
     <AppShell>
       <div className="mb-6">
-        <Button variant="ghost" size="sm" asChild className="mb-2 -ml-2">
-          <Link href="/clients">← Back to clients</Link>
-        </Button>
+        <BackButton fallbackHref="/clients" label="← Back to clients" />
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <h1 className="text-2xl font-semibold tracking-tight">
             {client.firstName} {client.lastName}

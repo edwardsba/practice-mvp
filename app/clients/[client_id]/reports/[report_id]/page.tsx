@@ -4,6 +4,7 @@ import { and, eq } from "drizzle-orm"
 
 import { SavedReportView } from "@/app/clients/[client_id]/reports/[report_id]/saved-report-view"
 import { AppShell } from "@/components/app-shell"
+import { BackButton } from "@/components/ui/back-button"
 import { Button } from "@/components/ui/button"
 import { clients, simpleReports } from "@/db/schema"
 import { requirePractitionerContext } from "@/lib/auth"
@@ -69,9 +70,10 @@ export default async function SavedReportPage({
   return (
     <AppShell>
       <div className="mb-6 no-print">
-        <Button variant="ghost" size="sm" asChild className="mb-2 -ml-2">
-          <Link href={`/clients/${clientId}`}>← Back to client</Link>
-        </Button>
+        <BackButton
+          fallbackHref={`/clients/${clientId}`}
+          label="← Back to client"
+        />
         <h1 className="text-2xl font-semibold tracking-tight">{clientName}</h1>
         <p className="mt-1 text-muted-foreground">Saved report</p>
       </div>

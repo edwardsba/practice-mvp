@@ -3,7 +3,7 @@ import Link from "next/link"
 import { getPractice } from "@/app/practice/actions"
 import { PracticeForm } from "@/app/practice/practice-form"
 import { AppShell } from "@/components/app-shell"
-import { Button } from "@/components/ui/button"
+import { BackButton } from "@/components/ui/back-button"
 
 export default async function EditPracticePage() {
   const practice = await getPractice()
@@ -22,9 +22,7 @@ export default async function EditPracticePage() {
   return (
     <AppShell>
       <div className="mb-6">
-        <Button variant="ghost" size="sm" asChild className="mb-2 -ml-2">
-          <Link href="/practice">← Back to practice</Link>
-        </Button>
+        <BackButton fallbackHref="/practice" label="← Back to practice" />
         <h1 className="text-2xl font-semibold tracking-tight">Edit practice</h1>
       </div>
 

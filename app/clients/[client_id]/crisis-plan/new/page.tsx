@@ -4,7 +4,7 @@ import { notFound } from "next/navigation"
 import { createCrisisPlan } from "@/app/clients/[client_id]/crisis-plan/actions"
 import { CrisisPlanForm } from "@/components/crisis-plan/crisis-plan-form"
 import { AppShell } from "@/components/app-shell"
-import { Button } from "@/components/ui/button"
+import { BackButton } from "@/components/ui/back-button"
 import {
   loadEmergencyContacts,
   verifyClientInPractice,
@@ -30,9 +30,10 @@ export default async function NewCrisisPlanPage({
   return (
     <AppShell>
       <div className="mb-6">
-        <Button variant="ghost" size="sm" asChild className="mb-2 -ml-2">
-          <Link href={`/clients/${clientId}`}>← Back to client</Link>
-        </Button>
+        <BackButton
+          fallbackHref={`/clients/${clientId}`}
+          label="← Back to client"
+        />
         <h1 className="text-2xl font-semibold tracking-tight">
           Create crisis plan
         </h1>

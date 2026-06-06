@@ -4,7 +4,7 @@ import { notFound } from "next/navigation"
 import { createTreatmentPlanVersion } from "@/app/clients/[client_id]/treatment-plan/actions"
 import { TreatmentPlanForm } from "@/components/treatment-plan/treatment-plan-form"
 import { AppShell } from "@/components/app-shell"
-import { Button } from "@/components/ui/button"
+import { BackButton } from "@/components/ui/back-button"
 import { Badge } from "@/components/ui/badge"
 import {
   loadTreatmentPlanForPractice,
@@ -44,11 +44,10 @@ export default async function EditTreatmentPlanPage({
   return (
     <AppShell>
       <div className="mb-6">
-        <Button variant="ghost" size="sm" asChild className="mb-2 -ml-2">
-          <Link href={`/clients/${clientId}/treatment-plan/${planId}`}>
-            ← Back to treatment plan
-          </Link>
-        </Button>
+        <BackButton
+          fallbackHref={`/clients/${clientId}/treatment-plan/${planId}`}
+          label="← Back to treatment plan"
+        />
         <div className="flex flex-wrap items-center gap-2">
           <h1 className="text-2xl font-semibold tracking-tight">
             Edit treatment plan

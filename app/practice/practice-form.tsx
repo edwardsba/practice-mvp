@@ -22,7 +22,10 @@ type Practice = {
   timezone: string
   address: string | null
   phone: string | null
+  fax: string | null
   email: string | null
+  website: string | null
+  abn: string | null
 }
 
 const initialState: PracticeFormState = {}
@@ -58,21 +61,28 @@ export function PracticeForm({ practice }: { practice: Practice }) {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="address">Address</Label>
-            <Input
-              id="address"
-              name="address"
-              defaultValue={practice.address ?? ""}
-            />
+            <Label htmlFor="abn">ABN</Label>
+            <Input id="abn" name="abn" defaultValue={practice.abn ?? ""} />
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="phone">Phone</Label>
-            <Input
-              id="phone"
-              name="phone"
-              type="tel"
-              defaultValue={practice.phone ?? ""}
-            />
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="phone">Phone</Label>
+              <Input
+                id="phone"
+                name="phone"
+                type="tel"
+                defaultValue={practice.phone ?? ""}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="fax">Fax</Label>
+              <Input
+                id="fax"
+                name="fax"
+                type="tel"
+                defaultValue={practice.fax ?? ""}
+              />
+            </div>
           </div>
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
@@ -81,6 +91,23 @@ export function PracticeForm({ practice }: { practice: Practice }) {
               name="email"
               type="email"
               defaultValue={practice.email ?? ""}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="website">Website</Label>
+            <Input
+              id="website"
+              name="website"
+              type="url"
+              defaultValue={practice.website ?? ""}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="address">Address</Label>
+            <Input
+              id="address"
+              name="address"
+              defaultValue={practice.address ?? ""}
             />
           </div>
           {state.error ? (

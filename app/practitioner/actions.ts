@@ -2,8 +2,10 @@
 
 import { eq } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
+import { redirect } from "next/navigation"
 
 import { practitionerProfiles } from "@/db/schema"
+import { getMemberships } from "@/lib/actions/practitioner-practice"
 import { requirePractitionerContext } from "@/lib/auth"
 import { db } from "@/lib/db"
 
@@ -23,7 +25,16 @@ export async function getPractitionerProfile() {
     )
     .limit(1)
 
-  return profile ?? null
+  if (!profile) {
+    return null
+  }
+
+  const memberships = await getMemberships(context.practitionerProfileId)
+
+  return {
+    ...profile,
+    memberships,
+  }
 }
 
 export async function updatePractitionerProfile(
@@ -33,23 +44,39 @@ export async function updatePractitionerProfile(
   const context = await requirePractitionerContext()
 
   const title = String(formData.get("title") ?? "").trim() || null
-  const fullName = String(formData.get("full_name") ?? "").trim()
+  const firstName = String(formData.get("first_name") ?? "").trim()
+  const preferredName =
+    String(formData.get("preferred_name") ?? "").trim() || null
+  const lastName = String(formData.get("last_name") ?? "").trim()
   const registrationNumber =
     String(formData.get("registration_number") ?? "").trim() || null
   const registrationBody =
     String(formData.get("registration_body") ?? "").trim() || null
+  const phone = String(formData.get("phone") ?? "").trim() || null
+  const email = String(formData.get("email") ?? "").trim() || null
+  const reportSignature =
+    String(formData.get("report_signature") ?? "").trim() || null
 
-  if (!fullName) {
-    return { error: "Full name is required." }
+  if (!firstName) {
+    return { error: "First name is required." }
+  }
+
+  if (!lastName) {
+    return { error: "Last name is required." }
   }
 
   await db
     .update(practitionerProfiles)
     .set({
       title,
-      fullName,
+      firstName,
+      preferredName,
+      lastName,
       registrationNumber,
       registrationBody,
+      phone,
+      email,
+      reportSignature,
       updatedAt: new Date(),
     })
     .where(
@@ -58,5 +85,5 @@ export async function updatePractitionerProfile(
 
   revalidatePath("/practitioner")
   revalidatePath("/practitioner/edit")
-  return { success: true }
+  redirect("/practitioner")
 }

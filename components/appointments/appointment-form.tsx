@@ -16,6 +16,8 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import {
   APPOINTMENT_DURATIONS,
+  APPOINTMENT_MODE_LABELS,
+  APPOINTMENT_MODES,
   APPOINTMENT_STATUS_LABELS,
   APPOINTMENT_STATUSES,
   buildAppointmentTimeOptions,
@@ -42,6 +44,7 @@ type AppointmentInitialValues = {
   appointmentTime: string
   durationMinutes: number
   location: string | null
+  mode?: string
   status: string
   notes: string | null
 }
@@ -163,13 +166,31 @@ export function AppointmentForm({
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="location">Location</Label>
-            <Input
-              id="location"
-              name="location"
-              defaultValue={initialValues?.location ?? ""}
-            />
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="location">Location</Label>
+              <Input
+                id="location"
+                name="location"
+                defaultValue={initialValues?.location ?? ""}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="mode">Mode</Label>
+              <select
+                id="mode"
+                name="mode"
+                required
+                defaultValue={initialValues?.mode ?? "face_to_face"}
+                className={selectClassName}
+              >
+                {APPOINTMENT_MODES.map((mode) => (
+                  <option key={mode} value={mode}>
+                    {APPOINTMENT_MODE_LABELS[mode]}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
           <div className="space-y-2">

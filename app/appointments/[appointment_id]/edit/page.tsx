@@ -52,6 +52,7 @@ export default async function EditAppointmentPage({
           appointmentTime: appointment.appointmentTime,
           durationMinutes: appointment.durationMinutes,
           location: appointment.location,
+          mode: appointment.mode,
           status: appointment.status,
           notes: appointment.notes,
         }}

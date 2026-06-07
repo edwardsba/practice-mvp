@@ -1,7 +1,9 @@
 import {
   APPOINTMENT_DURATIONS,
+  APPOINTMENT_MODES,
   APPOINTMENT_STATUSES,
   type AppointmentDuration,
+  type AppointmentMode,
   type AppointmentStatus,
 } from "@/lib/appointments/constants"
 
@@ -11,6 +13,7 @@ export type AppointmentFormValues = {
   appointmentTime: string
   durationMinutes: AppointmentDuration
   location: string | null
+  mode: AppointmentMode
   status: AppointmentStatus
   notes: string | null
 }
@@ -51,6 +54,9 @@ export function parseAppointmentFormData(
   const appointmentTimeRaw = String(formData.get("appointment_time") ?? "").trim()
   const durationRaw = Number(formData.get("duration_minutes"))
   const location = String(formData.get("location") ?? "").trim() || null
+  const modeRaw = String(formData.get("mode") ?? "face_to_face")
+    .trim()
+    .toLowerCase()
   const statusRaw = String(formData.get("status") ?? "").trim().toLowerCase()
   const notes = String(formData.get("notes") ?? "").trim() || null
 
@@ -75,12 +81,17 @@ export function parseAppointmentFormData(
     return { error: "Status is required." }
   }
 
+  if (!APPOINTMENT_MODES.includes(modeRaw as AppointmentMode)) {
+    return { error: "Mode is required." }
+  }
+
   return {
     clientId,
     appointmentDate,
     appointmentTime,
     durationMinutes: durationRaw as AppointmentDuration,
     location,
+    mode: modeRaw as AppointmentMode,
     status: statusRaw as AppointmentStatus,
     notes,
   }

@@ -17,6 +17,10 @@ import {
   formatAutomationTimestamp,
   formatClientNameLastFirst,
 } from "@/lib/appointments/format"
+import {
+  APPOINTMENT_MODE_LABELS,
+  type AppointmentMode,
+} from "@/lib/appointments/constants"
 import { loadAppointmentForPractice } from "@/lib/appointments/load"
 import { requirePractitionerContext } from "@/lib/auth"
 import { loadSessionNoteForAppointment } from "@/lib/session-notes/load"
@@ -131,6 +135,14 @@ export default async function AppointmentDetailPage({
               <dt className="text-sm text-muted-foreground">Location</dt>
               <dd className="font-medium">
                 {appointment.location?.trim() || "—"}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-sm text-muted-foreground">Mode</dt>
+              <dd className="font-medium">
+                {APPOINTMENT_MODE_LABELS[
+                  appointment.mode as AppointmentMode
+                ] ?? appointment.mode}
               </dd>
             </div>
             <div className="sm:col-span-2">

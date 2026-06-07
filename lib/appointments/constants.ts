@@ -14,6 +14,15 @@ export const APPOINTMENT_STATUS_LABELS: Record<AppointmentStatus, string> = {
   completed: "Completed",
 }
 
+export const APPOINTMENT_MODES = ["face_to_face", "online"] as const
+
+export type AppointmentMode = (typeof APPOINTMENT_MODES)[number]
+
+export const APPOINTMENT_MODE_LABELS: Record<AppointmentMode, string> = {
+  face_to_face: "Face to face",
+  online: "Online",
+}
+
 export const APPOINTMENT_DURATIONS = [50, 80, 110] as const
 
 export type AppointmentDuration = (typeof APPOINTMENT_DURATIONS)[number]

@@ -15,6 +15,7 @@ import {
 } from "@/db/schema"
 import { requirePractitionerContext } from "@/lib/auth"
 import { db } from "@/lib/db"
+import { formatPractitionerName } from "@/lib/practitioner/format"
 import {
   GAD7_IMPAIRMENT_ELEMENT_KEY,
   getFunctionalImpairmentLabelsByResultId,
@@ -251,7 +252,10 @@ export async function buildSnapshot(
   const [practitioner] = await db
     .select({
       title: practitionerProfiles.title,
-      fullName: practitionerProfiles.fullName,
+      firstName: practitionerProfiles.firstName,
+      preferredName: practitionerProfiles.preferredName,
+      lastName: practitionerProfiles.lastName,
+      reportSignature: practitionerProfiles.reportSignature,
     })
     .from(practitionerProfiles)
     .where(
@@ -277,7 +281,7 @@ export async function buildSnapshot(
     },
     practitioner: {
       title: practitioner.title,
-      fullName: practitioner.fullName,
+      fullName: formatPractitionerName(practitioner),
     },
     practice: {
       practiceName: practice.practiceName,

@@ -3,7 +3,12 @@ import { redirect } from "next/navigation"
 
 import { db } from "@/lib/db"
 import { createClient } from "@/lib/supabase/server"
-import { practitionerProfiles, practices, users } from "@/db/schema"
+import {
+  practitionerPracticeMemberships,
+  practitionerProfiles,
+  practices,
+  users,
+} from "@/db/schema"
 
 export type PractitionerContext = {
   userId: string
@@ -47,9 +52,27 @@ export async function getPractitionerContext(): Promise<PractitionerContext | nu
     return null
   }
 
+  const [membership] = await db
+    .select({ practiceId: practitionerPracticeMemberships.practiceId })
+    .from(practitionerPracticeMemberships)
+    .where(
+      and(
+        eq(
+          practitionerPracticeMemberships.practitionerProfileId,
+          profile.practitionerProfileId
+        ),
+        eq(practitionerPracticeMemberships.isActive, true)
+      )
+    )
+    .limit(1)
+
+  if (!membership) {
+    return null
+  }
+
   return {
     userId: dbUser.userId,
-    practiceId: profile.practiceId,
+    practiceId: membership.practiceId,
     practitionerProfileId: profile.practitionerProfileId,
     email: user.email,
   }

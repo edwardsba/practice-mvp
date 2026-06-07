@@ -6,6 +6,7 @@ import { ReportForm } from "@/app/clients/[client_id]/reports/new/report-form"
 import { AppShell } from "@/components/app-shell"
 import { BackButton } from "@/components/ui/back-button"
 import { clients, practitionerProfiles, practices } from "@/db/schema"
+import { formatPractitionerName } from "@/lib/practitioner/format"
 import { requirePractitionerContext } from "@/lib/auth"
 import { db } from "@/lib/db"
 
@@ -42,7 +43,10 @@ export default async function NewReportPage({
   const [practitioner] = await db
     .select({
       title: practitionerProfiles.title,
-      fullName: practitionerProfiles.fullName,
+      firstName: practitionerProfiles.firstName,
+      preferredName: practitionerProfiles.preferredName,
+      lastName: practitionerProfiles.lastName,
+      reportSignature: practitionerProfiles.reportSignature,
     })
     .from(practitionerProfiles)
     .where(
@@ -83,7 +87,7 @@ export default async function NewReportPage({
           },
           practitioner: {
             title: practitioner.title,
-            fullName: practitioner.fullName,
+            fullName: formatPractitionerName(practitioner),
           },
           practice: {
             practiceName: practice.practiceName,

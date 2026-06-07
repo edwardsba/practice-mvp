@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm"
 
 import { practitionerProfiles, practices } from "@/db/schema"
 import { db } from "@/lib/db"
+import { formatPractitionerName } from "@/lib/practitioner/format"
 
 export async function getQuestionnaireEmailContext(
   practiceId: string,
@@ -10,7 +11,10 @@ export async function getQuestionnaireEmailContext(
   const [practitioner] = await db
     .select({
       title: practitionerProfiles.title,
-      fullName: practitionerProfiles.fullName,
+      firstName: practitionerProfiles.firstName,
+      preferredName: practitionerProfiles.preferredName,
+      lastName: practitionerProfiles.lastName,
+      reportSignature: practitionerProfiles.reportSignature,
     })
     .from(practitionerProfiles)
     .where(eq(practitionerProfiles.practitionerProfileId, practitionerProfileId))
@@ -26,12 +30,10 @@ export async function getQuestionnaireEmailContext(
     return null
   }
 
-  const practitionerName = [practitioner.title, practitioner.fullName]
-    .filter(Boolean)
-    .join(" ")
+  const practitionerName = formatPractitionerName(practitioner)
 
   return {
     practiceName: practice.practiceName,
-    practitionerName: practitionerName || practitioner.fullName,
+    practitionerName,
   }
 }

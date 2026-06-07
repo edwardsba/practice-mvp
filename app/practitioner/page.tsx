@@ -9,6 +9,21 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import {
+  formatAvailabilityMode,
+  formatDayOfWeek,
+  formatPractitionerRegistration,
+  formatPractitionerViewName,
+  formatTimeForDisplay,
+} from "@/lib/practitioner/format"
 
 function displayValue(value: string | null | undefined) {
   const trimmed = value?.trim()
@@ -40,27 +55,134 @@ export default async function PractitionerPage() {
         </CardHeader>
         <CardContent>
           <dl className="grid gap-3 sm:grid-cols-2">
-            <div>
-              <dt className="text-sm text-muted-foreground">Title</dt>
-              <dd className="font-medium">{displayValue(profile.title)}</dd>
-            </div>
-            <div>
-              <dt className="text-sm text-muted-foreground">Full name</dt>
-              <dd className="font-medium">{displayValue(profile.fullName)}</dd>
-            </div>
-            <div>
-              <dt className="text-sm text-muted-foreground">Registration number</dt>
+            <div className="sm:col-span-2">
+              <dt className="text-sm text-muted-foreground">Name</dt>
               <dd className="font-medium">
-                {displayValue(profile.registrationNumber)}
+                {displayValue(formatPractitionerViewName(profile))}
               </dd>
             </div>
             <div>
-              <dt className="text-sm text-muted-foreground">Registration body</dt>
+              <dt className="text-sm text-muted-foreground">Registration</dt>
               <dd className="font-medium">
-                {displayValue(profile.registrationBody)}
+                {displayValue(
+                  formatPractitionerRegistration(
+                    profile.registrationBody,
+                    profile.registrationNumber
+                  )
+                )}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-sm text-muted-foreground">Phone</dt>
+              <dd className="font-medium">{displayValue(profile.phone)}</dd>
+            </div>
+            <div>
+              <dt className="text-sm text-muted-foreground">Email</dt>
+              <dd className="font-medium">{displayValue(profile.email)}</dd>
+            </div>
+            <div className="sm:col-span-2">
+              <dt className="text-sm text-muted-foreground">Report signature</dt>
+              <dd className="font-medium whitespace-pre-line">
+                {displayValue(profile.reportSignature)}
               </dd>
             </div>
           </dl>
+        </CardContent>
+      </Card>
+
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle>Practice memberships</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {profile.memberships.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              No practice memberships yet.
+            </p>
+          ) : (
+            profile.memberships.map((membership) => (
+              <div
+                key={membership.membershipId}
+                className="rounded-lg border p-4"
+              >
+                <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <dl className="grid flex-1 gap-3 sm:grid-cols-2">
+                    <div>
+                      <dt className="text-sm text-muted-foreground">Practice</dt>
+                      <dd className="font-medium">
+                        <Link
+                          href="/practice"
+                          className="text-primary hover:underline"
+                        >
+                          {membership.practiceName}
+                        </Link>
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-sm text-muted-foreground">Role</dt>
+                      <dd className="font-medium">
+                        {displayValue(membership.role)}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-sm text-muted-foreground">
+                        Medicare provider number
+                      </dt>
+                      <dd className="font-medium">
+                        {displayValue(membership.medicareProviderNumber)}
+                      </dd>
+                    </div>
+                  </dl>
+                  <Button variant="outline" size="sm" asChild>
+                    <Link
+                      href={`/practitioner/memberships/${membership.membershipId}/edit`}
+                    >
+                      Edit
+                    </Link>
+                  </Button>
+                </div>
+
+                {membership.availabilityBlocks.length > 0 ? (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Day</TableHead>
+                        <TableHead>Start time</TableHead>
+                        <TableHead>End time</TableHead>
+                        <TableHead>Mode</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {membership.availabilityBlocks.map((block) => (
+                        <TableRow key={block.blockId}>
+                          <TableCell>
+                            {formatDayOfWeek(block.dayOfWeek)}
+                          </TableCell>
+                          <TableCell>
+                            {formatTimeForDisplay(block.startTime)}
+                          </TableCell>
+                          <TableCell>
+                            {formatTimeForDisplay(block.endTime)}
+                          </TableCell>
+                          <TableCell>
+                            {formatAvailabilityMode(block.mode)}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    No availability blocks configured.
+                  </p>
+                )}
+              </div>
+            ))
+          )}
+
+          <Button variant="outline" asChild>
+            <Link href="/practitioner/memberships/new">Add Practice</Link>
+          </Button>
         </CardContent>
       </Card>
     </AppShell>

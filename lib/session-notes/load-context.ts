@@ -13,6 +13,7 @@ import {
   btpRatingLabel,
   parseBtpInstanceElementsJson,
 } from "@/lib/assessments/btp"
+import { formatPractitionerName } from "@/lib/practitioner/format"
 import {
   GAD7_IMPAIRMENT_ELEMENT_KEY,
   getFunctionalImpairmentLabelForResult,
@@ -396,7 +397,10 @@ export async function loadSessionNoteViewContext(
 
   const [practitioner] = await db
     .select({
-      fullName: practitionerProfiles.fullName,
+      firstName: practitionerProfiles.firstName,
+      preferredName: practitionerProfiles.preferredName,
+      lastName: practitionerProfiles.lastName,
+      reportSignature: practitionerProfiles.reportSignature,
       title: practitionerProfiles.title,
     })
     .from(practitionerProfiles)
@@ -437,7 +441,7 @@ export async function loadSessionNoteViewContext(
           ),
         }
       : null,
-    practitionerName: practitioner?.fullName ?? "",
+    practitionerName: practitioner ? formatPractitionerName(practitioner) : "",
     practitionerTitle: practitioner?.title ?? null,
   }
 }

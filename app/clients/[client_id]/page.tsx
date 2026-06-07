@@ -49,6 +49,15 @@ import { loadLatestSessionNoteForClient } from "@/lib/session-notes/load"
 import { loadActiveTreatmentPlanSummary } from "@/lib/treatment-plans/load"
 import { requirePractitionerContext } from "@/lib/auth"
 import { db } from "@/lib/db"
+import {
+  getClaimsByClientId,
+  getFundingApprovalsByClientId,
+} from "@/lib/actions/funding"
+import {
+  APPROVAL_STATUS_LABELS,
+  formatApprovalProgress,
+  formatDisplayDate,
+} from "@/lib/funding/format"
 import { buildTemplateVariablesFromLinkResponse } from "@/lib/email/link-response"
 import { getQuestionnaireEmailContext } from "@/lib/email/practitioner-context"
 
@@ -234,6 +243,8 @@ export default async function ClientDetailPage({
     nextAppointment,
     latestBtpResult,
     latestSessionNote,
+    clientClaims,
+    clientFundingApprovals,
   ] = await Promise.all([
     loadActiveTreatmentPlanSummary(clientId, context.practiceId),
     loadActiveCrisisPlanSummary(clientId, context.practiceId),
@@ -244,6 +255,8 @@ export default async function ClientDetailPage({
     loadNextAppointmentForClient(clientId, context.practiceId),
     loadLatestBtpResultForClient(clientId, context.practiceId),
     loadLatestSessionNoteForClient(clientId, context.practiceId),
+    getClaimsByClientId(clientId),
+    getFundingApprovalsByClientId(clientId),
   ])
 
   const clientEmail = client.email?.trim() || null
@@ -335,6 +348,125 @@ export default async function ClientDetailPage({
           clientId={clientId}
           contacts={emergencyContacts}
         />
+      </Card>
+
+      <Card className="mb-6">
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle>Claims</CardTitle>
+          <Button variant="outline" size="sm" asChild>
+            <Link href={`/funding/claims/new?client_id=${clientId}`}>
+              Add Claim
+            </Link>
+          </Button>
+        </CardHeader>
+        <CardContent>
+          <div className="rounded-lg border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Claim type</TableHead>
+                  <TableHead>Start date</TableHead>
+                  <TableHead>End date</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {clientClaims.length === 0 ? (
+                  <TableRow>
+                    <TableCell
+                      colSpan={3}
+                      className="h-16 text-center text-muted-foreground"
+                    >
+                      No claims yet.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  clientClaims.map((claim) => (
+                    <TableRow key={claim.claimId}>
+                      <TableCell>
+                        <Link
+                          href={`/funding/claims/${claim.claimId}`}
+                          className="text-primary hover:underline"
+                        >
+                          {claim.claimTypeName}
+                        </Link>
+                      </TableCell>
+                      <TableCell>{formatDisplayDate(claim.startDate)}</TableCell>
+                      <TableCell>{formatDisplayDate(claim.endDate)}</TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="mb-6">
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle>Funding approvals</CardTitle>
+          <Button variant="outline" size="sm" asChild>
+            <Link
+              href={`/funding/approvals/new?client_id=${clientId}&returnTo=/clients/${clientId}`}
+            >
+              Add Funding Approval
+            </Link>
+          </Button>
+        </CardHeader>
+        <CardContent>
+          <div className="rounded-lg border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Approval type</TableHead>
+                  <TableHead>Start date</TableHead>
+                  <TableHead>End date</TableHead>
+                  <TableHead>Progress</TableHead>
+                  <TableHead>Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {clientFundingApprovals.length === 0 ? (
+                  <TableRow>
+                    <TableCell
+                      colSpan={5}
+                      className="h-16 text-center text-muted-foreground"
+                    >
+                      No funding approvals yet.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  clientFundingApprovals.map((approval) => (
+                    <TableRow key={approval.fundingApprovalId}>
+                      <TableCell>
+                        <Link
+                          href={`/funding/approvals/${approval.fundingApprovalId}`}
+                          className="text-primary hover:underline"
+                        >
+                          {approval.approvalTypeName ?? "—"}
+                        </Link>
+                      </TableCell>
+                      <TableCell>
+                        {formatDisplayDate(approval.startDate)}
+                      </TableCell>
+                      <TableCell>{formatDisplayDate(approval.endDate)}</TableCell>
+                      <TableCell>
+                        {formatApprovalProgress(
+                          approval.appointmentsAttended,
+                          approval.appointmentsApproved
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {APPROVAL_STATUS_LABELS[
+                          approval.approvalStatus as keyof typeof APPROVAL_STATUS_LABELS
+                        ] ?? approval.approvalStatus}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
       </Card>
 
       <Card className="mb-6">

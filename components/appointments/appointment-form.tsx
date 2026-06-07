@@ -1,7 +1,9 @@
 "use client"
 
 import Link from "next/link"
-import { useActionState } from "react"
+import { useActionState, useState } from "react"
+
+import { FundingApprovalSelect } from "@/components/appointments/funding-approval-select"
 
 import type { AppointmentFormState } from "@/app/appointments/actions"
 import { Button } from "@/components/ui/button"
@@ -45,6 +47,7 @@ type AppointmentInitialValues = {
   durationMinutes: number
   location: string | null
   mode?: string
+  fundingApprovalId?: string | null
   status: string
   notes: string | null
 }
@@ -66,6 +69,9 @@ export function AppointmentForm({
   cancelHref: string
 }) {
   const [state, formAction, pending] = useActionState(action, {})
+  const [selectedClientId, setSelectedClientId] = useState(
+    initialValues?.clientId ?? ""
+  )
   const timeOptions = buildAppointmentTimeOptions()
 
   return (
@@ -81,7 +87,8 @@ export function AppointmentForm({
               id="client_id"
               name="client_id"
               required
-              defaultValue={initialValues?.clientId ?? ""}
+              value={selectedClientId}
+              onChange={(event) => setSelectedClientId(event.target.value)}
               className={selectClassName}
             >
               <option value="" disabled>
@@ -93,6 +100,15 @@ export function AppointmentForm({
                 </option>
               ))}
             </select>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="funding_approval_id">Funding approval</Label>
+            <FundingApprovalSelect
+              key={selectedClientId}
+              clientId={selectedClientId}
+              defaultValue={initialValues?.fundingApprovalId}
+            />
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">

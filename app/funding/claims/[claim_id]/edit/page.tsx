@@ -1,0 +1,64 @@
+import { notFound } from "next/navigation"
+
+import { getActiveClients } from "@/app/clients/actions"
+import { ClaimForm } from "@/components/funding/claim-form"
+import { AppShell } from "@/components/app-shell"
+import { BackButton } from "@/components/ui/back-button"
+import { getClaimById, getClaimTypes } from "@/lib/actions/funding"
+import { getProfessionalOrganisations } from "@/lib/actions/contacts"
+import { requirePractitionerContext } from "@/lib/auth"
+
+export default async function EditClaimPage({
+  params,
+}: {
+  params: Promise<{ claim_id: string }>
+}) {
+  const { claim_id: claimId } = await params
+  const context = await requirePractitionerContext()
+  const [claim, clients, claimTypes, organisations] = await Promise.all([
+    getClaimById(claimId),
+    getActiveClients(),
+    getClaimTypes(context.practiceId),
+    getProfessionalOrganisations(context.practiceId),
+  ])
+
+  if (!claim) {
+    notFound()
+  }
+
+  return (
+    <AppShell>
+      <div className="mb-6">
+        <BackButton
+          fallbackHref={`/funding/claims/${claimId}`}
+          label="← Back to claim"
+        />
+        <h1 className="text-2xl font-semibold tracking-tight">Edit claim</h1>
+      </div>
+
+      <ClaimForm
+        clients={clients}
+        claimTypes={claimTypes.map((type) => ({
+          claimTypeId: type.claimTypeId,
+          claimTypeName: type.claimTypeName,
+        }))}
+        organisations={organisations.map((org) => ({
+          organisationId: org.organisationId,
+          organisationName: org.organisationName,
+        }))}
+        initialValues={{
+          claimId: claim.claimId,
+          clientId: claim.clientId,
+          claimTypeId: claim.claimTypeId,
+          medicareCardNumber: claim.medicareCardNumber,
+          medicareIrn: claim.medicareIrn,
+          insuranceOrganisationId: claim.insuranceOrganisationId,
+          insuranceReferenceNumber: claim.insuranceReferenceNumber,
+          startDate: claim.startDate,
+          endDate: claim.endDate,
+        }}
+        cancelHref={`/funding/claims/${claimId}`}
+      />
+    </AppShell>
+  )
+}

@@ -91,6 +91,7 @@ export async function loadAppointmentForPractice(
       durationMinutes: appointments.durationMinutes,
       location: appointments.location,
       mode: appointments.mode,
+      fundingApprovalId: appointments.fundingApprovalId,
       status: appointments.status,
       notes: appointments.notes,
       reminderSentAt: appointments.reminderSentAt,

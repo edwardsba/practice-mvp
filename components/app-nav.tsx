@@ -52,8 +52,13 @@ const dropdownMenus: NavDropdown[] = [
   },
   {
     label: "Settings",
-    items: [{ href: "/settings/professions", label: "Professions" }],
-    isActive: (pathname) => pathname.startsWith("/settings"),
+    items: [
+      { href: "/settings/professions", label: "Professions" },
+      { href: "/funding/claim-types", label: "Claim Types" },
+      { href: "/funding/approval-types", label: "Funding Approval Types" },
+    ],
+    isActive: (pathname) =>
+      pathname.startsWith("/settings") || pathname.startsWith("/funding/claim-types") || pathname.startsWith("/funding/approval-types"),
   },
   {
     label: "Admin",
@@ -61,10 +66,14 @@ const dropdownMenus: NavDropdown[] = [
       { href: "/clients", label: "All Clients" },
       { href: "/appointments", label: "All Appointments" },
       { href: "/session-notes", label: "All Session Notes" },
+      { href: "/funding/claims", label: "All Claims" },
+      { href: "/funding/approvals", label: "All Funding Approvals" },
     ],
     isActive: (pathname) =>
       pathname.startsWith("/appointments") ||
-      pathname.startsWith("/session-notes"),
+      pathname.startsWith("/session-notes") ||
+      pathname.startsWith("/funding/claims") ||
+      pathname.startsWith("/funding/approvals"),
   },
 ]
 

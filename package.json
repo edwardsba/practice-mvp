@@ -19,7 +19,10 @@
     "db:crisis-plans": "tsx db/apply-crisis-plans-migration.ts",
     "db:session-notes": "tsx db/apply-session-notes-migration.ts",
     "db:contacts": "tsx db/apply-contacts-migration.ts",
-    "db:practitioner-practice": "tsx db/apply-practitioner-practice-migration.ts"
+    "db:practitioner-practice": "tsx db/apply-practitioner-practice-migration.ts",
+    "db:funding": "tsx db/apply-funding-migration.ts",
+    "db:medicare-irn": "tsx db/apply-medicare-irn-migration.ts",
+    "db:seed-funding": "tsx db/seed-funding.ts"
   },
   "dependencies": {
     "@react-pdf/renderer": "^4.5.1",

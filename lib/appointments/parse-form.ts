@@ -14,6 +14,7 @@ export type AppointmentFormValues = {
   durationMinutes: AppointmentDuration
   location: string | null
   mode: AppointmentMode
+  fundingApprovalId: string | null
   status: AppointmentStatus
   notes: string | null
 }
@@ -59,6 +60,10 @@ export function parseAppointmentFormData(
     .toLowerCase()
   const statusRaw = String(formData.get("status") ?? "").trim().toLowerCase()
   const notes = String(formData.get("notes") ?? "").trim() || null
+  const fundingApprovalIdRaw = String(
+    formData.get("funding_approval_id") ?? ""
+  ).trim()
+  const fundingApprovalId = fundingApprovalIdRaw || null
 
   if (!clientId) {
     return { error: "Client is required." }
@@ -92,6 +97,7 @@ export function parseAppointmentFormData(
     durationMinutes: durationRaw as AppointmentDuration,
     location,
     mode: modeRaw as AppointmentMode,
+    fundingApprovalId,
     status: statusRaw as AppointmentStatus,
     notes,
   }

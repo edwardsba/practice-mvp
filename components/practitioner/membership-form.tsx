@@ -31,6 +31,11 @@ const selectClassName = cn(
   "flex h-9 w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-1 text-sm shadow-xs transition-colors outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 dark:bg-input/30"
 )
 
+const timeInputClassName = cn(
+  "block h-9 w-full max-w-full min-w-0 appearance-none py-1",
+  "[&::-webkit-date-and-time-value]:min-w-0 [&::-webkit-date-and-time-value]:text-left"
+)
+
 type PracticeOption = {
   practiceId: string
   practiceName: string
@@ -280,9 +285,9 @@ export function MembershipForm({
                   {blocks.map((block, index) => (
                     <div
                       key={index}
-                      className="grid gap-3 rounded-lg border p-3 sm:grid-cols-[1.2fr_1fr_1fr_1fr_auto]"
+                      className="grid min-w-0 gap-3 rounded-lg border p-3 sm:grid-cols-[1.2fr_1fr_1fr_1fr_auto]"
                     >
-                      <div className="space-y-1">
+                      <div className="min-w-0 space-y-1">
                         <Label className="text-xs">Day</Label>
                         <select
                           value={block.dayOfWeek}
@@ -298,7 +303,7 @@ export function MembershipForm({
                           ))}
                         </select>
                       </div>
-                      <div className="space-y-1">
+                      <div className="min-w-0 space-y-1">
                         <Label className="text-xs">Start time</Label>
                         <Input
                           type="time"
@@ -306,9 +311,10 @@ export function MembershipForm({
                           onChange={(event) =>
                             updateBlock(index, "startTime", event.target.value)
                           }
+                          className={timeInputClassName}
                         />
                       </div>
-                      <div className="space-y-1">
+                      <div className="min-w-0 space-y-1">
                         <Label className="text-xs">End time</Label>
                         <Input
                           type="time"
@@ -316,9 +322,10 @@ export function MembershipForm({
                           onChange={(event) =>
                             updateBlock(index, "endTime", event.target.value)
                           }
+                          className={timeInputClassName}
                         />
                       </div>
-                      <div className="space-y-1">
+                      <div className="min-w-0 space-y-1">
                         <Label className="text-xs">Mode</Label>
                         <select
                           value={block.mode}
@@ -338,7 +345,7 @@ export function MembershipForm({
                           ))}
                         </select>
                       </div>
-                      <div className="flex items-end">
+                      <div className="flex min-w-0 items-end">
                         <Button
                           type="button"
                           variant="ghost"

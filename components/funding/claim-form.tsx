@@ -99,12 +99,25 @@ export function ClaimForm({
       </CardHeader>
       <CardContent>
         <form action={formAction} className="space-y-4">
+          {initialValues?.claimId && initialValues.clientId ? (
+            <input
+              type="hidden"
+              name="client_id"
+              value={initialValues.clientId}
+            />
+          ) : null}
+          <input
+            type="hidden"
+            name="claim_type_id"
+            value={selectedClaimTypeId}
+          />
+
           <div className="space-y-2">
             <Label htmlFor="client_id">Client</Label>
             <select
               id="client_id"
-              name="client_id"
-              required
+              name={initialValues?.claimId ? undefined : "client_id"}
+              required={!initialValues?.claimId}
               defaultValue={initialValues?.clientId ?? ""}
               disabled={Boolean(initialValues?.claimId)}
               className={selectClassName}
@@ -124,7 +137,6 @@ export function ClaimForm({
             <Label htmlFor="claim_type_id">Claim type</Label>
             <select
               id="claim_type_id"
-              name="claim_type_id"
               required
               value={selectedClaimTypeId}
               onChange={(event) => setSelectedClaimTypeId(event.target.value)}

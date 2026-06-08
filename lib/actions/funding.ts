@@ -407,7 +407,7 @@ export async function upsertClaim(
 ) {
   const context = await requirePractitionerContext()
 
-  const clientId = String(formData.get("client_id") ?? "").trim()
+  let clientId = String(formData.get("client_id") ?? "").trim()
   const claimTypeId = String(formData.get("claim_type_id") ?? "").trim()
   const medicareCardNumber =
     String(formData.get("medicare_card_number") ?? "").trim() || null
@@ -420,8 +420,8 @@ export async function upsertClaim(
   const startDate = String(formData.get("start_date") ?? "").trim() || null
   const endDate = String(formData.get("end_date") ?? "").trim() || null
 
-  if (!clientId || !claimTypeId) {
-    return { error: "Client and claim type are required." }
+  if (!claimTypeId) {
+    return { error: "Claim type is required." }
   }
 
   const now = new Date()
@@ -429,6 +429,23 @@ export async function upsertClaim(
 
   try {
     if (claimId) {
+      if (!clientId) {
+        const [existing] = await db
+          .select({ clientId: claims.clientId })
+          .from(claims)
+          .where(
+            and(
+              eq(claims.claimId, claimId),
+              eq(claims.practiceId, context.practiceId)
+            )
+          )
+          .limit(1)
+        if (!existing) {
+          return { error: "Claim not found." }
+        }
+        clientId = existing.clientId
+      }
+
       await db
         .update(claims)
         .set({
@@ -448,6 +465,10 @@ export async function upsertClaim(
           )
         )
     } else {
+      if (!clientId) {
+        return { error: "Client is required." }
+      }
+
       const [created] = await db
         .insert(claims)
         .values({

@@ -49,15 +49,8 @@ import { loadLatestSessionNoteForClient } from "@/lib/session-notes/load"
 import { loadActiveTreatmentPlanSummary } from "@/lib/treatment-plans/load"
 import { requirePractitionerContext } from "@/lib/auth"
 import { db } from "@/lib/db"
-import {
-  getClaimsByClientId,
-  getFundingApprovalsByClientId,
-} from "@/lib/actions/funding"
-import {
-  APPROVAL_STATUS_LABELS,
-  formatApprovalProgress,
-  formatDisplayDate,
-} from "@/lib/funding/format"
+import { getFundingPanelByClientId } from "@/lib/actions/funding"
+import { formatApprovalProgress, formatDisplayDate } from "@/lib/funding/format"
 import { buildTemplateVariablesFromLinkResponse } from "@/lib/email/link-response"
 import { getQuestionnaireEmailContext } from "@/lib/email/practitioner-context"
 
@@ -243,8 +236,7 @@ export default async function ClientDetailPage({
     nextAppointment,
     latestBtpResult,
     latestSessionNote,
-    clientClaims,
-    clientFundingApprovals,
+    fundingPanelRows,
   ] = await Promise.all([
     loadActiveTreatmentPlanSummary(clientId, context.practiceId),
     loadActiveCrisisPlanSummary(clientId, context.practiceId),
@@ -255,8 +247,7 @@ export default async function ClientDetailPage({
     loadNextAppointmentForClient(clientId, context.practiceId),
     loadLatestBtpResultForClient(clientId, context.practiceId),
     loadLatestSessionNoteForClient(clientId, context.practiceId),
-    getClaimsByClientId(clientId),
-    getFundingApprovalsByClientId(clientId),
+    getFundingPanelByClientId(clientId),
   ])
 
   const clientEmail = client.email?.trim() || null
@@ -351,117 +342,79 @@ export default async function ClientDetailPage({
       </Card>
 
       <Card className="mb-6">
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>Claims</CardTitle>
-          <Button variant="outline" size="sm" asChild>
-            <Link href={`/funding/claims/new?client_id=${clientId}`}>
-              Add Claim
-            </Link>
-          </Button>
-        </CardHeader>
-        <CardContent>
-          <div className="rounded-lg border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Claim type</TableHead>
-                  <TableHead>Start date</TableHead>
-                  <TableHead>End date</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {clientClaims.length === 0 ? (
-                  <TableRow>
-                    <TableCell
-                      colSpan={3}
-                      className="h-16 text-center text-muted-foreground"
-                    >
-                      No claims yet.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  clientClaims.map((claim) => (
-                    <TableRow key={claim.claimId}>
-                      <TableCell>
-                        <Link
-                          href={`/funding/claims/${claim.claimId}`}
-                          className="text-primary hover:underline"
-                        >
-                          {claim.claimTypeName}
-                        </Link>
-                      </TableCell>
-                      <TableCell>{formatDisplayDate(claim.startDate)}</TableCell>
-                      <TableCell>{formatDisplayDate(claim.endDate)}</TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
+        <CardHeader className="flex flex-row items-center justify-between gap-4">
+          <CardTitle>Funding</CardTitle>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" size="sm" asChild>
+              <Link href={`/funding/claims?clientId=${clientId}`}>
+                See All
+              </Link>
+            </Button>
+            <Button size="sm" asChild>
+              <Link href={`/funding/approvals/new?clientId=${clientId}`}>
+                Add Approval
+              </Link>
+            </Button>
           </div>
-        </CardContent>
-      </Card>
-
-      <Card className="mb-6">
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>Funding approvals</CardTitle>
-          <Button variant="outline" size="sm" asChild>
-            <Link
-              href={`/funding/approvals/new?client_id=${clientId}&returnTo=/clients/${clientId}`}
-            >
-              Add Funding Approval
-            </Link>
-          </Button>
         </CardHeader>
         <CardContent>
           <div className="rounded-lg border">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Approval type</TableHead>
-                  <TableHead>Start date</TableHead>
-                  <TableHead>End date</TableHead>
+                  <TableHead>Claim</TableHead>
+                  <TableHead>Approval</TableHead>
+                  <TableHead>Start</TableHead>
                   <TableHead>Progress</TableHead>
-                  <TableHead>Status</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {clientFundingApprovals.length === 0 ? (
+                {fundingPanelRows.length === 0 ? (
                   <TableRow>
                     <TableCell
-                      colSpan={5}
+                      colSpan={4}
                       className="h-16 text-center text-muted-foreground"
                     >
                       No funding approvals yet.
                     </TableCell>
                   </TableRow>
                 ) : (
-                  clientFundingApprovals.map((approval) => (
-                    <TableRow key={approval.fundingApprovalId}>
-                      <TableCell>
-                        <Link
-                          href={`/funding/approvals/${approval.fundingApprovalId}`}
-                          className="text-primary hover:underline"
-                        >
-                          {approval.approvalTypeName ?? "—"}
-                        </Link>
-                      </TableCell>
-                      <TableCell>
-                        {formatDisplayDate(approval.startDate)}
-                      </TableCell>
-                      <TableCell>{formatDisplayDate(approval.endDate)}</TableCell>
-                      <TableCell>
-                        {formatApprovalProgress(
-                          approval.appointmentsAttended,
-                          approval.appointmentsApproved
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {APPROVAL_STATUS_LABELS[
-                          approval.approvalStatus as keyof typeof APPROVAL_STATUS_LABELS
-                        ] ?? approval.approvalStatus}
-                      </TableCell>
-                    </TableRow>
-                  ))
+                  fundingPanelRows.map((row) => {
+                    const approvalHref = `/funding/approvals/${row.fundingApprovalId}`
+                    return (
+                      <TableRow
+                        key={row.fundingApprovalId}
+                        className="hover:bg-muted/50"
+                      >
+                        <TableCell>
+                          <Link
+                            href={approvalHref}
+                            className="block text-primary hover:underline"
+                          >
+                            {row.claimTypeName ?? "—"}
+                          </Link>
+                        </TableCell>
+                        <TableCell>
+                          <Link href={approvalHref} className="block hover:underline">
+                            {row.approvalTypeName ?? "—"}
+                          </Link>
+                        </TableCell>
+                        <TableCell>
+                          <Link href={approvalHref} className="block hover:underline">
+                            {formatDisplayDate(row.startDate)}
+                          </Link>
+                        </TableCell>
+                        <TableCell>
+                          <Link href={approvalHref} className="block hover:underline">
+                            {formatApprovalProgress(
+                              row.appointmentsAttended,
+                              row.appointmentsApproved
+                            )}
+                          </Link>
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })
                 )}
               </TableBody>
             </Table>

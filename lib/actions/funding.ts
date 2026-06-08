@@ -578,6 +578,46 @@ export async function getFundingApprovalsByClientId(clientId: string) {
   )
 }
 
+export async function getFundingPanelByClientId(clientId: string) {
+  const context = await requirePractitionerContext()
+
+  const rows = await db
+    .select({
+      fundingApprovalId: fundingApprovals.fundingApprovalId,
+      claimTypeName: claimTypes.claimTypeName,
+      approvalTypeName: fundingApprovalTypes.name,
+      startDate: fundingApprovals.startDate,
+      appointmentsApproved: fundingApprovals.appointmentsApproved,
+    })
+    .from(fundingApprovals)
+    .leftJoin(
+      fundingApprovalTypes,
+      eq(
+        fundingApprovals.fundingApprovalTypeId,
+        fundingApprovalTypes.fundingApprovalTypeId
+      )
+    )
+    .leftJoin(claims, eq(fundingApprovals.claimId, claims.claimId))
+    .leftJoin(claimTypes, eq(claims.claimTypeId, claimTypes.claimTypeId))
+    .where(
+      and(
+        eq(fundingApprovals.clientId, clientId),
+        eq(fundingApprovals.practiceId, context.practiceId),
+        eq(fundingApprovals.isActive, true)
+      )
+    )
+    .orderBy(desc(fundingApprovals.startDate))
+
+  return Promise.all(
+    rows.map(async (row) => ({
+      ...row,
+      appointmentsAttended: await countAppointmentsAttended(
+        row.fundingApprovalId
+      ),
+    }))
+  )
+}
+
 export async function getFundingApprovalById(fundingApprovalId: string) {
   const context = await requirePractitionerContext()
 

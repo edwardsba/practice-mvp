@@ -16,12 +16,17 @@ export default async function NewFundingApprovalPage({
   searchParams: Promise<{
     returnTo?: string
     client_id?: string
+    clientId?: string
     claimId?: string
   }>
 }) {
   const context = await requirePractitionerContext()
-  const { returnTo, client_id: clientIdParam, claimId: claimIdParam } =
-    await searchParams
+  const {
+    returnTo,
+    client_id: clientIdSnake,
+    clientId: clientIdCamel,
+    claimId: claimIdParam,
+  } = await searchParams
 
   const claimFromParam = claimIdParam
     ? await getClaimById(claimIdParam)
@@ -35,7 +40,7 @@ export default async function NewFundingApprovalPage({
   ])
 
   const initialClientId =
-    clientIdParam ?? claimFromParam?.clientId ?? undefined
+    clientIdSnake ?? clientIdCamel ?? claimFromParam?.clientId ?? undefined
   const initialClaimId = claimFromParam?.claimId ?? undefined
 
   return (

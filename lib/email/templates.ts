@@ -136,6 +136,40 @@ export function buildPlainTextBody(message: string, linkUrl: string): string {
   )
 }
 
+export function buildAdHocHtmlEmailBody(message: string): string {
+  const paragraphs = message.split(/\n\n+/)
+  const contentParts = paragraphs
+    .filter((paragraph) => paragraph.length > 0)
+    .map((paragraph) => {
+      const lines = escapeHtml(paragraph).split("\n").join("<br />")
+      return `<p style="margin:0 0 16px;font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:1.5;color:#111111;">${lines}</p>`
+    })
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Email</title>
+</head>
+<body style="margin:0;padding:0;background-color:#ffffff;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color:#ffffff;">
+    <tr>
+      <td align="center" style="padding:32px 16px;">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width:600px;width:100%;">
+          <tr>
+            <td style="font-family:Arial,Helvetica,sans-serif;color:#111111;">
+              ${contentParts.join("")}
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`
+}
+
 export function buildResolvedEmailBodies(
   message: string,
   subject: string,

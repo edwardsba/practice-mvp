@@ -1,17 +1,75 @@
 import { and, eq } from "drizzle-orm"
 import { NextResponse } from "next/server"
 
-import { assessmentAccessLinks, auditEvents } from "@/db/schema"
+import {
+  assessmentAccessLinks,
+  auditEvents,
+  clients,
+  communications,
+} from "@/db/schema"
 import { getPractitionerContext } from "@/lib/auth"
 import { db } from "@/lib/db"
 import { sendQuestionnaireEmail } from "@/lib/email/send-questionnaire-link"
 
 type SendEmailBody = {
   to?: string
+  cc?: string
+  bcc?: string
   subject?: string
   htmlBody?: string
   textBody?: string
+  messageText?: string
+  templateType?: string
   assessmentAccessLinkId?: string
+  clientId?: string
+}
+
+async function logCommunication({
+  practiceId,
+  clientId,
+  practitionerProfileId,
+  templateType,
+  toEmail,
+  ccEmail,
+  bccEmail,
+  subject,
+  messageText,
+  assessmentAccessLinkId,
+  status,
+  errorMessage,
+}: {
+  practiceId: string
+  clientId: string
+  practitionerProfileId: string
+  templateType: string
+  toEmail: string
+  ccEmail?: string | null
+  bccEmail?: string | null
+  subject: string
+  messageText?: string | null
+  assessmentAccessLinkId?: string | null
+  status: "sent" | "failed"
+  errorMessage?: string | null
+}) {
+  const [record] = await db
+    .insert(communications)
+    .values({
+      practiceId,
+      clientId,
+      practitionerProfileId,
+      templateType,
+      toEmail,
+      ccEmail: ccEmail || null,
+      bccEmail: bccEmail || null,
+      subject,
+      messageText: messageText || null,
+      assessmentAccessLinkId: assessmentAccessLinkId || null,
+      status,
+      errorMessage: errorMessage || null,
+    })
+    .returning({ communicationId: communications.communicationId })
+
+  return record?.communicationId ?? null
 }
 
 export async function POST(request: Request) {
@@ -28,65 +86,164 @@ export async function POST(request: Request) {
   }
 
   const to = body.to?.trim()
+  const cc = body.cc?.trim()
+  const bcc = body.bcc?.trim()
   const subject = body.subject?.trim()
   const htmlBody = body.htmlBody?.trim()
   const textBody = body.textBody?.trim()
+  const messageText = body.messageText?.trim()
   const assessmentAccessLinkId = body.assessmentAccessLinkId?.trim()
+  const clientIdParam = body.clientId?.trim()
+  const templateType =
+    body.templateType?.trim() ||
+    (assessmentAccessLinkId ? "send_assessment" : "")
 
-  if (!to || !subject || !htmlBody || !textBody || !assessmentAccessLinkId) {
+  if (!to || !subject || !htmlBody || !textBody) {
     return NextResponse.json(
-      {
-        error:
-          "to, subject, htmlBody, textBody, and assessmentAccessLinkId are required.",
-      },
+      { error: "to, subject, htmlBody, and textBody are required." },
       { status: 400 }
     )
   }
 
-  const [accessLink] = await db
-    .select({
-      assessmentAccessLinkId: assessmentAccessLinks.assessmentAccessLinkId,
-      practiceId: assessmentAccessLinks.practiceId,
-      clientId: assessmentAccessLinks.clientId,
-    })
-    .from(assessmentAccessLinks)
-    .where(
-      and(
-        eq(
-          assessmentAccessLinks.assessmentAccessLinkId,
-          assessmentAccessLinkId
-        ),
-        eq(assessmentAccessLinks.practiceId, context.practiceId)
-      )
+  if (templateType === "send_assessment" && !assessmentAccessLinkId) {
+    return NextResponse.json(
+      { error: "assessmentAccessLinkId is required for send_assessment emails." },
+      { status: 400 }
     )
-    .limit(1)
+  }
 
-  if (!accessLink) {
-    return NextResponse.json({ error: "Assessment link not found." }, { status: 404 })
+  if (templateType === "ad_hoc" && !clientIdParam) {
+    return NextResponse.json(
+      { error: "clientId is required for ad_hoc emails." },
+      { status: 400 }
+    )
+  }
+
+  if (
+    templateType !== "send_assessment" &&
+    templateType !== "ad_hoc"
+  ) {
+    return NextResponse.json(
+      { error: "templateType must be send_assessment or ad_hoc." },
+      { status: 400 }
+    )
+  }
+
+  let resolvedClientId: string | null = null
+  let resolvedAssessmentAccessLinkId: string | null = null
+
+  if (templateType === "send_assessment") {
+    const [accessLink] = await db
+      .select({
+        assessmentAccessLinkId: assessmentAccessLinks.assessmentAccessLinkId,
+        practiceId: assessmentAccessLinks.practiceId,
+        clientId: assessmentAccessLinks.clientId,
+      })
+      .from(assessmentAccessLinks)
+      .where(
+        and(
+          eq(
+            assessmentAccessLinks.assessmentAccessLinkId,
+            assessmentAccessLinkId!
+          ),
+          eq(assessmentAccessLinks.practiceId, context.practiceId)
+        )
+      )
+      .limit(1)
+
+    if (!accessLink) {
+      return NextResponse.json(
+        { error: "Assessment link not found." },
+        { status: 404 }
+      )
+    }
+
+    resolvedClientId = accessLink.clientId
+    resolvedAssessmentAccessLinkId = accessLink.assessmentAccessLinkId
+  } else {
+    const [clientRecord] = await db
+      .select({ clientId: clients.clientId })
+      .from(clients)
+      .where(
+        and(
+          eq(clients.clientId, clientIdParam!),
+          eq(clients.practiceId, context.practiceId),
+          eq(clients.isActive, true)
+        )
+      )
+      .limit(1)
+
+    if (!clientRecord) {
+      return NextResponse.json({ error: "Client not found." }, { status: 404 })
+    }
+
+    resolvedClientId = clientRecord.clientId
   }
 
   const result = await sendQuestionnaireEmail({
     to,
+    cc,
+    bcc,
     subject,
     htmlBody,
     textBody,
   })
 
   if (!result.sent) {
+    await logCommunication({
+      practiceId: context.practiceId,
+      clientId: resolvedClientId,
+      practitionerProfileId: context.practitionerProfileId,
+      templateType,
+      toEmail: to,
+      ccEmail: cc,
+      bccEmail: bcc,
+      subject,
+      messageText,
+      assessmentAccessLinkId: resolvedAssessmentAccessLinkId,
+      status: "failed",
+      errorMessage: result.error,
+    })
+
     return NextResponse.json({
       sent: false,
       error: result.error,
     })
   }
 
-  await db.insert(auditEvents).values({
+  const communicationId = await logCommunication({
     practiceId: context.practiceId,
-    userId: context.userId,
-    clientId: accessLink.clientId,
-    eventType: "email.sent",
-    entityType: "assessment_access_link",
-    entityId: assessmentAccessLinkId,
+    clientId: resolvedClientId,
+    practitionerProfileId: context.practitionerProfileId,
+    templateType,
+    toEmail: to,
+    ccEmail: cc,
+    bccEmail: bcc,
+    subject,
+    messageText,
+    assessmentAccessLinkId: resolvedAssessmentAccessLinkId,
+    status: "sent",
   })
+
+  if (templateType === "send_assessment") {
+    await db.insert(auditEvents).values({
+      practiceId: context.practiceId,
+      userId: context.userId,
+      clientId: resolvedClientId,
+      eventType: "email.sent",
+      entityType: "assessment_access_link",
+      entityId: resolvedAssessmentAccessLinkId!,
+    })
+  } else {
+    await db.insert(auditEvents).values({
+      practiceId: context.practiceId,
+      userId: context.userId,
+      clientId: resolvedClientId,
+      eventType: "email.sent",
+      entityType: "communication",
+      entityId: communicationId ?? resolvedClientId,
+    })
+  }
 
   return NextResponse.json({ sent: true })
 }

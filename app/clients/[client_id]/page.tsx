@@ -5,6 +5,7 @@ import { and, desc, eq } from "drizzle-orm"
 import { AppShell } from "@/components/app-shell"
 import { SendAssessmentButton } from "@/app/clients/[client_id]/send-assessment-button"
 import { SendBatteryButton } from "@/app/clients/[client_id]/send-battery-button"
+import { ActionItemsSection } from "@/app/clients/[client_id]/action-items-section"
 import { EmergencyContactsSection } from "@/components/emergency-contacts/emergency-contacts-section"
 import { BackButton } from "@/components/ui/back-button"
 import { Button } from "@/components/ui/button"
@@ -284,9 +285,6 @@ export default async function ClientDetailPage({
           <h1 className="text-2xl font-semibold tracking-tight">
             {client.firstName} {client.lastName}
           </h1>
-          <Button asChild>
-            <Link href={`/clients/${clientId}/reports/new`}>Create Report</Link>
-          </Button>
         </div>
       </div>
 
@@ -333,6 +331,14 @@ export default async function ClientDetailPage({
           </dl>
         </CardContent>
       </Card>
+
+      <ActionItemsSection
+        clientId={clientId}
+        clientEmail={clientEmail}
+        practitionerProfileId={context.practitionerProfileId}
+        templateVariables={questionnaireTemplateVariables}
+        defaultAssessments={defaultBatteryAssessments}
+      />
 
       <Card className="mb-6">
         <EmergencyContactsSection
@@ -445,25 +451,13 @@ export default async function ClientDetailPage({
           {!activeTreatmentPlan ? (
             <p className="text-sm text-muted-foreground">No treatment plan</p>
           ) : (
-            <dl className="grid gap-3 sm:grid-cols-3">
-              <div>
-                <dt className="text-sm text-muted-foreground">Start date</dt>
-                <dd className="font-medium">
-                  {formatDate(activeTreatmentPlan.startDate)}
-                </dd>
-              </div>
+            <dl className="grid gap-3">
               <div>
                 <dt className="text-sm text-muted-foreground">
                   Therapeutic target
                 </dt>
                 <dd className="font-medium">
                   {activeTreatmentPlan.therapeuticTarget?.trim() || "—"}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-sm text-muted-foreground">Version</dt>
-                <dd className="font-medium">
-                  v{activeTreatmentPlan.versionNumber}
                 </dd>
               </div>
             </dl>
@@ -513,17 +507,11 @@ export default async function ClientDetailPage({
           {!activeCrisisPlan ? (
             <p className="text-sm text-muted-foreground">No crisis plan</p>
           ) : (
-            <dl className="grid gap-3 sm:grid-cols-2">
+            <dl className="grid gap-3">
               <div>
                 <dt className="text-sm text-muted-foreground">Date of plan</dt>
                 <dd className="font-medium">
                   {formatDate(activeCrisisPlan.dateOfPlan)}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-sm text-muted-foreground">Version</dt>
-                <dd className="font-medium">
-                  v{activeCrisisPlan.versionNumber}
                 </dd>
               </div>
             </dl>

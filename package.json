@@ -22,6 +22,7 @@
     "db:practitioner-practice": "tsx db/apply-practitioner-practice-migration.ts",
     "db:funding": "tsx db/apply-funding-migration.ts",
     "db:medicare-irn": "tsx db/apply-medicare-irn-migration.ts",
+    "db:communications": "tsx db/apply-communications-migration.ts",
     "db:seed-funding": "tsx db/seed-funding.ts"
   },
   "dependencies": {

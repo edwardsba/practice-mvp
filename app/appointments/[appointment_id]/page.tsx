@@ -23,6 +23,11 @@ import {
 } from "@/lib/appointments/constants"
 import { loadAppointmentForPractice } from "@/lib/appointments/load"
 import { requirePractitionerContext } from "@/lib/auth"
+import {
+  APPROVAL_STATUS_LABELS,
+  formatApprovalProgress,
+  type ApprovalStatus,
+} from "@/lib/funding/format"
 import { resolveBackNavigation } from "@/lib/navigation/back"
 import { loadSessionNoteForAppointment } from "@/lib/session-notes/load"
 
@@ -92,7 +97,7 @@ export default async function AppointmentDetailPage({
         </div>
       </div>
 
-      <Card className="max-w-3xl">
+      <Card className="mb-6">
         <CardHeader>
           <CardTitle>Appointment details</CardTitle>
         </CardHeader>
@@ -170,6 +175,78 @@ export default async function AppointmentDetailPage({
               </dd>
             </div>
           </dl>
+        </CardContent>
+      </Card>
+
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle>Claim details</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {!appointment.fundingApprovalId ? (
+            <p className="text-sm text-muted-foreground">
+              No funding approval linked to this appointment.
+            </p>
+          ) : (
+            <dl className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <dt className="text-sm text-muted-foreground">
+                  Funding approval type
+                </dt>
+                <dd className="font-medium">
+                  {appointment.approvalTypeName ?? "—"}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-sm text-muted-foreground">Claim type</dt>
+                <dd className="font-medium">
+                  {appointment.claimTypeName ?? "—"}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-sm text-muted-foreground">Referrer</dt>
+                <dd className="font-medium">
+                  {appointment.referrerFirstName || appointment.referrerLastName
+                    ? `${appointment.referrerFirstName ?? ""} ${appointment.referrerLastName ?? ""}`.trim()
+                    : "—"}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-sm text-muted-foreground">
+                  Sessions progress
+                </dt>
+                <dd className="font-medium">
+                  {formatApprovalProgress(
+                    appointment.appointmentsAttended ?? 0,
+                    appointment.appointmentsApproved
+                  )}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-sm text-muted-foreground">
+                  Approval status
+                </dt>
+                <dd className="font-medium">
+                  {appointment.approvalStatus
+                    ? APPROVAL_STATUS_LABELS[
+                        appointment.approvalStatus as ApprovalStatus
+                      ] ?? appointment.approvalStatus
+                    : "—"}
+                </dd>
+              </div>
+            </dl>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Fees</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">
+            Fee details will be available once an Appointment Type is selected.
+          </p>
         </CardContent>
       </Card>
     </AppShell>

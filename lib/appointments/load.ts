@@ -1,10 +1,13 @@
-import { and, asc, desc, eq, gte, lte, lt } from "drizzle-orm"
+import { and, asc, count, desc, eq, gte, lte, lt, ne } from "drizzle-orm"
 
 import {
   appointments,
+  claimTypes,
+  claims,
   clients,
   fundingApprovalTypes,
   fundingApprovals,
+  professionals,
 } from "@/db/schema"
 import type { AppointmentFilter } from "@/lib/appointments/constants"
 import { todayDateString } from "@/lib/appointments/format"
@@ -103,9 +106,32 @@ export async function loadAppointmentForPractice(
       preSessionBatterySentAt: appointments.preSessionBatterySentAt,
       clientFirstName: clients.firstName,
       clientLastName: clients.lastName,
+      approvalTypeName: fundingApprovalTypes.name,
+      claimTypeName: claimTypes.claimTypeName,
+      referrerFirstName: professionals.firstName,
+      referrerLastName: professionals.lastName,
+      appointmentsApproved: fundingApprovals.appointmentsApproved,
+      approvalStatus: fundingApprovals.approvalStatus,
     })
     .from(appointments)
     .innerJoin(clients, eq(appointments.clientId, clients.clientId))
+    .leftJoin(
+      fundingApprovals,
+      eq(appointments.fundingApprovalId, fundingApprovals.fundingApprovalId)
+    )
+    .leftJoin(
+      fundingApprovalTypes,
+      eq(
+        fundingApprovals.fundingApprovalTypeId,
+        fundingApprovalTypes.fundingApprovalTypeId
+      )
+    )
+    .leftJoin(claims, eq(fundingApprovals.claimId, claims.claimId))
+    .leftJoin(claimTypes, eq(claims.claimTypeId, claimTypes.claimTypeId))
+    .leftJoin(
+      professionals,
+      eq(fundingApprovals.referrerId, professionals.professionalId)
+    )
     .where(
       and(
         eq(appointments.appointmentId, appointmentId),
@@ -114,7 +140,28 @@ export async function loadAppointmentForPractice(
     )
     .limit(1)
 
-  return row ?? null
+  if (!row) {
+    return null
+  }
+
+  let appointmentsAttended: number | null = null
+  if (row.fundingApprovalId) {
+    const [attendedRow] = await db
+      .select({ total: count() })
+      .from(appointments)
+      .where(
+        and(
+          eq(appointments.fundingApprovalId, row.fundingApprovalId),
+          ne(appointments.status, "cancelled")
+        )
+      )
+    appointmentsAttended = Number(attendedRow?.total ?? 0)
+  }
+
+  return {
+    ...row,
+    appointmentsAttended,
+  }
 }
 
 export async function loadAppointmentsForClient(

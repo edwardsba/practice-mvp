@@ -24,6 +24,8 @@
     "db:medicare-irn": "tsx db/apply-medicare-irn-migration.ts",
     "db:communications": "tsx db/apply-communications-migration.ts",
     "db:client-comms-prefs": "tsx db/apply-client-communication-preferences-migration.ts",
+    "db:appointment-types": "tsx db/apply-appointment-types-migration.ts",
+    "db:seed-appointment-types": "tsx db/seed-appointment-types.ts",
     "db:seed-funding": "tsx db/seed-funding.ts"
   },
   "dependencies": {

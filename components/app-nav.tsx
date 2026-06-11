@@ -54,11 +54,14 @@ const dropdownMenus: NavDropdown[] = [
     label: "Settings",
     items: [
       { href: "/settings/professions", label: "Professions" },
+      { href: "/settings/appointment-types", label: "Appointment Types" },
       { href: "/funding/claim-types", label: "Claim Types" },
       { href: "/funding/approval-types", label: "Funding Approval Types" },
     ],
     isActive: (pathname) =>
-      pathname.startsWith("/settings") || pathname.startsWith("/funding/claim-types") || pathname.startsWith("/funding/approval-types"),
+      pathname.startsWith("/settings") ||
+      pathname.startsWith("/funding/claim-types") ||
+      pathname.startsWith("/funding/approval-types"),
   },
   {
     label: "Admin",

@@ -24,6 +24,7 @@ export function FundingApprovalSelect({
     }>
   >([])
   const [loading, setLoading] = useState(false)
+  const [selectedValue, setSelectedValue] = useState(defaultValue ?? "")
 
   useEffect(() => {
     if (!clientId) {
@@ -63,7 +64,8 @@ export function FundingApprovalSelect({
     <select
       id="funding_approval_id"
       name="funding_approval_id"
-      defaultValue={defaultValue ?? ""}
+      value={selectedValue}
+      onChange={(e) => setSelectedValue(e.target.value)}
       disabled={loading}
       className={selectClassName}
     >

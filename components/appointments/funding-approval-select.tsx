@@ -9,20 +9,26 @@ const selectClassName = cn(
   "flex h-9 w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-1 text-sm shadow-xs transition-colors outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 dark:bg-input/30"
 )
 
+type FundingApprovalOption = {
+  fundingApprovalId: string
+  label: string
+  isInactive: boolean
+  claimTypeId: string | null
+}
+
 export function FundingApprovalSelect({
   clientId,
   defaultValue,
+  onSelectionChange,
 }: {
   clientId: string
   defaultValue?: string | null
+  onSelectionChange?: (
+    fundingApprovalId: string,
+    claimTypeId: string | null
+  ) => void
 }) {
-  const [options, setOptions] = useState<
-    Array<{
-      fundingApprovalId: string
-      label: string
-      isInactive: boolean
-    }>
-  >([])
+  const [options, setOptions] = useState<FundingApprovalOption[]>([])
   const [loading, setLoading] = useState(false)
   const [selectedValue, setSelectedValue] = useState(defaultValue ?? "")
 
@@ -51,6 +57,20 @@ export function FundingApprovalSelect({
       cancelled = true
     }
   }, [clientId])
+
+  useEffect(() => {
+    if (!onSelectionChange) return
+
+    if (!selectedValue) {
+      onSelectionChange("", null)
+      return
+    }
+
+    const selected = options.find(
+      (option) => option.fundingApprovalId === selectedValue
+    )
+    onSelectionChange(selectedValue, selected?.claimTypeId ?? null)
+  }, [selectedValue, options, onSelectionChange])
 
   if (!clientId) {
     return (

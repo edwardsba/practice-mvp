@@ -15,6 +15,8 @@ export const appointments = pgTable('appointments', {
   location: text('location'),
   mode: text('mode').notNull().default('face_to_face'),
   fundingApprovalId: uuid('funding_approval_id'),
+  appointmentTypeId: uuid('appointment_type_id'),
+  membershipId: uuid('membership_id'),
   status: text('status').notNull().default('scheduled'),
   notes: text('notes'),
   reminderSentAt: timestamp('reminder_sent_at', { withTimezone: true }),

@@ -6,6 +6,7 @@ import { getActiveClients } from "@/app/clients/actions"
 import { AppointmentForm } from "@/components/appointments/appointment-form"
 import { AppShell } from "@/components/app-shell"
 import { Button } from "@/components/ui/button"
+import { getMemberships } from "@/lib/actions/practitioner-practice"
 import { loadAppointmentForPractice } from "@/lib/appointments/load"
 import { requirePractitionerContext } from "@/lib/auth"
 
@@ -20,9 +21,10 @@ export default async function EditAppointmentPage({
   const { returnTo } = await searchParams
   const context = await requirePractitionerContext()
 
-  const [appointment, clients] = await Promise.all([
+  const [appointment, clients, memberships] = await Promise.all([
     loadAppointmentForPractice(appointmentId, context.practiceId),
     getActiveClients(),
+    getMemberships(context.practitionerProfileId),
   ])
 
   if (!appointment) {
@@ -30,6 +32,20 @@ export default async function EditAppointmentPage({
   }
 
   const clientName = `${appointment.clientFirstName} ${appointment.clientLastName}`
+
+  const availabilityBlocks = memberships.flatMap((membership) =>
+    membership.availabilityBlocks.map((block) => ({
+      dayOfWeek: block.dayOfWeek,
+      startTime: block.startTime,
+      endTime: block.endTime,
+      mode: block.mode,
+    }))
+  )
+
+  const practiceMemberships = memberships.map((membership) => ({
+    membershipId: membership.membershipId,
+    practiceName: membership.practiceName,
+  }))
 
   return (
     <AppShell>
@@ -46,14 +62,18 @@ export default async function EditAppointmentPage({
       <AppointmentForm
         action={updateAppointment.bind(null, appointmentId, returnTo)}
         clients={clients}
+        practiceId={context.practiceId}
+        availabilityBlocks={availabilityBlocks}
+        practiceMemberships={practiceMemberships}
         initialValues={{
           clientId: appointment.clientId,
           appointmentDate: appointment.appointmentDate,
           appointmentTime: appointment.appointmentTime,
           durationMinutes: appointment.durationMinutes,
-          location: appointment.location,
           mode: appointment.mode,
           fundingApprovalId: appointment.fundingApprovalId,
+          appointmentTypeId: appointment.appointmentTypeId,
+          membershipId: appointment.membershipId ?? "",
           status: appointment.status,
           notes: appointment.notes,
         }}

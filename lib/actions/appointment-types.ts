@@ -113,6 +113,83 @@ export async function getPracticeMembershipsForForm(practiceId: string) {
     .orderBy(asc(practices.practiceName))
 }
 
+export async function getPracticeMembershipsForDropdown(
+  practitionerProfileId: string
+) {
+  const context = await requirePractitionerContext()
+  if (context.practitionerProfileId !== practitionerProfileId) {
+    return []
+  }
+
+  return db
+    .select({
+      membershipId: practitionerPracticeMemberships.membershipId,
+      practiceName: practices.practiceName,
+    })
+    .from(practitionerPracticeMemberships)
+    .innerJoin(
+      practices,
+      eq(practitionerPracticeMemberships.practiceId, practices.practiceId)
+    )
+    .where(
+      and(
+        eq(
+          practitionerPracticeMemberships.practitionerProfileId,
+          practitionerProfileId
+        ),
+        eq(practitionerPracticeMemberships.isActive, true)
+      )
+    )
+    .orderBy(asc(practices.practiceName))
+}
+
+export async function getAppointmentTypesForDropdown(
+  practiceId: string,
+  claimTypeId?: string | null
+) {
+  await verifyPracticeId(practiceId)
+
+  let resolvedClaimTypeId = claimTypeId ?? null
+
+  if (!resolvedClaimTypeId) {
+    const [privateClaimType] = await db
+      .select({ claimTypeId: claimTypes.claimTypeId })
+      .from(claimTypes)
+      .where(
+        and(
+          eq(claimTypes.practiceId, practiceId),
+          eq(claimTypes.claimTypeName, "Private"),
+          eq(claimTypes.isActive, true)
+        )
+      )
+      .limit(1)
+
+    resolvedClaimTypeId = privateClaimType?.claimTypeId ?? null
+  }
+
+  const conditions = [
+    eq(appointmentTypes.practiceId, practiceId),
+    eq(appointmentTypes.isActive, true),
+    eq(appointmentTypes.status, "active"),
+  ]
+
+  if (resolvedClaimTypeId) {
+    conditions.push(eq(appointmentTypes.claimTypeId, resolvedClaimTypeId))
+  }
+
+  return db
+    .select({
+      appointmentTypeId: appointmentTypes.appointmentTypeId,
+      nickname: appointmentTypes.nickname,
+      durationMinutes: appointmentTypes.durationMinutes,
+      mode: appointmentTypes.mode,
+      claimTypeId: appointmentTypes.claimTypeId,
+    })
+    .from(appointmentTypes)
+    .where(and(...conditions))
+    .orderBy(asc(appointmentTypes.nickname))
+}
+
 export async function getAppointmentTypes(practiceId: string) {
   await verifyPracticeId(practiceId)
   const today = todayDateString()
@@ -124,6 +201,7 @@ export async function getAppointmentTypes(practiceId: string) {
       name: appointmentTypes.name,
       referenceNumber: appointmentTypes.referenceNumber,
       durationMinutes: appointmentTypes.durationMinutes,
+      mode: appointmentTypes.mode,
       status: appointmentTypes.status,
       claimTypeName: claimTypes.claimTypeName,
       practiceName: practices.practiceName,

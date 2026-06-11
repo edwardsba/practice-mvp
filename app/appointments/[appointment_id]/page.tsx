@@ -9,6 +9,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import { formatCurrency, formatDisplayDate } from "@/lib/appointment-types/format"
 import {
   formatAppointmentDate,
   formatAppointmentDuration,
@@ -139,9 +140,15 @@ export default async function AppointmentDetailPage({
               </dd>
             </div>
             <div>
+              <dt className="text-sm text-muted-foreground">Appointment type</dt>
+              <dd className="font-medium">
+                {appointment.appointmentTypeNickname?.trim() || "—"}
+              </dd>
+            </div>
+            <div>
               <dt className="text-sm text-muted-foreground">Location</dt>
               <dd className="font-medium">
-                {appointment.location?.trim() || "—"}
+                {appointment.practiceName?.trim() || "—"}
               </dd>
             </div>
             <div>
@@ -244,9 +251,54 @@ export default async function AppointmentDetailPage({
           <CardTitle>Fees</CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-muted-foreground">
-            Fee details will be available once an Appointment Type is selected.
-          </p>
+          {!appointment.appointmentTypeId ? (
+            <p className="text-sm text-muted-foreground">
+              No appointment type selected.
+            </p>
+          ) : (
+            <dl className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <dt className="text-sm text-muted-foreground">
+                  Appointment type
+                </dt>
+                <dd className="font-medium">
+                  {appointment.appointmentTypeNickname ?? "—"}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-sm text-muted-foreground">Item number</dt>
+                <dd className="font-medium">
+                  {appointment.appointmentTypeReferenceNumber?.trim() || "—"}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-sm text-muted-foreground">Fee</dt>
+                <dd className="font-medium">
+                  {formatCurrency(appointment.appointmentTypeFee)}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-sm text-muted-foreground">Tax</dt>
+                <dd className="font-medium">
+                  {formatCurrency(appointment.appointmentTypeTax)}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-sm text-muted-foreground">Total</dt>
+                <dd className="font-medium">
+                  {formatCurrency(appointment.appointmentTypeTotal)}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-sm text-muted-foreground">
+                  Fee effective date
+                </dt>
+                <dd className="font-medium">
+                  {formatDisplayDate(appointment.appointmentTypeFeeStartDate)}
+                </dd>
+              </div>
+            </dl>
+          )}
         </CardContent>
       </Card>
     </AppShell>

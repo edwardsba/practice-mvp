@@ -2,14 +2,19 @@ import { and, asc, count, desc, eq, gte, lte, lt, ne } from "drizzle-orm"
 
 import {
   appointments,
+  appointmentTypeFees,
+  appointmentTypes,
   claimTypes,
   claims,
   clients,
   fundingApprovalTypes,
   fundingApprovals,
+  practices,
+  practitionerPracticeMemberships,
   professionals,
 } from "@/db/schema"
 import type { AppointmentFilter } from "@/lib/appointments/constants"
+import { pickCurrentFee } from "@/lib/appointment-types/format"
 import { todayDateString } from "@/lib/appointments/format"
 import { db } from "@/lib/db"
 
@@ -100,6 +105,8 @@ export async function loadAppointmentForPractice(
       location: appointments.location,
       mode: appointments.mode,
       fundingApprovalId: appointments.fundingApprovalId,
+      appointmentTypeId: appointments.appointmentTypeId,
+      membershipId: appointments.membershipId,
       status: appointments.status,
       notes: appointments.notes,
       reminderSentAt: appointments.reminderSentAt,
@@ -112,9 +119,24 @@ export async function loadAppointmentForPractice(
       referrerLastName: professionals.lastName,
       appointmentsApproved: fundingApprovals.appointmentsApproved,
       approvalStatus: fundingApprovals.approvalStatus,
+      appointmentTypeNickname: appointmentTypes.nickname,
+      appointmentTypeReferenceNumber: appointmentTypes.referenceNumber,
+      practiceName: practices.practiceName,
     })
     .from(appointments)
     .innerJoin(clients, eq(appointments.clientId, clients.clientId))
+    .leftJoin(
+      appointmentTypes,
+      eq(appointments.appointmentTypeId, appointmentTypes.appointmentTypeId)
+    )
+    .leftJoin(
+      practitionerPracticeMemberships,
+      eq(appointments.membershipId, practitionerPracticeMemberships.membershipId)
+    )
+    .leftJoin(
+      practices,
+      eq(practitionerPracticeMemberships.practiceId, practices.practiceId)
+    )
     .leftJoin(
       fundingApprovals,
       eq(appointments.fundingApprovalId, fundingApprovals.fundingApprovalId)
@@ -144,6 +166,35 @@ export async function loadAppointmentForPractice(
     return null
   }
 
+  let appointmentTypeFee: string | null = null
+  let appointmentTypeTax: string | null = null
+  let appointmentTypeTotal: string | null = null
+  let appointmentTypeFeeStartDate: string | null = null
+
+  if (row.appointmentTypeId) {
+    const fees = await db
+      .select({
+        fee: appointmentTypeFees.fee,
+        tax: appointmentTypeFees.tax,
+        total: appointmentTypeFees.total,
+        startDate: appointmentTypeFees.startDate,
+        endDate: appointmentTypeFees.endDate,
+        status: appointmentTypeFees.status,
+      })
+      .from(appointmentTypeFees)
+      .where(
+        eq(appointmentTypeFees.appointmentTypeId, row.appointmentTypeId)
+      )
+
+    const currentFee = pickCurrentFee(fees, todayDateString())
+    if (currentFee) {
+      appointmentTypeFee = currentFee.fee
+      appointmentTypeTax = currentFee.tax
+      appointmentTypeTotal = currentFee.total
+      appointmentTypeFeeStartDate = currentFee.startDate
+    }
+  }
+
   let appointmentsAttended: number | null = null
   if (row.fundingApprovalId) {
     const [attendedRow] = await db
@@ -160,6 +211,10 @@ export async function loadAppointmentForPractice(
 
   return {
     ...row,
+    appointmentTypeFee,
+    appointmentTypeTax,
+    appointmentTypeTotal,
+    appointmentTypeFeeStartDate,
     appointmentsAttended,
   }
 }

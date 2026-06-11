@@ -12,9 +12,10 @@ export type AppointmentFormValues = {
   appointmentDate: string
   appointmentTime: string
   durationMinutes: AppointmentDuration
-  location: string | null
   mode: AppointmentMode
   fundingApprovalId: string | null
+  appointmentTypeId: string | null
+  membershipId: string | null
   status: AppointmentStatus
   notes: string | null
 }
@@ -54,7 +55,6 @@ export function parseAppointmentFormData(
   const appointmentDate = String(formData.get("appointment_date") ?? "").trim()
   const appointmentTimeRaw = String(formData.get("appointment_time") ?? "").trim()
   const durationRaw = Number(formData.get("duration_minutes"))
-  const location = String(formData.get("location") ?? "").trim() || null
   const modeRaw = String(formData.get("mode") ?? "face_to_face")
     .trim()
     .toLowerCase()
@@ -64,6 +64,12 @@ export function parseAppointmentFormData(
     formData.get("funding_approval_id") ?? ""
   ).trim()
   const fundingApprovalId = fundingApprovalIdRaw || null
+  const appointmentTypeIdRaw = String(
+    formData.get("appointment_type_id") ?? ""
+  ).trim()
+  const appointmentTypeId = appointmentTypeIdRaw || null
+  const membershipIdRaw = String(formData.get("membership_id") ?? "").trim()
+  const membershipId = membershipIdRaw || null
 
   if (!clientId) {
     return { error: "Client is required." }
@@ -95,9 +101,10 @@ export function parseAppointmentFormData(
     appointmentDate,
     appointmentTime,
     durationMinutes: durationRaw as AppointmentDuration,
-    location,
     mode: modeRaw as AppointmentMode,
     fundingApprovalId,
+    appointmentTypeId,
+    membershipId,
     status: statusRaw as AppointmentStatus,
     notes,
   }

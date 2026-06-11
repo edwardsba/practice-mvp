@@ -901,6 +901,7 @@ export async function getFundingApprovalsForDropdown(clientId: string) {
       approvalTypeName: fundingApprovalTypes.name,
       appointmentsApproved: fundingApprovals.appointmentsApproved,
       approvalStatus: fundingApprovals.approvalStatus,
+      claimTypeId: claims.claimTypeId,
     })
     .from(fundingApprovals)
     .leftJoin(
@@ -910,6 +911,7 @@ export async function getFundingApprovalsForDropdown(clientId: string) {
         fundingApprovalTypes.fundingApprovalTypeId
       )
     )
+    .leftJoin(claims, eq(fundingApprovals.claimId, claims.claimId))
     .where(
       and(
         eq(fundingApprovals.clientId, clientId),
@@ -931,6 +933,7 @@ export async function getFundingApprovalsForDropdown(clientId: string) {
           row.appointmentsApproved
         ),
         approvalStatus: row.approvalStatus,
+        claimTypeId: row.claimTypeId,
         isInactive:
           row.approvalStatus === "expired" ||
           row.approvalStatus === "exhausted",

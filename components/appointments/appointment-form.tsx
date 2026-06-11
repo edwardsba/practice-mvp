@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { useActionState, useState } from "react"
+import { useActionState, useCallback, useEffect, useMemo, useState } from "react"
 
 import { FundingApprovalSelect } from "@/components/appointments/funding-approval-select"
 
@@ -16,6 +16,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { getAppointmentTypesForDropdown } from "@/lib/actions/appointment-types"
 import {
   APPOINTMENT_DURATIONS,
   APPOINTMENT_MODE_LABELS,
@@ -28,6 +29,11 @@ import {
   formatDateForInput,
   formatTimeForInput,
 } from "@/lib/appointments/format"
+import {
+  resolveMode,
+  type AppointmentTypeOption,
+  type AvailabilityBlock,
+} from "@/lib/appointments/resolve-mode"
 import { cn } from "@/lib/utils"
 
 const selectClassName = cn(
@@ -40,14 +46,20 @@ type ClientOption = {
   lastName: string
 }
 
+type PracticeMembership = {
+  membershipId: string
+  practiceName: string
+}
+
 type AppointmentInitialValues = {
   clientId: string
   appointmentDate: string
   appointmentTime: string
   durationMinutes: number
-  location: string | null
   mode?: string
   fundingApprovalId?: string | null
+  appointmentTypeId?: string | null
+  membershipId?: string | null
   status: string
   notes: string | null
 }
@@ -55,6 +67,9 @@ type AppointmentInitialValues = {
 export function AppointmentForm({
   action,
   clients,
+  practiceId,
+  availabilityBlocks,
+  practiceMemberships,
   initialValues,
   submitLabel,
   cancelHref,
@@ -64,6 +79,9 @@ export function AppointmentForm({
     formData: FormData
   ) => Promise<AppointmentFormState>
   clients: ClientOption[]
+  practiceId: string
+  availabilityBlocks: AvailabilityBlock[]
+  practiceMemberships: PracticeMembership[]
   initialValues?: AppointmentInitialValues
   submitLabel: string
   cancelHref: string
@@ -72,7 +90,121 @@ export function AppointmentForm({
   const [selectedClientId, setSelectedClientId] = useState(
     initialValues?.clientId ?? ""
   )
+  const [selectedDate, setSelectedDate] = useState(
+    formatDateForInput(initialValues?.appointmentDate ?? null)
+  )
+  const [selectedTime, setSelectedTime] = useState(
+    formatTimeForInput(initialValues?.appointmentTime ?? null)
+  )
+  const [selectedFundingApprovalClaimTypeId, setSelectedFundingApprovalClaimTypeId] =
+    useState<string | null>(null)
+  const [appointmentTypeOptions, setAppointmentTypeOptions] = useState<
+    AppointmentTypeOption[]
+  >([])
+  const [loadingAppointmentTypes, setLoadingAppointmentTypes] = useState(false)
+  const [selectedAppointmentTypeId, setSelectedAppointmentTypeId] = useState(
+    initialValues?.appointmentTypeId ?? ""
+  )
+  const [duration, setDuration] = useState(
+    String(initialValues?.durationMinutes ?? 50)
+  )
+  const [mode, setMode] = useState(initialValues?.mode ?? "face_to_face")
+  const [membershipId, setMembershipId] = useState(
+    initialValues?.membershipId ?? ""
+  )
+  const [fundingApprovalSelected, setFundingApprovalSelected] = useState(false)
+
   const timeOptions = buildAppointmentTimeOptions()
+
+  const selectedAppointmentType = useMemo(
+    () =>
+      appointmentTypeOptions.find(
+        (option) => option.appointmentTypeId === selectedAppointmentTypeId
+      ) ?? null,
+    [appointmentTypeOptions, selectedAppointmentTypeId]
+  )
+
+  const handleFundingApprovalChange = useCallback(
+    (fundingApprovalId: string, claimTypeId: string | null) => {
+      setFundingApprovalSelected(true)
+      setSelectedFundingApprovalClaimTypeId(claimTypeId)
+    },
+    []
+  )
+
+  useEffect(() => {
+    if (!selectedClientId || !fundingApprovalSelected) {
+      return
+    }
+
+    let cancelled = false
+    setLoadingAppointmentTypes(true)
+
+    getAppointmentTypesForDropdown(
+      practiceId,
+      selectedFundingApprovalClaimTypeId
+    )
+      .then((results) => {
+        if (!cancelled) {
+          setAppointmentTypeOptions(results)
+          setSelectedAppointmentTypeId((current) => {
+            if (current) return current
+            return pickAppointmentTypeByMode(
+              results,
+              resolveMode(
+                selectedDate,
+                selectedTime,
+                null,
+                availabilityBlocks
+              )
+            )
+          })
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLoadingAppointmentTypes(false)
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [
+    practiceId,
+    selectedClientId,
+    selectedFundingApprovalClaimTypeId,
+    fundingApprovalSelected,
+    selectedDate,
+    selectedTime,
+    availabilityBlocks,
+  ])
+
+  useEffect(() => {
+    if (practiceMemberships.length === 1 && !membershipId) {
+      setMembershipId(practiceMemberships[0].membershipId)
+    }
+  }, [practiceMemberships, membershipId])
+
+  useEffect(() => {
+    if (!selectedAppointmentType) return
+    setDuration(String(selectedAppointmentType.durationMinutes))
+  }, [selectedAppointmentType])
+
+  useEffect(() => {
+    const resolved = resolveMode(
+      selectedDate,
+      selectedTime,
+      selectedAppointmentType,
+      availabilityBlocks
+    )
+    setMode(resolved)
+  }, [
+    selectedDate,
+    selectedTime,
+    selectedAppointmentType,
+    availabilityBlocks,
+  ])
 
   return (
     <form action={formAction} className="space-y-6">
@@ -102,15 +234,6 @@ export function AppointmentForm({
             </select>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="funding_approval_id">Funding approval</Label>
-            <FundingApprovalSelect
-              key={selectedClientId}
-              clientId={selectedClientId}
-              defaultValue={initialValues?.fundingApprovalId}
-            />
-          </div>
-
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="appointment_date">Date</Label>
@@ -119,9 +242,8 @@ export function AppointmentForm({
                 name="appointment_date"
                 type="date"
                 required
-                defaultValue={formatDateForInput(
-                  initialValues?.appointmentDate ?? null
-                )}
+                value={selectedDate}
+                onChange={(event) => setSelectedDate(event.target.value)}
               />
             </div>
             <div className="space-y-2">
@@ -130,9 +252,8 @@ export function AppointmentForm({
                 id="appointment_time"
                 name="appointment_time"
                 required
-                defaultValue={formatTimeForInput(
-                  initialValues?.appointmentTime ?? null
-                )}
+                value={selectedTime}
+                onChange={(event) => setSelectedTime(event.target.value)}
                 className={selectClassName}
               >
                 <option value="" disabled>
@@ -147,6 +268,40 @@ export function AppointmentForm({
             </div>
           </div>
 
+          <div className="space-y-2">
+            <Label htmlFor="funding_approval_id">Funding approval</Label>
+            <FundingApprovalSelect
+              key={selectedClientId}
+              clientId={selectedClientId}
+              defaultValue={initialValues?.fundingApprovalId}
+              onSelectionChange={handleFundingApprovalChange}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="appointment_type_id">Appointment type</Label>
+            <select
+              id="appointment_type_id"
+              name="appointment_type_id"
+              value={selectedAppointmentTypeId}
+              onChange={(event) =>
+                setSelectedAppointmentTypeId(event.target.value)
+              }
+              disabled={!selectedClientId || loadingAppointmentTypes}
+              className={selectClassName}
+            >
+              <option value="">Select appointment type</option>
+              {appointmentTypeOptions.map((option) => (
+                <option
+                  key={option.appointmentTypeId}
+                  value={option.appointmentTypeId}
+                >
+                  {option.nickname}
+                </option>
+              ))}
+            </select>
+          </div>
+
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="duration_minutes">Duration</Label>
@@ -154,12 +309,53 @@ export function AppointmentForm({
                 id="duration_minutes"
                 name="duration_minutes"
                 required
-                defaultValue={String(initialValues?.durationMinutes ?? 50)}
+                value={duration}
+                onChange={(event) => setDuration(event.target.value)}
                 className={selectClassName}
               >
-                {APPOINTMENT_DURATIONS.map((duration) => (
-                  <option key={duration} value={duration}>
-                    {duration} min
+                {APPOINTMENT_DURATIONS.map((durationOption) => (
+                  <option key={durationOption} value={durationOption}>
+                    {durationOption} min
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="mode">Mode</Label>
+              <select
+                id="mode"
+                name="mode"
+                required
+                value={mode}
+                onChange={(event) => setMode(event.target.value)}
+                className={selectClassName}
+              >
+                {APPOINTMENT_MODES.map((modeOption) => (
+                  <option key={modeOption} value={modeOption}>
+                    {APPOINTMENT_MODE_LABELS[modeOption]}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="membership_id">Location</Label>
+              <select
+                id="membership_id"
+                name="membership_id"
+                value={membershipId}
+                onChange={(event) => setMembershipId(event.target.value)}
+                className={selectClassName}
+              >
+                <option value="">Select practice</option>
+                {practiceMemberships.map((membership) => (
+                  <option
+                    key={membership.membershipId}
+                    value={membership.membershipId}
+                  >
+                    {membership.practiceName}
                   </option>
                 ))}
               </select>
@@ -176,33 +372,6 @@ export function AppointmentForm({
                 {APPOINTMENT_STATUSES.map((status) => (
                   <option key={status} value={status}>
                     {APPOINTMENT_STATUS_LABELS[status]}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="location">Location</Label>
-              <Input
-                id="location"
-                name="location"
-                defaultValue={initialValues?.location ?? ""}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="mode">Mode</Label>
-              <select
-                id="mode"
-                name="mode"
-                required
-                defaultValue={initialValues?.mode ?? "face_to_face"}
-                className={selectClassName}
-              >
-                {APPOINTMENT_MODES.map((mode) => (
-                  <option key={mode} value={mode}>
-                    {APPOINTMENT_MODE_LABELS[mode]}
                   </option>
                 ))}
               </select>
@@ -237,6 +406,25 @@ export function AppointmentForm({
       </div>
     </form>
   )
+}
+
+function pickAppointmentTypeByMode(
+  options: AppointmentTypeOption[],
+  resolvedMode: string
+): string {
+  if (options.length === 0) return ""
+
+  if (resolvedMode === "online") {
+    const match = options.find((option) => option.mode === "online")
+    if (match) return match.appointmentTypeId
+  }
+
+  if (resolvedMode === "face_to_face") {
+    const match = options.find((option) => option.mode === "face_to_face")
+    if (match) return match.appointmentTypeId
+  }
+
+  return options[0].appointmentTypeId
 }
 
 function formatTimeLabel(time: string): string {

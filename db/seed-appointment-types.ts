@@ -19,6 +19,7 @@ type SeedAppointmentType = {
   referenceNumber: string | null
   claimTypeName: string
   durationMinutes: number
+  mode: string
   fee: string
   tax: string
   total: string
@@ -32,6 +33,7 @@ const SEED_TYPES: SeedAppointmentType[] = [
     referenceNumber: "80110",
     claimTypeName: "Medicare",
     durationMinutes: 50,
+    mode: "face_to_face",
     fee: "137.05",
     tax: "0.00",
     total: "137.05",
@@ -43,6 +45,7 @@ const SEED_TYPES: SeedAppointmentType[] = [
     referenceNumber: "91170",
     claimTypeName: "Medicare",
     durationMinutes: 50,
+    mode: "online",
     fee: "137.05",
     tax: "0.00",
     total: "137.05",
@@ -54,6 +57,7 @@ const SEED_TYPES: SeedAppointmentType[] = [
     referenceNumber: null,
     claimTypeName: "Private",
     durationMinutes: 50,
+    mode: "face_to_face",
     fee: "220.00",
     tax: "0.00",
     total: "220.00",
@@ -65,6 +69,7 @@ const SEED_TYPES: SeedAppointmentType[] = [
     referenceNumber: "15_054_0128_1_3",
     claimTypeName: "NDIS",
     durationMinutes: 50,
+    mode: "face_to_face",
     fee: "214.41",
     tax: "0.00",
     total: "214.41",
@@ -170,6 +175,7 @@ async function main() {
         claimTypeId: claimTypeByName[seed.claimTypeName],
         membershipId: membership?.membershipId ?? null,
         durationMinutes: seed.durationMinutes,
+        mode: seed.mode,
         status: "active",
         updatedAt: now,
       })

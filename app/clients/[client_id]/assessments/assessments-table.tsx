@@ -106,14 +106,13 @@ export function AssessmentsTable({
               <TableHead>Assessment Type</TableHead>
               <TableHead>Score</TableHead>
               <TableHead>Severity / Risk</TableHead>
-              <TableHead className="text-right">View</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {filteredResults.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={5}
+                  colSpan={4}
                   className="h-20 text-center text-muted-foreground"
                 >
                   No assessment results recorded yet.
@@ -123,24 +122,38 @@ export function AssessmentsTable({
               filteredResults.map((result) => {
                 const resultHref = `/clients/${clientId}/results/${result.assessmentResultId}`
                 return (
-                  <TableRow key={result.assessmentResultId}>
-                    <TableCell>{formatDate(result.assessmentDate)}</TableCell>
+                  <TableRow
+                    key={result.assessmentResultId}
+                    className="cursor-pointer hover:bg-muted/50"
+                  >
                     <TableCell>
-                      {formatAssessmentType(
-                        result.assessmentCode,
-                        result.assessmentName
-                      )}
-                    </TableCell>
-                    <TableCell>{result.score}</TableCell>
-                    <TableCell className={cn(result.assessmentCode !== "ASQ" && "capitalize")}>
-                      {formatSeverityOrRisk(result)}
-                    </TableCell>
-                    <TableCell className="text-right">
                       <Link
                         href={resultHref}
-                        className="text-primary hover:underline"
+                        className="block font-medium text-primary hover:underline"
                       >
-                        View
+                        {formatDate(result.assessmentDate)}
+                      </Link>
+                    </TableCell>
+                    <TableCell>
+                      <Link href={resultHref} className="block hover:underline">
+                        {formatAssessmentType(
+                          result.assessmentCode,
+                          result.assessmentName
+                        )}
+                      </Link>
+                    </TableCell>
+                    <TableCell>
+                      <Link href={resultHref} className="block hover:underline">
+                        {result.score}
+                      </Link>
+                    </TableCell>
+                    <TableCell
+                      className={cn(
+                        result.assessmentCode !== "ASQ" && "capitalize"
+                      )}
+                    >
+                      <Link href={resultHref} className="block hover:underline">
+                        {formatSeverityOrRisk(result)}
                       </Link>
                     </TableCell>
                   </TableRow>

@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/table"
 import { clients } from "@/db/schema"
 import { requirePractitionerContext } from "@/lib/auth"
+import { appendReturnTo } from "@/lib/navigation/back"
 import { db } from "@/lib/db"
 import {
   formatSessionNoteDate,
@@ -54,6 +55,7 @@ export default async function ClientSessionNotesPage({
     clientId
   )
   const clientName = `${client.firstName} ${client.lastName}`
+  const returnTo = `/clients/${clientId}/session-notes`
 
   return (
     <AppShell>
@@ -79,38 +81,45 @@ export default async function ClientSessionNotesPage({
             <TableRow>
               <TableHead>Date</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead className="text-right">View</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {notes.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={3}
+                  colSpan={2}
                   className="h-20 text-center text-muted-foreground"
                 >
                   No session notes yet.
                 </TableCell>
               </TableRow>
             ) : (
-              notes.map((note) => (
-                <TableRow key={note.sessionNoteId}>
-                  <TableCell>
-                    {formatSessionNoteDate(note.sessionDate)}
-                  </TableCell>
-                  <TableCell>
-                    {formatSessionNoteStatus(note.status)}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Link
-                      href={`/session-notes/${note.sessionNoteId}`}
-                      className="text-primary hover:underline"
-                    >
-                      View
-                    </Link>
-                  </TableCell>
-                </TableRow>
-              ))
+              notes.map((note) => {
+                const noteHref = appendReturnTo(
+                  `/session-notes/${note.sessionNoteId}`,
+                  returnTo
+                )
+                return (
+                  <TableRow
+                    key={note.sessionNoteId}
+                    className="cursor-pointer hover:bg-muted/50"
+                  >
+                    <TableCell>
+                      <Link
+                        href={noteHref}
+                        className="block font-medium text-primary hover:underline"
+                      >
+                        {formatSessionNoteDate(note.sessionDate)}
+                      </Link>
+                    </TableCell>
+                    <TableCell>
+                      <Link href={noteHref} className="block hover:underline">
+                        {formatSessionNoteStatus(note.status)}
+                      </Link>
+                    </TableCell>
+                  </TableRow>
+                )
+              })
             )}
           </TableBody>
         </Table>

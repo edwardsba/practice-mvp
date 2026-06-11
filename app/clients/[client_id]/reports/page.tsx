@@ -136,7 +136,7 @@ export default async function ClientReportsPage({
                 return (
                   <TableRow
                     key={report.simpleReportId}
-                    className="hover:bg-muted/50"
+                    className="cursor-pointer hover:bg-muted/50"
                   >
                     <TableCell>
                       <Link

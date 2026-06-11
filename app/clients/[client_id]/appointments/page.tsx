@@ -88,14 +88,13 @@ export default async function ClientAppointmentsPage({
               <TableHead>Mode</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Funding Approval</TableHead>
-              <TableHead className="text-right">View</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {appointments.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={6}
+                  colSpan={5}
                   className="h-20 text-center text-muted-foreground"
                 >
                   No appointments scheduled.
@@ -108,35 +107,43 @@ export default async function ClientAppointmentsPage({
                   returnTo
                 )
                 return (
-                <TableRow key={appointment.appointmentId}>
-                  <TableCell>
-                    {formatAppointmentDate(appointment.appointmentDate)}
-                  </TableCell>
-                  <TableCell>
-                    {formatAppointmentTime(appointment.appointmentTime)}
-                  </TableCell>
-                  <TableCell>
-                    {appointment.mode in APPOINTMENT_MODE_LABELS
-                      ? APPOINTMENT_MODE_LABELS[
-                          appointment.mode as AppointmentMode
-                        ]
-                      : appointment.mode}
-                  </TableCell>
-                  <TableCell>
-                    {formatAppointmentStatus(appointment.status)}
-                  </TableCell>
-                  <TableCell>
-                    {appointment.approvalTypeName ?? "—"}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Link
-                      href={appointmentHref}
-                      className="text-primary hover:underline"
-                    >
-                      View
-                    </Link>
-                  </TableCell>
-                </TableRow>
+                  <TableRow
+                    key={appointment.appointmentId}
+                    className="cursor-pointer hover:bg-muted/50"
+                  >
+                    <TableCell>
+                      <Link
+                        href={appointmentHref}
+                        className="block font-medium text-primary hover:underline"
+                      >
+                        {formatAppointmentDate(appointment.appointmentDate)}
+                      </Link>
+                    </TableCell>
+                    <TableCell>
+                      <Link href={appointmentHref} className="block hover:underline">
+                        {formatAppointmentTime(appointment.appointmentTime)}
+                      </Link>
+                    </TableCell>
+                    <TableCell>
+                      <Link href={appointmentHref} className="block hover:underline">
+                        {appointment.mode in APPOINTMENT_MODE_LABELS
+                          ? APPOINTMENT_MODE_LABELS[
+                              appointment.mode as AppointmentMode
+                            ]
+                          : appointment.mode}
+                      </Link>
+                    </TableCell>
+                    <TableCell>
+                      <Link href={appointmentHref} className="block hover:underline">
+                        {formatAppointmentStatus(appointment.status)}
+                      </Link>
+                    </TableCell>
+                    <TableCell>
+                      <Link href={appointmentHref} className="block hover:underline">
+                        {appointment.approvalTypeName ?? "—"}
+                      </Link>
+                    </TableCell>
+                  </TableRow>
                 )
               })
             )}

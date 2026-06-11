@@ -1,6 +1,11 @@
-import { and, asc, eq, gte, lte, lt } from "drizzle-orm"
+import { and, asc, desc, eq, gte, lte, lt } from "drizzle-orm"
 
-import { appointments, clients } from "@/db/schema"
+import {
+  appointments,
+  clients,
+  fundingApprovalTypes,
+  fundingApprovals,
+} from "@/db/schema"
 import type { AppointmentFilter } from "@/lib/appointments/constants"
 import { todayDateString } from "@/lib/appointments/format"
 import { db } from "@/lib/db"
@@ -110,6 +115,43 @@ export async function loadAppointmentForPractice(
     .limit(1)
 
   return row ?? null
+}
+
+export async function loadAppointmentsForClient(
+  clientId: string,
+  practiceId: string
+) {
+  return db
+    .select({
+      appointmentId: appointments.appointmentId,
+      appointmentDate: appointments.appointmentDate,
+      appointmentTime: appointments.appointmentTime,
+      mode: appointments.mode,
+      status: appointments.status,
+      approvalTypeName: fundingApprovalTypes.name,
+    })
+    .from(appointments)
+    .leftJoin(
+      fundingApprovals,
+      eq(appointments.fundingApprovalId, fundingApprovals.fundingApprovalId)
+    )
+    .leftJoin(
+      fundingApprovalTypes,
+      eq(
+        fundingApprovals.fundingApprovalTypeId,
+        fundingApprovalTypes.fundingApprovalTypeId
+      )
+    )
+    .where(
+      and(
+        eq(appointments.clientId, clientId),
+        eq(appointments.practiceId, practiceId)
+      )
+    )
+    .orderBy(
+      desc(appointments.appointmentDate),
+      desc(appointments.appointmentTime)
+    )
 }
 
 export async function loadNextAppointmentForClient(

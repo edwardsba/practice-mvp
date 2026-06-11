@@ -7,6 +7,7 @@ import {
   updateClient,
   type UpdateClientFormState,
 } from "@/app/clients/[client_id]/edit/actions"
+import { FormCheckboxField } from "@/components/treatment-plan/form-fields"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -32,6 +33,12 @@ export function EditClientForm({
     dateOfBirth: string | null
     email: string | null
     phone: string | null
+    commsOptOut: boolean
+    reminderOptOut: boolean
+    preSessionOptOut: boolean
+    postSessionOptOut: boolean
+    adminCommsOptOut: boolean
+    onlineBookingPermitted: boolean
   }
 }) {
   const [state, formAction, pending] = useActionState(
@@ -89,6 +96,52 @@ export function EditClientForm({
           name="phone"
           type="tel"
           defaultValue={client.phone ?? ""}
+        />
+      </div>
+
+      <div id="communication-preferences" className="space-y-4 border-t pt-6">
+        <div>
+          <h2 className="text-lg font-medium">Communication Preferences</h2>
+          <p className="text-sm text-muted-foreground">
+            Manage how this client receives communications from your practice.
+          </p>
+        </div>
+
+        <FormCheckboxField
+          id="comms_opt_out"
+          name="comms_opt_out"
+          label="Global contact opt-out"
+          defaultChecked={client.commsOptOut}
+        />
+        <FormCheckboxField
+          id="reminder_opt_out"
+          name="reminder_opt_out"
+          label="Opt out of appointment reminder emails"
+          defaultChecked={client.reminderOptOut}
+        />
+        <FormCheckboxField
+          id="pre_session_opt_out"
+          name="pre_session_opt_out"
+          label="Opt out of pre-session questionnaire emails"
+          defaultChecked={client.preSessionOptOut}
+        />
+        <FormCheckboxField
+          id="post_session_opt_out"
+          name="post_session_opt_out"
+          label="Opt out of post-session questionnaire emails"
+          defaultChecked={client.postSessionOptOut}
+        />
+        <FormCheckboxField
+          id="admin_comms_opt_out"
+          name="admin_comms_opt_out"
+          label="Opt out of admin communication emails"
+          defaultChecked={client.adminCommsOptOut}
+        />
+        <FormCheckboxField
+          id="online_booking_permitted"
+          name="online_booking_permitted"
+          label="Online booking permitted"
+          defaultChecked={client.onlineBookingPermitted}
         />
       </div>
 

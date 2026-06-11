@@ -30,6 +30,12 @@ export default async function EditClientPage({
       dateOfBirth: clients.dateOfBirth,
       email: clients.email,
       phone: clients.phone,
+      commsOptOut: clients.commsOptOut,
+      reminderOptOut: clients.reminderOptOut,
+      preSessionOptOut: clients.preSessionOptOut,
+      postSessionOptOut: clients.postSessionOptOut,
+      adminCommsOptOut: clients.adminCommsOptOut,
+      onlineBookingPermitted: clients.onlineBookingPermitted,
     })
     .from(clients)
     .where(

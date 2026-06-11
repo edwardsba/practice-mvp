@@ -23,6 +23,7 @@ import {
 } from "@/lib/appointments/constants"
 import { loadAppointmentForPractice } from "@/lib/appointments/load"
 import { requirePractitionerContext } from "@/lib/auth"
+import { resolveBackNavigation } from "@/lib/navigation/back"
 import { loadSessionNoteForAppointment } from "@/lib/session-notes/load"
 
 export default async function AppointmentDetailPage({
@@ -33,7 +34,8 @@ export default async function AppointmentDetailPage({
   searchParams: Promise<{ returnTo?: string }>
 }) {
   const { appointment_id: appointmentId } = await params
-  const { returnTo } = await searchParams
+  const { returnTo: returnToParam } = await searchParams
+  const returnTo = returnToParam?.trim() || undefined
   const context = await requirePractitionerContext()
 
   const [appointment, linkedSessionNote] = await Promise.all([
@@ -49,17 +51,17 @@ export default async function AppointmentDetailPage({
     appointment.clientFirstName,
     appointment.clientLastName
   )
-  const backHref = returnTo ?? "/appointments"
-  const backLabel =
-    returnTo === "/calendar"
-      ? "← Back to calendar"
-      : "← Back to appointments"
+  const back = resolveBackNavigation(
+    returnTo,
+    "/appointments",
+    "← Back to appointments"
+  )
 
   return (
     <AppShell>
       <div className="mb-6">
         <Button variant="ghost" size="sm" asChild className="mb-2 -ml-2">
-          <Link href={backHref}>{backLabel}</Link>
+          <Link href={back.href}>{back.label}</Link>
         </Button>
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <h1 className="text-2xl font-semibold tracking-tight">Appointment</h1>
@@ -81,7 +83,7 @@ export default async function AppointmentDetailPage({
             )}
             <Button asChild variant="outline">
               <Link
-                href={`/appointments/${appointmentId}/edit?returnTo=${returnTo ?? "/appointments"}`}
+                href={`/appointments/${appointmentId}/edit?returnTo=${encodeURIComponent(returnTo ?? "/appointments")}`}
               >
                 Edit
               </Link>

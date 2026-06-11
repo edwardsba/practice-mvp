@@ -24,6 +24,12 @@ export async function updateClient(
   const email = String(formData.get("email") ?? "").trim() || null
   const phone = String(formData.get("phone") ?? "").trim() || null
   const dateOfBirth = String(formData.get("date_of_birth") ?? "").trim() || null
+  const commsOptOut = formData.get("comms_opt_out") === "on"
+  const reminderOptOut = formData.get("reminder_opt_out") === "on"
+  const preSessionOptOut = formData.get("pre_session_opt_out") === "on"
+  const postSessionOptOut = formData.get("post_session_opt_out") === "on"
+  const adminCommsOptOut = formData.get("admin_comms_opt_out") === "on"
+  const onlineBookingPermitted = formData.get("online_booking_permitted") === "on"
 
   if (!firstName || !lastName) {
     return { error: "First name and last name are required." }
@@ -55,6 +61,12 @@ export async function updateClient(
       email,
       phone,
       dateOfBirth,
+      commsOptOut,
+      reminderOptOut,
+      preSessionOptOut,
+      postSessionOptOut,
+      adminCommsOptOut,
+      onlineBookingPermitted,
       updatedAt: now,
     })
     .where(eq(clients.clientId, clientId))

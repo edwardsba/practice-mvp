@@ -57,6 +57,12 @@ export const clients = pgTable('clients', {
   email: citext('email'),
   phone: text('phone'),
   isActive: boolean('is_active').notNull().default(true),
+  commsOptOut: boolean('comms_opt_out').notNull().default(false),
+  reminderOptOut: boolean('reminder_opt_out').notNull().default(false),
+  preSessionOptOut: boolean('pre_session_opt_out').notNull().default(false),
+  postSessionOptOut: boolean('post_session_opt_out').notNull().default(false),
+  adminCommsOptOut: boolean('admin_comms_opt_out').notNull().default(false),
+  onlineBookingPermitted: boolean('online_booking_permitted').notNull().default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 })

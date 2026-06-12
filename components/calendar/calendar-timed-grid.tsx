@@ -35,8 +35,8 @@ function AppointmentBlock({
   return (
     <Link
       href={`/appointments/${appointment.appointmentId}?returnTo=/calendar`}
-      className="flex h-full min-h-0 flex-col justify-center truncate rounded-md border border-primary/20 bg-primary/10 px-1 py-0.5 text-[10px] font-medium text-primary hover:bg-primary/15 sm:px-2 sm:py-1 sm:text-xs"
-      style={{ minHeight: rowSpan * CALENDAR_SLOT_HEIGHT_PX - 4 }}
+      className="flex h-full min-h-0 flex-col justify-center truncate rounded-md border border-primary/20 bg-primary/10 px-1 text-[10px] font-medium leading-tight text-primary hover:bg-primary/15 sm:px-2 sm:text-xs"
+      style={{ minHeight: rowSpan * CALENDAR_SLOT_HEIGHT_PX - 8 }}
     >
       {formatAppointmentClientName(appointment)}
     </Link>
@@ -74,7 +74,7 @@ function TimedGridTable({
 
   return (
     <div className="rounded-lg border bg-background">
-      <table className="w-full border-collapse text-sm">
+      <table className="w-full table-fixed border-collapse text-sm">
         <thead>
           <tr>
             <th className="w-12 border-b bg-muted/40 px-1 py-2 text-left text-[10px] font-medium text-muted-foreground sm:w-20 sm:px-2 sm:text-xs" />
@@ -85,12 +85,7 @@ function TimedGridTable({
               return (
                 <th
                   key={day}
-                  className={cn(
-                    "border-b border-l px-1 py-2 text-center text-xs font-medium sm:px-2",
-                    isToday
-                      ? "bg-primary/10 text-primary"
-                      : "bg-muted/40 text-muted-foreground"
-                  )}
+                  className="border-b border-l bg-muted/40 px-1 py-2 text-center text-xs font-medium text-muted-foreground sm:px-2"
                 >
                   <div className="flex flex-col items-center gap-0.5">
                     <span className="text-[10px] uppercase sm:text-xs">
@@ -113,7 +108,7 @@ function TimedGridTable({
         <tbody>
           {slots.map((slot, slotIndex) => (
             <tr key={slot}>
-              <td className="border-b bg-muted/20 px-1 py-1 text-[10px] text-muted-foreground sm:px-2 sm:text-xs">
+              <td className="w-12 border-b bg-muted/20 px-1 py-1 text-[10px] text-muted-foreground sm:w-20 sm:px-2 sm:text-xs">
                 {formatSlotLabel(slot)}
               </td>
               {days.map((day) => {
@@ -143,14 +138,16 @@ function TimedGridTable({
                 return (
                   <td
                     key={`${day}-${slot}`}
-                    className={cn(
-                      "border-b border-l p-0 align-top",
-                      !available && "bg-muted/30"
-                    )}
+                    className="border-b border-l p-0 align-top"
                   >
                     <Link
                       href={newAppointmentUrl(day, slot)}
-                      className="block hover:bg-muted/50"
+                      className={cn(
+                        "block truncate",
+                        available
+                          ? "hover:bg-muted/50"
+                          : "bg-muted/30 hover:bg-muted/40"
+                      )}
                       style={{ height: CALENDAR_SLOT_HEIGHT_PX }}
                       aria-label={`Add appointment on ${day} at ${slot}`}
                     />

@@ -6,7 +6,7 @@ import { getFundingApprovalsForDropdown } from "@/lib/actions/funding"
 import { cn } from "@/lib/utils"
 
 const selectClassName = cn(
-  "flex h-9 w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-1 text-sm shadow-xs transition-colors outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 dark:bg-input/30"
+  "flex h-9 w-full max-w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-1 text-sm shadow-xs transition-colors outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 dark:bg-input/30"
 )
 
 type FundingApprovalOption = {
@@ -81,25 +81,27 @@ export function FundingApprovalSelect({
   }
 
   return (
-    <select
-      id="funding_approval_id"
-      name="funding_approval_id"
-      value={selectedValue}
-      onChange={(e) => setSelectedValue(e.target.value)}
-      disabled={loading}
-      className={selectClassName}
-    >
-      <option value="">No funding approval (private)</option>
-      {options.map((option) => (
-        <option
-          key={option.fundingApprovalId}
-          value={option.fundingApprovalId}
-          className={option.isInactive ? "text-muted-foreground" : undefined}
-        >
-          {option.label}
-          {option.isInactive ? " (inactive)" : ""}
-        </option>
-      ))}
-    </select>
+    <div className="min-w-0">
+      <select
+        id="funding_approval_id"
+        name="funding_approval_id"
+        value={selectedValue}
+        onChange={(e) => setSelectedValue(e.target.value)}
+        disabled={loading}
+        className={selectClassName}
+      >
+        <option value="">No funding approval (private)</option>
+        {options.map((option) => (
+          <option
+            key={option.fundingApprovalId}
+            value={option.fundingApprovalId}
+            className={option.isInactive ? "text-muted-foreground" : undefined}
+          >
+            {option.label}
+            {option.isInactive ? " (inactive)" : ""}
+          </option>
+        ))}
+      </select>
+    </div>
   )
 }

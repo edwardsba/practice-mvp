@@ -37,7 +37,12 @@ import {
 import { cn } from "@/lib/utils"
 
 const selectClassName = cn(
-  "flex h-9 w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-1 text-sm shadow-xs transition-colors outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 dark:bg-input/30"
+  "flex h-9 w-full max-w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-1 text-sm shadow-xs transition-colors outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 dark:bg-input/30"
+)
+
+const dateInputClassName = cn(
+  "block h-9 w-full max-w-full min-w-0 appearance-none py-1",
+  "[&::-webkit-date-and-time-value]:min-w-0 [&::-webkit-date-and-time-value]:text-left"
 )
 
 type ClientOption = {
@@ -234,8 +239,8 @@ export function AppointmentForm({
             </select>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
+          <div className="grid min-w-0 gap-4 sm:grid-cols-2">
+            <div className="min-w-0 space-y-2">
               <Label htmlFor="appointment_date">Date</Label>
               <Input
                 id="appointment_date"
@@ -244,9 +249,10 @@ export function AppointmentForm({
                 required
                 value={selectedDate}
                 onChange={(event) => setSelectedDate(event.target.value)}
+                className={dateInputClassName}
               />
             </div>
-            <div className="space-y-2">
+            <div className="min-w-0 space-y-2">
               <Label htmlFor="appointment_time">Time</Label>
               <select
                 id="appointment_time"
@@ -268,7 +274,7 @@ export function AppointmentForm({
             </div>
           </div>
 
-          <div className="space-y-2">
+          <div className="min-w-0 space-y-2">
             <Label htmlFor="funding_approval_id">Funding approval</Label>
             <FundingApprovalSelect
               key={selectedClientId}

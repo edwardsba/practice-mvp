@@ -59,7 +59,7 @@ export default async function CalendarPage({
 
   return (
     <AppShell>
-      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="mb-6 hidden sm:flex sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-2xl font-semibold tracking-tight">Calendar</h1>
         <Button asChild>
           <Link href="/appointments/new?returnTo=/calendar">
@@ -68,7 +68,7 @@ export default async function CalendarPage({
         </Button>
       </div>
 
-      <div className="mb-6">
+      <div className="mb-4 sm:mb-6">
         <CalendarControls view={view} anchorDate={anchorDate} />
       </div>
 

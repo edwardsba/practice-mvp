@@ -50,26 +50,24 @@ export default async function ProfessionalDetailPage({
           fallbackHref="/contacts/professionals"
           label="← Back to professionals"
         />
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">
-              {displayName}
-            </h1>
-            <p className="mt-1 text-muted-foreground">
-              {professional.professionName ?? "No profession set"}
-            </p>
-          </div>
-          <Button asChild variant="outline">
-            <Link href={`/contacts/professionals/${professionalId}/edit`}>
-              Edit
-            </Link>
-          </Button>
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">
+            {displayName}
+          </h1>
+          <p className="mt-1 text-muted-foreground">
+            {professional.professionName ?? "No profession set"}
+          </p>
         </div>
       </div>
 
       <Card className="mb-6">
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Details</CardTitle>
+          <Button variant="outline" size="sm" asChild>
+            <Link href={`/contacts/professionals/${professionalId}/edit`}>
+              Edit
+            </Link>
+          </Button>
         </CardHeader>
         <CardContent>
           <dl className="grid gap-4 sm:grid-cols-2">

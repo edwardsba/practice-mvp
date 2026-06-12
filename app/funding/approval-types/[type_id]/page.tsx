@@ -41,19 +41,15 @@ export default async function FundingApprovalTypeDetailPage({
           fallbackHref="/funding/approval-types"
           label="← Back to approval types"
         />
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <h1 className="text-2xl font-semibold tracking-tight">
-            {type.name}
-          </h1>
-          <Button variant="outline" size="sm" asChild>
-            <Link href={`/funding/approval-types/${typeId}/edit`}>Edit</Link>
-          </Button>
-        </div>
+        <h1 className="text-2xl font-semibold tracking-tight">{type.name}</h1>
       </div>
 
       <Card className="mb-6">
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Details</CardTitle>
+          <Button variant="outline" size="sm" asChild>
+            <Link href={`/funding/approval-types/${typeId}/edit`}>Edit</Link>
+          </Button>
         </CardHeader>
         <CardContent>
           <dl className="grid gap-3 sm:grid-cols-2">

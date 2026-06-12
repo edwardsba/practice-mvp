@@ -42,21 +42,19 @@ export default async function OrganisationDetailPage({
           fallbackHref="/contacts/organisations"
           label="← Back to organisations"
         />
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <h1 className="text-2xl font-semibold tracking-tight">
-            {organisation.organisationName}
-          </h1>
-          <Button asChild variant="outline">
+        <h1 className="text-2xl font-semibold tracking-tight">
+          {organisation.organisationName}
+        </h1>
+      </div>
+
+      <Card className="mb-6">
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle>Details</CardTitle>
+          <Button variant="outline" size="sm" asChild>
             <Link href={`/contacts/organisations/${organisationId}/edit`}>
               Edit
             </Link>
           </Button>
-        </div>
-      </div>
-
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle>Details</CardTitle>
         </CardHeader>
         <CardContent>
           <dl className="grid gap-4 sm:grid-cols-2">

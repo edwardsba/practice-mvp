@@ -28,6 +28,7 @@
     "db:appointment-type-link": "tsx db/apply-appointment-type-link-migration.ts",
     "db:seed-appointment-types": "tsx db/seed-appointment-types.ts",
     "db:seed-appointment-types-mode": "tsx db/seed-appointment-types-mode.ts",
+    "db:practitioner-calendar-settings": "tsx db/apply-practitioner-calendar-settings-migration.ts",
     "db:seed-funding": "tsx db/seed-funding.ts"
   },
   "dependencies": {

@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, boolean, timestamp, customType } from 'drizzle-orm/pg-core'
+import { pgTable, uuid, text, boolean, timestamp, customType, time, integer } from 'drizzle-orm/pg-core'
 
 const citext = customType<{ data: string }>({
   dataType() {
@@ -43,6 +43,9 @@ export const practitionerProfiles = pgTable('practitioner_profiles', {
   phone: text('phone'),
   email: citext('email'),
   reportSignature: text('report_signature'),
+  calendarStartTime: time('calendar_start_time').notNull().default('07:00'),
+  calendarEndTime: time('calendar_end_time').notNull().default('20:00'),
+  calendarIntervalMinutes: integer('calendar_interval_minutes').notNull().default(30),
   isActive: boolean('is_active').notNull().default(true),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),

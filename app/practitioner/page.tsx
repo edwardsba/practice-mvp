@@ -92,6 +92,29 @@ export default async function PractitionerPage() {
 
       <Card className="mb-6">
         <CardHeader>
+          <CardTitle>Calendar Settings</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <dl className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <dt className="text-sm text-muted-foreground">Calendar hours</dt>
+              <dd className="font-medium">
+                {formatTimeForDisplay(profile.calendarStartTime)} –{" "}
+                {formatTimeForDisplay(profile.calendarEndTime)}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-sm text-muted-foreground">Desktop interval</dt>
+              <dd className="font-medium">
+                {profile.calendarIntervalMinutes} minutes
+              </dd>
+            </div>
+          </dl>
+        </CardContent>
+      </Card>
+
+      <Card className="mb-6">
+        <CardHeader>
           <CardTitle>Practice memberships</CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">

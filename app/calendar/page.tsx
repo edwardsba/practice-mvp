@@ -1,10 +1,12 @@
 import Link from "next/link"
 
+import { getPractitionerProfile } from "@/app/practitioner/actions"
 import { CalendarControls } from "@/components/calendar/calendar-controls"
 import { CalendarMonthView } from "@/components/calendar/calendar-month-view"
 import { CalendarTimedGrid } from "@/components/calendar/calendar-timed-grid"
 import { AppShell } from "@/components/app-shell"
 import { Button } from "@/components/ui/button"
+import { getMemberships } from "@/lib/actions/practitioner-practice"
 import { loadAppointmentsForPractitionerInRange } from "@/lib/appointments/load"
 import { requirePractitionerContext } from "@/lib/auth"
 import {
@@ -13,6 +15,7 @@ import {
   parseAnchorDate,
   parseCalendarView,
 } from "@/lib/calendar/dates"
+import { formatTimeForInput } from "@/lib/calendar/time-slots"
 
 export default async function CalendarPage({
   searchParams,
@@ -25,11 +28,30 @@ export default async function CalendarPage({
   const anchorDate = parseAnchorDate(dateParam)
   const { start, end } = getCalendarLoadRange(view, anchorDate)
 
-  const appointments = await loadAppointmentsForPractitionerInRange(
-    context.practiceId,
-    context.practitionerProfileId,
-    start,
-    end
+  const [appointments, profile, memberships] = await Promise.all([
+    loadAppointmentsForPractitionerInRange(
+      context.practiceId,
+      context.practitionerProfileId,
+      start,
+      end
+    ),
+    getPractitionerProfile(),
+    getMemberships(context.practitionerProfileId),
+  ])
+
+  const calendarSettings = {
+    startTime: formatTimeForInput(profile?.calendarStartTime ?? "07:00:00"),
+    endTime: formatTimeForInput(profile?.calendarEndTime ?? "20:00:00"),
+    intervalMinutes: profile?.calendarIntervalMinutes ?? 30,
+  }
+
+  const availabilityBlocks = memberships.flatMap((membership) =>
+    membership.availabilityBlocks.map((block) => ({
+      dayOfWeek: block.dayOfWeek,
+      startTime: block.startTime,
+      endTime: block.endTime,
+      mode: block.mode,
+    }))
   )
 
   const timedDays =
@@ -56,7 +78,12 @@ export default async function CalendarPage({
           appointments={appointments}
         />
       ) : (
-        <CalendarTimedGrid days={timedDays} appointments={appointments} />
+        <CalendarTimedGrid
+          days={timedDays}
+          appointments={appointments}
+          calendarSettings={calendarSettings}
+          availabilityBlocks={availabilityBlocks}
+        />
       )}
     </AppShell>
   )

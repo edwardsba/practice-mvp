@@ -5,23 +5,62 @@ import {
 
 import type { CalendarAppointment } from "@/lib/appointments/load"
 
-export const CALENDAR_SLOT_START_HOUR = 7
-export const CALENDAR_SLOT_END_HOUR = 20
-export const CALENDAR_SLOT_INTERVAL_MINUTES = 30
 export const CALENDAR_SLOT_HEIGHT_PX = 48
 
-export function generateCalendarTimeSlots(): string[] {
-  const slots: string[] = []
+export function parseTimeString(time: string): { hour: number; minute: number } {
+  const normalized = time.trim().slice(0, 5)
+  const [hours, minutes] = normalized.split(":").map((part) => Number(part))
+  if (Number.isNaN(hours) || Number.isNaN(minutes)) {
+    return { hour: 7, minute: 0 }
+  }
+  return { hour: hours, minute: minutes }
+}
 
-  for (let hour = CALENDAR_SLOT_START_HOUR; hour <= CALENDAR_SLOT_END_HOUR; hour++) {
-    for (const minute of [0, 30]) {
-      if (hour === CALENDAR_SLOT_END_HOUR && minute > 0) {
-        break
-      }
-      slots.push(
-        `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`
-      )
-    }
+export function parseTimeStringToMinutes(time: string): number {
+  const { hour, minute } = parseTimeString(time)
+  return hour * 60 + minute
+}
+
+export function generateCalendarTimeSlots(
+  startHour: number,
+  endHour: number,
+  intervalMinutes: number
+): string[] {
+  const slots: string[] = []
+  let currentMinutes = startHour * 60
+  const endMinutes = endHour * 60
+
+  while (currentMinutes <= endMinutes) {
+    const hour = Math.floor(currentMinutes / 60)
+    const minute = currentMinutes % 60
+    slots.push(
+      `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`
+    )
+    if (currentMinutes >= endMinutes) break
+    currentMinutes += intervalMinutes
+  }
+
+  return slots
+}
+
+export function generateCalendarTimeSlotsFromSettings(
+  startTime: string,
+  endTime: string,
+  intervalMinutes: number
+): string[] {
+  const startMinutes = parseTimeStringToMinutes(startTime)
+  const endMinutes = parseTimeStringToMinutes(endTime)
+  const slots: string[] = []
+  let currentMinutes = startMinutes
+
+  while (currentMinutes <= endMinutes) {
+    const hour = Math.floor(currentMinutes / 60)
+    const minute = currentMinutes % 60
+    slots.push(
+      `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`
+    )
+    if (currentMinutes >= endMinutes) break
+    currentMinutes += intervalMinutes
   }
 
   return slots
@@ -38,17 +77,21 @@ function timeToMinutes(time: string): number {
   return hours * 60 + minutes
 }
 
-export function getAppointmentSlotIndex(time: string): number {
-  const startMinutes = CALENDAR_SLOT_START_HOUR * 60
+export function getAppointmentSlotIndex(
+  time: string,
+  startMinutes: number,
+  intervalMinutes: number
+): number {
   const minutes = timeToMinutes(time)
-  const index = Math.floor(
-    (minutes - startMinutes) / CALENDAR_SLOT_INTERVAL_MINUTES
-  )
+  const index = Math.floor((minutes - startMinutes) / intervalMinutes)
   return index >= 0 ? index : -1
 }
 
-export function getAppointmentRowSpan(durationMinutes: number): number {
-  return Math.max(1, Math.ceil(durationMinutes / CALENDAR_SLOT_INTERVAL_MINUTES))
+export function getAppointmentRowSpan(
+  durationMinutes: number,
+  intervalMinutes: number
+): number {
+  return Math.max(1, Math.ceil(durationMinutes / intervalMinutes))
 }
 
 export function formatSlotLabel(slot: string): string {
@@ -63,7 +106,9 @@ export type TimedGridCell =
 export function buildTimedGridCells(
   date: string,
   appointments: CalendarAppointment[],
-  slots: string[]
+  slots: string[],
+  startMinutes: number,
+  intervalMinutes: number
 ): TimedGridCell[] {
   const states: TimedGridCell[] = slots.map(() => ({ type: "empty" }))
   const dayAppointments = appointments
@@ -75,7 +120,11 @@ export function buildTimedGridCells(
     )
 
   for (const appointment of dayAppointments) {
-    const slotIndex = getAppointmentSlotIndex(appointment.appointmentTime)
+    const slotIndex = getAppointmentSlotIndex(
+      appointment.appointmentTime,
+      startMinutes,
+      intervalMinutes
+    )
     if (slotIndex < 0 || slotIndex >= slots.length) {
       continue
     }
@@ -85,7 +134,7 @@ export function buildTimedGridCells(
     }
 
     const rowSpan = Math.min(
-      getAppointmentRowSpan(appointment.durationMinutes),
+      getAppointmentRowSpan(appointment.durationMinutes, intervalMinutes),
       slots.length - slotIndex
     )
 
@@ -124,9 +173,16 @@ export function groupAppointmentsByDate(
   return grouped
 }
 
-export function formatAppointmentClientName(appointment: CalendarAppointment): string {
+export function formatAppointmentClientName(
+  appointment: CalendarAppointment
+): string {
   return formatClientNameLastFirst(
     appointment.clientFirstName,
     appointment.clientLastName
   )
+}
+
+export function formatTimeForInput(value: string | null | undefined): string {
+  if (!value) return "07:00"
+  return value.slice(0, 5)
 }

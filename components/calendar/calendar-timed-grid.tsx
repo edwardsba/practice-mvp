@@ -2,15 +2,28 @@ import Link from "next/link"
 
 import { formatDayColumnHeader, newAppointmentUrl } from "@/lib/calendar/dates"
 import {
+  isSlotAvailable,
+  type AvailabilityBlock,
+} from "@/lib/calendar/availability"
+import {
   buildTimedGridCells,
   CALENDAR_SLOT_HEIGHT_PX,
   formatAppointmentClientName,
   formatSlotLabel,
-  generateCalendarTimeSlots,
+  generateCalendarTimeSlotsFromSettings,
+  parseTimeStringToMinutes,
 } from "@/lib/calendar/time-slots"
 import type { CalendarAppointment } from "@/lib/appointments/load"
 import { todayDateString } from "@/lib/appointments/format"
 import { cn } from "@/lib/utils"
+
+const MOBILE_INTERVAL_MINUTES = 60
+
+type CalendarSettings = {
+  startTime: string
+  endTime: string
+  intervalMinutes: number
+}
 
 function AppointmentBlock({
   appointment,
@@ -30,17 +43,33 @@ function AppointmentBlock({
   )
 }
 
-export function CalendarTimedGrid({
+function TimedGridTable({
   days,
   appointments,
+  slots,
+  startMinutes,
+  intervalMinutes,
+  availabilityBlocks,
 }: {
   days: string[]
   appointments: CalendarAppointment[]
+  slots: string[]
+  startMinutes: number
+  intervalMinutes: number
+  availabilityBlocks: AvailabilityBlock[]
 }) {
-  const slots = generateCalendarTimeSlots()
   const today = todayDateString()
   const cellsByDay = new Map(
-    days.map((day) => [day, buildTimedGridCells(day, appointments, slots)])
+    days.map((day) => [
+      day,
+      buildTimedGridCells(
+        day,
+        appointments,
+        slots,
+        startMinutes,
+        intervalMinutes
+      ),
+    ])
   )
 
   return (
@@ -76,6 +105,7 @@ export function CalendarTimedGrid({
               {days.map((day) => {
                 const cells = cellsByDay.get(day)!
                 const cell = cells[slotIndex]
+                const available = isSlotAvailable(day, slot, availabilityBlocks)
 
                 if (cell.type === "skip") {
                   return null
@@ -99,7 +129,10 @@ export function CalendarTimedGrid({
                 return (
                   <td
                     key={`${day}-${slot}`}
-                    className="border-b border-l p-0 align-top"
+                    className={cn(
+                      "border-b border-l p-0 align-top",
+                      !available && "bg-muted/30"
+                    )}
                   >
                     <Link
                       href={newAppointmentUrl(day, slot)}
@@ -115,5 +148,54 @@ export function CalendarTimedGrid({
         </tbody>
       </table>
     </div>
+  )
+}
+
+export function CalendarTimedGrid({
+  days,
+  appointments,
+  calendarSettings,
+  availabilityBlocks,
+}: {
+  days: string[]
+  appointments: CalendarAppointment[]
+  calendarSettings: CalendarSettings
+  availabilityBlocks: AvailabilityBlock[]
+}) {
+  const startMinutes = parseTimeStringToMinutes(calendarSettings.startTime)
+  const mobileSlots = generateCalendarTimeSlotsFromSettings(
+    calendarSettings.startTime,
+    calendarSettings.endTime,
+    MOBILE_INTERVAL_MINUTES
+  )
+  const desktopSlots = generateCalendarTimeSlotsFromSettings(
+    calendarSettings.startTime,
+    calendarSettings.endTime,
+    calendarSettings.intervalMinutes
+  )
+
+  return (
+    <>
+      <div className="block md:hidden">
+        <TimedGridTable
+          days={days}
+          appointments={appointments}
+          slots={mobileSlots}
+          startMinutes={startMinutes}
+          intervalMinutes={MOBILE_INTERVAL_MINUTES}
+          availabilityBlocks={availabilityBlocks}
+        />
+      </div>
+      <div className="hidden md:block">
+        <TimedGridTable
+          days={days}
+          appointments={appointments}
+          slots={desktopSlots}
+          startMinutes={startMinutes}
+          intervalMinutes={calendarSettings.intervalMinutes}
+          availabilityBlocks={availabilityBlocks}
+        />
+      </div>
+    </>
   )
 }

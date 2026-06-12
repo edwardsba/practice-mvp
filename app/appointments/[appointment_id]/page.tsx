@@ -9,10 +9,16 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
-import { formatCurrency, formatDisplayDate } from "@/lib/appointment-types/format"
 import {
-  formatAppointmentDate,
-  formatAppointmentDuration,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import { formatCurrency } from "@/lib/appointment-types/format"
+import {
   formatAppointmentStatus,
   formatAppointmentTime,
   formatAutomationTimestamp,
@@ -25,12 +31,15 @@ import {
 import { loadAppointmentForPractice } from "@/lib/appointments/load"
 import { requirePractitionerContext } from "@/lib/auth"
 import {
-  APPROVAL_STATUS_LABELS,
   formatApprovalProgress,
-  type ApprovalStatus,
+  formatDisplayDate,
 } from "@/lib/funding/format"
 import { resolveBackNavigation } from "@/lib/navigation/back"
 import { loadSessionNoteForAppointment } from "@/lib/session-notes/load"
+
+function formatAppointmentDateTime(date: string, time: string): string {
+  return `${formatDisplayDate(date)} at ${formatAppointmentTime(time)}`
+}
 
 export default async function AppointmentDetailPage({
   params,
@@ -62,6 +71,7 @@ export default async function AppointmentDetailPage({
     "/appointments",
     "← Back to appointments"
   )
+  const notes = appointment.notes?.trim() ?? ""
 
   return (
     <AppShell>
@@ -100,7 +110,7 @@ export default async function AppointmentDetailPage({
 
       <Card className="mb-6">
         <CardHeader>
-          <CardTitle>Appointment details</CardTitle>
+          <CardTitle>Appointment</CardTitle>
         </CardHeader>
         <CardContent>
           <dl className="grid gap-4 sm:grid-cols-2">
@@ -116,39 +126,12 @@ export default async function AppointmentDetailPage({
               </dd>
             </div>
             <div>
-              <dt className="text-sm text-muted-foreground">Status</dt>
+              <dt className="text-sm text-muted-foreground">Date &amp; time</dt>
               <dd className="font-medium">
-                {formatAppointmentStatus(appointment.status)}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-sm text-muted-foreground">Date</dt>
-              <dd className="font-medium">
-                {formatAppointmentDate(appointment.appointmentDate)}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-sm text-muted-foreground">Time</dt>
-              <dd className="font-medium">
-                {formatAppointmentTime(appointment.appointmentTime)}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-sm text-muted-foreground">Duration</dt>
-              <dd className="font-medium">
-                {formatAppointmentDuration(appointment.durationMinutes)}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-sm text-muted-foreground">Appointment type</dt>
-              <dd className="font-medium">
-                {appointment.appointmentTypeNickname?.trim() || "—"}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-sm text-muted-foreground">Location</dt>
-              <dd className="font-medium">
-                {appointment.practiceName?.trim() || "—"}
+                {formatAppointmentDateTime(
+                  appointment.appointmentDate,
+                  appointment.appointmentTime
+                )}
               </dd>
             </div>
             <div>
@@ -159,10 +142,119 @@ export default async function AppointmentDetailPage({
                 ] ?? appointment.mode}
               </dd>
             </div>
-            <div className="sm:col-span-2">
+            <div>
+              <dt className="text-sm text-muted-foreground">Location</dt>
+              <dd className="font-medium">
+                {appointment.practiceName?.trim() || "—"}
+              </dd>
+            </div>
+          </dl>
+        </CardContent>
+      </Card>
+
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle>Fees</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {!appointment.appointmentTypeId ? (
+            <p className="text-sm text-muted-foreground">
+              No appointment type selected.
+            </p>
+          ) : (
+            <div className="rounded-lg border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Item</TableHead>
+                    <TableHead>Fee</TableHead>
+                    <TableHead>Tax</TableHead>
+                    <TableHead>Total</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  <TableRow>
+                    <TableCell>
+                      {appointment.appointmentTypeNickname ?? "—"}
+                    </TableCell>
+                    <TableCell>
+                      {appointment.appointmentTypeReferenceNumber?.trim() || "—"}
+                    </TableCell>
+                    <TableCell>
+                      {formatCurrency(appointment.appointmentTypeFee)}
+                    </TableCell>
+                    <TableCell>
+                      {formatCurrency(appointment.appointmentTypeTax)}
+                    </TableCell>
+                    <TableCell>
+                      {formatCurrency(appointment.appointmentTypeTotal)}
+                    </TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle>Claim</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {!appointment.fundingApprovalId ? (
+            <p className="text-sm text-muted-foreground">
+              No funding approval linked to this appointment.
+            </p>
+          ) : (
+            <div className="rounded-lg border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Claim</TableHead>
+                    <TableHead>Approval</TableHead>
+                    <TableHead>Progress</TableHead>
+                    <TableHead>Start</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  <TableRow>
+                    <TableCell>{appointment.claimTypeName ?? "—"}</TableCell>
+                    <TableCell>{appointment.approvalTypeName ?? "—"}</TableCell>
+                    <TableCell>
+                      {formatApprovalProgress(
+                        appointment.appointmentsAttended ?? 0,
+                        appointment.appointmentsApproved
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {formatDisplayDate(appointment.fundingApprovalStartDate)}
+                    </TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Admin</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <dl className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <dt className="text-sm text-muted-foreground">Status</dt>
+              <dd className="font-medium">
+                {formatAppointmentStatus(appointment.status)}
+              </dd>
+            </div>
+            <div className={notes.length > 80 ? "sm:col-span-2" : undefined}>
               <dt className="text-sm text-muted-foreground">Notes</dt>
               <dd className="font-medium whitespace-pre-wrap">
-                {appointment.notes?.trim() || "—"}
+                {notes || "—"}
               </dd>
             </div>
             <div>
@@ -174,7 +266,9 @@ export default async function AppointmentDetailPage({
               </dd>
             </div>
             <div>
-              <dt className="text-sm text-muted-foreground">Pre-session battery</dt>
+              <dt className="text-sm text-muted-foreground">
+                Pre-session battery
+              </dt>
               <dd className="font-medium">
                 {appointment.preSessionBatterySentAt
                   ? `Pre-session battery sent: ${formatAutomationTimestamp(appointment.preSessionBatterySentAt)}`
@@ -182,123 +276,6 @@ export default async function AppointmentDetailPage({
               </dd>
             </div>
           </dl>
-        </CardContent>
-      </Card>
-
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle>Claim details</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {!appointment.fundingApprovalId ? (
-            <p className="text-sm text-muted-foreground">
-              No funding approval linked to this appointment.
-            </p>
-          ) : (
-            <dl className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <dt className="text-sm text-muted-foreground">
-                  Funding approval type
-                </dt>
-                <dd className="font-medium">
-                  {appointment.approvalTypeName ?? "—"}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-sm text-muted-foreground">Claim type</dt>
-                <dd className="font-medium">
-                  {appointment.claimTypeName ?? "—"}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-sm text-muted-foreground">Referrer</dt>
-                <dd className="font-medium">
-                  {appointment.referrerFirstName || appointment.referrerLastName
-                    ? `${appointment.referrerFirstName ?? ""} ${appointment.referrerLastName ?? ""}`.trim()
-                    : "—"}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-sm text-muted-foreground">
-                  Sessions progress
-                </dt>
-                <dd className="font-medium">
-                  {formatApprovalProgress(
-                    appointment.appointmentsAttended ?? 0,
-                    appointment.appointmentsApproved
-                  )}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-sm text-muted-foreground">
-                  Approval status
-                </dt>
-                <dd className="font-medium">
-                  {appointment.approvalStatus
-                    ? APPROVAL_STATUS_LABELS[
-                        appointment.approvalStatus as ApprovalStatus
-                      ] ?? appointment.approvalStatus
-                    : "—"}
-                </dd>
-              </div>
-            </dl>
-          )}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Fees</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {!appointment.appointmentTypeId ? (
-            <p className="text-sm text-muted-foreground">
-              No appointment type selected.
-            </p>
-          ) : (
-            <dl className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <dt className="text-sm text-muted-foreground">
-                  Appointment type
-                </dt>
-                <dd className="font-medium">
-                  {appointment.appointmentTypeNickname ?? "—"}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-sm text-muted-foreground">Item number</dt>
-                <dd className="font-medium">
-                  {appointment.appointmentTypeReferenceNumber?.trim() || "—"}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-sm text-muted-foreground">Fee</dt>
-                <dd className="font-medium">
-                  {formatCurrency(appointment.appointmentTypeFee)}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-sm text-muted-foreground">Tax</dt>
-                <dd className="font-medium">
-                  {formatCurrency(appointment.appointmentTypeTax)}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-sm text-muted-foreground">Total</dt>
-                <dd className="font-medium">
-                  {formatCurrency(appointment.appointmentTypeTotal)}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-sm text-muted-foreground">
-                  Fee effective date
-                </dt>
-                <dd className="font-medium">
-                  {formatDisplayDate(appointment.appointmentTypeFeeStartDate)}
-                </dd>
-              </div>
-            </dl>
-          )}
         </CardContent>
       </Card>
     </AppShell>

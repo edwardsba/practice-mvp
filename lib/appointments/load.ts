@@ -119,6 +119,7 @@ export async function loadAppointmentForPractice(
       referrerLastName: professionals.lastName,
       appointmentsApproved: fundingApprovals.appointmentsApproved,
       approvalStatus: fundingApprovals.approvalStatus,
+      fundingApprovalStartDate: fundingApprovals.startDate,
       appointmentTypeNickname: appointmentTypes.nickname,
       appointmentTypeReferenceNumber: appointmentTypes.referenceNumber,
       practiceName: practices.practiceName,

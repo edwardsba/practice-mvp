@@ -13,6 +13,7 @@ const WEEKDAY_LABELS_FULL = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 const WEEKDAY_LABELS_SHORT = ["M", "Tu", "W", "Th", "F", "Sa", "Su"]
 const MOBILE_VISIBLE_APPOINTMENTS = 2
 const DESKTOP_VISIBLE_APPOINTMENTS = 4
+const MIN_ROW_HEIGHT_REM = 3.5
 
 export function CalendarMonthView({
   anchorDate,
@@ -25,87 +26,107 @@ export function CalendarMonthView({
   const appointmentsByDate = groupAppointmentsByDate(appointments)
   const today = todayDateString()
   const weekRowCount = gridDays.length / 7
+  const gridMinHeightRem = weekRowCount * MIN_ROW_HEIGHT_REM
 
   return (
-    <div className="flex h-[calc(100vh-320px)] min-h-[420px] flex-col rounded-lg border bg-background">
-      <div className="grid grid-cols-7 border-b bg-muted/40 text-xs font-medium text-muted-foreground">
+    <div className="flex max-h-[calc(100vh-240px)] flex-col overflow-hidden rounded-lg border bg-background sm:max-h-[calc(100vh-280px)]">
+      <div className="grid shrink-0 grid-cols-7 border-b bg-muted/40 text-xs font-medium text-muted-foreground">
         {WEEKDAY_LABELS_FULL.map((label, index) => (
           <div
             key={label}
-            className="border-l px-1 py-2 text-center first:border-l-0 sm:px-2"
+            className={cn(
+              "border-l px-1 py-2 text-center sm:px-2",
+              index === 0 && "border-l-0"
+            )}
           >
             <span className="sm:hidden">{WEEKDAY_LABELS_SHORT[index]}</span>
             <span className="hidden sm:inline">{label}</span>
           </div>
         ))}
       </div>
-      <div
-        className="grid flex-1 grid-cols-7"
-        style={{ gridTemplateRows: `repeat(${weekRowCount}, 1fr)` }}
-      >
-        {gridDays.map(({ date, inMonth }) => {
-          const dayAppointments = appointmentsByDate.get(date) ?? []
-          const isToday = date === today
-          const dayNumber = parseDateString(date).getDate()
-          const mobileVisible = dayAppointments.slice(0, MOBILE_VISIBLE_APPOINTMENTS)
-          const desktopVisible = dayAppointments.slice(0, DESKTOP_VISIBLE_APPOINTMENTS)
-          const hiddenMobileCount =
-            dayAppointments.length - MOBILE_VISIBLE_APPOINTMENTS
-          const hiddenDesktopCount =
-            dayAppointments.length - DESKTOP_VISIBLE_APPOINTMENTS
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        <div
+          className="grid h-full min-h-full grid-cols-7"
+          style={{
+            gridTemplateRows: `repeat(${weekRowCount}, minmax(${MIN_ROW_HEIGHT_REM}rem, 1fr))`,
+            minHeight: `${gridMinHeightRem}rem`,
+          }}
+        >
+          {gridDays.map(({ date, inMonth }, index) => {
+            const dayAppointments = appointmentsByDate.get(date) ?? []
+            const isToday = date === today
+            const dayNumber = parseDateString(date).getDate()
+            const mobileVisible = dayAppointments.slice(
+              0,
+              MOBILE_VISIBLE_APPOINTMENTS
+            )
+            const desktopVisible = dayAppointments.slice(
+              0,
+              DESKTOP_VISIBLE_APPOINTMENTS
+            )
+            const hiddenMobileCount =
+              dayAppointments.length - MOBILE_VISIBLE_APPOINTMENTS
+            const hiddenDesktopCount =
+              dayAppointments.length - DESKTOP_VISIBLE_APPOINTMENTS
+            const isFirstColumn = index % 7 === 0
 
-          return (
-            <Link
-              key={date}
-              href={`/calendar?view=day&date=${date}`}
-              className={cn(
-                "flex h-full min-h-0 flex-col overflow-hidden border-b border-l p-1 first:border-l-0 hover:bg-muted/30 sm:p-2",
-                !inMonth && "bg-muted/20 text-muted-foreground"
-              )}
-            >
-              <span
+            return (
+              <Link
+                key={date}
+                href={`/calendar?view=day&date=${date}`}
                 className={cn(
-                  "mb-1 flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-medium sm:size-7 sm:text-sm",
-                  isToday && "bg-primary text-primary-foreground"
+                  "flex min-h-0 flex-col overflow-hidden border-b border-l p-1 hover:bg-muted/30 sm:p-2",
+                  isFirstColumn && "border-l-0",
+                  !inMonth && "bg-muted/20 text-muted-foreground"
                 )}
               >
-                {dayNumber}
-              </span>
-              <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-hidden">
-                <div className="space-y-0.5 sm:hidden">
-                  {mobileVisible.map((appointment) => (
-                    <span
-                      key={appointment.appointmentId}
-                      className="block truncate rounded border border-primary/20 bg-primary/10 px-1 text-[10px] font-medium text-primary"
-                    >
-                      {formatAppointmentClientName(appointment)}
-                    </span>
-                  ))}
-                  {hiddenMobileCount > 0 ? (
-                    <span className="block truncate text-[10px] text-muted-foreground">
-                      +{hiddenMobileCount} more
-                    </span>
-                  ) : null}
-                </div>
-                <div className="hidden min-h-0 flex-1 flex-col gap-0.5 overflow-hidden sm:flex">
-                  {desktopVisible.map((appointment) => (
-                    <span
-                      key={appointment.appointmentId}
-                      className="block truncate rounded border border-primary/20 bg-primary/10 px-2 text-xs font-medium text-primary"
-                    >
-                      {formatAppointmentClientName(appointment)}
-                    </span>
-                  ))}
-                  {hiddenDesktopCount > 0 ? (
-                    <span className="block truncate text-xs text-muted-foreground">
-                      +{hiddenDesktopCount} more
-                    </span>
-                  ) : null}
-                </div>
-              </div>
-            </Link>
-          )
-        })}
+                <span
+                  className={cn(
+                    "flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-medium sm:size-7 sm:text-sm",
+                    isToday && "bg-primary text-primary-foreground",
+                    dayAppointments.length > 0 && "mb-1"
+                  )}
+                >
+                  {dayNumber}
+                </span>
+                {dayAppointments.length > 0 ? (
+                  <>
+                    <div className="min-h-0 flex-1 space-y-0.5 overflow-hidden sm:hidden">
+                      {mobileVisible.map((appointment) => (
+                        <span
+                          key={appointment.appointmentId}
+                          className="block truncate rounded border border-primary/20 bg-primary/10 px-1 text-[10px] font-medium text-primary"
+                        >
+                          {formatAppointmentClientName(appointment)}
+                        </span>
+                      ))}
+                      {hiddenMobileCount > 0 ? (
+                        <span className="block truncate text-[10px] text-muted-foreground">
+                          +{hiddenMobileCount} more
+                        </span>
+                      ) : null}
+                    </div>
+                    <div className="hidden min-h-0 flex-1 flex-col gap-0.5 overflow-hidden sm:flex">
+                      {desktopVisible.map((appointment) => (
+                        <span
+                          key={appointment.appointmentId}
+                          className="block truncate rounded border border-primary/20 bg-primary/10 px-2 text-xs font-medium text-primary"
+                        >
+                          {formatAppointmentClientName(appointment)}
+                        </span>
+                      ))}
+                      {hiddenDesktopCount > 0 ? (
+                        <span className="block truncate text-xs text-muted-foreground">
+                          +{hiddenDesktopCount} more
+                        </span>
+                      ) : null}
+                    </div>
+                  </>
+                ) : null}
+              </Link>
+            )
+          })}
+        </div>
       </div>
     </div>
   )

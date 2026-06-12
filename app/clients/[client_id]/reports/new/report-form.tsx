@@ -26,6 +26,12 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import type { ReportSnapshot } from "@/lib/reports/snapshot"
 import { resolveReportTitle } from "@/lib/reports/snapshot"
+import { cn } from "@/lib/utils"
+
+const dateInputClassName = cn(
+  "block h-9 w-full max-w-full min-w-0 appearance-none py-1",
+  "[&::-webkit-date-and-time-value]:min-w-0 [&::-webkit-date-and-time-value]:text-left"
+)
 
 const initialSaveState: SaveReportDraftState = {}
 
@@ -138,23 +144,25 @@ export function ReportForm({
             <CardTitle>Date range</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
+            <div className="grid min-w-0 gap-4 sm:grid-cols-2">
+              <div className="min-w-0 space-y-2">
                 <Label htmlFor="date_range_start">Start date</Label>
                 <Input
                   id="date_range_start"
                   type="date"
                   value={dateRangeStart}
                   onChange={(e) => handleStartChange(e.target.value)}
+                  className={dateInputClassName}
                 />
               </div>
-              <div className="space-y-2">
+              <div className="min-w-0 space-y-2">
                 <Label htmlFor="date_range_end">End date</Label>
                 <Input
                   id="date_range_end"
                   type="date"
                   value={dateRangeEnd}
                   onChange={(e) => handleEndChange(e.target.value)}
+                  className={dateInputClassName}
                 />
               </div>
             </div>

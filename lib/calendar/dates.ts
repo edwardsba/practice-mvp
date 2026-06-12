@@ -153,6 +153,15 @@ export function formatDayColumnHeader(dateStr: string): string {
   })
 }
 
+const WEEKDAY_SHORT_LABELS = ["M", "Tu", "W", "Th", "F", "Sa", "Su"]
+
+export function formatDayShortLabel(dateStr: string): string {
+  const date = parseDateString(dateStr)
+  const jsDay = date.getDay()
+  const index = jsDay === 0 ? 6 : jsDay - 1
+  return WEEKDAY_SHORT_LABELS[index]
+}
+
 export function buildCalendarUrl(
   view: CalendarView,
   date: string,

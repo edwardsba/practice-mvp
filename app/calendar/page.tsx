@@ -4,6 +4,7 @@ import { getPractitionerProfile } from "@/app/practitioner/actions"
 import { CalendarControls } from "@/components/calendar/calendar-controls"
 import { CalendarMonthView } from "@/components/calendar/calendar-month-view"
 import { CalendarTimedGrid } from "@/components/calendar/calendar-timed-grid"
+import { SwipeableCalendar } from "@/components/calendar/swipeable-calendar"
 import { AppShell } from "@/components/app-shell"
 import { Button } from "@/components/ui/button"
 import { getMemberships } from "@/lib/actions/practitioner-practice"
@@ -72,19 +73,21 @@ export default async function CalendarPage({
         <CalendarControls view={view} anchorDate={anchorDate} />
       </div>
 
-      {view === "month" ? (
-        <CalendarMonthView
-          anchorDate={anchorDate}
-          appointments={appointments}
-        />
-      ) : (
-        <CalendarTimedGrid
-          days={timedDays}
-          appointments={appointments}
-          calendarSettings={calendarSettings}
-          availabilityBlocks={availabilityBlocks}
-        />
-      )}
+      <SwipeableCalendar view={view} anchorDate={anchorDate}>
+        {view === "month" ? (
+          <CalendarMonthView
+            anchorDate={anchorDate}
+            appointments={appointments}
+          />
+        ) : (
+          <CalendarTimedGrid
+            days={timedDays}
+            appointments={appointments}
+            calendarSettings={calendarSettings}
+            availabilityBlocks={availabilityBlocks}
+          />
+        )}
+      </SwipeableCalendar>
     </AppShell>
   )
 }

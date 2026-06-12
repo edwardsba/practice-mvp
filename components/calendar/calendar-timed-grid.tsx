@@ -1,6 +1,6 @@
 import Link from "next/link"
 
-import { formatDayColumnHeader, newAppointmentUrl } from "@/lib/calendar/dates"
+import { formatDayShortLabel, newAppointmentUrl, parseDateString } from "@/lib/calendar/dates"
 import {
   isSlotAvailable,
   type AvailabilityBlock,
@@ -35,7 +35,7 @@ function AppointmentBlock({
   return (
     <Link
       href={`/appointments/${appointment.appointmentId}?returnTo=/calendar`}
-      className="flex h-full min-h-0 flex-col justify-center rounded-md border border-primary/20 bg-primary/10 px-2 py-1 text-xs font-medium text-primary hover:bg-primary/15"
+      className="flex h-full min-h-0 flex-col justify-center truncate rounded-md border border-primary/20 bg-primary/10 px-1 py-0.5 text-[10px] font-medium text-primary hover:bg-primary/15 sm:px-2 sm:py-1 sm:text-xs"
       style={{ minHeight: rowSpan * CALENDAR_SLOT_HEIGHT_PX - 4 }}
     >
       {formatAppointmentClientName(appointment)}
@@ -73,24 +73,38 @@ function TimedGridTable({
   )
 
   return (
-    <div className="overflow-x-auto rounded-lg border bg-background">
-      <table className="w-full min-w-[720px] border-collapse text-sm">
+    <div className="rounded-lg border bg-background">
+      <table className="w-full border-collapse text-sm">
         <thead>
           <tr>
-            <th className="w-20 border-b bg-muted/40 px-2 py-2 text-left text-xs font-medium text-muted-foreground" />
+            <th className="w-12 border-b bg-muted/40 px-1 py-2 text-left text-[10px] font-medium text-muted-foreground sm:w-20 sm:px-2 sm:text-xs" />
             {days.map((day) => {
               const isToday = day === today
+              const dayNumber = parseDateString(day).getDate()
+
               return (
                 <th
                   key={day}
                   className={cn(
-                    "border-b border-l px-2 py-2 text-left text-xs font-medium",
+                    "border-b border-l px-1 py-2 text-center text-xs font-medium sm:px-2",
                     isToday
                       ? "bg-primary/10 text-primary"
                       : "bg-muted/40 text-muted-foreground"
                   )}
                 >
-                  {formatDayColumnHeader(day)}
+                  <div className="flex flex-col items-center gap-0.5">
+                    <span className="text-[10px] uppercase sm:text-xs">
+                      {formatDayShortLabel(day)}
+                    </span>
+                    <span
+                      className={cn(
+                        "flex size-6 items-center justify-center rounded-full text-sm font-medium sm:size-7",
+                        isToday && "bg-primary text-primary-foreground"
+                      )}
+                    >
+                      {dayNumber}
+                    </span>
+                  </div>
                 </th>
               )
             })}
@@ -99,7 +113,7 @@ function TimedGridTable({
         <tbody>
           {slots.map((slot, slotIndex) => (
             <tr key={slot}>
-              <td className="border-b bg-muted/20 px-2 py-1 text-xs text-muted-foreground">
+              <td className="border-b bg-muted/20 px-1 py-1 text-[10px] text-muted-foreground sm:px-2 sm:text-xs">
                 {formatSlotLabel(slot)}
               </td>
               {days.map((day) => {
@@ -116,7 +130,7 @@ function TimedGridTable({
                     <td
                       key={`${day}-${slot}`}
                       rowSpan={cell.rowSpan}
-                      className="border-b border-l p-1 align-top"
+                      className="border-b border-l p-0.5 align-top sm:p-1"
                     >
                       <AppointmentBlock
                         appointment={cell.appointment}

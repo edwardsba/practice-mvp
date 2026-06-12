@@ -29,7 +29,7 @@ export function CalendarMonthView({
   const gridMinHeightRem = weekRowCount * MIN_ROW_HEIGHT_REM
 
   return (
-    <div className="flex max-h-[calc(100vh-240px)] flex-col overflow-hidden rounded-lg border bg-background sm:max-h-[calc(100vh-280px)]">
+    <div className="flex h-[calc(100vh-200px)] flex-col overflow-hidden rounded-lg border bg-background sm:h-[calc(100vh-280px)]">
       <div className="grid shrink-0 grid-cols-7 border-b bg-muted/40 text-xs font-medium text-muted-foreground">
         {WEEKDAY_LABELS_FULL.map((label, index) => (
           <div
@@ -46,7 +46,7 @@ export function CalendarMonthView({
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div
-          className="grid h-full min-h-full grid-cols-7"
+          className="grid h-full min-h-0 grid-cols-7"
           style={{
             gridTemplateRows: `repeat(${weekRowCount}, minmax(${MIN_ROW_HEIGHT_REM}rem, 1fr))`,
             minHeight: `${gridMinHeightRem}rem`,

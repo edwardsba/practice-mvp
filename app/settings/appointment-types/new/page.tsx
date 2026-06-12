@@ -1,18 +1,12 @@
 import { AppointmentTypeForm } from "@/components/appointment-types/appointment-type-form"
 import { AppShell } from "@/components/app-shell"
 import { BackButton } from "@/components/ui/back-button"
-import {
-  getClaimTypesForAppointmentTypes,
-  getPracticeMembershipsForForm,
-} from "@/lib/actions/appointment-types"
+import { getClaimTypesForAppointmentTypes } from "@/lib/actions/appointment-types"
 import { requirePractitionerContext } from "@/lib/auth"
 
 export default async function NewAppointmentTypePage() {
   const context = await requirePractitionerContext()
-  const [claimTypes, memberships] = await Promise.all([
-    getClaimTypesForAppointmentTypes(context.practiceId),
-    getPracticeMembershipsForForm(context.practiceId),
-  ])
+  const claimTypes = await getClaimTypesForAppointmentTypes(context.practiceId)
 
   return (
     <AppShell>
@@ -29,7 +23,6 @@ export default async function NewAppointmentTypePage() {
       <AppointmentTypeForm
         practiceId={context.practiceId}
         claimTypes={claimTypes}
-        memberships={memberships}
         cancelHref="/settings/appointment-types"
       />
     </AppShell>

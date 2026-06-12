@@ -19,6 +19,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import {
+  formatAppointmentTypeMode,
   formatAppointmentTypeStatus,
   formatCurrency,
   formatDisplayDate,
@@ -84,8 +85,10 @@ export default async function AppointmentTypeDetailPage({
               <dd className="font-medium">{type.claimTypeName ?? "—"}</dd>
             </div>
             <div>
-              <dt className="text-sm text-muted-foreground">Location</dt>
-              <dd className="font-medium">{type.practiceName ?? "—"}</dd>
+              <dt className="text-sm text-muted-foreground">Mode</dt>
+              <dd className="font-medium">
+                {formatAppointmentTypeMode(type.mode)}
+              </dd>
             </div>
             <div>
               <dt className="text-sm text-muted-foreground">Duration</dt>

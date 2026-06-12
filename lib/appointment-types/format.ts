@@ -1,7 +1,17 @@
+import {
+  APPOINTMENT_MODE_LABELS,
+  type AppointmentMode,
+} from "@/lib/appointments/constants"
+
 export function formatAppointmentTypeStatus(status: string) {
   if (status === "active") return "Active"
   if (status === "inactive") return "Inactive"
   return status.charAt(0).toUpperCase() + status.slice(1)
+}
+
+export function formatAppointmentTypeMode(mode: string | null | undefined) {
+  if (!mode?.trim()) return "—"
+  return APPOINTMENT_MODE_LABELS[mode as AppointmentMode] ?? mode
 }
 
 export function formatCurrency(value: string | number | null | undefined) {

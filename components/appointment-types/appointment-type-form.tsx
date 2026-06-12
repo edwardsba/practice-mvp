@@ -28,11 +28,6 @@ type ClaimTypeOption = {
   claimTypeName: string
 }
 
-type MembershipOption = {
-  membershipId: string
-  practiceName: string
-}
-
 type FeeRow = {
   fee: string
   tax: string
@@ -47,7 +42,7 @@ type InitialValues = {
   name?: string
   referenceNumber?: string | null
   claimTypeId?: string | null
-  membershipId?: string | null
+  mode?: string | null
   durationMinutes?: number
   status?: string
   fees?: FeeRow[]
@@ -73,13 +68,11 @@ function calculateTotal(fee: string, tax: string) {
 export function AppointmentTypeForm({
   practiceId,
   claimTypes,
-  memberships,
   initialValues,
   cancelHref,
 }: {
   practiceId: string
   claimTypes: ClaimTypeOption[]
-  memberships: MembershipOption[]
   initialValues?: InitialValues
   cancelHref: string
 }) {
@@ -191,22 +184,16 @@ export function AppointmentTypeForm({
               </select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="membership_id">Location</Label>
+              <Label htmlFor="mode">Mode</Label>
               <select
-                id="membership_id"
-                name="membership_id"
-                defaultValue={initialValues?.membershipId ?? ""}
+                id="mode"
+                name="mode"
+                defaultValue={initialValues?.mode ?? ""}
                 className={selectClassName}
               >
-                <option value="">Select location</option>
-                {memberships.map((membership) => (
-                  <option
-                    key={membership.membershipId}
-                    value={membership.membershipId}
-                  >
-                    {membership.practiceName}
-                  </option>
-                ))}
+                <option value="">No default</option>
+                <option value="face_to_face">Face to face</option>
+                <option value="online">Online</option>
               </select>
             </div>
           </div>

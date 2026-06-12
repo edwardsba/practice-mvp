@@ -268,22 +268,13 @@ export async function getAppointmentTypeById(
       name: appointmentTypes.name,
       referenceNumber: appointmentTypes.referenceNumber,
       claimTypeId: appointmentTypes.claimTypeId,
-      membershipId: appointmentTypes.membershipId,
+      mode: appointmentTypes.mode,
       durationMinutes: appointmentTypes.durationMinutes,
       status: appointmentTypes.status,
       claimTypeName: claimTypes.claimTypeName,
-      practiceName: practices.practiceName,
     })
     .from(appointmentTypes)
     .leftJoin(claimTypes, eq(appointmentTypes.claimTypeId, claimTypes.claimTypeId))
-    .leftJoin(
-      practitionerPracticeMemberships,
-      eq(appointmentTypes.membershipId, practitionerPracticeMemberships.membershipId)
-    )
-    .leftJoin(
-      practices,
-      eq(practitionerPracticeMemberships.practiceId, practices.practiceId)
-    )
     .where(
       and(
         eq(appointmentTypes.appointmentTypeId, appointmentTypeId),
@@ -331,8 +322,8 @@ export async function upsertAppointmentType(
     String(formData.get("reference_number") ?? "").trim() || null
   const claimTypeId =
     String(formData.get("claim_type_id") ?? "").trim() || null
-  const membershipId =
-    String(formData.get("membership_id") ?? "").trim() || null
+  const modeRaw = String(formData.get("mode") ?? "").trim()
+  const mode = modeRaw || null
   const durationMinutes = Number(formData.get("duration_minutes") ?? 50)
   const status = String(formData.get("status") ?? "active").trim()
   const feesRaw = String(formData.get("fee_rows") ?? "")
@@ -347,6 +338,10 @@ export async function upsertAppointmentType(
 
   if (status !== "active" && status !== "inactive") {
     return { error: "Status must be active or inactive." }
+  }
+
+  if (mode && mode !== "face_to_face" && mode !== "online") {
+    return { error: "Mode must be face to face or online." }
   }
 
   const parsedFees = parseFees(feesRaw)
@@ -382,7 +377,8 @@ export async function upsertAppointmentType(
           name,
           referenceNumber,
           claimTypeId,
-          membershipId,
+          membershipId: null,
+          mode,
           durationMinutes,
           status,
           updatedAt: now,
@@ -397,7 +393,8 @@ export async function upsertAppointmentType(
           name,
           referenceNumber,
           claimTypeId,
-          membershipId,
+          membershipId: null,
+          mode,
           durationMinutes,
           status,
           updatedAt: now,

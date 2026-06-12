@@ -6,7 +6,6 @@ import { BackButton } from "@/components/ui/back-button"
 import {
   getAppointmentTypeById,
   getClaimTypesForAppointmentTypes,
-  getPracticeMembershipsForForm,
 } from "@/lib/actions/appointment-types"
 import { requirePractitionerContext } from "@/lib/auth"
 
@@ -18,10 +17,9 @@ export default async function EditAppointmentTypePage({
   const { type_id: typeId } = await params
   const context = await requirePractitionerContext()
 
-  const [type, claimTypes, memberships] = await Promise.all([
+  const [type, claimTypes] = await Promise.all([
     getAppointmentTypeById(context.practiceId, typeId),
     getClaimTypesForAppointmentTypes(context.practiceId),
-    getPracticeMembershipsForForm(context.practiceId),
   ])
 
   if (!type) {
@@ -43,7 +41,6 @@ export default async function EditAppointmentTypePage({
       <AppointmentTypeForm
         practiceId={context.practiceId}
         claimTypes={claimTypes}
-        memberships={memberships}
         cancelHref={`/settings/appointment-types/${typeId}`}
         initialValues={{
           appointmentTypeId: type.appointmentTypeId,
@@ -51,7 +48,7 @@ export default async function EditAppointmentTypePage({
           name: type.name,
           referenceNumber: type.referenceNumber,
           claimTypeId: type.claimTypeId,
-          membershipId: type.membershipId,
+          mode: type.mode,
           durationMinutes: type.durationMinutes,
           status: type.status,
           fees: type.fees.map((fee) => ({

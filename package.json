@@ -29,7 +29,9 @@
     "db:seed-appointment-types": "tsx db/seed-appointment-types.ts",
     "db:seed-appointment-types-mode": "tsx db/seed-appointment-types-mode.ts",
     "db:practitioner-calendar-settings": "tsx db/apply-practitioner-calendar-settings-migration.ts",
-    "db:seed-funding": "tsx db/seed-funding.ts"
+    "db:seed-funding": "tsx db/seed-funding.ts",
+    "db:email-templates": "tsx db/apply-email-templates-migration.ts",
+    "db:seed-email-templates": "tsx db/seed-email-templates.ts"
   },
   "dependencies": {
     "@react-pdf/renderer": "^4.5.1",

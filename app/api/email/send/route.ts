@@ -112,19 +112,9 @@ export async function POST(request: Request) {
     )
   }
 
-  if (templateType === "ad_hoc" && !clientIdParam) {
+  if (templateType !== "send_assessment" && !clientIdParam) {
     return NextResponse.json(
-      { error: "clientId is required for ad_hoc emails." },
-      { status: 400 }
-    )
-  }
-
-  if (
-    templateType !== "send_assessment" &&
-    templateType !== "ad_hoc"
-  ) {
-    return NextResponse.json(
-      { error: "templateType must be send_assessment or ad_hoc." },
+      { error: "clientId is required for this email template." },
       { status: 400 }
     )
   }

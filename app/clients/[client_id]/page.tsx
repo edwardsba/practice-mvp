@@ -182,6 +182,7 @@ export default async function ClientDetailPage({
           <ActionItemsSection
             clientId={clientId}
             clientEmail={clientEmail}
+            practiceId={context.practiceId}
             practitionerProfileId={context.practitionerProfileId}
             templateVariables={questionnaireTemplateVariables}
             defaultAssessments={defaultBatteryAssessments}

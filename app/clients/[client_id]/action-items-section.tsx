@@ -17,12 +17,14 @@ import type { QuestionnaireEmailTemplateVariables } from "@/lib/email/templates"
 export function ActionItemsSection({
   clientId,
   clientEmail,
+  practiceId,
   practitionerProfileId,
   templateVariables,
   defaultAssessments,
 }: {
   clientId: string
   clientEmail: string | null
+  practiceId: string
   practitionerProfileId: string
   templateVariables: QuestionnaireEmailTemplateVariables | null
   defaultAssessments: BatteryAssessmentChip[]
@@ -84,6 +86,7 @@ export function ActionItemsSection({
         <SendCommunicationModal
           open={modalOpen}
           onOpenChange={setModalOpen}
+          practiceId={practiceId}
           clientId={clientId}
           clientEmail={clientEmail}
           practitionerProfileId={practitionerProfileId}

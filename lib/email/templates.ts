@@ -73,18 +73,26 @@ function escapeHtmlAttr(text: string): string {
   return escapeHtml(text).replace(/'/g, "&#39;")
 }
 
-export function buildQuestionnaireLinkButtonHtml(linkUrl: string): string {
+export function buildQuestionnaireLinkButtonHtml(
+  linkUrl: string,
+  label = "Complete Questionnaire"
+): string {
   const href = escapeHtmlAttr(linkUrl)
+  const buttonLabel = escapeHtml(label)
   return `<table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center" style="margin:24px auto;">
   <tr>
     <td align="center" bgcolor="#1a1a1a" style="border-radius:6px;">
-      <a href="${href}" target="_blank" style="display:inline-block;padding:14px 28px;font-family:Arial,Helvetica,sans-serif;font-size:16px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:6px;background-color:#1a1a1a;">Complete Questionnaire &rarr;</a>
+      <a href="${href}" target="_blank" style="display:inline-block;padding:14px 28px;font-family:Arial,Helvetica,sans-serif;font-size:16px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:6px;background-color:#1a1a1a;">${buttonLabel} &rarr;</a>
     </td>
   </tr>
 </table>`
 }
 
-export function buildHtmlEmailBody(message: string, linkUrl: string): string {
+export function buildHtmlEmailBody(
+  message: string,
+  linkUrl: string,
+  buttonLabel = "Complete Questionnaire"
+): string {
   const parts = message.split(QUESTIONNAIRE_LINK_VARIABLE)
   const contentParts: string[] = []
 
@@ -100,7 +108,7 @@ export function buildHtmlEmailBody(message: string, linkUrl: string): string {
       }
     }
     if (i < parts.length - 1) {
-      contentParts.push(buildQuestionnaireLinkButtonHtml(linkUrl))
+      contentParts.push(buildQuestionnaireLinkButtonHtml(linkUrl, buttonLabel))
     }
   }
 
@@ -115,7 +123,7 @@ export function buildHtmlEmailBody(message: string, linkUrl: string): string {
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color:#ffffff;">
     <tr>
       <td align="center" style="padding:32px 16px;">
-        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width:600px;width:100%;">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" align="center" style="max-width:600px;width:100%;margin:0 auto;">
           <tr>
             <td style="font-family:Arial,Helvetica,sans-serif;color:#111111;">
               ${contentParts.join("")}
@@ -156,7 +164,7 @@ export function buildAdHocHtmlEmailBody(message: string): string {
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color:#ffffff;">
     <tr>
       <td align="center" style="padding:32px 16px;">
-        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width:600px;width:100%;">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" align="center" style="max-width:600px;width:100%;margin:0 auto;">
           <tr>
             <td style="font-family:Arial,Helvetica,sans-serif;color:#111111;">
               ${contentParts.join("")}
@@ -174,7 +182,8 @@ export function buildResolvedEmailBodies(
   message: string,
   subject: string,
   linkUrl: string,
-  variables: QuestionnaireEmailTemplateVariables
+  variables: QuestionnaireEmailTemplateVariables,
+  buttonLabel = "Complete Questionnaire"
 ): { subject: string; htmlBody: string; textBody: string } {
   const resolvedVars: Record<string, string> = { ...variables }
   const subjectResolved = resolveTemplate(subject, {
@@ -192,7 +201,7 @@ export function buildResolvedEmailBodies(
 
   return {
     subject: subjectResolved,
-    htmlBody: buildHtmlEmailBody(htmlMessage, linkUrl),
+    htmlBody: buildHtmlEmailBody(htmlMessage, linkUrl, buttonLabel),
     textBody,
   }
 }

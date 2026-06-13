@@ -84,6 +84,7 @@ export default async function ClientCommunicationsPage({
         clientId={clientId}
         clientName={clientName}
         clientEmail={clientEmail}
+        practiceId={context.practiceId}
         practitionerProfileId={context.practitionerProfileId}
         templateVariables={questionnaireTemplateVariables}
         defaultAssessments={defaultBatteryAssessments}

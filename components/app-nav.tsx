@@ -55,6 +55,7 @@ const dropdownMenus: NavDropdown[] = [
     items: [
       { href: "/settings/professions", label: "Professions" },
       { href: "/settings/appointment-types", label: "Appointment Types" },
+      { href: "/settings/email-templates", label: "Email Templates" },
       { href: "/funding/claim-types", label: "Claim Types" },
       { href: "/funding/approval-types", label: "Funding Approval Types" },
     ],

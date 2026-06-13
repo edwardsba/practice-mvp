@@ -97,6 +97,7 @@ export function CommunicationsPageClient({
   clientId,
   clientName,
   clientEmail,
+  practiceId,
   practitionerProfileId,
   templateVariables,
   defaultAssessments,
@@ -105,6 +106,7 @@ export function CommunicationsPageClient({
   clientId: string
   clientName: string
   clientEmail: string | null
+  practiceId: string
   practitionerProfileId: string
   templateVariables: QuestionnaireEmailTemplateVariables | null
   defaultAssessments: BatteryAssessmentChip[]
@@ -276,6 +278,7 @@ export function CommunicationsPageClient({
         <SendCommunicationModal
           open={sendModalOpen}
           onOpenChange={setSendModalOpen}
+          practiceId={practiceId}
           clientId={clientId}
           clientEmail={clientEmail}
           practitionerProfileId={practitionerProfileId}

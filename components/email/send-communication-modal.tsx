@@ -15,6 +15,10 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import {
+  getEmailTemplateById,
+  getEmailTemplatesForDropdown,
+} from "@/lib/actions/email-templates"
+import {
   selectedBatteryCodes,
   type BatteryAssessmentChip,
 } from "@/lib/assessments/battery-defaults"
@@ -24,7 +28,7 @@ import {
   buildResolvedEmailBodies,
   EMAIL_TEMPLATE_VARIABLE_CHIPS,
   formatQuestionnaireExpiryDate,
-  getDefaultEmailDraft,
+  QUESTIONNAIRE_LINK_VARIABLE,
   resolveTemplate,
   type QuestionnaireEmailTemplateVariables,
 } from "@/lib/email/templates"
@@ -36,16 +40,28 @@ type AssessmentChip = {
   selected: boolean
 }
 
-type EmailTemplateType = "send_assessment" | "ad_hoc"
+type TemplateDropdownOption = {
+  emailTemplateId: string
+  name: string
+  templateKey: string | null
+}
 
-const TEMPLATE_OPTIONS: Array<{ value: EmailTemplateType; label: string }> = [
-  { value: "send_assessment", label: "Send Assessment" },
-  { value: "ad_hoc", label: "Ad hoc" },
-]
+type LoadedTemplate = {
+  emailTemplateId: string
+  templateKey: string | null
+  name: string
+  subject: string
+  message: string
+  defaultCc: string | null
+  defaultBcc: string | null
+  hasActionButton: boolean
+  actionButtonLabel: string | null
+}
 
 export function SendCommunicationModal({
   open,
   onOpenChange,
+  practiceId,
   clientId,
   clientEmail,
   practitionerProfileId,
@@ -55,6 +71,7 @@ export function SendCommunicationModal({
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
+  practiceId: string
   clientId: string
   clientEmail: string | null
   practitionerProfileId: string
@@ -63,8 +80,13 @@ export function SendCommunicationModal({
   onSendComplete: (result: { sent: boolean; email: string }) => void
 }) {
   const messageRef = useRef<HTMLTextAreaElement>(null)
-  const [templateType, setTemplateType] =
-    useState<EmailTemplateType>("send_assessment")
+  const [templateOptions, setTemplateOptions] = useState<
+    TemplateDropdownOption[]
+  >([])
+  const [selectedTemplateId, setSelectedTemplateId] = useState("")
+  const [loadedTemplate, setLoadedTemplate] = useState<LoadedTemplate | null>(
+    null
+  )
   const [subject, setSubject] = useState("")
   const [message, setMessage] = useState("")
   const [cc, setCc] = useState("")
@@ -72,37 +94,109 @@ export function SendCommunicationModal({
   const [sending, setSending] = useState(false)
   const [sendError, setSendError] = useState<string | null>(null)
   const [assessmentChips, setAssessmentChips] = useState<AssessmentChip[]>([])
+  const [loadingTemplates, setLoadingTemplates] = useState(false)
 
   const toEmail = clientEmail?.trim() ?? ""
   const hasEmail = Boolean(toEmail)
+  const templateKey = loadedTemplate?.templateKey ?? null
 
   useEffect(() => {
     if (!open) return
 
-    setTemplateType("send_assessment")
-    applyTemplateDraft("send_assessment")
-    setCc("")
-    setBcc("")
     setSendError(null)
     setSending(false)
     setAssessmentChips(defaultAssessments?.map((item) => ({ ...item })) ?? [])
-  }, [open, templateVariables, defaultAssessments])
 
-  function applyTemplateDraft(nextTemplate: EmailTemplateType) {
-    if (nextTemplate === "send_assessment") {
-      const draft = getDefaultEmailDraft(templateVariables)
-      setSubject(draft.subject)
-      setMessage(draft.message)
-      return
+    let cancelled = false
+
+    async function loadTemplates() {
+      setLoadingTemplates(true)
+      try {
+        const options = await getEmailTemplatesForDropdown(practiceId)
+        if (cancelled) return
+
+        setTemplateOptions(options)
+
+        const defaultOption =
+          options.find((option) => option.templateKey === "send_assessment") ??
+          options[0]
+
+        if (defaultOption) {
+          setSelectedTemplateId(defaultOption.emailTemplateId)
+          await applyTemplate(defaultOption.emailTemplateId)
+        } else {
+          setSelectedTemplateId("")
+          setLoadedTemplate(null)
+          setSubject("")
+          setMessage("")
+          setCc("")
+          setBcc("")
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingTemplates(false)
+        }
+      }
     }
 
-    setSubject("")
-    setMessage("")
+    void loadTemplates()
+
+    return () => {
+      cancelled = true
+    }
+  }, [open, practiceId, templateVariables, defaultAssessments])
+
+  async function applyTemplate(templateId: string) {
+    const template = await getEmailTemplateById(practiceId, templateId)
+    if (!template) return
+
+    setLoadedTemplate({
+      emailTemplateId: template.emailTemplateId,
+      templateKey: template.templateKey,
+      name: template.name,
+      subject: template.subject,
+      message: template.message,
+      defaultCc: template.defaultCc,
+      defaultBcc: template.defaultBcc,
+      hasActionButton: template.hasActionButton,
+      actionButtonLabel: template.actionButtonLabel,
+    })
+
+    if (template.templateKey === "send_assessment") {
+      setSubject(
+        resolveTemplate(template.subject, {
+          ...templateVariables,
+          questionnaire_link: "",
+        })
+      )
+      setMessage(
+        resolveTemplate(template.message, {
+          ...templateVariables,
+          questionnaire_link: QUESTIONNAIRE_LINK_VARIABLE,
+        })
+      )
+    } else {
+      setSubject(
+        resolveTemplate(template.subject, {
+          ...templateVariables,
+          questionnaire_link: "",
+        })
+      )
+      setMessage(
+        resolveTemplate(template.message, {
+          ...templateVariables,
+          questionnaire_link: "",
+        })
+      )
+    }
+
+    setCc(template.defaultCc?.trim() ?? "")
+    setBcc(template.defaultBcc?.trim() ?? "")
   }
 
-  function handleTemplateChange(nextTemplate: EmailTemplateType) {
-    setTemplateType(nextTemplate)
-    applyTemplateDraft(nextTemplate)
+  async function handleTemplateChange(templateId: string) {
+    setSelectedTemplateId(templateId)
+    await applyTemplate(templateId)
   }
 
   function toggleAssessment(code: string) {
@@ -162,13 +256,15 @@ export function SendCommunicationModal({
   }
 
   async function handleSend() {
-    if (!hasEmail) return
+    if (!hasEmail || !loadedTemplate) return
 
     setSending(true)
     setSendError(null)
 
+    const templateType = loadedTemplate.templateKey ?? "generic"
+
     try {
-      if (templateType === "send_assessment") {
+      if (templateKey === "send_assessment") {
         const linkData = await createQuestionnaireLink()
         const resolvedVariables: QuestionnaireEmailTemplateVariables = {
           ...linkData.templateVariables,
@@ -176,6 +272,9 @@ export function SendCommunicationModal({
             new Date(linkData.expires_at)
           ),
         }
+
+        const buttonLabel =
+          loadedTemplate.actionButtonLabel?.trim() || "Complete Questionnaire"
 
         const {
           subject: resolvedSubject,
@@ -185,7 +284,8 @@ export function SendCommunicationModal({
           message,
           subject,
           linkData.link,
-          resolvedVariables
+          resolvedVariables,
+          buttonLabel
         )
 
         const response = await fetch("/api/email/send", {
@@ -199,8 +299,46 @@ export function SendCommunicationModal({
             htmlBody,
             textBody,
             messageText: message,
-            templateType: "send_assessment",
+            templateType,
             assessmentAccessLinkId: linkData.assessmentAccessLinkId,
+          }),
+        })
+
+        const data = (await response.json()) as {
+          sent?: boolean
+          error?: string
+        }
+
+        if (!response.ok || !data.sent) {
+          setSendError(data.error ?? "Unable to send email.")
+          onSendComplete({ sent: false, email: toEmail })
+          return
+        }
+      } else if (
+        loadedTemplate.hasActionButton &&
+        templateKey !== "send_assessment"
+      ) {
+        // TODO: Generic action-button templates need a link source wired in code.
+        const resolvedSubject = resolveTemplate(subject, {
+          ...templateVariables,
+          questionnaire_link: "",
+        })
+        const htmlBody = buildAdHocHtmlEmailBody(message)
+        const textBody = message.replace(/\n{3,}/g, "\n\n")
+
+        const response = await fetch("/api/email/send", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            to: toEmail,
+            cc: cc.trim() || undefined,
+            bcc: bcc.trim() || undefined,
+            subject: resolvedSubject,
+            htmlBody,
+            textBody,
+            messageText: message,
+            templateType,
+            clientId,
           }),
         })
 
@@ -233,7 +371,7 @@ export function SendCommunicationModal({
             htmlBody,
             textBody,
             messageText: message,
-            templateType: "ad_hoc",
+            templateType,
             clientId,
           }),
         })
@@ -263,14 +401,16 @@ export function SendCommunicationModal({
   }
 
   const showAssessmentChips =
-    templateType === "send_assessment" && assessmentChips.length > 0
+    templateKey === "send_assessment" && assessmentChips.length > 0
   const selectedAssessmentCount = assessmentChips.filter(
     (item) => item.selected
   ).length
+  const isAdHoc = templateKey === "ad_hoc"
   const canSend =
     hasEmail &&
-    subject.trim().length > 0 &&
-    (templateType === "ad_hoc" || selectedAssessmentCount > 0)
+    Boolean(loadedTemplate) &&
+    (isAdHoc || subject.trim().length > 0) &&
+    (isAdHoc || templateKey !== "send_assessment" || selectedAssessmentCount > 0)
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -288,17 +428,23 @@ export function SendCommunicationModal({
             <Label htmlFor="email_template">Email Template</Label>
             <select
               id="email_template"
-              value={templateType}
-              onChange={(e) =>
-                handleTemplateChange(e.target.value as EmailTemplateType)
-              }
-              className="flex h-9 w-full rounded-lg border border-input bg-transparent px-2.5 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
+              value={selectedTemplateId}
+              onChange={(e) => void handleTemplateChange(e.target.value)}
+              disabled={loadingTemplates || templateOptions.length === 0}
+              className="flex h-9 w-full rounded-lg border border-input bg-transparent px-2.5 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-50 dark:bg-input/30"
             >
-              {TEMPLATE_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
+              {templateOptions.length === 0 ? (
+                <option value="">No templates available</option>
+              ) : (
+                templateOptions.map((option) => (
+                  <option
+                    key={option.emailTemplateId}
+                    value={option.emailTemplateId}
+                  >
+                    {option.name}
+                  </option>
+                ))
+              )}
             </select>
           </div>
 

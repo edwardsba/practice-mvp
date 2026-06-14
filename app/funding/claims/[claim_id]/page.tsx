@@ -19,6 +19,11 @@ import {
 } from "@/components/ui/table"
 import { getClaimById } from "@/lib/actions/funding"
 import {
+  formatAppointmentDate,
+  formatAppointmentStatus,
+  formatAppointmentTime,
+} from "@/lib/appointments/format"
+import {
   APPROVAL_STATUS_LABELS,
   formatApprovalProgress,
   formatDisplayDate,
@@ -47,6 +52,12 @@ export default async function ClaimDetailPage({
 
   const showMedicare = isMedicareClaimType(claim.claimTypeName)
   const showInsurance = isInsuranceClaimType(claim.claimTypeName)
+  const approvalNameById = new Map(
+    claim.fundingApprovals.map((approval) => [
+      approval.fundingApprovalId,
+      approval.approvalTypeName ?? "Funding approval",
+    ])
+  )
 
   return (
     <AppShell>
@@ -182,6 +193,72 @@ export default async function ClaimDetailPage({
                         {APPROVAL_STATUS_LABELS[
                           approval.approvalStatus as keyof typeof APPROVAL_STATUS_LABELS
                         ] ?? approval.approvalStatus}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle>Appointments</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="rounded-lg border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Time</TableHead>
+                  <TableHead>Location</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Approval</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {claim.linkedAppointments.length === 0 ? (
+                  <TableRow>
+                    <TableCell
+                      colSpan={5}
+                      className="h-16 text-center text-muted-foreground"
+                    >
+                      No appointments linked yet.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  claim.linkedAppointments.map((appointment) => (
+                    <TableRow key={appointment.appointmentId}>
+                      <TableCell>
+                        <Link
+                          href={`/appointments/${appointment.appointmentId}`}
+                          className="text-primary hover:underline"
+                        >
+                          {formatAppointmentDate(appointment.appointmentDate)}
+                        </Link>
+                      </TableCell>
+                      <TableCell>
+                        {formatAppointmentTime(appointment.appointmentTime)}
+                      </TableCell>
+                      <TableCell>{appointment.location?.trim() || "—"}</TableCell>
+                      <TableCell>
+                        {formatAppointmentStatus(appointment.status)}
+                      </TableCell>
+                      <TableCell>
+                        {appointment.fundingApprovalId ? (
+                          <Link
+                            href={`/funding/approvals/${appointment.fundingApprovalId}`}
+                            className="text-primary hover:underline"
+                          >
+                            {approvalNameById.get(appointment.fundingApprovalId) ??
+                              "View"}
+                          </Link>
+                        ) : (
+                          "—"
+                        )}
                       </TableCell>
                     </TableRow>
                   ))

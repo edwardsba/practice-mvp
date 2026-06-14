@@ -393,10 +393,33 @@ export async function getClaimById(claimId: string) {
     )
     .orderBy(desc(simpleReports.createdAt))
 
+  const linkedAppointments = await db
+    .select({
+      appointmentId: appointments.appointmentId,
+      appointmentDate: appointments.appointmentDate,
+      appointmentTime: appointments.appointmentTime,
+      location: appointments.location,
+      status: appointments.status,
+      fundingApprovalId: appointments.fundingApprovalId,
+    })
+    .from(appointments)
+    .innerJoin(
+      fundingApprovals,
+      eq(appointments.fundingApprovalId, fundingApprovals.fundingApprovalId)
+    )
+    .where(
+      and(
+        eq(fundingApprovals.claimId, claimId),
+        eq(fundingApprovals.practiceId, context.practiceId)
+      )
+    )
+    .orderBy(asc(appointments.appointmentDate), asc(appointments.appointmentTime))
+
   return {
     ...claim,
     fundingApprovals: claimApprovals,
     reports,
+    linkedAppointments,
   }
 }
 

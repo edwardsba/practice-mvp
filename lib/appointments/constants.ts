@@ -1,8 +1,9 @@
 export const APPOINTMENT_STATUSES = [
   "scheduled",
   "confirmed",
-  "cancelled",
   "completed",
+  "no_show",
+  "cancelled",
 ] as const
 
 export type AppointmentStatus = (typeof APPOINTMENT_STATUSES)[number]
@@ -10,8 +11,9 @@ export type AppointmentStatus = (typeof APPOINTMENT_STATUSES)[number]
 export const APPOINTMENT_STATUS_LABELS: Record<AppointmentStatus, string> = {
   scheduled: "Scheduled",
   confirmed: "Confirmed",
-  cancelled: "Cancelled",
   completed: "Completed",
+  no_show: "No-show",
+  cancelled: "Cancelled",
 }
 
 export const APPOINTMENT_MODES = ["face_to_face", "online"] as const

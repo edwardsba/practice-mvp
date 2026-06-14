@@ -11,6 +11,7 @@ function emptySummary(error: string): AppointmentAutomationSummary & {
   return {
     reminders_sent: 0,
     batteries_sent: 0,
+    post_session_sent: 0,
     errors: [error],
     error,
   }

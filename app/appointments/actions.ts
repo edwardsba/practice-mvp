@@ -66,6 +66,7 @@ export async function testAppointmentAutomations(): Promise<TestAutomationsState
     const result: AppointmentAutomationSummary = {
       reminders_sent: payload.reminders_sent ?? 0,
       batteries_sent: payload.batteries_sent ?? 0,
+      post_session_sent: payload.post_session_sent ?? 0,
       errors: payload.errors ?? [],
     }
     revalidatePath("/appointments")

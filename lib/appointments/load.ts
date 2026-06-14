@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, gte, lte, lt, ne } from "drizzle-orm"
+import { and, asc, count, desc, eq, gte, lte, lt } from "drizzle-orm"
 
 import {
   appointments,
@@ -111,6 +111,7 @@ export async function loadAppointmentForPractice(
       notes: appointments.notes,
       reminderSentAt: appointments.reminderSentAt,
       preSessionBatterySentAt: appointments.preSessionBatterySentAt,
+      postSessionSentAt: appointments.postSessionSentAt,
       clientFirstName: clients.firstName,
       clientLastName: clients.lastName,
       approvalTypeName: fundingApprovalTypes.name,
@@ -204,7 +205,7 @@ export async function loadAppointmentForPractice(
       .where(
         and(
           eq(appointments.fundingApprovalId, row.fundingApprovalId),
-          ne(appointments.status, "cancelled")
+          eq(appointments.status, "completed")
         )
       )
     appointmentsAttended = Number(attendedRow?.total ?? 0)

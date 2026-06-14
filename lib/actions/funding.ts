@@ -1,6 +1,6 @@
 "use server"
 
-import { and, asc, count, desc, eq, ne } from "drizzle-orm"
+import { and, asc, count, desc, eq } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 
 import {
@@ -47,7 +47,7 @@ async function countAppointmentsAttended(fundingApprovalId: string) {
     .where(
       and(
         eq(appointments.fundingApprovalId, fundingApprovalId),
-        ne(appointments.status, "cancelled")
+        eq(appointments.status, "completed")
       )
     )
 

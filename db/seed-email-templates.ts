@@ -32,6 +32,48 @@ const SEED_TEMPLATES = [
     hasActionButton: false,
     actionButtonLabel: null as string | null,
   },
+  {
+    templateKey: "appointment_reminder",
+    name: "Appointment Reminder",
+    subject: "Appointment reminder from {practice_name}",
+    message: `Hi {client_first_name},
+
+This is a reminder that you have an appointment on {appointment_date} at {appointment_time} at {location}.
+
+{practitioner_name}
+{practice_name}`,
+    defaultCc: null as string | null,
+    defaultBcc: null as string | null,
+    hasActionButton: false,
+    actionButtonLabel: null as string | null,
+  },
+  {
+    templateKey: "pre_session_questionnaire",
+    name: "Pre-Session Questionnaire",
+    subject: DEFAULT_QUESTIONNAIRE_SUBJECT,
+    message: DEFAULT_QUESTIONNAIRE_MESSAGE,
+    defaultCc: null as string | null,
+    defaultBcc: null as string | null,
+    hasActionButton: true,
+    actionButtonLabel: "Complete Questionnaire",
+  },
+  {
+    templateKey: "post_session",
+    name: "Post-Session Feedback",
+    subject: "How was your session? — {practice_name}",
+    message: `Hi {client_first_name},
+
+Thank you for coming in. We'd really appreciate a couple of minutes of your feedback about the session.
+
+{questionnaire_link}
+
+{practitioner_name}
+{practice_name}`,
+    defaultCc: null as string | null,
+    defaultBcc: null as string | null,
+    hasActionButton: true,
+    actionButtonLabel: "Share Feedback",
+  },
 ] as const
 
 async function main() {
@@ -56,19 +98,23 @@ async function main() {
 
   const practiceId = practice.practiceId
 
-  const [existingCount] = await db
-    .select({ emailTemplateId: emailTemplates.emailTemplateId })
-    .from(emailTemplates)
-    .where(eq(emailTemplates.practiceId, practiceId))
-    .limit(1)
-
-  if (existingCount) {
-    console.log("Email templates already exist for this practice — skipping seed.")
-    await pool.end()
-    return
-  }
-
   for (const seed of SEED_TEMPLATES) {
+    const [existing] = await db
+      .select({ emailTemplateId: emailTemplates.emailTemplateId })
+      .from(emailTemplates)
+      .where(
+        and(
+          eq(emailTemplates.practiceId, practiceId),
+          eq(emailTemplates.templateKey, seed.templateKey)
+        )
+      )
+      .limit(1)
+
+    if (existing) {
+      console.log(`Email template already exists, skipping: ${seed.name}`)
+      continue
+    }
+
     await db.insert(emailTemplates).values({
       practiceId,
       templateKey: seed.templateKey,

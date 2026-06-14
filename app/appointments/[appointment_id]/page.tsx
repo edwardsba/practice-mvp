@@ -275,6 +275,16 @@ export default async function AppointmentDetailPage({
                   : "Pre-session battery not yet sent"}
               </dd>
             </div>
+            <div>
+              <dt className="text-sm text-muted-foreground">
+                Post-session feedback
+              </dt>
+              <dd className="font-medium">
+                {appointment.postSessionSentAt
+                  ? `Post-session feedback sent: ${formatAutomationTimestamp(appointment.postSessionSentAt)}`
+                  : "Post-session feedback not yet sent"}
+              </dd>
+            </div>
           </dl>
         </CardContent>
       </Card>

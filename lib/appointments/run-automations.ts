@@ -2,6 +2,7 @@ import { and, eq, inArray, isNull } from "drizzle-orm"
 
 import { appointments, auditEvents, clients } from "@/db/schema"
 import { batteryCodesFromTreatmentPlan } from "@/lib/assessments/battery-defaults"
+import { createAssessmentLink } from "@/lib/assessments/create-assessment-link"
 import { createBatteryInstance } from "@/lib/assessments/create-battery-instance"
 import {
   formatAppointmentDate,
@@ -9,35 +10,61 @@ import {
   sydneyDatePlusDays,
 } from "@/lib/appointments/format"
 import { db } from "@/lib/db"
-import { sendAppointmentReminderEmail } from "@/lib/email/send-appointment-reminder"
+import { getEmailTemplateByKey } from "@/lib/email/template-loader"
 import { getQuestionnaireEmailContext } from "@/lib/email/practitioner-context"
 import { sendQuestionnaireEmail } from "@/lib/email/send-questionnaire-link"
 import {
   buildResolvedEmailBodies,
-  getDefaultEmailDraft,
+  buildResolvedPlainEmailBodies,
 } from "@/lib/email/templates"
 import { loadActiveTreatmentPlanSummary } from "@/lib/treatment-plans/load"
 
 const ACTIVE_STATUSES = ["scheduled", "confirmed"] as const
+const COMPLETED_STATUS = "completed"
 
 export type AppointmentAutomationSummary = {
   reminders_sent: number
   batteries_sent: number
+  post_session_sent: number
   errors: string[]
+}
+
+type EmailTemplateRow = NonNullable<
+  Awaited<ReturnType<typeof getEmailTemplateByKey>>
+>
+
+async function logAppointmentAuditEvent(
+  practiceId: string,
+  clientId: string,
+  appointmentId: string,
+  eventType: string,
+  metadata?: Record<string, unknown>
+) {
+  await db.insert(auditEvents).values({
+    practiceId,
+    clientId,
+    eventType,
+    entityType: "appointment",
+    entityId: appointmentId,
+    actorMetadataJson: metadata ?? null,
+  })
 }
 
 export async function runAppointmentAutomations(): Promise<AppointmentAutomationSummary> {
   const summary: AppointmentAutomationSummary = {
     reminders_sent: 0,
     batteries_sent: 0,
+    post_session_sent: 0,
     errors: [],
   }
 
   const reminderDate = sydneyDatePlusDays(2)
   const batteryDate = sydneyDatePlusDays(1)
+  const postSessionDate = sydneyDatePlusDays(-1)
 
   await processReminders(reminderDate, summary)
   await processPreSessionBatteries(batteryDate, summary)
+  await processPostSessionQuestionnaires(postSessionDate, summary)
 
   return summary
 }
@@ -57,6 +84,8 @@ async function processReminders(
       location: appointments.location,
       clientEmail: clients.email,
       clientFirstName: clients.firstName,
+      commsOptOut: clients.commsOptOut,
+      reminderOptOut: clients.reminderOptOut,
     })
     .from(appointments)
     .innerJoin(clients, eq(appointments.clientId, clients.clientId))
@@ -68,39 +97,106 @@ async function processReminders(
       )
     )
 
+  const templateCache = new Map<string, EmailTemplateRow | null>()
+
   for (const row of rows) {
+    if (row.commsOptOut || row.reminderOptOut) {
+      await logAppointmentAuditEvent(
+        row.practiceId,
+        row.clientId,
+        row.appointmentId,
+        "appointment.reminder_skipped",
+        { reason: "opted_out" }
+      )
+      continue
+    }
+
     const clientEmail = row.clientEmail?.trim()
     if (!clientEmail) {
+      await logAppointmentAuditEvent(
+        row.practiceId,
+        row.clientId,
+        row.appointmentId,
+        "appointment.reminder_skipped",
+        { reason: "no_email" }
+      )
       continue
     }
 
     try {
+      let template = templateCache.get(row.practiceId)
+      if (template === undefined) {
+        template = await getEmailTemplateByKey(
+          row.practiceId,
+          "appointment_reminder"
+        )
+        templateCache.set(row.practiceId, template)
+      }
+
+      if (!template) {
+        summary.errors.push(
+          `Reminder failed for appointment ${row.appointmentId}: appointment_reminder template not found.`
+        )
+        await logAppointmentAuditEvent(
+          row.practiceId,
+          row.clientId,
+          row.appointmentId,
+          "appointment.reminder_failed",
+          { reason: "template_missing" }
+        )
+        continue
+      }
+
       const emailContext = await getQuestionnaireEmailContext(
         row.practiceId,
         row.practitionerProfileId
       )
       if (!emailContext) {
         summary.errors.push(
-          `Reminder skipped for appointment ${row.appointmentId}: practice or practitioner not found.`
+          `Reminder failed for appointment ${row.appointmentId}: practice or practitioner not found.`
+        )
+        await logAppointmentAuditEvent(
+          row.practiceId,
+          row.clientId,
+          row.appointmentId,
+          "appointment.reminder_failed",
+          { reason: "practitioner_context_missing" }
         )
         continue
       }
 
-      const subject = `Appointment reminder from ${emailContext.practiceName}`
-      const sendResult = await sendAppointmentReminderEmail({
+      const { subject, htmlBody, textBody } = buildResolvedPlainEmailBodies(
+        template.message,
+        template.subject,
+        {
+          client_first_name: row.clientFirstName.trim() || "there",
+          practice_name: emailContext.practiceName,
+          practitioner_name: emailContext.practitionerName,
+          appointment_date: formatAppointmentDate(row.appointmentDate),
+          appointment_time: formatAppointmentTime(row.appointmentTime),
+          location: row.location?.trim() || "your scheduled location",
+        }
+      )
+
+      const sendResult = await sendQuestionnaireEmail({
         to: clientEmail,
+        cc: template.defaultCc ?? undefined,
+        bcc: template.defaultBcc ?? undefined,
         subject,
-        clientFirstName: row.clientFirstName.trim() || "there",
-        appointmentDate: formatAppointmentDate(row.appointmentDate),
-        appointmentTime: formatAppointmentTime(row.appointmentTime),
-        location: row.location?.trim() || "",
-        practitionerName: emailContext.practitionerName,
-        practiceName: emailContext.practiceName,
+        htmlBody,
+        textBody,
       })
 
       if (!sendResult.sent) {
         summary.errors.push(
           `Reminder failed for appointment ${row.appointmentId}: ${sendResult.error}`
+        )
+        await logAppointmentAuditEvent(
+          row.practiceId,
+          row.clientId,
+          row.appointmentId,
+          "appointment.reminder_failed",
+          { error: sendResult.error }
         )
         continue
       }
@@ -109,10 +205,7 @@ async function processReminders(
       await db.transaction(async (tx) => {
         await tx
           .update(appointments)
-          .set({
-            reminderSentAt: now,
-            updatedAt: now,
-          })
+          .set({ reminderSentAt: now, updatedAt: now })
           .where(eq(appointments.appointmentId, row.appointmentId))
 
         await tx.insert(auditEvents).values({
@@ -126,10 +219,16 @@ async function processReminders(
 
       summary.reminders_sent += 1
     } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error"
       summary.errors.push(
-        `Reminder failed for appointment ${row.appointmentId}: ${
-          error instanceof Error ? error.message : "Unknown error"
-        }`
+        `Reminder failed for appointment ${row.appointmentId}: ${message}`
+      )
+      await logAppointmentAuditEvent(
+        row.practiceId,
+        row.clientId,
+        row.appointmentId,
+        "appointment.reminder_failed",
+        { error: message }
       )
     }
   }
@@ -146,6 +245,8 @@ async function processPreSessionBatteries(
       practiceId: appointments.practiceId,
       practitionerProfileId: appointments.practitionerProfileId,
       clientEmail: clients.email,
+      commsOptOut: clients.commsOptOut,
+      preSessionOptOut: clients.preSessionOptOut,
     })
     .from(appointments)
     .innerJoin(clients, eq(appointments.clientId, clients.clientId))
@@ -157,13 +258,56 @@ async function processPreSessionBatteries(
       )
     )
 
+  const templateCache = new Map<string, EmailTemplateRow | null>()
+
   for (const row of rows) {
+    if (row.commsOptOut || row.preSessionOptOut) {
+      await logAppointmentAuditEvent(
+        row.practiceId,
+        row.clientId,
+        row.appointmentId,
+        "appointment.pre_session_battery_skipped",
+        { reason: "opted_out" }
+      )
+      continue
+    }
+
     const clientEmail = row.clientEmail?.trim()
     if (!clientEmail) {
+      await logAppointmentAuditEvent(
+        row.practiceId,
+        row.clientId,
+        row.appointmentId,
+        "appointment.pre_session_battery_skipped",
+        { reason: "no_email" }
+      )
       continue
     }
 
     try {
+      let template = templateCache.get(row.practiceId)
+      if (template === undefined) {
+        template = await getEmailTemplateByKey(
+          row.practiceId,
+          "pre_session_questionnaire"
+        )
+        templateCache.set(row.practiceId, template)
+      }
+
+      if (!template) {
+        summary.errors.push(
+          `Pre-session battery failed for appointment ${row.appointmentId}: pre_session_questionnaire template not found.`
+        )
+        await logAppointmentAuditEvent(
+          row.practiceId,
+          row.clientId,
+          row.appointmentId,
+          "appointment.pre_session_battery_failed",
+          { reason: "template_missing" }
+        )
+        continue
+      }
+
       const treatmentPlan = await loadActiveTreatmentPlanSummary(
         row.clientId,
         row.practiceId
@@ -185,19 +329,28 @@ async function processPreSessionBatteries(
         summary.errors.push(
           `Pre-session battery failed for appointment ${row.appointmentId}: ${batteryResult.error}`
         )
+        await logAppointmentAuditEvent(
+          row.practiceId,
+          row.clientId,
+          row.appointmentId,
+          "appointment.pre_session_battery_failed",
+          { error: batteryResult.error }
+        )
         continue
       }
 
-      const draft = getDefaultEmailDraft(batteryResult.templateVariables)
       const { subject, htmlBody, textBody } = buildResolvedEmailBodies(
-        draft.message,
-        draft.subject,
+        template.message,
+        template.subject,
         batteryResult.link,
-        batteryResult.templateVariables
+        batteryResult.templateVariables,
+        template.actionButtonLabel ?? "Complete Questionnaire"
       )
 
       const sendResult = await sendQuestionnaireEmail({
         to: clientEmail,
+        cc: template.defaultCc ?? undefined,
+        bcc: template.defaultBcc ?? undefined,
         subject,
         htmlBody,
         textBody,
@@ -207,6 +360,13 @@ async function processPreSessionBatteries(
         summary.errors.push(
           `Pre-session battery email failed for appointment ${row.appointmentId}: ${sendResult.error}`
         )
+        await logAppointmentAuditEvent(
+          row.practiceId,
+          row.clientId,
+          row.appointmentId,
+          "appointment.pre_session_battery_failed",
+          { error: sendResult.error }
+        )
         continue
       }
 
@@ -214,10 +374,7 @@ async function processPreSessionBatteries(
       await db.transaction(async (tx) => {
         await tx
           .update(appointments)
-          .set({
-            preSessionBatterySentAt: now,
-            updatedAt: now,
-          })
+          .set({ preSessionBatterySentAt: now, updatedAt: now })
           .where(eq(appointments.appointmentId, row.appointmentId))
 
         await tx.insert(auditEvents).values({
@@ -231,10 +388,173 @@ async function processPreSessionBatteries(
 
       summary.batteries_sent += 1
     } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error"
       summary.errors.push(
-        `Pre-session battery failed for appointment ${row.appointmentId}: ${
-          error instanceof Error ? error.message : "Unknown error"
-        }`
+        `Pre-session battery failed for appointment ${row.appointmentId}: ${message}`
+      )
+      await logAppointmentAuditEvent(
+        row.practiceId,
+        row.clientId,
+        row.appointmentId,
+        "appointment.pre_session_battery_failed",
+        { error: message }
+      )
+    }
+  }
+}
+
+async function processPostSessionQuestionnaires(
+  targetDate: string,
+  summary: AppointmentAutomationSummary
+) {
+  const rows = await db
+    .select({
+      appointmentId: appointments.appointmentId,
+      clientId: appointments.clientId,
+      practiceId: appointments.practiceId,
+      practitionerProfileId: appointments.practitionerProfileId,
+      clientEmail: clients.email,
+      commsOptOut: clients.commsOptOut,
+      postSessionOptOut: clients.postSessionOptOut,
+    })
+    .from(appointments)
+    .innerJoin(clients, eq(appointments.clientId, clients.clientId))
+    .where(
+      and(
+        eq(appointments.appointmentDate, targetDate),
+        eq(appointments.status, COMPLETED_STATUS),
+        isNull(appointments.postSessionSentAt)
+      )
+    )
+
+  const templateCache = new Map<string, EmailTemplateRow | null>()
+
+  for (const row of rows) {
+    if (row.commsOptOut || row.postSessionOptOut) {
+      await logAppointmentAuditEvent(
+        row.practiceId,
+        row.clientId,
+        row.appointmentId,
+        "appointment.post_session_skipped",
+        { reason: "opted_out" }
+      )
+      continue
+    }
+
+    const clientEmail = row.clientEmail?.trim()
+    if (!clientEmail) {
+      await logAppointmentAuditEvent(
+        row.practiceId,
+        row.clientId,
+        row.appointmentId,
+        "appointment.post_session_skipped",
+        { reason: "no_email" }
+      )
+      continue
+    }
+
+    try {
+      let template = templateCache.get(row.practiceId)
+      if (template === undefined) {
+        template = await getEmailTemplateByKey(row.practiceId, "post_session")
+        templateCache.set(row.practiceId, template)
+      }
+
+      if (!template) {
+        summary.errors.push(
+          `Post-session feedback failed for appointment ${row.appointmentId}: post_session template not found.`
+        )
+        await logAppointmentAuditEvent(
+          row.practiceId,
+          row.clientId,
+          row.appointmentId,
+          "appointment.post_session_failed",
+          { reason: "template_missing" }
+        )
+        continue
+      }
+
+      const linkResult = await createAssessmentLink({
+        clientId: row.clientId,
+        practiceId: row.practiceId,
+        practitionerProfileId: row.practitionerProfileId,
+        assessmentCode: "PSQ",
+        userId: null,
+      })
+
+      if (!linkResult.ok) {
+        summary.errors.push(
+          `Post-session feedback failed for appointment ${row.appointmentId}: ${linkResult.error}`
+        )
+        await logAppointmentAuditEvent(
+          row.practiceId,
+          row.clientId,
+          row.appointmentId,
+          "appointment.post_session_failed",
+          { error: linkResult.error }
+        )
+        continue
+      }
+
+      const { subject, htmlBody, textBody } = buildResolvedEmailBodies(
+        template.message,
+        template.subject,
+        linkResult.link,
+        linkResult.templateVariables,
+        template.actionButtonLabel ?? "Share Feedback"
+      )
+
+      const sendResult = await sendQuestionnaireEmail({
+        to: clientEmail,
+        cc: template.defaultCc ?? undefined,
+        bcc: template.defaultBcc ?? undefined,
+        subject,
+        htmlBody,
+        textBody,
+      })
+
+      if (!sendResult.sent) {
+        summary.errors.push(
+          `Post-session feedback failed for appointment ${row.appointmentId}: ${sendResult.error}`
+        )
+        await logAppointmentAuditEvent(
+          row.practiceId,
+          row.clientId,
+          row.appointmentId,
+          "appointment.post_session_failed",
+          { error: sendResult.error }
+        )
+        continue
+      }
+
+      const now = new Date()
+      await db.transaction(async (tx) => {
+        await tx
+          .update(appointments)
+          .set({ postSessionSentAt: now, updatedAt: now })
+          .where(eq(appointments.appointmentId, row.appointmentId))
+
+        await tx.insert(auditEvents).values({
+          practiceId: row.practiceId,
+          clientId: row.clientId,
+          eventType: "appointment.post_session_sent",
+          entityType: "appointment",
+          entityId: row.appointmentId,
+        })
+      })
+
+      summary.post_session_sent += 1
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error"
+      summary.errors.push(
+        `Post-session feedback failed for appointment ${row.appointmentId}: ${message}`
+      )
+      await logAppointmentAuditEvent(
+        row.practiceId,
+        row.clientId,
+        row.appointmentId,
+        "appointment.post_session_failed",
+        { error: message }
       )
     }
   }

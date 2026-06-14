@@ -1,5 +1,29 @@
 export const QUESTIONNAIRE_LINK_VARIABLE = "{questionnaire_link}"
 
+export const SYSTEM_LINK_TEMPLATE_KEYS: string[] = [
+  "send_assessment",
+  "pre_session_questionnaire",
+  "post_session",
+]
+
+export const NO_ACTION_BUTTON_TEMPLATE_KEYS: string[] = [
+  "appointment_reminder",
+]
+
+export const PROTECTED_TEMPLATE_KEYS: string[] = [
+  "send_assessment",
+  "ad_hoc",
+  "appointment_reminder",
+  "pre_session_questionnaire",
+  "post_session",
+]
+
+export const EXCLUDED_FROM_MANUAL_SEND_TEMPLATE_KEYS: string[] = [
+  "appointment_reminder",
+  "pre_session_questionnaire",
+  "post_session",
+]
+
 export const DEFAULT_QUESTIONNAIRE_SUBJECT =
   "Your pre-session questionnaire from {practice_name}"
 
@@ -14,13 +38,78 @@ This link expires on {expiry_date}.
 {practitioner_name}
 {practice_name}`
 
-export const EMAIL_TEMPLATE_VARIABLE_CHIPS = [
-  { variable: "{client_first_name}", label: "Client first name" },
-  { variable: "{practice_name}", label: "Practice name" },
-  { variable: "{practitioner_name}", label: "Practitioner name" },
-  { variable: QUESTIONNAIRE_LINK_VARIABLE, label: "Questionnaire button" },
-  { variable: "{expiry_date}", label: "Expiry date" },
-] as const
+export type EmailVariableAvailability =
+  | "always"
+  | "action_button"
+  | "appointment_reminder"
+
+export type EmailTemplateVariableChip = {
+  variable: string
+  label: string
+  description: string
+  example: string
+  availability: EmailVariableAvailability
+}
+
+export const EMAIL_TEMPLATE_VARIABLE_CHIPS: EmailTemplateVariableChip[] = [
+  {
+    variable: "{client_first_name}",
+    label: "Client first name",
+    description: "The client's first name.",
+    example: "Sarah",
+    availability: "always",
+  },
+  {
+    variable: "{practice_name}",
+    label: "Practice name",
+    description: "Your practice's name.",
+    example: "Mindful Psychology",
+    availability: "always",
+  },
+  {
+    variable: "{practitioner_name}",
+    label: "Practitioner name",
+    description: "The practitioner's name as shown to clients.",
+    example: "Dr Jane Smith",
+    availability: "always",
+  },
+  {
+    variable: QUESTIONNAIRE_LINK_VARIABLE,
+    label: "Questionnaire button",
+    description: "Inserts a button linking to the questionnaire or assessment.",
+    example: "Complete Questionnaire →",
+    availability: "action_button",
+  },
+  {
+    variable: "{expiry_date}",
+    label: "Expiry date",
+    description: "The date the questionnaire or assessment link expires.",
+    example: "21 June 2026",
+    availability: "action_button",
+  },
+  {
+    variable: "{appointment_date}",
+    label: "Appointment date",
+    description: "The date of the client's appointment.",
+    example: "Mon, 15 Jun 2026",
+    availability: "appointment_reminder",
+  },
+  {
+    variable: "{appointment_time}",
+    label: "Appointment time",
+    description: "The time of the client's appointment.",
+    example: "2:30 PM",
+    availability: "appointment_reminder",
+  },
+  {
+    variable: "{location}",
+    label: "Location",
+    description:
+      'The appointment\'s location. Falls back to "your scheduled location" if left blank on the appointment.',
+    example: "Suite 4, 123 Smith Street",
+    availability: "appointment_reminder",
+  },
+]
 
 export function formatQuestionnaireExpiryDate(expiresAt: Date): string {
   return expiresAt.toLocaleDateString("en-AU", {
@@ -203,5 +292,19 @@ export function buildResolvedEmailBodies(
     subject: subjectResolved,
     htmlBody: buildHtmlEmailBody(htmlMessage, linkUrl, buttonLabel),
     textBody,
+  }
+}
+
+export function buildResolvedPlainEmailBodies(
+  message: string,
+  subject: string,
+  variables: Record<string, string>
+): { subject: string; htmlBody: string; textBody: string } {
+  const resolvedSubject = resolveTemplate(subject, variables)
+  const resolvedMessage = resolveTemplate(message, variables)
+  return {
+    subject: resolvedSubject,
+    htmlBody: buildAdHocHtmlEmailBody(resolvedMessage),
+    textBody: resolvedMessage.replace(/\n{3,}/g, "\n\n"),
   }
 }

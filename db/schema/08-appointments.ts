@@ -23,6 +23,9 @@ export const appointments = pgTable('appointments', {
   preSessionBatterySentAt: timestamp('pre_session_battery_sent_at', {
     withTimezone: true,
   }),
+  postSessionSentAt: timestamp('post_session_sent_at', {
+    withTimezone: true,
+  }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 })

@@ -1,12 +1,18 @@
 "use server"
 
-import { and, asc, eq } from "drizzle-orm"
+import { and, asc, eq, isNull, notInArray, or } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
 
 import { emailTemplates } from "@/db/schema"
 import { requirePractitionerContext } from "@/lib/auth"
 import { db } from "@/lib/db"
+import {
+  EXCLUDED_FROM_MANUAL_SEND_TEMPLATE_KEYS,
+  NO_ACTION_BUTTON_TEMPLATE_KEYS,
+  PROTECTED_TEMPLATE_KEYS,
+  SYSTEM_LINK_TEMPLATE_KEYS,
+} from "@/lib/email/templates"
 
 export type EmailTemplateFormState = {
   error?: string
@@ -65,7 +71,14 @@ export async function getEmailTemplatesForDropdown(practiceId: string) {
     .where(
       and(
         eq(emailTemplates.practiceId, practiceId),
-        eq(emailTemplates.isActive, true)
+        eq(emailTemplates.isActive, true),
+        or(
+          isNull(emailTemplates.templateKey),
+          notInArray(
+            emailTemplates.templateKey,
+            EXCLUDED_FROM_MANUAL_SEND_TEMPLATE_KEYS
+          )
+        )
       )
     )
     .orderBy(asc(emailTemplates.createdAt))
@@ -118,7 +131,19 @@ export async function upsertEmailTemplate(
   const now = new Date()
 
   if (emailTemplateId && existingTemplate) {
-    const isSendAssessment = existingTemplate.templateKey === "send_assessment"
+    const templateKey = existingTemplate.templateKey
+    const hasSystemActionButton = templateKey
+      ? SYSTEM_LINK_TEMPLATE_KEYS.includes(templateKey)
+      : false
+    const forcesNoActionButton = templateKey
+      ? NO_ACTION_BUTTON_TEMPLATE_KEYS.includes(templateKey)
+      : false
+
+    const resolvedHasActionButton = hasSystemActionButton
+      ? true
+      : forcesNoActionButton
+        ? false
+        : hasActionButton
 
     await db
       .update(emailTemplates)
@@ -128,10 +153,10 @@ export async function upsertEmailTemplate(
         message,
         defaultCc,
         defaultBcc,
-        hasActionButton: isSendAssessment ? true : hasActionButton,
-        actionButtonLabel: isSendAssessment
+        hasActionButton: resolvedHasActionButton,
+        actionButtonLabel: hasSystemActionButton
           ? actionButtonLabel ?? existingTemplate.actionButtonLabel
-          : hasActionButton
+          : resolvedHasActionButton
             ? actionButtonLabel
             : null,
         updatedAt: now,
@@ -183,12 +208,11 @@ export async function deleteEmailTemplate(
     return { error: "Email template not found." }
   }
 
-  if (existing.templateKey === "send_assessment") {
-    return { error: "The Send Assessment template cannot be deleted." }
-  }
-
-  if (existing.templateKey === "ad_hoc") {
-    return { error: "The Ad hoc template cannot be deleted." }
+  if (
+    existing.templateKey &&
+    PROTECTED_TEMPLATE_KEYS.includes(existing.templateKey)
+  ) {
+    return { error: "This system template cannot be deleted." }
   }
 
   await db

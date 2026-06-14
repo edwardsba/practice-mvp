@@ -19,7 +19,14 @@ import {
   upsertEmailTemplate,
   type EmailTemplateFormState,
 } from "@/lib/actions/email-templates"
-import { EMAIL_TEMPLATE_VARIABLE_CHIPS } from "@/lib/email/templates"
+import {
+  EMAIL_TEMPLATE_VARIABLE_CHIPS,
+  NO_ACTION_BUTTON_TEMPLATE_KEYS,
+  PROTECTED_TEMPLATE_KEYS,
+  SYSTEM_LINK_TEMPLATE_KEYS,
+  type EmailTemplateVariableChip,
+} from "@/lib/email/templates"
+import { cn } from "@/lib/utils"
 
 type InitialValues = {
   emailTemplateId?: string
@@ -33,6 +40,46 @@ type InitialValues = {
   actionButtonLabel?: string | null
 }
 
+function isChipAvailable(
+  chip: EmailTemplateVariableChip,
+  templateKey: string | null | undefined,
+  hasActionButton: boolean
+) {
+  if (chip.availability === "always") return true
+  if (chip.availability === "action_button") return hasActionButton
+  if (chip.availability === "appointment_reminder") {
+    return templateKey === "appointment_reminder"
+  }
+  return false
+}
+
+function chipUnavailableTitle(chip: EmailTemplateVariableChip) {
+  if (chip.availability === "action_button") {
+    return "Available when 'Has action button' is enabled"
+  }
+  if (chip.availability === "appointment_reminder") {
+    return "Only available in the Appointment Reminder template"
+  }
+  return undefined
+}
+
+function getSystemTemplateNote(
+  templateKey: string | null | undefined
+): string | null {
+  switch (templateKey) {
+    case "send_assessment":
+      return "This is the Send Assessment template — special behaviour (assessment link creation, assessment selection) is built into the system and cannot be changed here."
+    case "pre_session_questionnaire":
+      return "This is the Pre-Session Questionnaire template, sent automatically the day before each appointment. The questionnaire link is generated automatically by the system and inserted via {questionnaire_link}."
+    case "post_session":
+      return "This is the Post-Session template, sent automatically the day after each completed appointment. The feedback link is generated automatically by the system and inserted via {questionnaire_link}."
+    case "appointment_reminder":
+      return "This is the Appointment Reminder template, sent automatically two days before each appointment. It has no action button."
+    default:
+      return null
+  }
+}
+
 export function EmailTemplateForm({
   practiceId,
   initialValues,
@@ -43,13 +90,24 @@ export function EmailTemplateForm({
   cancelHref: string
 }) {
   const messageRef = useRef<HTMLTextAreaElement>(null)
-  const isSendAssessment = initialValues?.templateKey === "send_assessment"
-  const isProtectedTemplate =
-    initialValues?.templateKey === "send_assessment" ||
-    initialValues?.templateKey === "ad_hoc"
+  const templateKey = initialValues?.templateKey ?? null
+  const hasSystemActionButton = templateKey
+    ? SYSTEM_LINK_TEMPLATE_KEYS.includes(templateKey)
+    : false
+  const forcesNoActionButton = templateKey
+    ? NO_ACTION_BUTTON_TEMPLATE_KEYS.includes(templateKey)
+    : false
+  const isProtectedTemplate = templateKey
+    ? PROTECTED_TEMPLATE_KEYS.includes(templateKey)
+    : false
   const [hasActionButton, setHasActionButton] = useState(
-    isSendAssessment ? true : (initialValues?.hasActionButton ?? false)
+    hasSystemActionButton
+      ? true
+      : forcesNoActionButton
+        ? false
+        : (initialValues?.hasActionButton ?? false)
   )
+  const systemTemplateNote = getSystemTemplateNote(templateKey)
   const [message, setMessage] = useState(initialValues?.message ?? "")
   const [deleteError, setDeleteError] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
@@ -110,11 +168,9 @@ export function EmailTemplateForm({
         </CardTitle>
       </CardHeader>
       <CardContent>
-        {isSendAssessment ? (
+        {systemTemplateNote ? (
           <p className="mb-4 text-sm text-muted-foreground">
-            This is the Send Assessment template — special behaviour (assessment
-            link creation, assessment selection) is built into the system and
-            cannot be changed here.
+            {systemTemplateNote}
           </p>
         ) : null}
 
@@ -156,17 +212,35 @@ export function EmailTemplateForm({
           <div className="space-y-2">
             <p className="text-sm font-medium">Insert variable</p>
             <div className="flex flex-wrap gap-2">
-              {EMAIL_TEMPLATE_VARIABLE_CHIPS.map((chip) => (
-                <Button
-                  key={chip.variable}
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => insertVariable(chip.variable)}
-                >
-                  {chip.label}
-                </Button>
-              ))}
+              {EMAIL_TEMPLATE_VARIABLE_CHIPS.map((chip) => {
+                const available = isChipAvailable(
+                  chip,
+                  templateKey,
+                  hasActionButton
+                )
+
+                return (
+                  <Button
+                    key={chip.variable}
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={!available}
+                    title={
+                      !available ? chipUnavailableTitle(chip) : undefined
+                    }
+                    className={cn(
+                      !available && "cursor-not-allowed opacity-40"
+                    )}
+                    onClick={() => {
+                      if (!available) return
+                      insertVariable(chip.variable)
+                    }}
+                  >
+                    {chip.label}
+                  </Button>
+                )
+              })}
             </div>
           </div>
 
@@ -190,7 +264,7 @@ export function EmailTemplateForm({
             />
           </div>
 
-          {!isSendAssessment ? (
+          {!hasSystemActionButton && !forcesNoActionButton ? (
             <>
               <input
                 type="hidden"
@@ -209,10 +283,14 @@ export function EmailTemplateForm({
               </div>
             </>
           ) : (
-            <input type="hidden" name="hasActionButton" value="true" />
+            <input
+              type="hidden"
+              name="hasActionButton"
+              value={hasActionButton ? "true" : "false"}
+            />
           )}
 
-          {hasActionButton || isSendAssessment ? (
+          {hasActionButton ? (
             <div className="space-y-2">
               <Label htmlFor="actionButtonLabel">Action button label</Label>
               <Input
@@ -221,7 +299,7 @@ export function EmailTemplateForm({
                 placeholder="e.g. Complete Questionnaire"
                 defaultValue={initialValues?.actionButtonLabel ?? ""}
               />
-              {!isSendAssessment ? (
+              {!hasSystemActionButton ? (
                 <p className="text-sm text-muted-foreground">
                   A button link source must be implemented in code for this
                   template to function (e.g. assessment link, appointment change

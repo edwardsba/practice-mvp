@@ -28,9 +28,15 @@ const PHQ9_STYLE_INSTRUCTION =
 const BTP_INSTRUCTION =
   "Over the last 2 weeks, choose the answer that best describes you."
 
+const PSQ_INSTRUCTION =
+  "As a result of this session... Please choose the answer that best describes you."
+
 export function questionnaireInstructionForCode(assessmentCode: string): string {
   if (assessmentCode === "BTP") {
     return BTP_INSTRUCTION
+  }
+  if (assessmentCode === "PSQ") {
+    return PSQ_INSTRUCTION
   }
 
   return PHQ9_STYLE_INSTRUCTION

@@ -20,6 +20,7 @@ const FILTER_OPTIONS = [
   { value: "ASSIST", label: "ASSIST" },
   { value: "ASQ", label: "ASQ" },
   { value: "BTP", label: "BTP" },
+  { value: "PSQ", label: "PSQ" },
 ] as const
 
 const ASSESSMENT_TYPE_LABELS: Record<string, string> = {
@@ -28,6 +29,7 @@ const ASSESSMENT_TYPE_LABELS: Record<string, string> = {
   ASSIST: "ASSIST",
   ASQ: "ASQ",
   BTP: "BTP",
+  PSQ: "PSQ",
 }
 
 type AssessmentResultRow = {
@@ -54,12 +56,22 @@ function formatAssessmentType(code: string, name: string) {
   return ASSESSMENT_TYPE_LABELS[code] ?? name
 }
 
+function formatScore(result: AssessmentResultRow) {
+  if (result.assessmentCode === "PSQ") {
+    return result.score > 0 ? `+${result.score}` : String(result.score)
+  }
+  return String(result.score)
+}
+
 function formatSeverityOrRisk(result: AssessmentResultRow) {
   if (result.assessmentCode === "ASQ") {
     return result.acuteRiskRating ?? "—"
   }
   if (result.assessmentCode === "BTP") {
     return "—"
+  }
+  if (result.assessmentCode === "PSQ") {
+    return result.severity ?? "—"
   }
   return result.severity ?? "—"
 }
@@ -144,12 +156,14 @@ export function AssessmentsTable({
                     </TableCell>
                     <TableCell>
                       <Link href={resultHref} className="block hover:underline">
-                        {result.score}
+                        {formatScore(result)}
                       </Link>
                     </TableCell>
                     <TableCell
                       className={cn(
-                        result.assessmentCode !== "ASQ" && "capitalize"
+                        result.assessmentCode !== "ASQ" &&
+                          result.assessmentCode !== "PSQ" &&
+                          "capitalize"
                       )}
                     >
                       <Link href={resultHref} className="block hover:underline">

@@ -34,6 +34,7 @@ import {
   PHQ9_IMPAIRMENT_ELEMENT_KEY,
 } from "@/lib/assessments/impairment"
 import { getMaxScoreForAssessmentDefinition } from "@/lib/assessments/max-score"
+import { calculatePsqScore } from "@/lib/assessments/psq"
 import { requirePractitionerContext } from "@/lib/auth"
 import { db } from "@/lib/db"
 
@@ -118,22 +119,7 @@ export default async function AssessmentResultDetailPage({
   }
 
   const isAsq = result.assessmentCode === "ASQ"
-  const maxScore = isAsq
-    ? 5
-    : await getMaxScoreForAssessmentDefinition(result.assessmentDefinitionId)
-
-  let functionalImpairmentLabel: string | null = null
-  if (result.assessmentCode === "PHQ9") {
-    functionalImpairmentLabel = await getFunctionalImpairmentLabelForResult(
-      result.assessmentInstanceId,
-      PHQ9_IMPAIRMENT_ELEMENT_KEY
-    )
-  } else if (result.assessmentCode === "GAD7") {
-    functionalImpairmentLabel = await getFunctionalImpairmentLabelForResult(
-      result.assessmentInstanceId,
-      GAD7_IMPAIRMENT_ELEMENT_KEY
-    )
-  }
+  const isPsq = result.assessmentCode === "PSQ"
 
   const responses = await db
     .select({
@@ -169,6 +155,139 @@ export default async function AssessmentResultDetailPage({
     .orderBy(asc(assessmentElements.displayOrder))
 
   const clientName = `${client.firstName} ${client.lastName}`
+
+  if (isPsq) {
+    const psqResult = calculatePsqScore(
+      responses.map((response) => response.scoreValue)
+    )
+
+    return (
+      <AppShell>
+        <div className="mb-6">
+          <BackButton
+            fallbackHref={`/clients/${clientId}/assessments`}
+            label="← Back to assessments"
+          />
+          <h1 className="text-2xl font-semibold tracking-tight">{clientName}</h1>
+        </div>
+
+        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div />
+          <MarkReviewedButton
+            clientId={clientId}
+            resultId={resultId}
+            status={result.status}
+          />
+        </div>
+
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle>Assessment details</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <dl className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <dt className="text-sm text-muted-foreground">Assessment name</dt>
+                <dd className="font-medium">{result.assessmentName}</dd>
+              </div>
+              <div>
+                <dt className="text-sm text-muted-foreground">Client name</dt>
+                <dd className="font-medium">{clientName}</dd>
+              </div>
+              <div>
+                <dt className="text-sm text-muted-foreground">Date</dt>
+                <dd className="font-medium">{formatDate(result.assessmentDate)}</dd>
+              </div>
+            </dl>
+          </CardContent>
+        </Card>
+
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle>Assessment results summary</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <dl className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <dt className="text-sm text-muted-foreground">
+                  Positive feedback
+                </dt>
+                <dd className="font-medium tabular-nums">
+                  {psqResult.positiveFeedback}/10
+                </dd>
+              </div>
+              <div>
+                <dt className="text-sm text-muted-foreground">
+                  Negative feedback
+                </dt>
+                <dd className="font-medium tabular-nums">
+                  {psqResult.negativeFeedback}/10
+                </dd>
+              </div>
+            </dl>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Questions &amp; results</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="rounded-lg border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-12">No.</TableHead>
+                    <TableHead>Question</TableHead>
+                    <TableHead>Result</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {responses.length === 0 ? (
+                    <TableRow>
+                      <TableCell
+                        colSpan={3}
+                        className="h-20 text-center text-muted-foreground"
+                      >
+                        No response data available.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    responses.map((row) => (
+                      <TableRow key={row.displayOrder}>
+                        <TableCell>{row.displayOrder}</TableCell>
+                        <TableCell className="whitespace-normal">
+                          {row.questionText}
+                        </TableCell>
+                        <TableCell>{row.responseLabel}</TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+      </AppShell>
+    )
+  }
+
+  const maxScore = isAsq
+    ? 5
+    : await getMaxScoreForAssessmentDefinition(result.assessmentDefinitionId)
+
+  let functionalImpairmentLabel: string | null = null
+  if (result.assessmentCode === "PHQ9") {
+    functionalImpairmentLabel = await getFunctionalImpairmentLabelForResult(
+      result.assessmentInstanceId,
+      PHQ9_IMPAIRMENT_ELEMENT_KEY
+    )
+  } else if (result.assessmentCode === "GAD7") {
+    functionalImpairmentLabel = await getFunctionalImpairmentLabelForResult(
+      result.assessmentInstanceId,
+      GAD7_IMPAIRMENT_ELEMENT_KEY
+    )
+  }
 
   return (
     <AppShell>

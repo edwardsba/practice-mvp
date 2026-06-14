@@ -31,7 +31,8 @@
     "db:practitioner-calendar-settings": "tsx db/apply-practitioner-calendar-settings-migration.ts",
     "db:seed-funding": "tsx db/seed-funding.ts",
     "db:email-templates": "tsx db/apply-email-templates-migration.ts",
-    "db:seed-email-templates": "tsx db/seed-email-templates.ts"
+    "db:seed-email-templates": "tsx db/seed-email-templates.ts",
+    "db:seed-psq": "npx tsx db/seed-psq.ts"
   },
   "dependencies": {
     "@react-pdf/renderer": "^4.5.1",

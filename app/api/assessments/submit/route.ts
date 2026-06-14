@@ -17,6 +17,7 @@ import {
   markBatteryInProgress,
   validateBatteryNextToken,
 } from "@/lib/assessments/battery-chain"
+import { calculatePsqScore, formatPsqSeverity } from "@/lib/assessments/psq"
 import { severityFromAssessmentCode } from "@/lib/assessments/severity"
 import { hashAssessmentToken } from "@/lib/assessments/token"
 import { db } from "@/lib/db"
@@ -117,6 +118,7 @@ export async function POST(request: Request) {
   }
 
   const isBtp = definition.assessmentCode === "BTP"
+  const isPsq = definition.assessmentCode === "PSQ"
 
   const elementIds = Object.keys(responses)
   if (elementIds.length === 0) {
@@ -187,6 +189,7 @@ export async function POST(request: Request) {
   }[] = []
 
   let totalScore = 0
+  const psqResponseScores: number[] = []
 
   for (const elementId of elementIds) {
     const responseValue = String(responses[elementId] ?? "").trim()
@@ -211,8 +214,12 @@ export async function POST(request: Request) {
       scoreValue,
     })
 
-    if (!isBtp && dataTypeByElementId.get(elementId) === "integer") {
+    if (!isBtp && !isPsq && dataTypeByElementId.get(elementId) === "integer") {
       totalScore += scoreValue
+    }
+
+    if (isPsq && dataTypeByElementId.get(elementId) === "integer") {
+      psqResponseScores.push(scoreValue)
     }
   }
 
@@ -242,10 +249,21 @@ export async function POST(request: Request) {
     }
   }
 
-  const severity = isBtp
-    ? null
-    : severityFromAssessmentCode(definition.assessmentCode, totalScore)
-  const resultScore = isBtp ? 0 : totalScore
+  let resultScore: number
+  let severity: string | null
+
+  if (isBtp) {
+    resultScore = 0
+    severity = null
+  } else if (isPsq) {
+    const psqResult = calculatePsqScore(psqResponseScores)
+    resultScore = psqResult.netScore
+    severity = formatPsqSeverity(psqResult)
+  } else {
+    resultScore = totalScore
+    severity = severityFromAssessmentCode(definition.assessmentCode, totalScore)
+  }
+
   const now = new Date()
 
   try {

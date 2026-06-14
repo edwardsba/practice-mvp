@@ -15,6 +15,7 @@ const MENU_ITEMS = (clientId: string): MenuItem[] => [
   { label: "Assessments", href: `/clients/${clientId}/assessments` },
   { label: "Communications", href: `/clients/${clientId}/communications` },
   { label: "Reports", href: `/clients/${clientId}/reports` },
+  { label: "Claims", href: `/clients/${clientId}/claims` },
   { label: "Tasks", disabled: true },
   { label: "Treatment Plans", disabled: true },
   { label: "Behavioural Targets", disabled: true },

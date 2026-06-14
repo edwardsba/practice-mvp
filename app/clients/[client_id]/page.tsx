@@ -200,7 +200,7 @@ export default async function ClientDetailPage({
               <CardTitle>Funding</CardTitle>
               <div className="flex flex-wrap gap-2">
                 <Button variant="outline" size="sm" asChild>
-                  <Link href={`/funding/claims?clientId=${clientId}`}>
+                  <Link href={`/clients/${clientId}/claims`}>
                     See All
                   </Link>
                 </Button>

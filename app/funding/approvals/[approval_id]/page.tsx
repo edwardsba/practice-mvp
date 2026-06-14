@@ -31,8 +31,6 @@ import {
   formatAppointmentDate,
   formatAppointmentTime,
 } from "@/lib/appointments/format"
-import { formatReportType } from "@/lib/reports/snapshot"
-
 function displayValue(value: string | null | undefined) {
   return value?.trim() || "—"
 }
@@ -279,8 +277,7 @@ export default async function FundingApprovalDetailPage({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {approval.reportLinks.length === 0 &&
-                approval.clientReports.length === 0 ? (
+                {approval.reportLinks.length === 0 ? (
                   <TableRow>
                     <TableCell
                       colSpan={4}
@@ -289,7 +286,7 @@ export default async function FundingApprovalDetailPage({
                       No reports yet.
                     </TableCell>
                   </TableRow>
-                ) : approval.reportLinks.length > 0 ? (
+                ) : (
                   approval.reportLinks.map((report) => (
                     <TableRow key={report.linkId}>
                       <TableCell>
@@ -312,26 +309,6 @@ export default async function FundingApprovalDetailPage({
                         ) : (
                           "—"
                         )}
-                      </TableCell>
-                    </TableRow>
-                  ))
-                ) : (
-                  approval.clientReports.map((report) => (
-                    <TableRow key={report.simpleReportId}>
-                      <TableCell>
-                        {formatDisplayDate(
-                          report.createdAt.toISOString().slice(0, 10)
-                        )}
-                      </TableCell>
-                      <TableCell>{formatReportType(report.reportType)}</TableCell>
-                      <TableCell>{report.reportStatus}</TableCell>
-                      <TableCell>
-                        <Link
-                          href={`/clients/${approval.clientId}/reports/${report.simpleReportId}`}
-                          className="text-primary hover:underline"
-                        >
-                          View
-                        </Link>
                       </TableCell>
                     </TableRow>
                   ))

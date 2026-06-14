@@ -25,6 +25,12 @@ export default async function ClientCommunicationsPage({
       firstName: clients.firstName,
       lastName: clients.lastName,
       email: clients.email,
+      commsOptOut: clients.commsOptOut,
+      reminderOptOut: clients.reminderOptOut,
+      preSessionOptOut: clients.preSessionOptOut,
+      postSessionOptOut: clients.postSessionOptOut,
+      adminCommsOptOut: clients.adminCommsOptOut,
+      onlineBookingPermitted: clients.onlineBookingPermitted,
     })
     .from(clients)
     .where(
@@ -64,6 +70,14 @@ export default async function ClientCommunicationsPage({
     activeTreatmentPlan?.behaviouralTargetItems ?? []
   )
   const clientName = `${client.firstName} ${client.lastName}`
+  const preferences = {
+    commsOptOut: client.commsOptOut,
+    reminderOptOut: client.reminderOptOut,
+    preSessionOptOut: client.preSessionOptOut,
+    postSessionOptOut: client.postSessionOptOut,
+    adminCommsOptOut: client.adminCommsOptOut,
+    onlineBookingPermitted: client.onlineBookingPermitted,
+  }
 
   const serializedCommunications = communications.map((communication) => ({
     communicationId: communication.communicationId,
@@ -89,6 +103,7 @@ export default async function ClientCommunicationsPage({
         templateVariables={questionnaireTemplateVariables}
         defaultAssessments={defaultBatteryAssessments}
         communications={serializedCommunications}
+        preferences={preferences}
       />
     </AppShell>
   )

@@ -4,7 +4,6 @@ import { and, eq } from "drizzle-orm"
 
 import { ActionItemsSection } from "@/app/clients/[client_id]/action-items-section"
 import { ClientMenuSidebar } from "@/app/clients/[client_id]/client-menu-sidebar"
-import { CommunicationPreferencesCard } from "@/app/clients/[client_id]/communication-preferences-card"
 import { EmergencyContactsSection } from "@/components/emergency-contacts/emergency-contacts-section"
 import { AppShell } from "@/components/app-shell"
 import { BackButton } from "@/components/ui/back-button"
@@ -375,18 +374,6 @@ export default async function ClientDetailPage({
               )}
             </CardContent>
           </Card>
-
-          <CommunicationPreferencesCard
-            clientId={clientId}
-            preferences={{
-              commsOptOut: client.commsOptOut,
-              reminderOptOut: client.reminderOptOut,
-              preSessionOptOut: client.preSessionOptOut,
-              postSessionOptOut: client.postSessionOptOut,
-              adminCommsOptOut: client.adminCommsOptOut,
-              onlineBookingPermitted: client.onlineBookingPermitted,
-            }}
-          />
         </div>
 
         <div className="max-lg:order-last">

@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { useEffect, useState } from "react"
 
+import { CommunicationPreferencesCard } from "@/app/clients/[client_id]/communication-preferences-card"
 import { SendCommunicationModal } from "@/components/email/send-communication-modal"
 import { Button } from "@/components/ui/button"
 import {
@@ -102,6 +103,7 @@ export function CommunicationsPageClient({
   templateVariables,
   defaultAssessments,
   communications,
+  preferences,
 }: {
   clientId: string
   clientName: string
@@ -111,6 +113,14 @@ export function CommunicationsPageClient({
   templateVariables: QuestionnaireEmailTemplateVariables | null
   defaultAssessments: BatteryAssessmentChip[]
   communications: CommunicationRow[]
+  preferences: {
+    commsOptOut: boolean
+    reminderOptOut: boolean
+    preSessionOptOut: boolean
+    postSessionOptOut: boolean
+    adminCommsOptOut: boolean
+    onlineBookingPermitted: boolean
+  }
 }) {
   const [sendModalOpen, setSendModalOpen] = useState(false)
   const [selectedCommunication, setSelectedCommunication] =
@@ -142,6 +152,8 @@ export function CommunicationsPageClient({
           </Button>
         </div>
       </div>
+
+      <CommunicationPreferencesCard clientId={clientId} preferences={preferences} />
 
       {statusMessage ? (
         <p className="mb-4 text-sm text-muted-foreground" role="status">

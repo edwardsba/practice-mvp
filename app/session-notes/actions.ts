@@ -89,24 +89,63 @@ export async function createSessionNote(
   redirect(`/session-notes/${sessionNoteId!}`)
 }
 
-export async function updateSessionNote(
+export type UpdateSessionNoteNotesState = {
+  error?: string
+}
+
+export async function updateSessionNoteNotes(
   sessionNoteId: string,
-  _prevState: SessionNoteFormState,
-  formData: FormData
-): Promise<SessionNoteFormState> {
+  notes: string
+): Promise<UpdateSessionNoteNotesState> {
   const context = await requirePractitionerContext()
-  const values = parseSessionNoteFormData(formData)
 
   const note = await loadSessionNoteForPractice(sessionNoteId, context.practiceId)
   if (!note) {
     return { error: "Session note not found." }
   }
-
   if (note.status === "finalised") {
-    redirect(`/session-notes/${sessionNoteId}`)
+    return { error: "This session note has been finalised." }
   }
 
-  if (!values.sessionDate) {
+  try {
+    await db
+      .update(sessionNotes)
+      .set({
+        practitionerNotes: notes.trim() || null,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(sessionNotes.sessionNoteId, sessionNoteId),
+          eq(sessionNotes.practiceId, context.practiceId)
+        )
+      )
+  } catch {
+    return { error: "Unable to save notes." }
+  }
+
+  return {}
+}
+
+export type UpdateSessionNoteDateTimeState = {
+  error?: string
+}
+
+export async function updateSessionNoteDateTime(
+  sessionNoteId: string,
+  sessionDate: string,
+  sessionTime: string | null
+): Promise<UpdateSessionNoteDateTimeState> {
+  const context = await requirePractitionerContext()
+
+  const note = await loadSessionNoteForPractice(sessionNoteId, context.practiceId)
+  if (!note) {
+    return { error: "Session note not found." }
+  }
+  if (note.status === "finalised") {
+    return { error: "This session note has been finalised." }
+  }
+  if (!sessionDate) {
     return { error: "Session date is required." }
   }
 
@@ -115,9 +154,8 @@ export async function updateSessionNote(
       await tx
         .update(sessionNotes)
         .set({
-          sessionDate: values.sessionDate,
-          sessionTime: values.sessionTime,
-          practitionerNotes: values.practitionerNotes,
+          sessionDate,
+          sessionTime,
           updatedAt: new Date(),
         })
         .where(
@@ -137,13 +175,11 @@ export async function updateSessionNote(
       })
     })
   } catch {
-    return { error: "Unable to update session note. Please try again." }
+    return { error: "Unable to update session date and time." }
   }
 
-  revalidatePath("/session-notes")
   revalidatePath(`/session-notes/${sessionNoteId}`)
-  revalidatePath(`/clients/${note.clientId}`)
-  redirect(`/session-notes/${sessionNoteId}`)
+  return {}
 }
 
 export async function finaliseSessionNote(

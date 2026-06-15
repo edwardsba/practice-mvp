@@ -1,6 +1,5 @@
 "use client"
 
-import Link from "next/link"
 import { useActionState } from "react"
 
 import {
@@ -35,16 +34,11 @@ export function SessionNoteActions({
       {isFinalised ? (
         <Badge variant="success">Finalised</Badge>
       ) : (
-        <>
-          <Button variant="outline" asChild>
-            <Link href={`/session-notes/${sessionNoteId}/edit`}>Edit</Link>
+        <form action={formAction}>
+          <Button type="submit" disabled={pending}>
+            {pending ? "Finalising…" : "Finalise"}
           </Button>
-          <form action={formAction}>
-            <Button type="submit" disabled={pending}>
-              {pending ? "Finalising…" : "Finalise"}
-            </Button>
-          </form>
-        </>
+        </form>
       )}
       <Button type="button" variant="outline" onClick={handlePrint}>
         Print

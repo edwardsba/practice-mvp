@@ -134,14 +134,6 @@ export default async function SessionNotesPage({
                         >
                           View
                         </Link>
-                        {note.status === "draft" ? (
-                          <Link
-                            href={`/session-notes/${note.sessionNoteId}/edit`}
-                            className="text-primary hover:underline"
-                          >
-                            Edit
-                          </Link>
-                        ) : null}
                       </div>
                     </TableCell>
                   </TableRow>

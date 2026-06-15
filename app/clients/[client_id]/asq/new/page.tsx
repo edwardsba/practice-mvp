@@ -17,10 +17,14 @@ import { requirePractitionerContext } from "@/lib/auth"
 import { db } from "@/lib/db"
 export default async function AdministerAsqPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ client_id: string }>
+  searchParams: Promise<{ session_note_id?: string }>
 }) {
   const { client_id: clientId } = await params
+  const { session_note_id: sessionNoteIdParam } = await searchParams
+  const sessionNoteId = sessionNoteIdParam?.trim() || null
   const context = await requirePractitionerContext()
 
   const [client] = await db
@@ -65,7 +69,12 @@ export default async function AdministerAsqPage({
           <CardTitle>Ask Suicide-Screening Questions</CardTitle>
         </CardHeader>
         <CardContent>
-          <AsqForm clientId={clientId} clientName={clientName} questions={questions} />
+          <AsqForm
+            clientId={clientId}
+            clientName={clientName}
+            questions={questions}
+            sessionNoteId={sessionNoteId}
+          />
         </CardContent>
       </Card>
     </AppShell>

@@ -12,10 +12,12 @@ export function AsqForm({
   clientId,
   clientName,
   questions,
+  sessionNoteId,
 }: {
   clientId: string
   clientName: string
   questions: AsqQuestion[]
+  sessionNoteId?: string | null
 }) {
   const [state, formAction, pending] = useActionState(
     saveAsqResult.bind(null, clientId),
@@ -24,6 +26,9 @@ export function AsqForm({
 
   return (
     <form action={formAction} className="space-y-8">
+      {sessionNoteId ? (
+        <input type="hidden" name="session_note_id" value={sessionNoteId} />
+      ) : null}
       <p className="text-sm text-muted-foreground">
         Ask Suicide-Screening Questions (ASQ) for {clientName}. Answer each question
         based on the client&apos;s responses.

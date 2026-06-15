@@ -29,6 +29,7 @@ export type CreateBatteryInstanceParams = {
   practitionerProfileId: string
   assessmentCodes: string[]
   userId?: string | null
+  appointmentId?: string | null
 }
 
 export type CreateBatteryInstanceResult =
@@ -145,6 +146,7 @@ export async function createBatteryInstance(
             clientId,
             practiceId,
             practitionerProfileId,
+            appointmentId: params.appointmentId ?? null,
             status: "assigned",
           })
           .returning({

@@ -38,10 +38,15 @@ This link expires on {expiry_date}.
 {practitioner_name}
 {practice_name}`
 
+export const APPOINTMENT_CONTEXT_TEMPLATE_KEYS: string[] = [
+  "appointment_reminder",
+  "pre_session_questionnaire",
+]
+
 export type EmailVariableAvailability =
   | "always"
   | "action_button"
-  | "appointment_reminder"
+  | "appointment_context"
 
 export type EmailTemplateVariableChip = {
   variable: string
@@ -92,22 +97,30 @@ export const EMAIL_TEMPLATE_VARIABLE_CHIPS: EmailTemplateVariableChip[] = [
     label: "Appointment date",
     description: "The date of the client's appointment.",
     example: "Mon, 15 Jun 2026",
-    availability: "appointment_reminder",
+    availability: "appointment_context",
   },
   {
     variable: "{appointment_time}",
     label: "Appointment time",
     description: "The time of the client's appointment.",
     example: "2:30 PM",
-    availability: "appointment_reminder",
+    availability: "appointment_context",
   },
   {
     variable: "{location}",
     label: "Location",
     description:
-      'The appointment\'s location. Falls back to "your scheduled location" if left blank on the appointment.',
+      'The appointment\'s location. Falls back to the practice address, then the practice name, if left blank on the appointment. For online appointments, consider using {appointment_location} instead.',
     example: "Suite 4, 123 Smith Street",
-    availability: "appointment_reminder",
+    availability: "appointment_context",
+  },
+  {
+    variable: "{appointment_location}",
+    label: "Appointment location",
+    description:
+      "A complete phrase describing where the appointment takes place — 'in person at [address]' for face-to-face appointments, or a note about the online session for online appointments. Designed for sentences like 'This appointment is {appointment_location}.'",
+    example: "in person at 12 Junction Street, Woollahra NSW 2027",
+    availability: "appointment_context",
   },
 ]
 
@@ -271,7 +284,7 @@ export function buildResolvedEmailBodies(
   message: string,
   subject: string,
   linkUrl: string,
-  variables: QuestionnaireEmailTemplateVariables,
+  variables: Record<string, string>,
   buttonLabel = "Complete Questionnaire"
 ): { subject: string; htmlBody: string; textBody: string } {
   const resolvedVars: Record<string, string> = { ...variables }

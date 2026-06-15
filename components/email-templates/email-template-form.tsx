@@ -20,6 +20,7 @@ import {
   type EmailTemplateFormState,
 } from "@/lib/actions/email-templates"
 import {
+  APPOINTMENT_CONTEXT_TEMPLATE_KEYS,
   EMAIL_TEMPLATE_VARIABLE_CHIPS,
   NO_ACTION_BUTTON_TEMPLATE_KEYS,
   PROTECTED_TEMPLATE_KEYS,
@@ -47,8 +48,8 @@ function isChipAvailable(
 ) {
   if (chip.availability === "always") return true
   if (chip.availability === "action_button") return hasActionButton
-  if (chip.availability === "appointment_reminder") {
-    return templateKey === "appointment_reminder"
+  if (chip.availability === "appointment_context") {
+    return templateKey ? APPOINTMENT_CONTEXT_TEMPLATE_KEYS.includes(templateKey) : false
   }
   return false
 }
@@ -57,8 +58,8 @@ function chipUnavailableTitle(chip: EmailTemplateVariableChip) {
   if (chip.availability === "action_button") {
     return "Available when 'Has action button' is enabled"
   }
-  if (chip.availability === "appointment_reminder") {
-    return "Only available in the Appointment Reminder template"
+  if (chip.availability === "appointment_context") {
+    return "Only available in templates with appointment context (Appointment Reminder, Pre-Session Questionnaire)"
   }
   return undefined
 }

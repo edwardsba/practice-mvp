@@ -20,6 +20,7 @@ export type CreateAssessmentLinkParams = {
   practitionerProfileId: string
   assessmentCode: string
   userId: string | null
+  appointmentId?: string | null
 }
 
 export type CreateAssessmentLinkResult =
@@ -116,6 +117,7 @@ export async function createAssessmentLink(
           clientId,
           practiceId,
           practitionerProfileId,
+          appointmentId: params.appointmentId ?? null,
           status: "assigned",
         })
         .returning({

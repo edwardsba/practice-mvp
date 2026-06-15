@@ -8,7 +8,6 @@ import { auditEvents, sessionNotes } from "@/db/schema"
 import { loadAppointmentForPractice } from "@/lib/appointments/load"
 import { requirePractitionerContext } from "@/lib/auth"
 import { db } from "@/lib/db"
-import { findBatteryInstanceForAppointment } from "@/lib/session-notes/battery-link"
 import {
   loadSessionNoteForPractice,
 } from "@/lib/session-notes/load"
@@ -41,7 +40,6 @@ export async function createSessionNote(
   }
 
   let appointmentId: string | null = values.appointmentId
-  let batteryInstanceId: string | null = null
 
   if (appointmentId) {
     const appointment = await loadAppointmentForPractice(
@@ -51,12 +49,6 @@ export async function createSessionNote(
     if (!appointment || appointment.clientId !== values.clientId) {
       return { error: "Appointment not found for this client." }
     }
-
-    batteryInstanceId = await findBatteryInstanceForAppointment(
-      values.clientId,
-      context.practiceId,
-      appointment.preSessionBatterySentAt
-    )
   }
 
   let sessionNoteId: string
@@ -70,7 +62,6 @@ export async function createSessionNote(
           practiceId: context.practiceId,
           practitionerProfileId: context.practitionerProfileId,
           appointmentId,
-          batteryInstanceId,
           sessionDate: values.sessionDate,
           sessionTime: values.sessionTime,
           practitionerNotes: values.practitionerNotes,

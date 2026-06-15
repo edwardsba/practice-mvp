@@ -39,6 +39,13 @@ function composePractitionerNameParts(
   return [profile.title?.trim(), name].filter(Boolean).join(" ")
 }
 
+export function formatPractitionerPreferredName(
+  profile: Pick<PractitionerNameFields, "firstName" | "preferredName" | "lastName">
+): string {
+  const firstName = profile.preferredName?.trim() || profile.firstName.trim()
+  return [firstName, profile.lastName.trim()].filter(Boolean).join(" ")
+}
+
 export function formatPractitionerViewName(
   profile: Omit<PractitionerNameFields, "reportSignature">
 ): string {

@@ -9,6 +9,10 @@ import {
   formatAppointmentTime,
   sydneyDatePlusDays,
 } from "@/lib/appointments/format"
+import {
+  resolveAppointmentLocationPhrase,
+  resolveAppointmentLocationText,
+} from "@/lib/appointments/location"
 import { db } from "@/lib/db"
 import { getEmailTemplateByKey } from "@/lib/email/template-loader"
 import { getQuestionnaireEmailContext } from "@/lib/email/practitioner-context"
@@ -82,6 +86,7 @@ async function processReminders(
       appointmentDate: appointments.appointmentDate,
       appointmentTime: appointments.appointmentTime,
       location: appointments.location,
+      mode: appointments.mode,
       clientEmail: clients.email,
       clientFirstName: clients.firstName,
       commsOptOut: clients.commsOptOut,
@@ -174,7 +179,17 @@ async function processReminders(
           practitioner_name: emailContext.practitionerName,
           appointment_date: formatAppointmentDate(row.appointmentDate),
           appointment_time: formatAppointmentTime(row.appointmentTime),
-          location: row.location?.trim() || "your scheduled location",
+          location: resolveAppointmentLocationText(
+            row.location,
+            emailContext.practiceAddress,
+            emailContext.practiceName
+          ),
+          appointment_location: resolveAppointmentLocationPhrase(
+            row.mode,
+            row.location,
+            emailContext.practiceAddress,
+            emailContext.practiceName
+          ),
         }
       )
 
@@ -244,6 +259,10 @@ async function processPreSessionBatteries(
       clientId: appointments.clientId,
       practiceId: appointments.practiceId,
       practitionerProfileId: appointments.practitionerProfileId,
+      appointmentDate: appointments.appointmentDate,
+      appointmentTime: appointments.appointmentTime,
+      location: appointments.location,
+      mode: appointments.mode,
       clientEmail: clients.email,
       commsOptOut: clients.commsOptOut,
       preSessionOptOut: clients.preSessionOptOut,
@@ -323,6 +342,7 @@ async function processPreSessionBatteries(
         practitionerProfileId: row.practitionerProfileId,
         assessmentCodes,
         userId: null,
+        appointmentId: row.appointmentId,
       })
 
       if (!batteryResult.ok) {
@@ -339,11 +359,46 @@ async function processPreSessionBatteries(
         continue
       }
 
+      const emailContext = await getQuestionnaireEmailContext(
+        row.practiceId,
+        row.practitionerProfileId
+      )
+      if (!emailContext) {
+        summary.errors.push(
+          `Pre-session battery failed for appointment ${row.appointmentId}: practice or practitioner not found.`
+        )
+        await logAppointmentAuditEvent(
+          row.practiceId,
+          row.clientId,
+          row.appointmentId,
+          "appointment.pre_session_battery_failed",
+          { reason: "practitioner_context_missing" }
+        )
+        continue
+      }
+
+      const variables = {
+        ...batteryResult.templateVariables,
+        appointment_date: formatAppointmentDate(row.appointmentDate),
+        appointment_time: formatAppointmentTime(row.appointmentTime),
+        location: resolveAppointmentLocationText(
+          row.location,
+          emailContext.practiceAddress,
+          emailContext.practiceName
+        ),
+        appointment_location: resolveAppointmentLocationPhrase(
+          row.mode,
+          row.location,
+          emailContext.practiceAddress,
+          emailContext.practiceName
+        ),
+      }
+
       const { subject, htmlBody, textBody } = buildResolvedEmailBodies(
         template.message,
         template.subject,
         batteryResult.link,
-        batteryResult.templateVariables,
+        variables,
         template.actionButtonLabel ?? "Complete Questionnaire"
       )
 
@@ -480,6 +535,7 @@ async function processPostSessionQuestionnaires(
         practitionerProfileId: row.practitionerProfileId,
         assessmentCode: "PSQ",
         userId: null,
+        appointmentId: row.appointmentId,
       })
 
       if (!linkResult.ok) {

@@ -32,6 +32,7 @@
     "db:seed-funding": "tsx db/seed-funding.ts",
     "db:email-templates": "tsx db/apply-email-templates-migration.ts",
     "db:post-session-sent-at": "tsx db/apply-post-session-sent-at-migration.ts",
+    "db:assessment-instance-links": "tsx db/apply-assessment-instance-links-migration.ts",
     "db:seed-email-templates": "tsx db/seed-email-templates.ts",
     "db:seed-psq": "npx tsx db/seed-psq.ts"
   },

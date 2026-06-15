@@ -5,7 +5,6 @@ import {
   assessmentInstances,
   assessmentResponses,
   assessmentResults,
-  batteryInstances,
   crisisPlans,
   practitionerProfiles,
 } from "@/db/schema"
@@ -78,89 +77,68 @@ type SessionNoteRow = NonNullable<
   Awaited<ReturnType<typeof loadSessionNoteForPractice>>
 >
 
-async function loadResultForInstance(instanceId: string) {
+const RESULT_COLUMNS = {
+  assessmentResultId: assessmentResults.assessmentResultId,
+  assessmentInstanceId: assessmentResults.assessmentInstanceId,
+  assessmentDate: assessmentResults.assessmentDate,
+  score: assessmentResults.score,
+  severity: assessmentResults.severity,
+  acuteRiskRating: assessmentResults.acuteRiskRating,
+  assessmentDefinitionId: assessmentInstances.assessmentDefinitionId,
+  assessmentCode: assessmentDefinitions.assessmentCode,
+  assessmentName: assessmentDefinitions.assessmentName,
+} as const
+
+async function loadResultByAppointment(appointmentId: string, assessmentCode: string) {
   const [row] = await db
-    .select({
-      assessmentResultId: assessmentResults.assessmentResultId,
-      assessmentInstanceId: assessmentResults.assessmentInstanceId,
-      assessmentDate: assessmentResults.assessmentDate,
-      score: assessmentResults.score,
-      severity: assessmentResults.severity,
-      assessmentDefinitionId: assessmentInstances.assessmentDefinitionId,
-      assessmentCode: assessmentDefinitions.assessmentCode,
-      assessmentName: assessmentDefinitions.assessmentName,
-    })
-    .from(assessmentResults)
+    .select(RESULT_COLUMNS)
+    .from(assessmentInstances)
     .innerJoin(
-      assessmentInstances,
-      eq(
-        assessmentResults.assessmentInstanceId,
-        assessmentInstances.assessmentInstanceId
-      )
+      assessmentResults,
+      eq(assessmentResults.assessmentInstanceId, assessmentInstances.assessmentInstanceId)
     )
     .innerJoin(
       assessmentDefinitions,
-      eq(
-        assessmentInstances.assessmentDefinitionId,
-        assessmentDefinitions.assessmentDefinitionId
+      eq(assessmentInstances.assessmentDefinitionId, assessmentDefinitions.assessmentDefinitionId)
+    )
+    .where(
+      and(
+        eq(assessmentInstances.appointmentId, appointmentId),
+        eq(assessmentDefinitions.assessmentCode, assessmentCode)
       )
     )
-    .where(eq(assessmentResults.assessmentInstanceId, instanceId))
+    .orderBy(desc(assessmentResults.assessmentDate))
     .limit(1)
 
   return row ?? null
 }
 
-async function loadResultForCodeOnSessionDate(
-  clientId: string,
-  practiceId: string,
-  assessmentCode: string,
-  sessionDate: string
-) {
-  const rows = await db
-    .select({
-      assessmentResultId: assessmentResults.assessmentResultId,
-      assessmentInstanceId: assessmentResults.assessmentInstanceId,
-      assessmentDate: assessmentResults.assessmentDate,
-      score: assessmentResults.score,
-      severity: assessmentResults.severity,
-      assessmentDefinitionId: assessmentInstances.assessmentDefinitionId,
-      assessmentCode: assessmentDefinitions.assessmentCode,
-      assessmentName: assessmentDefinitions.assessmentName,
-    })
-    .from(assessmentResults)
+async function loadResultBySessionNote(sessionNoteId: string, assessmentCode: string) {
+  const [row] = await db
+    .select(RESULT_COLUMNS)
+    .from(assessmentInstances)
     .innerJoin(
-      assessmentInstances,
-      eq(
-        assessmentResults.assessmentInstanceId,
-        assessmentInstances.assessmentInstanceId
-      )
+      assessmentResults,
+      eq(assessmentResults.assessmentInstanceId, assessmentInstances.assessmentInstanceId)
     )
     .innerJoin(
       assessmentDefinitions,
-      eq(
-        assessmentInstances.assessmentDefinitionId,
-        assessmentDefinitions.assessmentDefinitionId
-      )
+      eq(assessmentInstances.assessmentDefinitionId, assessmentDefinitions.assessmentDefinitionId)
     )
     .where(
       and(
-        eq(assessmentResults.clientId, clientId),
-        eq(assessmentResults.practiceId, practiceId),
+        eq(assessmentInstances.sessionNoteId, sessionNoteId),
         eq(assessmentDefinitions.assessmentCode, assessmentCode)
       )
     )
     .orderBy(desc(assessmentResults.assessmentDate))
+    .limit(1)
 
-  return (
-    rows.find((row) =>
-      assessmentDateMatchesSessionDate(row.assessmentDate, sessionDate)
-    ) ?? null
-  )
+  return row ?? null
 }
 
 async function buildAssessmentResult(
-  row: NonNullable<Awaited<ReturnType<typeof loadResultForInstance>>>,
+  row: Awaited<ReturnType<typeof loadResultByAppointment>>,
   impairmentElementKey?: string
 ): Promise<SessionNoteAssessmentResult> {
   if (!row) {
@@ -200,12 +178,11 @@ async function buildAssessmentResult(
 async function loadBtpForSession(
   note: SessionNoteRow
 ): Promise<SessionNoteBtpTarget[]> {
-  const btpResult = await loadResultForCodeOnSessionDate(
-    note.clientId,
-    note.practiceId,
-    "BTP",
-    note.sessionDate
-  )
+  if (!note.appointmentId) {
+    return []
+  }
+
+  const btpResult = await loadResultByAppointment(note.appointmentId, "BTP")
 
   if (!btpResult) {
     return []
@@ -259,33 +236,9 @@ async function loadAssessmentForSession(
   code: string,
   impairmentElementKey?: string
 ): Promise<SessionNoteAssessmentResult> {
-  let row: Awaited<ReturnType<typeof loadResultForInstance>> | null = null
-
-  if (note.batteryInstanceId && (code === "PHQ9" || code === "GAD7")) {
-    const [battery] = await db
-      .select({
-        phq9InstanceId: batteryInstances.phq9InstanceId,
-        gad7InstanceId: batteryInstances.gad7InstanceId,
-      })
-      .from(batteryInstances)
-      .where(eq(batteryInstances.batteryInstanceId, note.batteryInstanceId))
-      .limit(1)
-
-    if (battery) {
-      const instanceId =
-        code === "PHQ9" ? battery.phq9InstanceId : battery.gad7InstanceId
-      row = await loadResultForInstance(instanceId)
-    }
-  }
-
-  if (!row) {
-    row = await loadResultForCodeOnSessionDate(
-      note.clientId,
-      note.practiceId,
-      code,
-      note.sessionDate
-    )
-  }
+  const row = note.appointmentId
+    ? await loadResultByAppointment(note.appointmentId, code)
+    : null
 
   if (!row) {
     const names: Record<string, string> = {
@@ -310,50 +263,17 @@ async function loadAssessmentForSession(
 async function loadAsqForSession(
   note: SessionNoteRow
 ): Promise<SessionNoteAsqResult> {
-  const rows = await db
-    .select({
-      assessmentResultId: assessmentResults.assessmentResultId,
-      assessmentDate: assessmentResults.assessmentDate,
-      score: assessmentResults.score,
-      acuteRiskRating: assessmentResults.acuteRiskRating,
-    })
-    .from(assessmentResults)
-    .innerJoin(
-      assessmentInstances,
-      eq(
-        assessmentResults.assessmentInstanceId,
-        assessmentInstances.assessmentInstanceId
-      )
-    )
-    .innerJoin(
-      assessmentDefinitions,
-      eq(
-        assessmentInstances.assessmentDefinitionId,
-        assessmentDefinitions.assessmentDefinitionId
-      )
-    )
-    .where(
-      and(
-        eq(assessmentResults.clientId, note.clientId),
-        eq(assessmentResults.practiceId, note.practiceId),
-        eq(assessmentDefinitions.assessmentCode, "ASQ")
-      )
-    )
-    .orderBy(desc(assessmentResults.assessmentDate))
+  const row = await loadResultBySessionNote(note.sessionNoteId, "ASQ")
 
-  const match = rows.find((row) =>
-    assessmentDateMatchesSessionDate(row.assessmentDate, note.sessionDate)
-  )
-
-  if (!match) {
+  if (!row) {
     return null
   }
 
   return {
-    assessmentResultId: match.assessmentResultId,
-    assessmentDate: match.assessmentDate,
-    score: match.score,
-    acuteRiskRating: match.acuteRiskRating,
+    assessmentResultId: row.assessmentResultId,
+    assessmentDate: row.assessmentDate,
+    score: row.score,
+    acuteRiskRating: row.acuteRiskRating,
   }
 }
 

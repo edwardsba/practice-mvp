@@ -227,7 +227,7 @@ export default async function SessionNoteViewPage({
                 </div>
               ) : (
                 <Button asChild variant="outline" size="sm">
-                  <Link href={`/clients/${note.clientId}/asq/new`}>
+                  <Link href={`/clients/${note.clientId}/asq/new?session_note_id=${sessionNoteId}`}>
                     Administer ASQ
                   </Link>
                 </Button>

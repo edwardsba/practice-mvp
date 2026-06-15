@@ -20,6 +20,7 @@ import {
 import { getAsqDefinitionId } from "@/lib/assessments/load-asq"
 import { requirePractitionerContext } from "@/lib/auth"
 import { db } from "@/lib/db"
+import { loadSessionNoteForPractice } from "@/lib/session-notes/load"
 
 export type SaveAsqResultState = {
   error?: string
@@ -46,6 +47,16 @@ export async function saveAsqResult(
 
   if (!client) {
     return { error: "Client not found." }
+  }
+
+  const sessionNoteIdRaw = String(formData.get("session_note_id") ?? "").trim()
+  const sessionNoteId = sessionNoteIdRaw || null
+
+  if (sessionNoteId) {
+    const note = await loadSessionNoteForPractice(sessionNoteId, context.practiceId)
+    if (!note || note.clientId !== clientId) {
+      return { error: "Session note not found for this client." }
+    }
   }
 
   const definitionId = await getAsqDefinitionId()
@@ -148,6 +159,7 @@ export async function saveAsqResult(
         clientId,
         practiceId: context.practiceId,
         practitionerProfileId: context.practitionerProfileId,
+        sessionNoteId,
         status: "submitted",
         submittedAt: now,
       })
@@ -196,5 +208,5 @@ export async function saveAsqResult(
     })
   })
 
-  redirect(`/clients/${clientId}`)
+  redirect(sessionNoteId ? `/session-notes/${sessionNoteId}` : `/clients/${clientId}`)
 }

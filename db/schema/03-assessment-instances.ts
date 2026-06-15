@@ -8,6 +8,8 @@ export const assessmentInstances = pgTable('assessment_instances', {
   clientId: uuid('client_id').notNull().references(() => clients.clientId),
   practiceId: uuid('practice_id').notNull().references(() => practices.practiceId),
   practitionerProfileId: uuid('practitioner_profile_id').notNull().references(() => practitionerProfiles.practitionerProfileId),
+  appointmentId: uuid('appointment_id'),
+  sessionNoteId: uuid('session_note_id'),
   status: text('status').notNull().default('assigned'),
   instanceElementsJson: jsonb('instance_elements_json'),
   assignedAt: timestamp('assigned_at', { withTimezone: true }).notNull().defaultNow(),

@@ -2,6 +2,7 @@ import Link from "next/link"
 import { notFound } from "next/navigation"
 
 import { OngoingAssessmentsTable } from "@/components/session-notes/ongoing-assessments-table"
+import { ResendBatteryButton } from "@/components/session-notes/resend-battery-button"
 import {
   RiskAssessmentTable,
   type RiskAssessmentRow,
@@ -155,8 +156,13 @@ export default async function SessionNoteViewPage({
           </Card>
 
           <Card>
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between gap-3">
               <CardTitle>Ongoing assessments</CardTitle>
+              {!isFinalised &&
+              note.appointmentId &&
+              viewContext.assessments.some((a) => !a.assessmentResultId) ? (
+                <ResendBatteryButton appointmentId={note.appointmentId} />
+              ) : null}
             </CardHeader>
             <CardContent>
               <OngoingAssessmentsTable

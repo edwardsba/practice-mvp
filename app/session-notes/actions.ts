@@ -4,8 +4,12 @@ import { and, eq } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
 
-import { auditEvents, sessionNotes } from "@/db/schema"
+import { appointments, auditEvents, clients, sessionNotes } from "@/db/schema"
 import { loadAppointmentForPractice } from "@/lib/appointments/load"
+import {
+  sendPreSessionBatteryForAppointment,
+  type SendPreSessionBatteryResult,
+} from "@/lib/appointments/run-automations"
 import { requirePractitionerContext } from "@/lib/auth"
 import { db } from "@/lib/db"
 import {
@@ -232,4 +236,40 @@ export async function finaliseSessionNote(
   revalidatePath(`/session-notes/${sessionNoteId}`)
   revalidatePath(`/clients/${note.clientId}`)
   return { success: true }
+}
+
+export async function resendPreSessionBattery(
+  appointmentId: string
+): Promise<SendPreSessionBatteryResult> {
+  const context = await requirePractitionerContext()
+
+  const [row] = await db
+    .select({
+      appointmentId: appointments.appointmentId,
+      clientId: appointments.clientId,
+      practiceId: appointments.practiceId,
+      practitionerProfileId: appointments.practitionerProfileId,
+      appointmentDate: appointments.appointmentDate,
+      appointmentTime: appointments.appointmentTime,
+      location: appointments.location,
+      mode: appointments.mode,
+      clientEmail: clients.email,
+      commsOptOut: clients.commsOptOut,
+      preSessionOptOut: clients.preSessionOptOut,
+    })
+    .from(appointments)
+    .innerJoin(clients, eq(appointments.clientId, clients.clientId))
+    .where(
+      and(
+        eq(appointments.appointmentId, appointmentId),
+        eq(appointments.practiceId, context.practiceId)
+      )
+    )
+    .limit(1)
+
+  if (!row) {
+    return { status: "failed", error: "Appointment not found." }
+  }
+
+  return sendPreSessionBatteryForAppointment(row, { userId: context.userId })
 }

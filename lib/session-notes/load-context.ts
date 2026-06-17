@@ -273,7 +273,7 @@ async function loadAsqForSession(
     assessmentResultId: row.assessmentResultId,
     assessmentDate: row.assessmentDate,
     score: row.score,
-    acuteRiskRating: row.acuteRiskRating,
+    acuteRiskRating: row.severity,
   }
 }
 

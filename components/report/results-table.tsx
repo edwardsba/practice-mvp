@@ -104,7 +104,7 @@ export function ReportAsqResultsTable({
             <th className="h-10 px-2 text-left align-middle font-medium">Date</th>
             <th className="h-10 px-2 text-left align-middle font-medium">Score</th>
             <th className="h-10 px-2 text-left align-middle font-medium">
-              Acute Risk Rating
+              Screen outcome
             </th>
           </tr>
         </thead>

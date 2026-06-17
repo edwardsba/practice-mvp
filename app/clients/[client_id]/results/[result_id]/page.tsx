@@ -337,12 +337,6 @@ export default async function AssessmentResultDetailPage({
               </p>
               <p className="text-xl font-medium capitalize">{result.severity}</p>
             </div>
-            {isAsq && result.acuteRiskRating ? (
-              <div className="sm:border-l sm:pl-6">
-                <p className="text-sm text-muted-foreground">Acute risk rating</p>
-                <p className="text-xl font-medium">{result.acuteRiskRating}</p>
-              </div>
-            ) : null}
           </div>
           {functionalImpairmentLabel ? (
             <p className="text-sm">

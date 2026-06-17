@@ -65,7 +65,7 @@ function formatScore(result: AssessmentResultRow) {
 
 function formatSeverityOrRisk(result: AssessmentResultRow) {
   if (result.assessmentCode === "ASQ") {
-    return result.acuteRiskRating ?? "—"
+    return result.severity ?? "—"
   }
   if (result.assessmentCode === "BTP") {
     return "—"

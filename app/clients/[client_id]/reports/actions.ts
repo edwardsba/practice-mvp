@@ -118,7 +118,11 @@ async function fetchResultsForAssessment(
     score: row.score,
     severity: row.severity,
     functionalImpairmentLabel: impairmentLabels.get(row.assessmentResultId) ?? null,
-    acuteRiskRating: options?.includeAcuteRisk ? row.acuteRiskRating : undefined,
+    acuteRiskRating: options?.includeAcuteRisk
+      ? assessmentCode === "ASQ"
+        ? row.severity
+        : row.acuteRiskRating
+      : undefined,
   }))
 }
 

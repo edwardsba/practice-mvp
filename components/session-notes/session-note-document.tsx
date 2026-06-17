@@ -170,7 +170,7 @@ export function SessionNoteDocument({
                 <thead>
                   <tr>
                     <th>Score</th>
-                    <th>Acute Risk Rating</th>
+                    <th>Screen outcome</th>
                   </tr>
                 </thead>
                 <tbody>

@@ -12,11 +12,7 @@ import {
   auditEvents,
   clients,
 } from "@/db/schema"
-import {
-  ASQ_Q5_ELEMENT_KEY,
-  asqAcuteRiskRating,
-  asqScreenOutcome,
-} from "@/lib/assessments/asq"
+import { ASQ_Q5_ELEMENT_KEY, asqScreenOutcome } from "@/lib/assessments/asq"
 import { getAsqDefinitionId } from "@/lib/assessments/load-asq"
 import { requirePractitionerContext } from "@/lib/auth"
 import { db } from "@/lib/db"
@@ -148,7 +144,6 @@ export async function saveAsqResult(
   }
 
   const severity = asqScreenOutcome(totalScore, q5ResponseValue)
-  const acuteRiskRating = asqAcuteRiskRating(q5ResponseValue)
   const now = new Date()
 
   await db.transaction(async (tx) => {
@@ -184,7 +179,6 @@ export async function saveAsqResult(
         practiceId: context.practiceId,
         score: totalScore,
         severity,
-        acuteRiskRating,
         assessmentDate: now,
       })
       .returning({ assessmentResultId: assessmentResults.assessmentResultId })

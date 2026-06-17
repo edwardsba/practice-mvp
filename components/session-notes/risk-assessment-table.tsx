@@ -36,7 +36,7 @@ export function RiskAssessmentTable({
           <TableRow>
             <TableHead>Assessment</TableHead>
             <TableHead>Score</TableHead>
-            <TableHead>Acute risk rating</TableHead>
+            <TableHead>Screen outcome</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>

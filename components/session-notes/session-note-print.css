@@ -7,8 +7,8 @@
   body {
     background: white !important;
     color: #111 !important;
-    font-size: 11pt;
-    line-height: 1.45;
+    font-size: 10.5pt;
+    line-height: 1.4;
   }
 
   .min-h-full > header,
@@ -36,31 +36,32 @@
     overflow: visible !important;
   }
 
-  .session-note-document .session-note-header {
-    display: block !important;
-    break-inside: avoid;
-    break-after: avoid;
-    padding-bottom: 1rem;
-    margin-bottom: 0;
-    border-bottom: 1px solid #ccc;
-  }
-
   .session-note-document h2 {
-    font-size: 16pt;
+    font-size: 14pt;
     color: #111 !important;
+    margin-bottom: 0.75rem;
   }
 
-  .session-note-document h3 {
-    font-size: 12pt;
+  .session-note-document .session-note-meta {
+    margin-bottom: 1rem;
+  }
+
+  .session-note-document .session-note-meta p {
+    margin: 0;
+  }
+
+  .session-note-document .session-note-label {
+    font-size: 11pt;
+    font-style: italic;
+    font-weight: 600;
     color: #111 !important;
+    margin-top: 1.25rem;
+    margin-bottom: 0.5rem;
     break-after: avoid;
   }
 
-  .session-note-document .session-note-section {
-    display: block !important;
-    break-inside: auto;
-    margin-top: 1.25rem;
-    margin-bottom: 1.25rem;
+  .session-note-document p {
+    margin: 0 0 0.5rem;
   }
 
   .session-note-document .report-results-table {
@@ -69,9 +70,10 @@
     border-collapse: collapse !important;
     border: none !important;
     border-top: 1px solid #333 !important;
-    font-size: 10pt;
+    font-size: 9.5pt;
     overflow: visible !important;
     background: transparent !important;
+    margin-bottom: 0.75rem;
   }
 
   .session-note-document .report-results-table thead {
@@ -96,7 +98,7 @@
     background: transparent !important;
     font-weight: 700 !important;
     text-align: left !important;
-    padding: 6px 8px 6px 0;
+    padding: 5px 8px 5px 0;
   }
 
   .session-note-document .report-results-table td {
@@ -104,7 +106,7 @@
     border: none !important;
     border-bottom: 1px solid #e0e0e0 !important;
     background: transparent !important;
-    padding: 6px 8px 6px 0;
+    padding: 5px 8px 5px 0;
   }
 
   .session-note-document .report-results-table tbody tr:last-child td {
@@ -112,11 +114,15 @@
   }
 
   .session-note-document .session-note-signature {
-    display: block !important;
     break-inside: avoid;
     margin-top: 2rem;
     padding-top: 1.5rem;
     border-top: 1px solid #ccc;
+  }
+
+  .session-note-document .session-note-signature-line {
+    margin-top: 2.5rem;
+    border-bottom: 1px solid #666;
   }
 
   .session-note-document .text-muted-foreground {

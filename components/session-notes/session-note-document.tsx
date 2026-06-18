@@ -21,11 +21,17 @@ function formatDob(value: string | null) {
   })
 }
 
-function BtpTable({ targets }: { targets: SessionNoteBtpTarget[] }) {
-  if (targets.length === 0) {
+function ObjectiveMeasuresTable({
+  assessments,
+}: {
+  assessments: SessionNoteAssessmentResult[]
+}) {
+  const completed = assessments.filter((result) => result.assessmentResultId)
+
+  if (completed.length === 0) {
     return (
       <p className="text-sm text-muted-foreground">
-        No BTP results for this session.
+        No objective measures completed this session.
       </p>
     )
   }
@@ -34,17 +40,22 @@ function BtpTable({ targets }: { targets: SessionNoteBtpTarget[] }) {
     <table className="report-results-table w-full text-sm">
       <thead>
         <tr>
-          <th>Target</th>
+          <th>Assessment</th>
           <th>Score</th>
           <th>Rating</th>
+          <th>Functional Impairment</th>
         </tr>
       </thead>
       <tbody>
-        {targets.map((row) => (
-          <tr key={row.target}>
-            <td>{row.target}</td>
-            <td>{row.score}</td>
-            <td>{row.ratingLabel}</td>
+        {completed.map((result) => (
+          <tr key={result.code}>
+            <td>{result.name}</td>
+            <td>
+              {result.score}
+              {result.maxScore != null ? `/${result.maxScore}` : ""}
+            </td>
+            <td className="capitalize">{result.severity ?? "—"}</td>
+            <td>{result.functionalImpairmentLabel ?? "—"}</td>
           </tr>
         ))}
       </tbody>
@@ -52,33 +63,84 @@ function BtpTable({ targets }: { targets: SessionNoteBtpTarget[] }) {
   )
 }
 
-function AssessmentBlock({ result }: { result: SessionNoteAssessmentResult }) {
-  if (!result.assessmentResultId) {
-    return (
-      <p className="text-sm text-muted-foreground">Not completed this session.</p>
-    )
-  }
-
+function RiskAssessmentTable({
+  asqResult,
+  crisisPlan,
+}: {
+  asqResult: SessionNoteAsqResult
+  crisisPlan: SessionNoteCrisisPlanInfo
+}) {
   return (
-    <table className="report-results-table w-full text-sm">
-      <thead>
-        <tr>
-          <th>Score</th>
-          <th>Severity</th>
-          <th>Functional Impairment</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td>
-            {result.score}
-            {result.maxScore != null ? ` / ${result.maxScore}` : ""}
-          </td>
-          <td className="capitalize">{result.severity ?? "—"}</td>
-          <td>{result.functionalImpairmentLabel ?? "—"}</td>
-        </tr>
-      </tbody>
-    </table>
+    <>
+      {asqResult ? (
+        <table className="report-results-table w-full text-sm">
+          <thead>
+            <tr>
+              <th>Assessment</th>
+              <th>Score</th>
+              <th>Rating</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>ASQ</td>
+              <td>{asqResult.score}/5</td>
+              <td>{asqResult.acuteRiskRating ?? "—"}</td>
+            </tr>
+          </tbody>
+        </table>
+      ) : (
+        <p className="text-sm text-muted-foreground">
+          No ASQ administered this session.
+        </p>
+      )}
+      <p className="text-sm">
+        Current crisis plan:{" "}
+        {crisisPlan
+          ? `v${crisisPlan.versionNumber}, ${formatSessionNoteDate(crisisPlan.dateOfPlan)}`
+          : "—"}
+      </p>
+    </>
+  )
+}
+
+function TreatmentPlanProgress({
+  therapeuticTarget,
+  btpTargets,
+}: {
+  therapeuticTarget: string | null
+  btpTargets: SessionNoteBtpTarget[]
+}) {
+  return (
+    <>
+      <p className="text-sm">
+        Therapeutic target: {therapeuticTarget || "No treatment plan"}
+      </p>
+      {btpTargets.length === 0 ? (
+        <p className="text-sm text-muted-foreground">
+          No behavioural target results for this session.
+        </p>
+      ) : (
+        <table className="report-results-table w-full text-sm">
+          <thead>
+            <tr>
+              <th>Behavioural Target</th>
+              <th>Score</th>
+              <th>Rating</th>
+            </tr>
+          </thead>
+          <tbody>
+            {btpTargets.map((row) => (
+              <tr key={row.target}>
+                <td>{row.target}</td>
+                <td>{row.score}/5</td>
+                <td>{row.ratingLabel}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </>
   )
 }
 
@@ -117,108 +179,45 @@ export function SessionNoteDocument({
 
   return (
     <article className="session-note-document mx-auto max-w-3xl bg-white text-foreground">
-      <header className="session-note-header space-y-3 border-b pb-4">
-        <h2 className="text-2xl font-semibold tracking-tight">Session Note</h2>
-        <dl className="grid gap-3 text-sm sm:grid-cols-2">
-          <div>
-            <dt className="font-medium text-muted-foreground">Client</dt>
-            <dd>{clientName}</dd>
-            <dd className="text-muted-foreground">
-              Date of birth: {formatDob(dateOfBirth)}
-            </dd>
-          </div>
-          <div>
-            <dt className="font-medium text-muted-foreground">Session</dt>
-            <dd>{formatSessionNoteDate(sessionDate)}</dd>
-            <dd className="text-muted-foreground">
-              {formatSessionNoteTime(sessionTime)}
-            </dd>
-          </div>
-        </dl>
-      </header>
+      <h2 className="text-lg font-bold">Confidential Session Note</h2>
 
-      <section className="session-note-section pt-4">
-        <h3 className="mb-2 text-base font-semibold">Treatment Plan</h3>
-        <div className="mb-3">
-          <p className="text-sm font-medium text-muted-foreground">
-            Therapeutic target
-          </p>
-          <p className="text-sm">{therapeuticTarget || "No treatment plan"}</p>
-        </div>
-        <BtpTable targets={btpTargets} />
-      </section>
-
-      <section className="session-note-section">
-        <h3 className="mb-3 text-base font-semibold">Ongoing Assessments</h3>
-        <div className="space-y-4">
-          {assessments.map((result) => (
-            <div key={result.code}>
-              <h4 className="mb-1 text-sm font-medium">{result.name}</h4>
-              <AssessmentBlock result={result} />
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <section className="session-note-section">
-        <h3 className="mb-2 text-base font-semibold">Risk Assessment</h3>
-        <div className="space-y-3 text-sm">
-          <div>
-            <p className="font-medium">ASQ</p>
-            {asqResult ? (
-              <table className="report-results-table w-full text-sm">
-                <thead>
-                  <tr>
-                    <th>Score</th>
-                    <th>Screen outcome</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td>{asqResult.score}</td>
-                    <td>{asqResult.acuteRiskRating ?? "—"}</td>
-                  </tr>
-                </tbody>
-              </table>
-            ) : (
-              <p className="text-muted-foreground">No ASQ administered this session.</p>
-            )}
-          </div>
-          <div>
-            <p className="font-medium">Crisis Plan</p>
-            {crisisPlan ? (
-              <p>
-                Active plan v{crisisPlan.versionNumber} (
-                {formatSessionNoteDate(crisisPlan.dateOfPlan)}) —{" "}
-                {crisisPlan.updatedThisSession
-                  ? "Updated this session"
-                  : "Not updated"}
-              </p>
-            ) : (
-              <p className="text-muted-foreground">No active crisis plan.</p>
-            )}
-          </div>
-        </div>
-      </section>
-
-      <section className="session-note-section">
-        <h3 className="mb-2 text-base font-semibold">Practitioner Notes</h3>
-        <p className="whitespace-pre-wrap text-sm">
-          {practitionerNotes?.trim() || "—"}
+      <div className="session-note-meta text-sm">
+        <p>
+          <span className="font-medium">Client:</span> {clientName} (DOB:{" "}
+          {formatDob(dateOfBirth)})
         </p>
-      </section>
-
-      <section className="session-note-section">
-        <h3 className="mb-2 text-base font-semibold">Next Appointment</h3>
-        <p className="text-sm">
-          {nextAppointment?.label ?? "No upcoming appointment"}
+        <p>
+          <span className="font-medium">Session:</span>{" "}
+          {formatSessionNoteDate(sessionDate)}, {formatSessionNoteTime(sessionTime)}
         </p>
-      </section>
+      </div>
 
-      <footer className="session-note-signature pt-6">
+      <h3 className="session-note-label">Objective Measures</h3>
+      <ObjectiveMeasuresTable assessments={assessments} />
+
+      <h3 className="session-note-label">Risk Assessment</h3>
+      <RiskAssessmentTable asqResult={asqResult} crisisPlan={crisisPlan} />
+
+      <h3 className="session-note-label">Treatment Plan Progress</h3>
+      <TreatmentPlanProgress
+        therapeuticTarget={therapeuticTarget}
+        btpTargets={btpTargets}
+      />
+
+      <h3 className="session-note-label">Notes</h3>
+      <p className="whitespace-pre-wrap text-sm">
+        {practitionerNotes?.trim() || "—"}
+      </p>
+
+      <p className="text-sm">
+        <span className="italic">Next Appointment</span>{" "}
+        {nextAppointment?.label ?? "No upcoming appointment"}
+      </p>
+
+      <footer className="session-note-signature">
         <p className="text-sm text-muted-foreground">Practitioner signature</p>
-        <div className="mt-10 border-b border-foreground/40" />
-        <p className="mt-2 text-sm">{practitionerLine || "—"}</p>
+        <div className="session-note-signature-line" />
+        <p className="text-sm">{practitionerLine || "—"}</p>
       </footer>
     </article>
   )

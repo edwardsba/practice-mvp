@@ -34,6 +34,7 @@ function formatDob(value: string | null): string {
 }
 
 export type SessionNotePdfData = {
+  clientId: string
   clientName: string
   dateOfBirth: string | null
   sessionDate: string

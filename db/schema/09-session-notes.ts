@@ -20,6 +20,7 @@ export const sessionNotes = pgTable('session_notes', {
   practitionerNotes: text('practitioner_notes'),
   status: text('status').notNull().default('draft'),
   finalisedAt: timestamp('finalised_at', { withTimezone: true }),
+  pdfStoragePath: text('pdf_storage_path'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 })

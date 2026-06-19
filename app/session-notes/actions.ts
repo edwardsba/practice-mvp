@@ -1,11 +1,12 @@
 "use server"
 
-import { and, eq } from "drizzle-orm"
+import { and, asc, eq } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
 
 import { appointments, auditEvents, clients, sessionNotes } from "@/db/schema"
 import { loadAppointmentForPractice } from "@/lib/appointments/load"
+import { formatClientNameLastFirst } from "@/lib/appointments/format"
 import {
   sendPreSessionBatteryForAppointment,
   type SendPreSessionBatteryResult,
@@ -15,8 +16,37 @@ import { db } from "@/lib/db"
 import {
   loadSessionNoteForPractice,
 } from "@/lib/session-notes/load"
+import { generateSessionNotePdf } from "@/lib/session-notes/generate-pdf"
+import { loadSessionNoteViewContext } from "@/lib/session-notes/load-context"
+import { uploadSessionNotePdf } from "@/lib/session-notes/upload-pdf"
 import { parseSessionNoteFormData } from "@/lib/session-notes/parse-form"
+import { createAdminClient } from "@/lib/supabase/admin"
 import { verifyClientInPractice } from "@/lib/treatment-plans/load"
+
+async function buildPdfData(
+  note: NonNullable<Awaited<ReturnType<typeof loadSessionNoteForPractice>>>,
+  viewContext: Awaited<ReturnType<typeof loadSessionNoteViewContext>>
+) {
+  return {
+    clientId: note.clientId,
+    clientName: formatClientNameLastFirst(
+      note.clientFirstName,
+      note.clientLastName
+    ),
+    dateOfBirth: note.clientDateOfBirth,
+    sessionDate: note.sessionDate,
+    sessionTime: note.sessionTime,
+    therapeuticTarget: viewContext.therapeuticTarget,
+    btpTargets: viewContext.btpTargets,
+    assessments: viewContext.assessments,
+    asqResult: viewContext.asqResult,
+    crisisPlan: viewContext.crisisPlan,
+    practitionerNotes: note.practitionerNotes,
+    nextAppointment: viewContext.nextAppointment,
+    practitionerName: viewContext.practitionerName,
+    practitionerTitle: viewContext.practitionerTitle,
+  }
+}
 
 export type SessionNoteFormState = {
   error?: string
@@ -186,6 +216,29 @@ export async function updateSessionNoteDateTime(
   return {}
 }
 
+export type GenerateSessionNotePdfPreviewState = {
+  error?: string
+  pdfBase64?: string
+}
+
+export async function generateSessionNotePdfPreview(
+  sessionNoteId: string,
+  _prevState: GenerateSessionNotePdfPreviewState
+): Promise<GenerateSessionNotePdfPreviewState> {
+  const context = await requirePractitionerContext()
+
+  const note = await loadSessionNoteForPractice(sessionNoteId, context.practiceId)
+  if (!note) {
+    return { error: "Session note not found." }
+  }
+
+  const viewContext = await loadSessionNoteViewContext(note)
+  const pdfData = await buildPdfData(note, viewContext)
+  const buffer = await generateSessionNotePdf(pdfData)
+
+  return { pdfBase64: buffer.toString("base64") }
+}
+
 export async function finaliseSessionNote(
   sessionNoteId: string,
   _prevState: FinaliseSessionNoteState
@@ -232,10 +285,106 @@ export async function finaliseSessionNote(
     return { error: "Unable to finalise session note. Please try again." }
   }
 
+  const viewContext = await loadSessionNoteViewContext(note)
+  const pdfData = await buildPdfData(note, viewContext)
+  const uploadResult = await uploadSessionNotePdf(
+    sessionNoteId,
+    context.practiceId,
+    pdfData
+  )
+
+  if (!uploadResult.ok) {
+    console.error("PDF upload failed after finalise:", uploadResult.error)
+  }
+
   revalidatePath("/session-notes")
   revalidatePath(`/session-notes/${sessionNoteId}`)
   revalidatePath(`/clients/${note.clientId}`)
   return { success: true }
+}
+
+export type GetSessionNotePdfDownloadUrlState = {
+  error?: string
+  url?: string
+}
+
+export async function getSessionNotePdfDownloadUrl(
+  sessionNoteId: string
+): Promise<GetSessionNotePdfDownloadUrlState> {
+  const context = await requirePractitionerContext()
+
+  const note = await loadSessionNoteForPractice(sessionNoteId, context.practiceId)
+  if (!note || !note.pdfStoragePath) {
+    return { error: "No PDF available for this session note." }
+  }
+
+  const supabase = createAdminClient()
+  const { data, error } = await supabase.storage
+    .from("session-note-pdfs")
+    .createSignedUrl(note.pdfStoragePath, 60)
+
+  if (error || !data?.signedUrl) {
+    return { error: "Unable to generate download link." }
+  }
+
+  return { url: data.signedUrl }
+}
+
+export type ExportSessionNotesState = {
+  error?: string
+  links?: { sessionNoteId: string; sessionDate: string; url: string }[]
+}
+
+export async function exportSessionNotePdfs(
+  clientId: string,
+  _prevState: ExportSessionNotesState
+): Promise<ExportSessionNotesState> {
+  const context = await requirePractitionerContext()
+
+  const notes = await db
+    .select({
+      sessionNoteId: sessionNotes.sessionNoteId,
+      sessionDate: sessionNotes.sessionDate,
+      pdfStoragePath: sessionNotes.pdfStoragePath,
+    })
+    .from(sessionNotes)
+    .where(
+      and(
+        eq(sessionNotes.clientId, clientId),
+        eq(sessionNotes.practiceId, context.practiceId),
+        eq(sessionNotes.status, "finalised")
+      )
+    )
+    .orderBy(asc(sessionNotes.sessionDate))
+
+  const notesWithPdfs = notes.filter((n) => n.pdfStoragePath)
+
+  if (notesWithPdfs.length === 0) {
+    return { error: "No finalised session note PDFs found for this client." }
+  }
+
+  const supabase = createAdminClient()
+  const links: { sessionNoteId: string; sessionDate: string; url: string }[] = []
+
+  for (const note of notesWithPdfs) {
+    const { data, error } = await supabase.storage
+      .from("session-note-pdfs")
+      .createSignedUrl(note.pdfStoragePath!, 300)
+
+    if (!error && data?.signedUrl) {
+      links.push({
+        sessionNoteId: note.sessionNoteId,
+        sessionDate: note.sessionDate,
+        url: data.signedUrl,
+      })
+    }
+  }
+
+  if (links.length === 0) {
+    return { error: "Unable to generate download links." }
+  }
+
+  return { links }
 }
 
 export async function resendPreSessionBattery(

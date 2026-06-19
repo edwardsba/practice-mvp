@@ -4,6 +4,7 @@ import { and, eq } from "drizzle-orm"
 
 import { ActionItemsSection } from "@/app/clients/[client_id]/action-items-section"
 import { ClientMenuSidebar } from "@/app/clients/[client_id]/client-menu-sidebar"
+import { ExportSessionNotesButton } from "@/components/session-notes/export-session-notes-button"
 import { EmergencyContactsSection } from "@/components/emergency-contacts/emergency-contacts-section"
 import { AppShell } from "@/components/app-shell"
 import { BackButton } from "@/components/ui/back-button"
@@ -372,6 +373,15 @@ export default async function ClientDetailPage({
                   </div>
                 </dl>
               )}
+            </CardContent>
+          </Card>
+
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle>Records</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ExportSessionNotesButton clientId={clientId} />
             </CardContent>
           </Card>
         </div>

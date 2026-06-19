@@ -54,6 +54,7 @@ export async function loadSessionNoteForPractice(
       practitionerNotes: sessionNotes.practitionerNotes,
       status: sessionNotes.status,
       finalisedAt: sessionNotes.finalisedAt,
+      pdfStoragePath: sessionNotes.pdfStoragePath,
       clientFirstName: clients.firstName,
       clientLastName: clients.lastName,
       clientDateOfBirth: clients.dateOfBirth,

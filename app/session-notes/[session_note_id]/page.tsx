@@ -108,7 +108,11 @@ export default async function SessionNoteViewPage({
         </div>
       </div>
 
-      <SessionNoteActions sessionNoteId={sessionNoteId} status={note.status} />
+      <SessionNoteActions
+        sessionNoteId={sessionNoteId}
+        status={note.status}
+        pdfStoragePath={note.pdfStoragePath ?? null}
+      />
 
       <div className="no-print grid grid-cols-1 gap-6 lg:grid-cols-[1.6fr_1fr]">
         <SessionNotesEditor

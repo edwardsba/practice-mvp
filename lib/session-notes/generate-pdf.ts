@@ -48,6 +48,7 @@ export type SessionNotePdfData = {
   nextAppointment: SessionNoteNextAppointment
   practitionerName: string
   practitionerTitle: string | null
+  practitionerDisplayName: string
 }
 
 type TableColumn = {
@@ -258,11 +259,7 @@ export function generateSessionNotePdf(data: SessionNotePdfData): Promise<Buffer
     doc
       .fontSize(BASE_FONT_SIZE)
       .fillColor(TEXT_COLOR)
-      .text(
-        [data.practitionerTitle, data.practitionerName].filter(Boolean).join(" ") || "—",
-        PAGE_MARGIN,
-        signatureY + 36
-      )
+      .text(data.practitionerDisplayName || "—", PAGE_MARGIN, signatureY + 36)
 
     doc.end()
   })

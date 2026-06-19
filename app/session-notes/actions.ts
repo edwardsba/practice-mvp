@@ -45,6 +45,7 @@ async function buildPdfData(
     nextAppointment: viewContext.nextAppointment,
     practitionerName: viewContext.practitionerName,
     practitionerTitle: viewContext.practitionerTitle,
+    practitionerDisplayName: viewContext.practitionerDisplayName,
   }
 }
 

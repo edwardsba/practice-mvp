@@ -12,7 +12,10 @@ import {
   btpRatingLabel,
   parseBtpInstanceElementsJson,
 } from "@/lib/assessments/btp"
-import { formatPractitionerName } from "@/lib/practitioner/format"
+import {
+  formatPractitionerName,
+  formatPractitionerPreferredName,
+} from "@/lib/practitioner/format"
 import {
   GAD7_IMPAIRMENT_ELEMENT_KEY,
   getFunctionalImpairmentLabelForResult,
@@ -71,6 +74,7 @@ export type SessionNoteViewContext = {
   nextAppointment: SessionNoteNextAppointment
   practitionerName: string
   practitionerTitle: string | null
+  practitionerDisplayName: string
 }
 
 type SessionNoteRow = NonNullable<
@@ -363,5 +367,10 @@ export async function loadSessionNoteViewContext(
       : null,
     practitionerName: practitioner ? formatPractitionerName(practitioner) : "",
     practitionerTitle: practitioner?.title ?? null,
+    practitionerDisplayName: practitioner
+      ? [practitioner.title?.trim(), formatPractitionerPreferredName(practitioner)]
+          .filter(Boolean)
+          .join(" ")
+      : "",
   }
 }

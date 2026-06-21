@@ -28,6 +28,7 @@ export async function loadSessionNotesForPractice(
       sessionDate: sessionNotes.sessionDate,
       sessionTime: sessionNotes.sessionTime,
       status: sessionNotes.status,
+      pdfStoragePath: sessionNotes.pdfStoragePath,
       clientFirstName: clients.firstName,
       clientLastName: clients.lastName,
     })

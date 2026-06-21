@@ -3,6 +3,7 @@ import { notFound } from "next/navigation"
 import { and, eq } from "drizzle-orm"
 
 import { createDraftSessionNote } from "@/app/session-notes/actions"
+import { SessionNotePdfDownloadLink } from "@/components/session-notes/session-note-pdf-download-link"
 import { AppShell } from "@/components/app-shell"
 import { Button } from "@/components/ui/button"
 import {
@@ -20,6 +21,7 @@ import { db } from "@/lib/db"
 import {
   formatSessionNoteDate,
   formatSessionNoteStatus,
+  formatSessionNoteTime,
 } from "@/lib/session-notes/format"
 import { loadSessionNotesForPractice } from "@/lib/session-notes/load"
 
@@ -79,14 +81,16 @@ export default async function ClientSessionNotesPage({
           <TableHeader>
             <TableRow>
               <TableHead>Date</TableHead>
+              <TableHead>Time</TableHead>
               <TableHead>Status</TableHead>
+              <TableHead>PDF</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {notes.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={2}
+                  colSpan={4}
                   className="h-20 text-center text-muted-foreground"
                 >
                   No session notes yet.
@@ -113,8 +117,22 @@ export default async function ClientSessionNotesPage({
                     </TableCell>
                     <TableCell>
                       <Link href={noteHref} className="block hover:underline">
+                        {formatSessionNoteTime(note.sessionTime)}
+                      </Link>
+                    </TableCell>
+                    <TableCell>
+                      <Link href={noteHref} className="block hover:underline">
                         {formatSessionNoteStatus(note.status)}
                       </Link>
+                    </TableCell>
+                    <TableCell>
+                      {note.status === "finalised" && note.pdfStoragePath ? (
+                        <SessionNotePdfDownloadLink
+                          sessionNoteId={note.sessionNoteId}
+                        />
+                      ) : (
+                        <span className="text-sm text-muted-foreground">—</span>
+                      )}
                     </TableCell>
                   </TableRow>
                 )

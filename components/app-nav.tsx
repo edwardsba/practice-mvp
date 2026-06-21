@@ -30,29 +30,30 @@ const topLevelLinks: NavLink[] = [
   { href: "/dashboard", label: "Home" },
   { href: "/calendar", label: "Calendar" },
   { href: "/clients", label: "Clients" },
+  { href: "/contacts/professionals", label: "Contacts" },
 ]
 
 const dropdownMenus: NavDropdown[] = [
   {
-    label: "Contacts",
+    label: "Lists",
     items: [
-      { href: "/contacts/professionals", label: "All Professionals" },
+      { href: "/appointments", label: "All Appointments" },
+      { href: "/session-notes", label: "All Session Notes" },
+      { href: "/funding/claims", label: "All Claims" },
+      { href: "/funding/approvals", label: "All Funding Approvals" },
       { href: "/contacts/organisations", label: "All Organisations" },
     ],
-    isActive: (pathname) => pathname.startsWith("/contacts"),
-  },
-  {
-    label: "Practice",
-    items: [
-      { href: "/practice", label: "Practice Details" },
-      { href: "/practitioner", label: "My Practitioner Profile" },
-    ],
     isActive: (pathname) =>
-      pathname.startsWith("/practice") || pathname.startsWith("/practitioner"),
+      pathname.startsWith("/appointments") ||
+      pathname.startsWith("/session-notes") ||
+      pathname.startsWith("/funding/claims") ||
+      pathname.startsWith("/funding/approvals") ||
+      pathname.startsWith("/contacts/organisations"),
   },
   {
     label: "Settings",
     items: [
+      { href: "/practice", label: "Practice Details" },
       { href: "/settings/professions", label: "Professions" },
       { href: "/settings/appointment-types", label: "Appointment Types" },
       { href: "/settings/email-templates", label: "Email Templates" },
@@ -62,24 +63,10 @@ const dropdownMenus: NavDropdown[] = [
       { href: "/funding/approval-types", label: "Funding Approval Types" },
     ],
     isActive: (pathname) =>
+      pathname.startsWith("/practice") ||
       pathname.startsWith("/settings") ||
       pathname.startsWith("/funding/claim-types") ||
       pathname.startsWith("/funding/approval-types"),
-  },
-  {
-    label: "Admin",
-    items: [
-      { href: "/clients", label: "All Clients" },
-      { href: "/appointments", label: "All Appointments" },
-      { href: "/session-notes", label: "All Session Notes" },
-      { href: "/funding/claims", label: "All Claims" },
-      { href: "/funding/approvals", label: "All Funding Approvals" },
-    ],
-    isActive: (pathname) =>
-      pathname.startsWith("/appointments") ||
-      pathname.startsWith("/session-notes") ||
-      pathname.startsWith("/funding/claims") ||
-      pathname.startsWith("/funding/approvals"),
   },
 ]
 

@@ -47,6 +47,7 @@ export default async function EditProfessionalPage({
           context.practiceId,
           professionalId
         )}
+        practiceId={context.practiceId}
         professions={professions}
         organisations={organisations}
         initialValues={{

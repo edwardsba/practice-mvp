@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 
+import { createDraftSessionNote } from "@/app/session-notes/actions"
 import { SendCommunicationModal } from "@/components/email/send-communication-modal"
 import { Button } from "@/components/ui/button"
 import {
@@ -54,11 +55,11 @@ export function ActionItemsSection({
             <Button variant="outline" disabled>
               Edit Appointment
             </Button>
-            <Button variant="outline" asChild>
-              <Link href={`/session-notes/new?client_id=${clientId}`}>
+            <form action={createDraftSessionNote.bind(null, clientId, null)}>
+              <Button type="submit" variant="outline">
                 Add Session Note
-              </Link>
-            </Button>
+              </Button>
+            </form>
             <Button
               type="button"
               variant="outline"

@@ -6,7 +6,10 @@ import { redirect } from "next/navigation"
 
 import { appointments, auditEvents, clients, sessionNotes } from "@/db/schema"
 import { loadAppointmentForPractice } from "@/lib/appointments/load"
-import { formatClientNameLastFirst } from "@/lib/appointments/format"
+import {
+  formatClientNameLastFirst,
+  todayDateString,
+} from "@/lib/appointments/format"
 import {
   sendPreSessionBatteryForAppointment,
   type SendPreSessionBatteryResult,
@@ -19,7 +22,6 @@ import {
 import { generateSessionNotePdf } from "@/lib/session-notes/generate-pdf"
 import { loadSessionNoteViewContext } from "@/lib/session-notes/load-context"
 import { uploadSessionNotePdf } from "@/lib/session-notes/upload-pdf"
-import { parseSessionNoteFormData } from "@/lib/session-notes/parse-form"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { verifyClientInPractice } from "@/lib/treatment-plans/load"
 
@@ -49,78 +51,68 @@ async function buildPdfData(
   }
 }
 
-export type SessionNoteFormState = {
-  error?: string
-}
-
 export type FinaliseSessionNoteState = {
   error?: string
   success?: boolean
 }
 
-export async function createSessionNote(
-  _prevState: SessionNoteFormState,
-  formData: FormData
-): Promise<SessionNoteFormState> {
+export async function createDraftSessionNote(
+  clientId: string,
+  appointmentId: string | null
+) {
   const context = await requirePractitionerContext()
-  const values = parseSessionNoteFormData(formData)
 
-  if (!values.clientId || !values.sessionDate) {
-    return { error: "Client and session date are required." }
-  }
-
-  const client = await verifyClientInPractice(values.clientId, context.practiceId)
+  const client = await verifyClientInPractice(clientId, context.practiceId)
   if (!client) {
-    return { error: "Client not found." }
+    throw new Error("Client not found.")
   }
 
-  let appointmentId: string | null = values.appointmentId
+  let sessionDate = todayDateString()
+  let sessionTime: string | null = null
 
   if (appointmentId) {
     const appointment = await loadAppointmentForPractice(
       appointmentId,
       context.practiceId
     )
-    if (!appointment || appointment.clientId !== values.clientId) {
-      return { error: "Appointment not found for this client." }
+    if (!appointment || appointment.clientId !== clientId) {
+      throw new Error("Appointment not found for this client.")
     }
+    sessionDate = appointment.appointmentDate
+    sessionTime = appointment.appointmentTime
   }
 
   let sessionNoteId: string
 
-  try {
-    await db.transaction(async (tx) => {
-      const [note] = await tx
-        .insert(sessionNotes)
-        .values({
-          clientId: values.clientId,
-          practiceId: context.practiceId,
-          practitionerProfileId: context.practitionerProfileId,
-          appointmentId,
-          sessionDate: values.sessionDate,
-          sessionTime: values.sessionTime,
-          practitionerNotes: values.practitionerNotes,
-          status: "draft",
-        })
-        .returning({ sessionNoteId: sessionNotes.sessionNoteId })
-
-      sessionNoteId = note.sessionNoteId
-
-      await tx.insert(auditEvents).values({
+  await db.transaction(async (tx) => {
+    const [note] = await tx
+      .insert(sessionNotes)
+      .values({
+        clientId,
         practiceId: context.practiceId,
-        userId: context.userId,
-        clientId: values.clientId,
-        eventType: "session_note.created",
-        entityType: "session_note",
-        entityId: note.sessionNoteId,
+        practitionerProfileId: context.practitionerProfileId,
+        appointmentId,
+        sessionDate,
+        sessionTime,
+        practitionerNotes: null,
+        status: "draft",
       })
+      .returning({ sessionNoteId: sessionNotes.sessionNoteId })
+
+    sessionNoteId = note.sessionNoteId
+
+    await tx.insert(auditEvents).values({
+      practiceId: context.practiceId,
+      userId: context.userId,
+      clientId,
+      eventType: "session_note.created",
+      entityType: "session_note",
+      entityId: note.sessionNoteId,
     })
-  } catch {
-    return { error: "Unable to create session note. Please try again." }
-  }
+  })
 
   revalidatePath("/session-notes")
-  revalidatePath(`/clients/${values.clientId}`)
+  revalidatePath(`/clients/${clientId}`)
   redirect(`/session-notes/${sessionNoteId!}`)
 }
 

@@ -2,7 +2,6 @@ import Link from "next/link"
 
 import { SessionNotesFilter } from "@/app/session-notes/session-notes-filter"
 import { AppShell } from "@/components/app-shell"
-import { Button } from "@/components/ui/button"
 import {
   Table,
   TableBody,
@@ -50,29 +49,18 @@ export default async function SessionNotesPage({
     clientId
   )
 
-  const newHref = clientId
-    ? `/session-notes/new?client_id=${clientId}`
-    : "/session-notes/new"
-
   return (
     <AppShell>
-      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">
-            Session Notes
-          </h1>
-          {clientId ? (
-            <p className="mt-1 text-sm text-muted-foreground">
-              Showing notes for one client.{" "}
-              <Link href="/session-notes" className="text-primary hover:underline">
-                View all
-              </Link>
-            </p>
-          ) : null}
-        </div>
-        <Button asChild>
-          <Link href={newHref}>New Session Note</Link>
-        </Button>
+      <div className="mb-6">
+        <h1 className="text-2xl font-semibold tracking-tight">Session Notes</h1>
+        {clientId ? (
+          <p className="mt-1 text-sm text-muted-foreground">
+            Showing notes for one client.{" "}
+            <Link href="/session-notes" className="text-primary hover:underline">
+              View all
+            </Link>
+          </p>
+        ) : null}
       </div>
 
       <div className="mb-6">

@@ -1,6 +1,7 @@
 import Link from "next/link"
 import { notFound } from "next/navigation"
 
+import { createDraftSessionNote } from "@/app/session-notes/actions"
 import { AppShell } from "@/components/app-shell"
 import { Button } from "@/components/ui/button"
 import {
@@ -89,13 +90,17 @@ export default async function AppointmentDetailPage({
                 </Link>
               </Button>
             ) : (
-              <Button asChild variant="default">
-                <Link
-                  href={`/session-notes/new?appointment_id=${appointmentId}&client_id=${appointment.clientId}`}
-                >
+              <form
+                action={createDraftSessionNote.bind(
+                  null,
+                  appointment.clientId,
+                  appointmentId
+                )}
+              >
+                <Button type="submit" variant="default">
                   Create Session Note
-                </Link>
-              </Button>
+                </Button>
+              </form>
             )}
             <Button asChild variant="outline">
               <Link

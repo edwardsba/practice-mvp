@@ -2,6 +2,7 @@ import Link from "next/link"
 import { notFound } from "next/navigation"
 import { and, eq } from "drizzle-orm"
 
+import { createDraftSessionNote } from "@/app/session-notes/actions"
 import { AppShell } from "@/components/app-shell"
 import { Button } from "@/components/ui/button"
 import {
@@ -67,11 +68,9 @@ export default async function ClientSessionNotesPage({
           <h1 className="text-2xl font-semibold tracking-tight">
             Session Notes — {clientName}
           </h1>
-          <Button asChild>
-            <Link href={`/session-notes/new?client_id=${clientId}`}>
-              New Session Note
-            </Link>
-          </Button>
+          <form action={createDraftSessionNote.bind(null, clientId, null)}>
+            <Button type="submit">New Session Note</Button>
+          </form>
         </div>
       </div>
 

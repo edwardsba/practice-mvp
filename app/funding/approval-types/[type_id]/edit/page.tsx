@@ -3,8 +3,9 @@ import { notFound } from "next/navigation"
 import { ApprovalTypeForm } from "@/components/funding/approval-type-form"
 import { AppShell } from "@/components/app-shell"
 import { BackButton } from "@/components/ui/back-button"
-import { getClaimTypes, getFundingApprovalTypeById } from "@/lib/actions/funding"
+import { getClaimTypes, getFundingApprovalTypeById, deleteFundingApprovalType, getFundingApprovalTypeDeleteStatus } from "@/lib/actions/funding"
 import { requirePractitionerContext } from "@/lib/auth"
+import { EntityDeleteSection } from "@/components/entity-delete-section"
 
 export default async function EditFundingApprovalTypePage({
   params,
@@ -21,6 +22,11 @@ export default async function EditFundingApprovalTypePage({
   if (!type) {
     notFound()
   }
+
+  const deleteStatus = await getFundingApprovalTypeDeleteStatus(
+    context.practiceId,
+    typeId
+  )
 
   return (
     <AppShell>
@@ -52,6 +58,16 @@ export default async function EditFundingApprovalTypePage({
           })),
         }}
         cancelHref={`/funding/approval-types/${typeId}`}
+      />
+
+      <EntityDeleteSection
+        entityName="Funding Approval Type"
+        blockedReason={deleteStatus.blockedReason}
+        deleteAction={deleteFundingApprovalType.bind(
+          null,
+          typeId,
+          context.practiceId
+        )}
       />
     </AppShell>
   )

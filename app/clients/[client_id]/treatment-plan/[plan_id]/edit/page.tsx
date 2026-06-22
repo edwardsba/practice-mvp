@@ -1,10 +1,11 @@
 import Link from "next/link"
 import { notFound } from "next/navigation"
 
-import { createTreatmentPlanVersion } from "@/app/clients/[client_id]/treatment-plan/actions"
+import { createTreatmentPlanVersion, deleteTreatmentPlan } from "@/app/clients/[client_id]/treatment-plan/actions"
 import { TreatmentPlanForm } from "@/components/treatment-plan/treatment-plan-form"
 import { AppShell } from "@/components/app-shell"
 import { BackButton } from "@/components/ui/back-button"
+import { EntityDeleteSection } from "@/components/entity-delete-section"
 import { Badge } from "@/components/ui/badge"
 import {
   loadTreatmentPlanForPractice,
@@ -65,6 +66,11 @@ export default async function EditTreatmentPlanPage({
         initialPlan={plan}
         submitLabel="Save new version"
         cancelHref={`/clients/${clientId}/treatment-plan/${planId}`}
+      />
+
+      <EntityDeleteSection
+        entityName="Treatment Plan"
+        deleteAction={deleteTreatmentPlan.bind(null, planId, context.practiceId)}
       />
     </AppShell>
   )

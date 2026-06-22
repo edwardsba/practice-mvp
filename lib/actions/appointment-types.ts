@@ -15,6 +15,11 @@ import { pickCurrentFee } from "@/lib/appointment-types/format"
 import { todayDateString } from "@/lib/appointments/format"
 import { requirePractitionerContext } from "@/lib/auth"
 import { db } from "@/lib/db"
+import {
+  countActiveAppointmentsByType,
+  logDeleteAuditEvent,
+  performSoftDelete,
+} from "@/lib/delete/delete-utils"
 
 export type AppointmentTypeFormState = {
   error?: string
@@ -441,4 +446,68 @@ export async function upsertAppointmentType(
   revalidatePath(`/settings/appointment-types/${savedAppointmentTypeId}/edit`)
 
   redirect(`/settings/appointment-types/${savedAppointmentTypeId}`)
+}
+
+export async function getAppointmentTypeDeleteStatus(
+  practiceId: string,
+  appointmentTypeId: string
+) {
+  await verifyPracticeId(practiceId)
+
+  const existing = await getAppointmentTypeById(practiceId, appointmentTypeId)
+  if (!existing) {
+    return { blockedReason: "Appointment type not found." }
+  }
+
+  const appointmentCount = await countActiveAppointmentsByType(
+    appointmentTypeId,
+    practiceId
+  )
+
+  if (appointmentCount > 0) {
+    return {
+      blockedReason: `Cannot delete: ${appointmentCount} active appointments use this type.`,
+    }
+  }
+
+  return {}
+}
+
+export async function deleteAppointmentType(
+  appointmentTypeId: string,
+  practiceId: string
+): Promise<{ success?: boolean; error?: string; blockedReason?: string }> {
+  const context = await verifyPracticeId(practiceId)
+  const status = await getAppointmentTypeDeleteStatus(
+    practiceId,
+    appointmentTypeId
+  )
+
+  if (status.blockedReason) {
+    return { blockedReason: status.blockedReason }
+  }
+
+  const result = await performSoftDelete({
+    table: appointmentTypes,
+    id: appointmentTypeId,
+    idField: appointmentTypes.appointmentTypeId,
+    practiceId,
+    practiceIdField: appointmentTypes.practiceId,
+  })
+
+  if (!result.success) {
+    return { error: result.error ?? "Unable to delete appointment type." }
+  }
+
+  await logDeleteAuditEvent({
+    practiceId,
+    userId: context.userId,
+    eventType: "appointment_type.deleted",
+    entityType: "appointment_type",
+    entityId: appointmentTypeId,
+  })
+
+  revalidatePath("/settings/appointment-types")
+  revalidatePath(`/settings/appointment-types/${appointmentTypeId}`)
+  redirect("/settings/appointment-types")
 }

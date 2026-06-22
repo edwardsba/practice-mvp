@@ -3,8 +3,10 @@ import { notFound } from "next/navigation"
 import { and, eq } from "drizzle-orm"
 
 import { EditClientForm } from "@/app/clients/[client_id]/edit/edit-client-form"
+import { deleteClient, getClientDeleteStatus } from "@/app/clients/actions"
 import { AppShell } from "@/components/app-shell"
 import { BackButton } from "@/components/ui/back-button"
+import { EntityDeleteSection } from "@/components/entity-delete-section"
 import {
   Card,
   CardContent,
@@ -51,6 +53,8 @@ export default async function EditClientPage({
     notFound()
   }
 
+  const deleteStatus = await getClientDeleteStatus(clientId)
+
   const clientName = `${client.firstName} ${client.lastName}`
 
   return (
@@ -72,6 +76,13 @@ export default async function EditClientPage({
           <EditClientForm clientId={clientId} client={client} />
         </CardContent>
       </Card>
+
+      <EntityDeleteSection
+        entityName="Client"
+        blockedReason={deleteStatus.blockedReason}
+        requiresReportConfirmation={deleteStatus.requiresReportConfirmation}
+        deleteAction={deleteClient.bind(null, clientId)}
+      />
     </AppShell>
   )
 }

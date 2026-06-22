@@ -2,6 +2,7 @@
 
 import { and, asc, count, desc, eq } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
+import { redirect } from "next/navigation"
 
 import {
   appointments,
@@ -23,6 +24,14 @@ import {
   formatApprovalDropdownLabel,
   formatApprovalProgress,
 } from "@/lib/funding/format"
+import {
+  countActiveAppointmentsLinkedToClaim,
+  countActiveFundingApprovalsByType,
+  countActiveFundingApprovalsForClaim,
+  countClaimsByType,
+  logDeleteAuditEvent,
+  performSoftDelete,
+} from "@/lib/delete/delete-utils"
 
 export type FundingFormState = {
   error?: string
@@ -1073,4 +1082,263 @@ export async function getReferrersForDropdown(practiceId: string) {
   }
 
   return Array.from(byProfessional.values())
+}
+
+export async function getClaimTypeDeleteStatus(
+  practiceId: string,
+  claimTypeId: string
+) {
+  await verifyPracticeId(practiceId)
+
+  const [existing] = await db
+    .select({ claimTypeId: claimTypes.claimTypeId })
+    .from(claimTypes)
+    .where(
+      and(
+        eq(claimTypes.claimTypeId, claimTypeId),
+        eq(claimTypes.practiceId, practiceId),
+        eq(claimTypes.isActive, true)
+      )
+    )
+    .limit(1)
+
+  if (!existing) {
+    return { blockedReason: "Claim type not found." }
+  }
+
+  const claimCount = await countClaimsByType(claimTypeId, practiceId)
+  if (claimCount > 0) {
+    return {
+      blockedReason: `Cannot delete: ${claimCount} active claims use this type.`,
+    }
+  }
+
+  return {}
+}
+
+export async function deleteClaimType(
+  claimTypeId: string,
+  practiceId: string
+): Promise<{ success?: boolean; error?: string; blockedReason?: string }> {
+  const context = await verifyPracticeId(practiceId)
+  const status = await getClaimTypeDeleteStatus(practiceId, claimTypeId)
+
+  if (status.blockedReason) {
+    return { blockedReason: status.blockedReason }
+  }
+
+  const result = await performSoftDelete({
+    table: claimTypes,
+    id: claimTypeId,
+    idField: claimTypes.claimTypeId,
+    practiceId,
+    practiceIdField: claimTypes.practiceId,
+  })
+
+  if (!result.success) {
+    return { error: result.error ?? "Unable to delete claim type." }
+  }
+
+  await logDeleteAuditEvent({
+    practiceId,
+    userId: context.userId,
+    eventType: "claim_type.deleted",
+    entityType: "claim_type",
+    entityId: claimTypeId,
+  })
+
+  revalidatePath("/funding/claim-types")
+  revalidatePath(`/funding/claim-types/${claimTypeId}`)
+  redirect("/funding/claim-types")
+}
+
+export async function getFundingApprovalTypeDeleteStatus(
+  practiceId: string,
+  fundingApprovalTypeId: string
+) {
+  await verifyPracticeId(practiceId)
+
+  const [existing] = await db
+    .select({ fundingApprovalTypeId: fundingApprovalTypes.fundingApprovalTypeId })
+    .from(fundingApprovalTypes)
+    .where(
+      and(
+        eq(
+          fundingApprovalTypes.fundingApprovalTypeId,
+          fundingApprovalTypeId
+        ),
+        eq(fundingApprovalTypes.practiceId, practiceId),
+        eq(fundingApprovalTypes.isActive, true)
+      )
+    )
+    .limit(1)
+
+  if (!existing) {
+    return { blockedReason: "Funding approval type not found." }
+  }
+
+  const approvalCount = await countActiveFundingApprovalsByType(
+    fundingApprovalTypeId,
+    practiceId
+  )
+
+  if (approvalCount > 0) {
+    return {
+      blockedReason: `Cannot delete: ${approvalCount} active funding approvals use this type.`,
+    }
+  }
+
+  return {}
+}
+
+export async function deleteFundingApprovalType(
+  fundingApprovalTypeId: string,
+  practiceId: string
+): Promise<{ success?: boolean; error?: string; blockedReason?: string }> {
+  const context = await verifyPracticeId(practiceId)
+  const status = await getFundingApprovalTypeDeleteStatus(
+    practiceId,
+    fundingApprovalTypeId
+  )
+
+  if (status.blockedReason) {
+    return { blockedReason: status.blockedReason }
+  }
+
+  const result = await performSoftDelete({
+    table: fundingApprovalTypes,
+    id: fundingApprovalTypeId,
+    idField: fundingApprovalTypes.fundingApprovalTypeId,
+    practiceId,
+    practiceIdField: fundingApprovalTypes.practiceId,
+  })
+
+  if (!result.success) {
+    return {
+      error: result.error ?? "Unable to delete funding approval type.",
+    }
+  }
+
+  await logDeleteAuditEvent({
+    practiceId,
+    userId: context.userId,
+    eventType: "funding_approval_type.deleted",
+    entityType: "funding_approval_type",
+    entityId: fundingApprovalTypeId,
+  })
+
+  revalidatePath("/funding/approval-types")
+  revalidatePath(`/funding/approval-types/${fundingApprovalTypeId}`)
+  redirect("/funding/approval-types")
+}
+
+export async function getClaimDeleteStatus(claimId: string, practiceId: string) {
+  await verifyPracticeId(practiceId)
+
+  const claim = await getClaimById(claimId)
+  if (!claim) {
+    return { blockedReason: "Claim not found." }
+  }
+
+  const approvalCount = await countActiveFundingApprovalsForClaim(
+    claimId,
+    practiceId
+  )
+  if (approvalCount > 0) {
+    return {
+      blockedReason: `Cannot delete: ${approvalCount} active funding approvals use this claim.`,
+    }
+  }
+
+  const appointmentCount = await countActiveAppointmentsLinkedToClaim(
+    claimId,
+    practiceId
+  )
+  if (appointmentCount > 0) {
+    return {
+      blockedReason: `Cannot delete: ${appointmentCount} active appointments are linked to funding approvals using this claim.`,
+    }
+  }
+
+  return {}
+}
+
+export async function deleteClaim(
+  claimId: string,
+  practiceId: string
+): Promise<{ success?: boolean; error?: string; blockedReason?: string }> {
+  const context = await verifyPracticeId(practiceId)
+  const status = await getClaimDeleteStatus(claimId, practiceId)
+
+  if (status.blockedReason) {
+    return { blockedReason: status.blockedReason }
+  }
+
+  const claim = await getClaimById(claimId)
+
+  if (!claim) {
+    return { error: "Claim not found." }
+  }
+
+  const result = await performSoftDelete({
+    table: claims,
+    id: claimId,
+    idField: claims.claimId,
+    practiceId,
+    practiceIdField: claims.practiceId,
+  })
+
+  if (!result.success) {
+    return { error: result.error ?? "Unable to delete claim." }
+  }
+
+  await logDeleteAuditEvent({
+    practiceId,
+    userId: context.userId,
+    clientId: claim.clientId,
+    eventType: "claim.deleted",
+    entityType: "claim",
+    entityId: claimId,
+  })
+
+  revalidatePath("/funding/claims")
+  revalidatePath(`/funding/claims/${claimId}`)
+  redirect("/funding/claims")
+}
+
+export async function deleteFundingApproval(
+  fundingApprovalId: string,
+  practiceId: string
+): Promise<{ success?: boolean; error?: string; blockedReason?: string }> {
+  const context = await verifyPracticeId(practiceId)
+  const approval = await getFundingApprovalById(fundingApprovalId)
+
+  if (!approval) {
+    return { error: "Funding approval not found." }
+  }
+
+  const result = await performSoftDelete({
+    table: fundingApprovals,
+    id: fundingApprovalId,
+    idField: fundingApprovals.fundingApprovalId,
+    practiceId,
+    practiceIdField: fundingApprovals.practiceId,
+  })
+
+  if (!result.success) {
+    return { error: result.error ?? "Unable to delete funding approval." }
+  }
+
+  await logDeleteAuditEvent({
+    practiceId,
+    userId: context.userId,
+    clientId: approval.clientId,
+    eventType: "funding_approval.deleted",
+    entityType: "funding_approval",
+    entityId: fundingApprovalId,
+  })
+
+  revalidatePath("/funding/approvals")
+  revalidatePath(`/funding/approvals/${fundingApprovalId}`)
+  redirect("/funding/approvals")
 }

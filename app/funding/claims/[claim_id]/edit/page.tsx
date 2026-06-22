@@ -4,9 +4,10 @@ import { getActiveClients } from "@/app/clients/actions"
 import { ClaimForm } from "@/components/funding/claim-form"
 import { AppShell } from "@/components/app-shell"
 import { BackButton } from "@/components/ui/back-button"
-import { getClaimById, getClaimTypes } from "@/lib/actions/funding"
+import { getClaimById, getClaimTypes, deleteClaim, getClaimDeleteStatus } from "@/lib/actions/funding"
 import { getProfessionalOrganisations } from "@/lib/actions/contacts"
 import { requirePractitionerContext } from "@/lib/auth"
+import { EntityDeleteSection } from "@/components/entity-delete-section"
 
 export default async function EditClaimPage({
   params,
@@ -25,6 +26,8 @@ export default async function EditClaimPage({
   if (!claim) {
     notFound()
   }
+
+  const deleteStatus = await getClaimDeleteStatus(claimId, context.practiceId)
 
   return (
     <AppShell>
@@ -58,6 +61,12 @@ export default async function EditClaimPage({
           endDate: claim.endDate,
         }}
         cancelHref={`/funding/claims/${claimId}`}
+      />
+
+      <EntityDeleteSection
+        entityName="Claim"
+        blockedReason={deleteStatus.blockedReason}
+        deleteAction={deleteClaim.bind(null, claimId, context.practiceId)}
       />
     </AppShell>
   )

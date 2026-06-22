@@ -8,9 +8,11 @@ import { XIcon } from "lucide-react"
 import { createPracticeInline } from "@/app/practice/actions"
 import {
   upsertMembership,
+  deleteMembership,
   type AvailabilityBlockInput,
   type MembershipFormState,
 } from "@/lib/actions/practitioner-practice"
+import { DeleteConfirmationButton } from "@/components/delete-confirmation-button"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -379,6 +381,18 @@ export function MembershipForm({
           </form>
         </CardContent>
       </Card>
+
+      {isEditing && initialValues?.membershipId ? (
+        <DeleteConfirmationButton
+          entityName="Membership"
+          onDelete={async () => {
+            const result = await deleteMembership(initialValues.membershipId!)
+            if (result?.error) {
+              throw new Error(result.error)
+            }
+          }}
+        />
+      ) : null}
     </div>
   )
 }

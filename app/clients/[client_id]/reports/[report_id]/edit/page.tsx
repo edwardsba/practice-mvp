@@ -3,8 +3,10 @@ import { notFound, redirect } from "next/navigation"
 import { and, eq } from "drizzle-orm"
 
 import { EditReportForm } from "@/app/clients/[client_id]/reports/[report_id]/edit/edit-report-form"
+import { deleteSimpleReport } from "@/app/clients/[client_id]/reports/[report_id]/edit/actions"
 import { AppShell } from "@/components/app-shell"
 import { BackButton } from "@/components/ui/back-button"
+import { EntityDeleteSection } from "@/components/entity-delete-section"
 import { clients, simpleReports } from "@/db/schema"
 import { requirePractitionerContext } from "@/lib/auth"
 import { db } from "@/lib/db"
@@ -84,6 +86,15 @@ export default async function EditReportPage({
           clinicalSummaryText: report.clinicalSummaryText,
           recommendationsText: report.recommendationsText,
         }}
+      />
+
+      <EntityDeleteSection
+        entityName="Report"
+        deleteAction={deleteSimpleReport.bind(
+          null,
+          reportId,
+          context.practiceId
+        )}
       />
     </AppShell>
   )

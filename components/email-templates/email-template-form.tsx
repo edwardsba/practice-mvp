@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { useActionState, useRef, useState } from "react"
 
+import { DeleteConfirmationButton } from "@/components/delete-confirmation-button"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -111,7 +112,6 @@ export function EmailTemplateForm({
   const systemTemplateNote = getSystemTemplateNote(templateKey)
   const [message, setMessage] = useState(initialValues?.message ?? "")
   const [deleteError, setDeleteError] = useState<string | null>(null)
-  const [deleting, setDeleting] = useState(false)
 
   const [state, formAction, pending] = useActionState(
     upsertEmailTemplate.bind(
@@ -147,7 +147,6 @@ export function EmailTemplateForm({
   async function handleDelete() {
     if (!initialValues?.emailTemplateId || isProtectedTemplate) return
 
-    setDeleting(true)
     setDeleteError(null)
 
     const result = await deleteEmailTemplate(
@@ -157,7 +156,7 @@ export function EmailTemplateForm({
 
     if (result?.error) {
       setDeleteError(result.error)
-      setDeleting(false)
+      throw new Error(result.error)
     }
   }
 
@@ -323,21 +322,6 @@ export function EmailTemplateForm({
             <Button type="button" variant="outline" asChild>
               <Link href={cancelHref}>Cancel</Link>
             </Button>
-            {initialValues?.emailTemplateId ? (
-              <Button
-                type="button"
-                variant="destructive"
-                disabled={isProtectedTemplate || deleting}
-                title={
-                  isProtectedTemplate
-                    ? "This system template cannot be deleted."
-                    : undefined
-                }
-                onClick={handleDelete}
-              >
-                {deleting ? "Deleting…" : "Delete"}
-              </Button>
-            ) : null}
           </div>
 
           {deleteError ? (
@@ -346,6 +330,18 @@ export function EmailTemplateForm({
             </p>
           ) : null}
         </form>
+
+        {initialValues?.emailTemplateId ? (
+          <DeleteConfirmationButton
+            entityName="Email Template"
+            blockedReason={
+              isProtectedTemplate
+                ? "This system template cannot be deleted."
+                : undefined
+            }
+            onDelete={handleDelete}
+          />
+        ) : null}
       </CardContent>
     </Card>
   )

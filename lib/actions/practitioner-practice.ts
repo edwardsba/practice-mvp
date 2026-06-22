@@ -2,8 +2,10 @@
 
 import { and, asc, eq, inArray } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
+import { redirect } from "next/navigation"
 
 import {
+  auditEvents,
   practitionerAvailabilityBlocks,
   practitionerPracticeMemberships,
   practices,
@@ -376,6 +378,7 @@ export async function upsertMembership(
 }
 
 export async function deleteMembership(membershipId: string) {
+  const context = await requirePractitionerContext()
   const membership = await verifyMembershipOwnership(membershipId)
   if (!membership) {
     return { error: "Membership not found." }
@@ -393,8 +396,16 @@ export async function deleteMembership(membershipId: string) {
       .update(practitionerAvailabilityBlocks)
       .set({ isActive: false, updatedAt: now })
       .where(eq(practitionerAvailabilityBlocks.membershipId, membershipId))
+
+    await tx.insert(auditEvents).values({
+      practiceId: membership.practiceId,
+      userId: context.userId,
+      eventType: "membership.deleted",
+      entityType: "membership",
+      entityId: membershipId,
+    })
   })
 
   revalidatePath("/practitioner")
-  return { success: true }
+  redirect("/practitioner")
 }

@@ -6,8 +6,11 @@ import { BackButton } from "@/components/ui/back-button"
 import {
   getAppointmentTypeById,
   getClaimTypesForAppointmentTypes,
+  deleteAppointmentType,
+  getAppointmentTypeDeleteStatus,
 } from "@/lib/actions/appointment-types"
 import { requirePractitionerContext } from "@/lib/auth"
+import { EntityDeleteSection } from "@/components/entity-delete-section"
 
 export default async function EditAppointmentTypePage({
   params,
@@ -25,6 +28,11 @@ export default async function EditAppointmentTypePage({
   if (!type) {
     notFound()
   }
+
+  const deleteStatus = await getAppointmentTypeDeleteStatus(
+    context.practiceId,
+    typeId
+  )
 
   return (
     <AppShell>
@@ -59,6 +67,16 @@ export default async function EditAppointmentTypePage({
             status: fee.status as "active" | "inactive",
           })),
         }}
+      />
+
+      <EntityDeleteSection
+        entityName="Appointment Type"
+        blockedReason={deleteStatus.blockedReason}
+        deleteAction={deleteAppointmentType.bind(
+          null,
+          typeId,
+          context.practiceId
+        )}
       />
     </AppShell>
   )

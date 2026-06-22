@@ -1,10 +1,11 @@
 import Link from "next/link"
 import { notFound } from "next/navigation"
 
-import { createCrisisPlanVersion } from "@/app/clients/[client_id]/crisis-plan/actions"
+import { createCrisisPlanVersion, deleteCrisisPlan } from "@/app/clients/[client_id]/crisis-plan/actions"
 import { CrisisPlanForm } from "@/components/crisis-plan/crisis-plan-form"
 import { AppShell } from "@/components/app-shell"
 import { BackButton } from "@/components/ui/back-button"
+import { EntityDeleteSection } from "@/components/entity-delete-section"
 import { Badge } from "@/components/ui/badge"
 import {
   loadCrisisPlanForPractice,
@@ -63,6 +64,11 @@ export default async function EditCrisisPlanPage({
         initialContacts={contacts}
         submitLabel="Save new version"
         cancelHref={`/clients/${clientId}/crisis-plan/${planId}`}
+      />
+
+      <EntityDeleteSection
+        entityName="Crisis Plan"
+        deleteAction={deleteCrisisPlan.bind(null, planId, context.practiceId)}
       />
     </AppShell>
   )

@@ -1,10 +1,11 @@
 import Link from "next/link"
 import { notFound } from "next/navigation"
 
-import { updateAppointment } from "@/app/appointments/actions"
+import { updateAppointment, deleteAppointment, getAppointmentDeleteStatus } from "@/app/appointments/actions"
 import { getActiveClients } from "@/app/clients/actions"
 import { AppointmentForm } from "@/components/appointments/appointment-form"
 import { AppShell } from "@/components/app-shell"
+import { EntityDeleteSection } from "@/components/entity-delete-section"
 import { Button } from "@/components/ui/button"
 import { getMemberships } from "@/lib/actions/practitioner-practice"
 import { loadAppointmentForPractice } from "@/lib/appointments/load"
@@ -30,6 +31,8 @@ export default async function EditAppointmentPage({
   if (!appointment) {
     notFound()
   }
+
+  const deleteStatus = await getAppointmentDeleteStatus(appointmentId)
 
   const clientName = `${appointment.clientFirstName} ${appointment.clientLastName}`
 
@@ -79,6 +82,16 @@ export default async function EditAppointmentPage({
         }}
         submitLabel="Save appointment"
         cancelHref="/appointments"
+      />
+
+      <EntityDeleteSection
+        entityName="Appointment"
+        blockedReason={deleteStatus.blockedReason}
+        deleteAction={deleteAppointment.bind(
+          null,
+          appointmentId,
+          context.practiceId
+        )}
       />
     </AppShell>
   )

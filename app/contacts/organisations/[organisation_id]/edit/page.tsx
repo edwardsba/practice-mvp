@@ -7,8 +7,11 @@ import { OrganisationForm } from "@/components/contacts/organisation-form"
 import {
   getProfessionalOrganisationById,
   saveProfessionalOrganisationAction,
+  deleteOrganisation,
+  getOrganisationDeleteStatus,
 } from "@/lib/actions/contacts"
 import { requirePractitionerContext } from "@/lib/auth"
+import { EntityDeleteSection } from "@/components/entity-delete-section"
 
 export default async function EditOrganisationPage({
   params,
@@ -24,6 +27,7 @@ export default async function EditOrganisationPage({
   }
 
   const { organisation } = data
+  const deleteStatus = await getOrganisationDeleteStatus(organisationId)
 
   return (
     <AppShell>
@@ -57,6 +61,16 @@ export default async function EditOrganisationPage({
         }}
         submitLabel="Save organisation"
         cancelHref={`/contacts/organisations/${organisationId}`}
+      />
+
+      <EntityDeleteSection
+        entityName="Organisation"
+        blockedReason={deleteStatus.blockedReason}
+        deleteAction={deleteOrganisation.bind(
+          null,
+          organisationId,
+          context.practiceId
+        )}
       />
     </AppShell>
   )

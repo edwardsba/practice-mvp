@@ -2,6 +2,7 @@ import Link from "next/link"
 import { notFound } from "next/navigation"
 
 import { createDraftSessionNote } from "@/app/session-notes/actions"
+import { markAppointmentNoShow } from "@/app/appointments/actions"
 import { AppShell } from "@/components/app-shell"
 import { Button } from "@/components/ui/button"
 import {
@@ -73,6 +74,9 @@ export default async function AppointmentDetailPage({
     "← Back to appointments"
   )
   const notes = appointment.notes?.trim() ?? ""
+  const showNoShowButton = ["scheduled", "confirmed", "completed"].includes(
+    appointment.status
+  )
 
   return (
     <AppShell>
@@ -256,6 +260,15 @@ export default async function AppointmentDetailPage({
                 {formatAppointmentStatus(appointment.status)}
               </dd>
             </div>
+            {showNoShowButton ? (
+              <div className="sm:col-span-2">
+                <form action={markAppointmentNoShow.bind(null, appointmentId)}>
+                  <Button type="submit" variant="outline" size="sm">
+                    Mark as No-show
+                  </Button>
+                </form>
+              </div>
+            ) : null}
             <div className={notes.length > 80 ? "sm:col-span-2" : undefined}>
               <dt className="text-sm text-muted-foreground">Notes</dt>
               <dd className="font-medium whitespace-pre-wrap">

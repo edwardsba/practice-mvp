@@ -16,6 +16,7 @@ import {
   parseCrisisPlanFormData,
 } from "@/lib/crisis-plans/parse-form"
 import { syncEmergencyContacts } from "@/lib/crisis-plans/sync-emergency-contacts"
+import { logDeleteAuditEvent, performSoftDelete } from "@/lib/delete/delete-utils"
 
 export type CrisisPlanFormState = {
   error?: string
@@ -180,4 +181,58 @@ export async function createCrisisPlanVersion(
   revalidatePath(`/clients/${clientId}`)
   revalidatePath(`/clients/${clientId}/crisis-plan/${sourcePlanId}`)
   redirect(`/clients/${clientId}/crisis-plan/${newPlanId!}`)
+}
+
+export async function deleteCrisisPlan(
+  crisisPlanId: string,
+  practiceId: string
+): Promise<{ success?: boolean; error?: string; blockedReason?: string }> {
+  const context = await requirePractitionerContext()
+  if (context.practiceId !== practiceId) {
+    return { error: "Unauthorized practice access." }
+  }
+
+  const [plan] = await db
+    .select({
+      crisisPlanId: crisisPlans.crisisPlanId,
+      clientId: crisisPlans.clientId,
+    })
+    .from(crisisPlans)
+    .where(
+      and(
+        eq(crisisPlans.crisisPlanId, crisisPlanId),
+        eq(crisisPlans.practiceId, practiceId),
+        eq(crisisPlans.isActive, true)
+      )
+    )
+    .limit(1)
+
+  if (!plan) {
+    return { error: "Crisis plan not found." }
+  }
+
+  const result = await performSoftDelete({
+    table: crisisPlans,
+    id: crisisPlanId,
+    idField: crisisPlans.crisisPlanId,
+    practiceId,
+    practiceIdField: crisisPlans.practiceId,
+  })
+
+  if (!result.success) {
+    return { error: result.error ?? "Unable to delete crisis plan." }
+  }
+
+  await logDeleteAuditEvent({
+    practiceId,
+    userId: context.userId,
+    clientId: plan.clientId,
+    eventType: "crisis_plan.deleted",
+    entityType: "crisis_plan",
+    entityId: crisisPlanId,
+  })
+
+  revalidatePath(`/clients/${plan.clientId}`)
+  revalidatePath(`/clients/${plan.clientId}/crisis-plan`)
+  redirect(`/clients/${plan.clientId}/crisis-plan`)
 }

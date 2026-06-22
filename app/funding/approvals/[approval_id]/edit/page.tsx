@@ -9,8 +9,10 @@ import {
   getFundingApprovalById,
   getFundingApprovalTypesForForm,
   getReferrersForDropdown,
+  deleteFundingApproval,
 } from "@/lib/actions/funding"
 import { requirePractitionerContext } from "@/lib/auth"
+import { EntityDeleteSection } from "@/components/entity-delete-section"
 
 export default async function EditFundingApprovalPage({
   params,
@@ -74,6 +76,15 @@ export default async function EditFundingApprovalPage({
           })),
         }}
         cancelHref={`/funding/approvals/${approvalId}`}
+      />
+
+      <EntityDeleteSection
+        entityName="Funding Approval"
+        deleteAction={deleteFundingApproval.bind(
+          null,
+          approvalId,
+          context.practiceId
+        )}
       />
     </AppShell>
   )

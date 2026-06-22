@@ -12,6 +12,14 @@ import {
 } from "@/db/schema"
 import { requirePractitionerContext } from "@/lib/auth"
 import { db } from "@/lib/db"
+import {
+  countActiveFundingApprovalsForProfessional,
+  countClaimsByOrganisation,
+  logDeleteAuditEvent,
+  performSoftDelete,
+  verifyOrganisationInPractice,
+  verifyProfessionalInPractice,
+} from "@/lib/delete/delete-utils"
 
 export type ContactsFormState = {
   error?: string
@@ -593,4 +601,126 @@ export async function saveProfessionAction(
 
   revalidatePath("/settings/professions")
   return {}
+}
+
+export async function getProfessionalDeleteStatus(professionalId: string) {
+  const context = await requirePractitionerContext()
+
+  if (!(await verifyProfessionalInPractice(professionalId, context.practiceId))) {
+    return { blockedReason: "Professional not found." }
+  }
+
+  const approvalCount = await countActiveFundingApprovalsForProfessional(
+    professionalId,
+    context.practiceId
+  )
+
+  if (approvalCount > 0) {
+    return {
+      blockedReason: `Cannot delete: professional is referrer on ${approvalCount} active funding approvals.`,
+    }
+  }
+
+  return {}
+}
+
+export async function deleteProfessional(
+  professionalId: string,
+  practiceId: string
+): Promise<{ success?: boolean; error?: string; blockedReason?: string }> {
+  const context = await requirePractitionerContext()
+  if (context.practiceId !== practiceId) {
+    return { error: "Unauthorized practice access." }
+  }
+
+  const status = await getProfessionalDeleteStatus(professionalId)
+  if (status.blockedReason) {
+    return { blockedReason: status.blockedReason }
+  }
+
+  const result = await performSoftDelete({
+    table: professionals,
+    id: professionalId,
+    idField: professionals.professionalId,
+    practiceId,
+    practiceIdField: professionals.practiceId,
+  })
+
+  if (!result.success) {
+    return { error: result.error ?? "Unable to delete professional." }
+  }
+
+  await logDeleteAuditEvent({
+    practiceId,
+    userId: context.userId,
+    eventType: "professional.deleted",
+    entityType: "professional",
+    entityId: professionalId,
+  })
+
+  revalidatePath("/contacts/professionals")
+  revalidatePath(`/contacts/professionals/${professionalId}`)
+  redirect(`/contacts/professionals`)
+}
+
+export async function getOrganisationDeleteStatus(organisationId: string) {
+  const context = await requirePractitionerContext()
+
+  if (
+    !(await verifyOrganisationInPractice(organisationId, context.practiceId))
+  ) {
+    return { blockedReason: "Organisation not found." }
+  }
+
+  const claimCount = await countClaimsByOrganisation(
+    organisationId,
+    context.practiceId
+  )
+
+  if (claimCount > 0) {
+    return {
+      blockedReason: `Cannot delete: ${claimCount} claims require this organisation. All claims must have an organisation.`,
+    }
+  }
+
+  return {}
+}
+
+export async function deleteOrganisation(
+  organisationId: string,
+  practiceId: string
+): Promise<{ success?: boolean; error?: string; blockedReason?: string }> {
+  const context = await requirePractitionerContext()
+  if (context.practiceId !== practiceId) {
+    return { error: "Unauthorized practice access." }
+  }
+
+  const status = await getOrganisationDeleteStatus(organisationId)
+  if (status.blockedReason) {
+    return { blockedReason: status.blockedReason }
+  }
+
+  const result = await performSoftDelete({
+    table: professionalOrganisations,
+    id: organisationId,
+    idField: professionalOrganisations.organisationId,
+    practiceId,
+    practiceIdField: professionalOrganisations.practiceId,
+  })
+
+  if (!result.success) {
+    return { error: result.error ?? "Unable to delete organisation." }
+  }
+
+  await logDeleteAuditEvent({
+    practiceId,
+    userId: context.userId,
+    eventType: "organisation.deleted",
+    entityType: "organisation",
+    entityId: organisationId,
+  })
+
+  revalidatePath("/contacts/organisations")
+  revalidatePath(`/contacts/organisations/${organisationId}`)
+  redirect(`/contacts/organisations`)
 }

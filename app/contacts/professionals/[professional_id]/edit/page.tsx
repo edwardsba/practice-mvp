@@ -9,8 +9,11 @@ import {
   getProfessionalOrganisations,
   getProfessions,
   saveProfessionalAction,
+  deleteProfessional,
+  getProfessionalDeleteStatus,
 } from "@/lib/actions/contacts"
 import { requirePractitionerContext } from "@/lib/auth"
+import { EntityDeleteSection } from "@/components/entity-delete-section"
 
 export default async function EditProfessionalPage({
   params,
@@ -29,6 +32,8 @@ export default async function EditProfessionalPage({
   if (!data) {
     notFound()
   }
+
+  const deleteStatus = await getProfessionalDeleteStatus(professionalId)
 
   return (
     <AppShell>
@@ -66,6 +71,16 @@ export default async function EditProfessionalPage({
         }}
         submitLabel="Save professional"
         cancelHref={`/contacts/professionals/${professionalId}`}
+      />
+
+      <EntityDeleteSection
+        entityName="Professional"
+        blockedReason={deleteStatus.blockedReason}
+        deleteAction={deleteProfessional.bind(
+          null,
+          professionalId,
+          context.practiceId
+        )}
       />
     </AppShell>
   )

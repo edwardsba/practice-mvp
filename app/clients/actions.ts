@@ -2,10 +2,23 @@
 
 import { and, eq } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
+import { redirect } from "next/navigation"
 
 import { clients } from "@/db/schema"
 import { requirePractitionerContext } from "@/lib/auth"
 import { db } from "@/lib/db"
+import {
+  countActiveAppointments,
+  countActiveClaims,
+  countActiveCrisisPlans,
+  countActiveFundingApprovalsForClient,
+  countActiveTreatmentPlans,
+  countNonFinalisedSessionNotes,
+  countSimpleReports,
+  logDeleteAuditEvent,
+  performSoftDelete,
+  verifyClientInPractice,
+} from "@/lib/delete/delete-utils"
 
 export type ClientFormState = {
   error?: string
@@ -61,4 +74,131 @@ export async function createClient(
 
   revalidatePath("/clients")
   return { success: true }
+}
+
+export async function getClientDeleteStatus(clientId: string) {
+  const context = await requirePractitionerContext()
+
+  if (!(await verifyClientInPractice(clientId, context.practiceId))) {
+    return { blockedReason: "Client not found." }
+  }
+
+  const appointmentCount = await countActiveAppointments(
+    clientId,
+    context.practiceId
+  )
+  if (appointmentCount > 0) {
+    return {
+      blockedReason: `Cannot delete: client has ${appointmentCount} active appointments.`,
+    }
+  }
+
+  const sessionNoteCount = await countNonFinalisedSessionNotes(
+    clientId,
+    context.practiceId
+  )
+  if (sessionNoteCount > 0) {
+    return {
+      blockedReason: `Cannot delete: client has ${sessionNoteCount} non-finalised session notes.`,
+    }
+  }
+
+  const approvalCount = await countActiveFundingApprovalsForClient(
+    clientId,
+    context.practiceId
+  )
+  if (approvalCount > 0) {
+    return {
+      blockedReason: `Cannot delete: client has ${approvalCount} active funding approvals.`,
+    }
+  }
+
+  const crisisPlanCount = await countActiveCrisisPlans(
+    clientId,
+    context.practiceId
+  )
+  if (crisisPlanCount > 0) {
+    return {
+      blockedReason: `Cannot delete: client has ${crisisPlanCount} active crisis plans.`,
+    }
+  }
+
+  const treatmentPlanCount = await countActiveTreatmentPlans(
+    clientId,
+    context.practiceId
+  )
+  if (treatmentPlanCount > 0) {
+    return {
+      blockedReason: `Cannot delete: client has ${treatmentPlanCount} active treatment plans.`,
+    }
+  }
+
+  const claimCount = await countActiveClaims(clientId, context.practiceId)
+  if (claimCount > 0) {
+    return {
+      blockedReason: `Cannot delete: client has ${claimCount} active claims.`,
+    }
+  }
+
+  const reportCount = await countSimpleReports(clientId, context.practiceId)
+  if (reportCount > 0) {
+    return { requiresReportConfirmation: true }
+  }
+
+  return {}
+}
+
+export async function deleteClient(
+  clientId: string,
+  options?: { deletionReason?: string; acknowledgeReports?: boolean }
+): Promise<{
+  success?: boolean
+  error?: string
+  blockedReason?: string
+  hasReports?: boolean
+}> {
+  const context = await requirePractitionerContext()
+  const status = await getClientDeleteStatus(clientId)
+
+  if (status.blockedReason) {
+    return { blockedReason: status.blockedReason }
+  }
+
+  if (status.requiresReportConfirmation && !options?.acknowledgeReports) {
+    return {
+      hasReports: true,
+      blockedReason:
+        "Extra confirmation required: this client has reports on file.",
+    }
+  }
+
+  if (!(await verifyClientInPractice(clientId, context.practiceId))) {
+    return { error: "Client not found." }
+  }
+
+  const result = await performSoftDelete({
+    table: clients,
+    id: clientId,
+    idField: clients.clientId,
+    practiceId: context.practiceId,
+    practiceIdField: clients.practiceId,
+  })
+
+  if (!result.success) {
+    return { error: result.error ?? "Unable to delete client." }
+  }
+
+  await logDeleteAuditEvent({
+    practiceId: context.practiceId,
+    userId: context.userId,
+    clientId,
+    eventType: "client.deleted",
+    entityType: "client",
+    entityId: clientId,
+    deletionReason: options?.deletionReason,
+  })
+
+  revalidatePath("/clients")
+  revalidatePath(`/clients/${clientId}`)
+  redirect("/clients")
 }

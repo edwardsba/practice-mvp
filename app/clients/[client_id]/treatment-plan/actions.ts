@@ -12,6 +12,7 @@ import {
   parseTreatmentPlanFormData,
 } from "@/lib/treatment-plans/parse-form"
 import { loadTreatmentPlanForPractice, verifyClientInPractice } from "@/lib/treatment-plans/load"
+import { logDeleteAuditEvent, performSoftDelete } from "@/lib/delete/delete-utils"
 import type { TreatmentPlanFormState } from "@/components/treatment-plan/treatment-plan-form"
 
 export async function createTreatmentPlan(
@@ -139,4 +140,58 @@ export async function createTreatmentPlanVersion(
   revalidatePath(`/clients/${clientId}`)
   revalidatePath(`/clients/${clientId}/treatment-plan/${sourcePlanId}`)
   redirect(`/clients/${clientId}/treatment-plan/${newPlanId!}`)
+}
+
+export async function deleteTreatmentPlan(
+  treatmentPlanId: string,
+  practiceId: string
+): Promise<{ success?: boolean; error?: string; blockedReason?: string }> {
+  const context = await requirePractitionerContext()
+  if (context.practiceId !== practiceId) {
+    return { error: "Unauthorized practice access." }
+  }
+
+  const [plan] = await db
+    .select({
+      treatmentPlanId: treatmentPlans.treatmentPlanId,
+      clientId: treatmentPlans.clientId,
+    })
+    .from(treatmentPlans)
+    .where(
+      and(
+        eq(treatmentPlans.treatmentPlanId, treatmentPlanId),
+        eq(treatmentPlans.practiceId, practiceId),
+        eq(treatmentPlans.isActive, true)
+      )
+    )
+    .limit(1)
+
+  if (!plan) {
+    return { error: "Treatment plan not found." }
+  }
+
+  const result = await performSoftDelete({
+    table: treatmentPlans,
+    id: treatmentPlanId,
+    idField: treatmentPlans.treatmentPlanId,
+    practiceId,
+    practiceIdField: treatmentPlans.practiceId,
+  })
+
+  if (!result.success) {
+    return { error: result.error ?? "Unable to delete treatment plan." }
+  }
+
+  await logDeleteAuditEvent({
+    practiceId,
+    userId: context.userId,
+    clientId: plan.clientId,
+    eventType: "treatment_plan.deleted",
+    entityType: "treatment_plan",
+    entityId: treatmentPlanId,
+  })
+
+  revalidatePath(`/clients/${plan.clientId}`)
+  revalidatePath(`/clients/${plan.clientId}/treatment-plan`)
+  redirect(`/clients/${plan.clientId}/treatment-plan`)
 }

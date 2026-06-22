@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 
+import { autoCompleteElapsedAppointments } from "@/lib/appointments/auto-complete"
 import {
   runAppointmentAutomations,
   type AppointmentAutomationSummary,
@@ -7,8 +8,10 @@ import {
 
 function emptySummary(error: string): AppointmentAutomationSummary & {
   error: string
+  appointments_completed: number
 } {
   return {
+    appointments_completed: 0,
     reminders_sent: 0,
     batteries_sent: 0,
     post_session_sent: 0,
@@ -26,13 +29,27 @@ async function handleCron(request: Request) {
         { status: 500 }
       )
     }
-
     if (request.headers.get("authorization") !== `Bearer ${cronSecret}`) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const summary = await runAppointmentAutomations()
-    return NextResponse.json(summary)
+    // Step 1: Auto-complete elapsed appointments BEFORE running automations
+    // so that newly-completed appointments can trigger post-session emails
+    // in the same cron pass.
+    //
+    // NOTE: This is the temporary cron trigger. When migrating to Supabase
+    // pg_cron or event-driven scheduling, move this call to the new trigger
+    // and remove it from here.
+    const completionResult = await autoCompleteElapsedAppointments()
+
+    // Step 2: Run email automations (reminders, pre-session, post-session)
+    const automationSummary = await runAppointmentAutomations()
+
+    return NextResponse.json({
+      appointments_completed: completionResult.completed,
+      ...automationSummary,
+      errors: [...completionResult.errors, ...automationSummary.errors],
+    })
   } catch (error) {
     console.error("Appointment automations cron failed:", error)
     const message =

@@ -1,6 +1,6 @@
 import Link from "next/link"
 import { notFound } from "next/navigation"
-import { and, desc, eq } from "drizzle-orm"
+import { and, desc, eq, ne } from "drizzle-orm"
 
 import { AppShell } from "@/components/app-shell"
 import { Button } from "@/components/ui/button"
@@ -87,7 +87,8 @@ export default async function ClientReportsPage({
     .where(
       and(
         eq(simpleReports.clientId, clientId),
-        eq(simpleReports.practiceId, context.practiceId)
+        eq(simpleReports.practiceId, context.practiceId),
+        ne(simpleReports.reportStatus, "deleted")
       )
     )
     .orderBy(desc(simpleReports.createdAt))

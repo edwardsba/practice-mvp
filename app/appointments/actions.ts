@@ -10,6 +10,10 @@ import type { AppointmentAutomationSummary } from "@/lib/appointments/run-automa
 import { loadAppointmentForPractice } from "@/lib/appointments/load"
 import { requirePractitionerContext } from "@/lib/auth"
 import { db } from "@/lib/db"
+import {
+  countNonFinalisedSessionNotesByAppointment,
+  logDeleteAuditEvent,
+} from "@/lib/delete/delete-utils"
 
 export type AppointmentFormState = {
   error?: string
@@ -240,4 +244,122 @@ export async function updateAppointment(
       ? `/appointments/${appointmentId}?returnTo=${returnTo}`
       : `/appointments/${appointmentId}`
   )
+}
+
+export async function getAppointmentDeleteStatus(appointmentId: string) {
+  const context = await requirePractitionerContext()
+  const appointment = await loadAppointmentForPractice(
+    appointmentId,
+    context.practiceId
+  )
+
+  if (!appointment) {
+    return { blockedReason: "Appointment not found." }
+  }
+
+  const sessionNoteCount = await countNonFinalisedSessionNotesByAppointment(
+    appointmentId,
+    context.practiceId
+  )
+
+  if (sessionNoteCount > 0) {
+    return {
+      blockedReason: `Cannot delete: appointment has ${sessionNoteCount} non-finalised session notes.`,
+    }
+  }
+
+  return {}
+}
+
+export async function deleteAppointment(
+  appointmentId: string,
+  practiceId: string
+): Promise<{ success?: boolean; error?: string; blockedReason?: string }> {
+  const context = await requirePractitionerContext()
+  if (context.practiceId !== practiceId) {
+    return { error: "Unauthorized practice access." }
+  }
+
+  const status = await getAppointmentDeleteStatus(appointmentId)
+  if (status.blockedReason) {
+    return { blockedReason: status.blockedReason }
+  }
+
+  const appointment = await loadAppointmentForPractice(
+    appointmentId,
+    practiceId
+  )
+  if (!appointment) {
+    return { error: "Appointment not found." }
+  }
+
+  try {
+    await db
+      .update(appointments)
+      .set({ status: "cancelled", updatedAt: new Date() })
+      .where(
+        and(
+          eq(appointments.appointmentId, appointmentId),
+          eq(appointments.practiceId, practiceId)
+        )
+      )
+
+    await logDeleteAuditEvent({
+      practiceId,
+      userId: context.userId,
+      clientId: appointment.clientId,
+      eventType: "appointment.deleted",
+      entityType: "appointment",
+      entityId: appointmentId,
+    })
+  } catch {
+    return { error: "Unable to delete appointment. Please try again." }
+  }
+
+  revalidatePath("/appointments")
+  revalidatePath(`/appointments/${appointmentId}`)
+  revalidatePath(`/clients/${appointment.clientId}`)
+  redirect("/appointments")
+}
+
+export async function markAppointmentNoShow(
+  appointmentId: string
+): Promise<void> {
+  const context = await requirePractitionerContext()
+  const appointment = await loadAppointmentForPractice(
+    appointmentId,
+    context.practiceId
+  )
+  if (!appointment) throw new Error("Appointment not found.")
+  if (appointment.status === "cancelled") {
+    throw new Error("Cannot mark a cancelled appointment as no-show.")
+  }
+  if (appointment.status === "no_show") {
+    throw new Error("Appointment is already marked as no-show.")
+  }
+
+  await db.transaction(async (tx) => {
+    await tx
+      .update(appointments)
+      .set({ status: "no_show", updatedAt: new Date() })
+      .where(
+        and(
+          eq(appointments.appointmentId, appointmentId),
+          eq(appointments.practiceId, context.practiceId)
+        )
+      )
+    await tx.insert(auditEvents).values({
+      practiceId: context.practiceId,
+      userId: context.userId,
+      clientId: appointment.clientId,
+      eventType: "appointment.no_show",
+      entityType: "appointment",
+      entityId: appointmentId,
+    })
+  })
+
+  revalidatePath(`/appointments/${appointmentId}`)
+  revalidatePath("/appointments")
+  revalidatePath(`/clients/${appointment.clientId}`)
+  redirect(`/appointments/${appointmentId}`)
 }

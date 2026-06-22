@@ -4,7 +4,10 @@ import { and, asc, eq, isNull, notInArray, or } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
 
-import { emailTemplates } from "@/db/schema"
+import {
+  emailTemplates,
+  auditEvents,
+} from "@/db/schema"
 import { requirePractitionerContext } from "@/lib/auth"
 import { db } from "@/lib/db"
 import {
@@ -201,7 +204,7 @@ export async function deleteEmailTemplate(
   practiceId: string,
   templateId: string
 ): Promise<{ error?: string }> {
-  await verifyPracticeId(practiceId)
+  const context = await verifyPracticeId(practiceId)
 
   const existing = await getEmailTemplateById(practiceId, templateId)
   if (!existing) {
@@ -224,6 +227,14 @@ export async function deleteEmailTemplate(
         eq(emailTemplates.practiceId, practiceId)
       )
     )
+
+  await db.insert(auditEvents).values({
+    practiceId,
+    userId: context.userId,
+    eventType: "email_template.deleted",
+    entityType: "email_template",
+    entityId: templateId,
+  })
 
   revalidatePath("/settings/email-templates")
   redirect("/settings/email-templates")

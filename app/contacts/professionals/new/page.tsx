@@ -8,7 +8,12 @@ import {
 } from "@/lib/actions/contacts"
 import { requirePractitionerContext } from "@/lib/auth"
 
-export default async function NewProfessionalPage() {
+export default async function NewProfessionalPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ returnTo?: string }>
+}) {
+  const { returnTo } = await searchParams
   const context = await requirePractitionerContext()
   const [professions, organisations] = await Promise.all([
     getProfessions(context.practiceId),
@@ -19,8 +24,8 @@ export default async function NewProfessionalPage() {
     <AppShell>
       <div className="mb-6">
         <BackButton
-          fallbackHref="/contacts/professionals"
-          label="← Back to professionals"
+          fallbackHref={returnTo ?? "/contacts/professionals"}
+          label="← Back"
         />
         <h1 className="text-2xl font-semibold tracking-tight">
           Add professional
@@ -31,12 +36,13 @@ export default async function NewProfessionalPage() {
         action={saveProfessionalAction.bind(
           null,
           context.practiceId,
-          undefined
+          undefined,
+          returnTo ?? null
         )}
         professions={professions}
         organisations={organisations}
         submitLabel="Save professional"
-        cancelHref="/contacts/professionals"
+        cancelHref={returnTo ?? "/contacts/professionals"}
       />
     </AppShell>
   )

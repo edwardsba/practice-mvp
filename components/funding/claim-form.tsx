@@ -58,12 +58,14 @@ export function ClaimForm({
   organisations,
   initialValues,
   cancelHref,
+  returnTo,
 }: {
   clients: ClientOption[]
   claimTypes: ClaimTypeOption[]
   organisations: OrganisationOption[]
   initialValues?: ClaimInitialValues
   cancelHref: string
+  returnTo?: string
 }) {
   const router = useRouter()
   const [state, formAction, pending] = useActionState(
@@ -87,10 +89,15 @@ export function ClaimForm({
 
   useEffect(() => {
     if (state.success && state.claimId) {
-      router.push(`/funding/claims/${state.claimId}`)
+      if (returnTo) {
+        const separator = returnTo.includes("?") ? "&" : "?"
+        router.push(`${returnTo}${separator}created_claim_id=${state.claimId}`)
+      } else {
+        router.push(`/funding/claims/${state.claimId}`)
+      }
       router.refresh()
     }
-  }, [state.success, state.claimId, router])
+  }, [state.success, state.claimId, returnTo, router])
 
   return (
     <Card className="max-w-xl">

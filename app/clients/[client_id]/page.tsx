@@ -205,7 +205,9 @@ export default async function ClientDetailPage({
                   </Link>
                 </Button>
                 <Button size="sm" asChild>
-                  <Link href={`/funding/approvals/new?clientId=${clientId}`}>
+                  <Link
+                    href={`/funding/approvals/new?clientId=${clientId}&returnTo=${encodeURIComponent(`/clients/${clientId}`)}`}
+                  >
                     Add Approval
                   </Link>
                 </Button>

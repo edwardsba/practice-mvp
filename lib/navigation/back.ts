@@ -32,6 +32,12 @@ function labelForReturnTo(returnTo: string, defaultLabel: string): string {
   if (returnTo.startsWith("/contacts/professionals")) {
     return "← Back to professional"
   }
+  if (returnTo.startsWith("/funding/approvals/")) {
+    return "← Back to funding approval"
+  }
+  if (returnTo === "/funding/approvals") {
+    return "← Back to funding approvals"
+  }
   return defaultLabel
 }
 

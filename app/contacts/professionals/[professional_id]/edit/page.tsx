@@ -50,7 +50,8 @@ export default async function EditProfessionalPage({
         action={saveProfessionalAction.bind(
           null,
           context.practiceId,
-          professionalId
+          professionalId,
+          null
         )}
         professionalId={professionalId}
         professions={professions}

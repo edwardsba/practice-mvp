@@ -1,13 +1,18 @@
 "use client"
 
 import Link from "next/link"
-import { useActionState, useEffect, useMemo, useState } from "react"
-import { useRouter } from "next/navigation"
+import { useActionState, useEffect, useMemo, useRef, useState } from "react"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 
 import {
   upsertFundingApproval,
   type FundingFormState,
 } from "@/lib/actions/funding"
+import {
+  clearFundingApprovalDraft,
+  loadFundingApprovalDraft,
+  saveFundingApprovalDraft,
+} from "@/lib/funding/funding-approval-draft"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -123,6 +128,11 @@ export function FundingApprovalForm({
   returnTo?: string
 }) {
   const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const currentUrl = `${pathname}${searchParams.toString() ? `?${searchParams.toString()}` : ""}`
+  const draftId = initialValues?.fundingApprovalId ?? "new"
+  const skipNextTypeAutoFill = useRef(false)
   const [state, formAction, pending] = useActionState(
     upsertFundingApproval.bind(null, initialValues?.fundingApprovalId) as (
       prevState: FundingFormState,
@@ -133,6 +143,7 @@ export function FundingApprovalForm({
 
   const [clientId, setClientId] = useState(initialValues?.clientId ?? "")
   const [claimId, setClaimId] = useState(initialValues?.claimId ?? "")
+  const [referrerId, setReferrerId] = useState(initialValues?.referrerId ?? "")
   const [approvalTypeId, setApprovalTypeId] = useState(
     initialValues?.fundingApprovalTypeId ?? ""
   )
@@ -166,7 +177,48 @@ export function FundingApprovalForm({
   )
 
   useEffect(() => {
+    const draft = loadFundingApprovalDraft(draftId)
+    if (draft) {
+      skipNextTypeAutoFill.current = true
+      setClientId(draft.clientId || clientId)
+      setApprovalTypeId(draft.approvalTypeId || approvalTypeId)
+      setClaimId(draft.claimId || claimId)
+      setReferrerId(draft.referrerId || referrerId)
+      setStartDate(draft.startDate || startDate)
+      setEndDate(draft.endDate || endDate)
+      setAppointmentsApproved(
+        draft.appointmentsApproved || appointmentsApproved
+      )
+      if (draft.reportLinks?.length) setReportLinks(draft.reportLinks)
+      clearFundingApprovalDraft(draftId)
+    }
+
+    const params = new URLSearchParams(window.location.search)
+    const createdClaimId = params.get("created_claim_id")
+    if (createdClaimId) {
+      setClaimId(createdClaimId)
+    }
+
+    const createdReferrerId = params.get("created_referrer_id")
+    if (createdReferrerId) {
+      setReferrerId(createdReferrerId)
+    }
+
+    if (createdClaimId || createdReferrerId) {
+      const cleanParams = new URLSearchParams(window.location.search)
+      cleanParams.delete("created_claim_id")
+      cleanParams.delete("created_referrer_id")
+      const cleanUrl = `${window.location.pathname}${cleanParams.toString() ? `?${cleanParams.toString()}` : ""}`
+      window.history.replaceState({}, "", cleanUrl)
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
     if (!selectedType) return
+    if (skipNextTypeAutoFill.current) {
+      skipNextTypeAutoFill.current = false
+      return
+    }
     if (!initialValues?.fundingApprovalId) {
       setAppointmentsApproved(
         selectedType.appointmentsApproved?.toString() ?? ""
@@ -188,14 +240,27 @@ export function FundingApprovalForm({
 
   useEffect(() => {
     if (state.success && state.fundingApprovalId) {
-      router.push(`/funding/approvals/${state.fundingApprovalId}`)
+      if (returnTo) {
+        router.push(returnTo)
+      } else {
+        router.push(`/funding/approvals/${state.fundingApprovalId}`)
+      }
       router.refresh()
     }
-  }, [state.success, state.fundingApprovalId, router])
+  }, [state.success, state.fundingApprovalId, returnTo, router])
 
-  const newClaimHref = returnTo
-    ? `/funding/claims/new?returnTo=${encodeURIComponent(returnTo)}`
-    : "/funding/claims/new"
+  function saveCurrentDraft() {
+    saveFundingApprovalDraft(draftId, {
+      clientId,
+      approvalTypeId,
+      claimId,
+      referrerId,
+      startDate,
+      endDate,
+      appointmentsApproved,
+      reportLinks,
+    })
+  }
 
   return (
     <Card className="max-w-3xl">
@@ -233,6 +298,9 @@ export function FundingApprovalForm({
                 </option>
               ))}
             </select>
+            {initialValues?.fundingApprovalId && clientId ? (
+              <input type="hidden" name="client_id" value={clientId} />
+            ) : null}
           </div>
 
           <div className="space-y-2">
@@ -274,33 +342,59 @@ export function FundingApprovalForm({
                   </option>
                 ))}
               </select>
-              <Button type="button" variant="outline" size="sm" asChild>
-                <Link href={newClaimHref}>Add new claim</Link>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  saveCurrentDraft()
+                  const returnToUrl = currentUrl
+                  const claimUrl = `/funding/claims/new?${clientId ? `client_id=${clientId}&` : ""}returnTo=${encodeURIComponent(returnToUrl)}`
+                  window.location.href = claimUrl
+                }}
+              >
+                Add new claim
               </Button>
             </div>
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="referrer_id">Referrer</Label>
-            <select
-              id="referrer_id"
-              name="referrer_id"
-              defaultValue={initialValues?.referrerId ?? ""}
-              className={selectClassName}
-            >
-              <option value="">Select referrer</option>
-              {referrers.map((referrer) => (
-                <option
-                  key={referrer.professionalId}
-                  value={referrer.professionalId}
-                >
-                  {referrer.lastName}, {referrer.firstName}
-                  {referrer.organisationName
-                    ? ` — ${referrer.organisationName}`
-                    : ""}
-                </option>
-              ))}
-            </select>
+            <div className="flex flex-wrap items-center gap-2">
+              <select
+                id="referrer_id"
+                name="referrer_id"
+                value={referrerId}
+                onChange={(event) => setReferrerId(event.target.value)}
+                className={selectClassName}
+              >
+                <option value="">Select referrer</option>
+                {referrers.map((referrer) => (
+                  <option
+                    key={referrer.professionalId}
+                    value={referrer.professionalId}
+                  >
+                    {referrer.lastName}, {referrer.firstName}
+                    {referrer.organisationName
+                      ? ` — ${referrer.organisationName}`
+                      : ""}
+                  </option>
+                ))}
+              </select>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  saveCurrentDraft()
+                  const returnToUrl = currentUrl
+                  const professionalUrl = `/contacts/professionals/new?returnTo=${encodeURIComponent(returnToUrl)}`
+                  window.location.href = professionalUrl
+                }}
+              >
+                Add new referrer
+              </Button>
+            </div>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">

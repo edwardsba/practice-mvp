@@ -554,6 +554,7 @@ export async function saveProfessionalOrganisationAction(
 export async function saveProfessionalAction(
   practiceId: string,
   professionalId: string | undefined,
+  returnTo: string | null,
   _prevState: ContactsFormState,
   formData: FormData
 ): Promise<ContactsFormState> {
@@ -579,6 +580,11 @@ export async function saveProfessionalAction(
     savedProfessionalId = result.professionalId
   } catch {
     return { error: "Unable to save professional. Please try again." }
+  }
+
+  if (returnTo) {
+    const separator = returnTo.includes("?") ? "&" : "?"
+    redirect(`${returnTo}${separator}created_referrer_id=${savedProfessionalId}`)
   }
 
   redirect(`/contacts/professionals/${savedProfessionalId}`)

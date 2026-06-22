@@ -45,6 +45,7 @@ export default async function NewClaimPage({
             : undefined
         }
         cancelHref={returnTo ?? "/funding/claims"}
+        returnTo={returnTo}
       />
     </AppShell>
   )

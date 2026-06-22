@@ -40,7 +40,8 @@ export default async function EditOrganisationPage({
         action={saveProfessionalOrganisationAction.bind(
           null,
           context.practiceId,
-          organisationId
+          organisationId,
+          null
         )}
         initialValues={{
           organisationName: organisation.organisationName,

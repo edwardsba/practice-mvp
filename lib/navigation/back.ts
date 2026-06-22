@@ -29,6 +29,9 @@ function labelForReturnTo(returnTo: string, defaultLabel: string): string {
   if (returnTo === "/calendar") {
     return "← Back to calendar"
   }
+  if (returnTo.startsWith("/contacts/professionals")) {
+    return "← Back to professional"
+  }
   return defaultLabel
 }
 

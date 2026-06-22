@@ -505,6 +505,7 @@ export async function upsertProfessional(
 export async function saveProfessionalOrganisationAction(
   practiceId: string,
   organisationId: string | undefined,
+  returnTo: string | null,
   _prevState: ContactsFormState,
   formData: FormData
 ): Promise<ContactsFormState> {
@@ -534,47 +535,12 @@ export async function saveProfessionalOrganisationAction(
     return { error: "Unable to save organisation. Please try again." }
   }
 
-  redirect(`/contacts/organisations/${savedOrganisationId}`)
-}
-
-export type CreateOrganisationDialogState = {
-  error?: string
-  organisationId?: string
-  organisationName?: string
-}
-
-export async function createOrganisationFromDialog(
-  practiceId: string,
-  _prevState: CreateOrganisationDialogState,
-  formData: FormData
-): Promise<CreateOrganisationDialogState> {
-  try {
-    const organisationName = String(formData.get("organisation_name") ?? "")
-
-    const result = await upsertProfessionalOrganisation(practiceId, {
-      organisationName,
-      organisationType: trimOrNull(formData.get("organisation_type")),
-      streetAddress: trimOrNull(formData.get("street_address")),
-      postalAddress: trimOrNull(formData.get("postal_address")),
-      phone: trimOrNull(formData.get("phone")),
-      fax: trimOrNull(formData.get("fax")),
-      email: trimOrNull(formData.get("email")),
-      claimsEmail: trimOrNull(formData.get("claims_email")),
-      secureMessaging: trimOrNull(formData.get("secure_messaging")),
-      website: trimOrNull(formData.get("website")),
-    })
-
-    if ("error" in result && result.error) {
-      return { error: result.error }
-    }
-
-    return {
-      organisationId: result.organisationId,
-      organisationName: organisationName.trim(),
-    }
-  } catch {
-    return { error: "Unable to create organisation. Please try again." }
+  if (returnTo) {
+    const separator = returnTo.includes("?") ? "&" : "?"
+    redirect(`${returnTo}${separator}created_organisation_id=${savedOrganisationId}`)
   }
+
+  redirect(`/contacts/organisations/${savedOrganisationId}`)
 }
 
 export async function saveProfessionalAction(

@@ -33,7 +33,6 @@ export default async function NewProfessionalPage() {
           context.practiceId,
           undefined
         )}
-        practiceId={context.practiceId}
         professions={professions}
         organisations={organisations}
         submitLabel="Save professional"

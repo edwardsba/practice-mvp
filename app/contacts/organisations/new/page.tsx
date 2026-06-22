@@ -1,32 +1,44 @@
+import Link from "next/link"
+
 import { AppShell } from "@/components/app-shell"
-import { BackButton } from "@/components/ui/back-button"
+import { Button } from "@/components/ui/button"
 import { OrganisationForm } from "@/components/contacts/organisation-form"
 import { saveProfessionalOrganisationAction } from "@/lib/actions/contacts"
 import { requirePractitionerContext } from "@/lib/auth"
+import { resolveBackNavigation } from "@/lib/navigation/back"
 
-export default async function NewOrganisationPage() {
+export default async function NewOrganisationPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ returnTo?: string }>
+}) {
   const context = await requirePractitionerContext()
+  const { returnTo } = await searchParams
+  const back = resolveBackNavigation(
+    returnTo,
+    "/contacts/organisations",
+    "← Back to organisations"
+  )
 
   return (
     <AppShell>
       <div className="mb-6">
-        <BackButton
-          fallbackHref="/contacts/organisations"
-          label="← Back to organisations"
-        />
+        <Button variant="ghost" size="sm" asChild className="mb-2 -ml-2">
+          <Link href={back.href}>{back.label}</Link>
+        </Button>
         <h1 className="text-2xl font-semibold tracking-tight">
           Add organisation
         </h1>
       </div>
-
       <OrganisationForm
         action={saveProfessionalOrganisationAction.bind(
           null,
           context.practiceId,
-          undefined
+          undefined,
+          returnTo ?? null
         )}
         submitLabel="Save organisation"
-        cancelHref="/contacts/organisations"
+        cancelHref={back.href}
       />
     </AppShell>
   )

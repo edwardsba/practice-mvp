@@ -76,29 +76,42 @@ export function ClientsTable({ clients }: { clients: ClientRow[] }) {
                 </TableCell>
               </TableRow>
             ) : (
-              filtered.map((client) => (
-                <TableRow key={client.clientId}>
-                  <TableCell>
-                    <Link
-                      href={`/clients/${client.clientId}`}
-                      className="font-medium text-primary hover:underline"
-                    >
-                      {client.firstName}
-                    </Link>
-                  </TableCell>
-                  <TableCell>
-                    <Link
-                      href={`/clients/${client.clientId}`}
-                      className="hover:underline"
-                    >
-                      {client.lastName}
-                    </Link>
-                  </TableCell>
-                  <TableCell>{client.email ?? "—"}</TableCell>
-                  <TableCell>{client.phone ?? "—"}</TableCell>
-                  <TableCell>{formatDate(client.dateOfBirth)}</TableCell>
-                </TableRow>
-              ))
+              filtered.map((client) => {
+                const clientHref = `/clients/${client.clientId}`
+
+                return (
+                  <TableRow
+                    key={client.clientId}
+                    className="cursor-pointer hover:bg-muted/50"
+                  >
+                    <TableCell>
+                      <Link href={clientHref} className="block font-medium text-primary hover:underline">
+                        {client.firstName}
+                      </Link>
+                    </TableCell>
+                    <TableCell>
+                      <Link href={clientHref} className="block hover:underline">
+                        {client.lastName}
+                      </Link>
+                    </TableCell>
+                    <TableCell>
+                      <Link href={clientHref} className="block">
+                        {client.email ?? "—"}
+                      </Link>
+                    </TableCell>
+                    <TableCell>
+                      <Link href={clientHref} className="block">
+                        {client.phone ?? "—"}
+                      </Link>
+                    </TableCell>
+                    <TableCell>
+                      <Link href={clientHref} className="block">
+                        {formatDate(client.dateOfBirth)}
+                      </Link>
+                    </TableCell>
+                  </TableRow>
+                )
+              })
             )}
           </TableBody>
         </Table>

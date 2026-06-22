@@ -50,21 +50,37 @@ export default async function FundingApprovalsPage() {
                 </TableCell>
               </TableRow>
             ) : (
-              approvals.map((approval) => (
-                <TableRow key={approval.fundingApprovalId}>
-                  <TableCell>
-                    <Link
-                      href={`/funding/approvals/${approval.fundingApprovalId}`}
-                      className="font-medium text-primary hover:underline"
-                    >
-                      {approval.clientLastName}, {approval.clientFirstName}
-                    </Link>
-                  </TableCell>
-                  <TableCell>{approval.approvalTypeName ?? "—"}</TableCell>
-                  <TableCell>{formatDisplayDate(approval.startDate)}</TableCell>
-                  <TableCell>{formatDisplayDate(approval.endDate)}</TableCell>
-                </TableRow>
-              ))
+              approvals.map((approval) => {
+                const approvalHref = `/funding/approvals/${approval.fundingApprovalId}`
+
+                return (
+                  <TableRow
+                    key={approval.fundingApprovalId}
+                    className="cursor-pointer hover:bg-muted/50"
+                  >
+                    <TableCell>
+                      <Link href={approvalHref} className="block font-medium text-primary hover:underline">
+                        {approval.clientLastName}, {approval.clientFirstName}
+                      </Link>
+                    </TableCell>
+                    <TableCell>
+                      <Link href={approvalHref} className="block">
+                        {approval.approvalTypeName ?? "—"}
+                      </Link>
+                    </TableCell>
+                    <TableCell>
+                      <Link href={approvalHref} className="block">
+                        {formatDisplayDate(approval.startDate)}
+                      </Link>
+                    </TableCell>
+                    <TableCell>
+                      <Link href={approvalHref} className="block">
+                        {formatDisplayDate(approval.endDate)}
+                      </Link>
+                    </TableCell>
+                  </TableRow>
+                )
+              })
             )}
           </TableBody>
         </Table>

@@ -51,21 +51,37 @@ export default async function FundingApprovalTypesPage() {
                 </TableCell>
               </TableRow>
             ) : (
-              types.map((type) => (
-                <TableRow key={type.fundingApprovalTypeId}>
-                  <TableCell>
-                    <Link
-                      href={`/funding/approval-types/${type.fundingApprovalTypeId}`}
-                      className="font-medium text-primary hover:underline"
-                    >
-                      {type.name}
-                    </Link>
-                  </TableCell>
-                  <TableCell>{type.claimTypeName ?? "—"}</TableCell>
-                  <TableCell>{type.appointmentsApproved ?? "—"}</TableCell>
-                  <TableCell>{type.durationMonths ?? "No limit"}</TableCell>
-                </TableRow>
-              ))
+              types.map((type) => {
+                const typeHref = `/funding/approval-types/${type.fundingApprovalTypeId}`
+
+                return (
+                  <TableRow
+                    key={type.fundingApprovalTypeId}
+                    className="cursor-pointer hover:bg-muted/50"
+                  >
+                    <TableCell>
+                      <Link href={typeHref} className="block font-medium text-primary hover:underline">
+                        {type.name}
+                      </Link>
+                    </TableCell>
+                    <TableCell>
+                      <Link href={typeHref} className="block">
+                        {type.claimTypeName ?? "—"}
+                      </Link>
+                    </TableCell>
+                    <TableCell>
+                      <Link href={typeHref} className="block">
+                        {type.appointmentsApproved ?? "—"}
+                      </Link>
+                    </TableCell>
+                    <TableCell>
+                      <Link href={typeHref} className="block">
+                        {type.durationMonths ?? "No limit"}
+                      </Link>
+                    </TableCell>
+                  </TableRow>
+                )
+              })
             )}
           </TableBody>
         </Table>

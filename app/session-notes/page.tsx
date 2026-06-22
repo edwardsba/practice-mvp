@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/table"
 import { formatClientNameLastFirst } from "@/lib/appointments/format"
 import { requirePractitionerContext } from "@/lib/auth"
+import { appendReturnTo } from "@/lib/navigation/back"
 import {
   SESSION_NOTE_FILTER_VALUES,
   type SessionNoteFilter,
@@ -48,6 +49,11 @@ export default async function SessionNotesPage({
     filter,
     clientId
   )
+  const listReturnTo = clientId
+    ? `/session-notes?client_id=${encodeURIComponent(clientId)}${
+        filter !== "all" ? `&filter=${filter}` : ""
+      }`
+    : null
 
   return (
     <AppShell>
@@ -75,14 +81,13 @@ export default async function SessionNotesPage({
               <TableHead>Time</TableHead>
               <TableHead>Client</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {notes.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={5}
+                  colSpan={4}
                   className="h-20 text-center text-muted-foreground"
                 >
                   No session notes yet.
@@ -94,35 +99,37 @@ export default async function SessionNotesPage({
                   note.clientFirstName,
                   note.clientLastName
                 )
+                const noteHref = listReturnTo
+                  ? appendReturnTo(
+                      `/session-notes/${note.sessionNoteId}`,
+                      listReturnTo
+                    )
+                  : `/session-notes/${note.sessionNoteId}`
 
                 return (
-                  <TableRow key={note.sessionNoteId}>
+                  <TableRow
+                    key={note.sessionNoteId}
+                    className="cursor-pointer hover:bg-muted/50"
+                  >
                     <TableCell>
-                      {formatSessionNoteDate(note.sessionDate)}
+                      <Link href={noteHref} className="block">
+                        {formatSessionNoteDate(note.sessionDate)}
+                      </Link>
                     </TableCell>
                     <TableCell>
-                      {formatSessionNoteTime(note.sessionTime)}
+                      <Link href={noteHref} className="block">
+                        {formatSessionNoteTime(note.sessionTime)}
+                      </Link>
                     </TableCell>
                     <TableCell>
-                      <Link
-                        href={`/clients/${note.clientId}`}
-                        className="font-medium text-primary hover:underline"
-                      >
+                      <Link href={noteHref} className="block">
                         {clientName}
                       </Link>
                     </TableCell>
                     <TableCell>
-                      {formatSessionNoteStatus(note.status)}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-3 text-sm">
-                        <Link
-                          href={`/session-notes/${note.sessionNoteId}`}
-                          className="text-primary hover:underline"
-                        >
-                          View
-                        </Link>
-                      </div>
+                      <Link href={noteHref} className="block">
+                        {formatSessionNoteStatus(note.status)}
+                      </Link>
                     </TableCell>
                   </TableRow>
                 )

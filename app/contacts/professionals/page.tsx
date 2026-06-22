@@ -47,36 +47,46 @@ export default async function ProfessionalsPage() {
                 </TableCell>
               </TableRow>
             ) : (
-              professionals.map((professional) => (
-                <TableRow key={professional.professionalId}>
-                  <TableCell>
-                    <Link
-                      href={`/contacts/professionals/${professional.professionalId}`}
-                      className="font-medium text-primary hover:underline"
-                    >
-                      {professional.lastName}, {professional.firstName}
-                    </Link>
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {professional.organisations.length === 0
-                      ? "—"
-                      : professional.organisations.map((org, index) => (
-                          <div key={`${org.name}-${index}`}>
-                            {org.name}
-                            {org.streetAddress || org.postalAddress ? (
-                              <span className="block text-xs">
-                                {formatOrganisationAddress(
-                                  org.streetAddress,
-                                  org.postalAddress
-                                )}
-                              </span>
-                            ) : null}
-                          </div>
-                        ))}
-                  </TableCell>
-                  <TableCell>{professional.professionName ?? "—"}</TableCell>
-                </TableRow>
-              ))
+              professionals.map((professional) => {
+                const professionalHref = `/contacts/professionals/${professional.professionalId}`
+
+                return (
+                  <TableRow
+                    key={professional.professionalId}
+                    className="cursor-pointer hover:bg-muted/50"
+                  >
+                    <TableCell>
+                      <Link href={professionalHref} className="block font-medium text-primary hover:underline">
+                        {professional.lastName}, {professional.firstName}
+                      </Link>
+                    </TableCell>
+                    <TableCell>
+                      <Link href={professionalHref} className="block text-sm text-muted-foreground">
+                        {professional.organisations.length === 0
+                          ? "—"
+                          : professional.organisations.map((org, index) => (
+                              <div key={`${org.name}-${index}`}>
+                                {org.name}
+                                {org.streetAddress || org.postalAddress ? (
+                                  <span className="block text-xs">
+                                    {formatOrganisationAddress(
+                                      org.streetAddress,
+                                      org.postalAddress
+                                    )}
+                                  </span>
+                                ) : null}
+                              </div>
+                            ))}
+                      </Link>
+                    </TableCell>
+                    <TableCell>
+                      <Link href={professionalHref} className="block">
+                        {professional.professionName ?? "—"}
+                      </Link>
+                    </TableCell>
+                  </TableRow>
+                )
+              })
             )}
           </TableBody>
         </Table>

@@ -74,14 +74,13 @@ export default async function AppointmentsPage({
               <TableHead>Duration</TableHead>
               <TableHead>Location</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {appointments.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={7}
+                  colSpan={6}
                   className="h-20 text-center text-muted-foreground"
                 >
                   No appointments scheduled.
@@ -93,45 +92,42 @@ export default async function AppointmentsPage({
                   appointment.clientFirstName,
                   appointment.clientLastName
                 )
+                const appointmentHref = `/appointments/${appointment.appointmentId}`
 
                 return (
-                  <TableRow key={appointment.appointmentId}>
+                  <TableRow
+                    key={appointment.appointmentId}
+                    className="cursor-pointer hover:bg-muted/50"
+                  >
                     <TableCell>
-                      {formatAppointmentDate(appointment.appointmentDate)}
+                      <Link href={appointmentHref} className="block">
+                        {formatAppointmentDate(appointment.appointmentDate)}
+                      </Link>
                     </TableCell>
                     <TableCell>
-                      {formatAppointmentTime(appointment.appointmentTime)}
+                      <Link href={appointmentHref} className="block">
+                        {formatAppointmentTime(appointment.appointmentTime)}
+                      </Link>
                     </TableCell>
                     <TableCell>
-                      <Link
-                        href={`/clients/${appointment.clientId}`}
-                        className="font-medium text-primary hover:underline"
-                      >
+                      <Link href={appointmentHref} className="block">
                         {clientName}
                       </Link>
                     </TableCell>
                     <TableCell>
-                      {formatAppointmentDuration(appointment.durationMinutes)}
+                      <Link href={appointmentHref} className="block">
+                        {formatAppointmentDuration(appointment.durationMinutes)}
+                      </Link>
                     </TableCell>
-                    <TableCell>{appointment.location?.trim() || "—"}</TableCell>
                     <TableCell>
-                      {formatAppointmentStatus(appointment.status)}
+                      <Link href={appointmentHref} className="block">
+                        {appointment.location?.trim() || "—"}
+                      </Link>
                     </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-3 text-sm">
-                        <Link
-                          href={`/appointments/${appointment.appointmentId}`}
-                          className="text-primary hover:underline"
-                        >
-                          View
-                        </Link>
-                        <Link
-                          href={`/appointments/${appointment.appointmentId}/edit`}
-                          className="text-primary hover:underline"
-                        >
-                          Edit
-                        </Link>
-                      </div>
+                    <TableCell>
+                      <Link href={appointmentHref} className="block">
+                        {formatAppointmentStatus(appointment.status)}
+                      </Link>
                     </TableCell>
                   </TableRow>
                 )

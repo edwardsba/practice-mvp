@@ -49,25 +49,35 @@ export default async function OrganisationsPage() {
                 </TableCell>
               </TableRow>
             ) : (
-              organisations.map((organisation) => (
-                <TableRow key={organisation.organisationId}>
-                  <TableCell>
-                    <Link
-                      href={`/contacts/organisations/${organisation.organisationId}`}
-                      className="font-medium text-primary hover:underline"
-                    >
-                      {organisation.organisationName}
-                    </Link>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {formatOrganisationAddress(
-                      organisation.streetAddress,
-                      organisation.postalAddress
-                    )}
-                  </TableCell>
-                  <TableCell>{organisation.organisationType ?? "—"}</TableCell>
-                </TableRow>
-              ))
+              organisations.map((organisation) => {
+                const organisationHref = `/contacts/organisations/${organisation.organisationId}`
+
+                return (
+                  <TableRow
+                    key={organisation.organisationId}
+                    className="cursor-pointer hover:bg-muted/50"
+                  >
+                    <TableCell>
+                      <Link href={organisationHref} className="block font-medium text-primary hover:underline">
+                        {organisation.organisationName}
+                      </Link>
+                    </TableCell>
+                    <TableCell>
+                      <Link href={organisationHref} className="block text-muted-foreground">
+                        {formatOrganisationAddress(
+                          organisation.streetAddress,
+                          organisation.postalAddress
+                        )}
+                      </Link>
+                    </TableCell>
+                    <TableCell>
+                      <Link href={organisationHref} className="block">
+                        {organisation.organisationType ?? "—"}
+                      </Link>
+                    </TableCell>
+                  </TableRow>
+                )
+              })
             )}
           </TableBody>
         </Table>

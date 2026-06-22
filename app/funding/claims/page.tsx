@@ -61,21 +61,37 @@ export default async function ClaimsPage({
                 </TableCell>
               </TableRow>
             ) : (
-              claims.map((claim) => (
-                <TableRow key={claim.claimId}>
-                  <TableCell>
-                    <Link
-                      href={`/funding/claims/${claim.claimId}`}
-                      className="font-medium text-primary hover:underline"
-                    >
-                      {claim.clientLastName}, {claim.clientFirstName}
-                    </Link>
-                  </TableCell>
-                  <TableCell>{claim.claimTypeName}</TableCell>
-                  <TableCell>{formatDisplayDate(claim.startDate)}</TableCell>
-                  <TableCell>{formatDisplayDate(claim.endDate)}</TableCell>
-                </TableRow>
-              ))
+              claims.map((claim) => {
+                const claimHref = `/funding/claims/${claim.claimId}`
+
+                return (
+                  <TableRow
+                    key={claim.claimId}
+                    className="cursor-pointer hover:bg-muted/50"
+                  >
+                    <TableCell>
+                      <Link href={claimHref} className="block font-medium text-primary hover:underline">
+                        {claim.clientLastName}, {claim.clientFirstName}
+                      </Link>
+                    </TableCell>
+                    <TableCell>
+                      <Link href={claimHref} className="block">
+                        {claim.claimTypeName}
+                      </Link>
+                    </TableCell>
+                    <TableCell>
+                      <Link href={claimHref} className="block">
+                        {formatDisplayDate(claim.startDate)}
+                      </Link>
+                    </TableCell>
+                    <TableCell>
+                      <Link href={claimHref} className="block">
+                        {formatDisplayDate(claim.endDate)}
+                      </Link>
+                    </TableCell>
+                  </TableRow>
+                )
+              })
             )}
           </TableBody>
         </Table>

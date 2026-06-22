@@ -68,32 +68,54 @@ export default async function AppointmentTypesPage() {
                 </TableCell>
               </TableRow>
             ) : (
-              types.map((type) => (
-                <TableRow key={type.appointmentTypeId}>
-                  <TableCell>
-                    <Link
-                      href={`/settings/appointment-types/${type.appointmentTypeId}`}
-                      className="font-medium text-primary hover:underline"
-                    >
-                      {type.nickname}
-                    </Link>
-                  </TableCell>
-                  <TableCell>{type.name}</TableCell>
-                  <TableCell>{type.claimTypeName ?? "—"}</TableCell>
-                  <TableCell>{type.referenceNumber ?? "—"}</TableCell>
-                  <TableCell>
-                    {formatAppointmentDuration(type.durationMinutes)}
-                  </TableCell>
-                  <TableCell>
-                    {type.currentFee
-                      ? formatCurrency(type.currentFee.total)
-                      : "—"}
-                  </TableCell>
-                  <TableCell>
-                    {formatAppointmentTypeStatus(type.status)}
-                  </TableCell>
-                </TableRow>
-              ))
+              types.map((type) => {
+                const typeHref = `/settings/appointment-types/${type.appointmentTypeId}`
+
+                return (
+                  <TableRow
+                    key={type.appointmentTypeId}
+                    className="cursor-pointer hover:bg-muted/50"
+                  >
+                    <TableCell>
+                      <Link href={typeHref} className="block font-medium text-primary hover:underline">
+                        {type.nickname}
+                      </Link>
+                    </TableCell>
+                    <TableCell>
+                      <Link href={typeHref} className="block">
+                        {type.name}
+                      </Link>
+                    </TableCell>
+                    <TableCell>
+                      <Link href={typeHref} className="block">
+                        {type.claimTypeName ?? "—"}
+                      </Link>
+                    </TableCell>
+                    <TableCell>
+                      <Link href={typeHref} className="block">
+                        {type.referenceNumber ?? "—"}
+                      </Link>
+                    </TableCell>
+                    <TableCell>
+                      <Link href={typeHref} className="block">
+                        {formatAppointmentDuration(type.durationMinutes)}
+                      </Link>
+                    </TableCell>
+                    <TableCell>
+                      <Link href={typeHref} className="block">
+                        {type.currentFee
+                          ? formatCurrency(type.currentFee.total)
+                          : "—"}
+                      </Link>
+                    </TableCell>
+                    <TableCell>
+                      <Link href={typeHref} className="block">
+                        {formatAppointmentTypeStatus(type.status)}
+                      </Link>
+                    </TableCell>
+                  </TableRow>
+                )
+              })
             )}
           </TableBody>
         </Table>

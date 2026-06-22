@@ -64,29 +64,39 @@ export default async function EmailTemplatesPage() {
                 </TableCell>
               </TableRow>
             ) : (
-              templates.map((template) => (
-                <TableRow key={template.emailTemplateId}>
-                  <TableCell>
-                    <Link
-                      href={`/settings/email-templates/${template.emailTemplateId}/edit`}
-                      className="font-medium text-primary hover:underline"
-                    >
-                      {template.name}
-                    </Link>
-                  </TableCell>
-                  <TableCell>
-                    {template.subject.trim()
-                      ? truncate(template.subject)
-                      : "—"}
-                  </TableCell>
-                  <TableCell>
-                    {template.hasActionButton ? "Yes" : "No"}
-                  </TableCell>
-                  <TableCell>
-                    {template.isActive ? "Active" : "Inactive"}
-                  </TableCell>
-                </TableRow>
-              ))
+              templates.map((template) => {
+                const templateHref = `/settings/email-templates/${template.emailTemplateId}/edit`
+
+                return (
+                  <TableRow
+                    key={template.emailTemplateId}
+                    className="cursor-pointer hover:bg-muted/50"
+                  >
+                    <TableCell>
+                      <Link href={templateHref} className="block font-medium text-primary hover:underline">
+                        {template.name}
+                      </Link>
+                    </TableCell>
+                    <TableCell>
+                      <Link href={templateHref} className="block">
+                        {template.subject.trim()
+                          ? truncate(template.subject)
+                          : "—"}
+                      </Link>
+                    </TableCell>
+                    <TableCell>
+                      <Link href={templateHref} className="block">
+                        {template.hasActionButton ? "Yes" : "No"}
+                      </Link>
+                    </TableCell>
+                    <TableCell>
+                      <Link href={templateHref} className="block">
+                        {template.isActive ? "Active" : "Inactive"}
+                      </Link>
+                    </TableCell>
+                  </TableRow>
+                )
+              })
             )}
           </TableBody>
         </Table>

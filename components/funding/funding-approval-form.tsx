@@ -35,6 +35,7 @@ import {
   APPROVAL_STATUS_LABELS,
   APPROVAL_STATUSES,
   formatDisplayDate,
+  isMedicareClaimType,
 } from "@/lib/funding/format"
 import {
   formatAppointmentDate,
@@ -64,6 +65,7 @@ type ApprovalTypeOption = {
 type ClaimOption = {
   claimId: string
   clientId: string
+  claimTypeId: string | null
   claimTypeName: string
   startDate?: string | null
 }
@@ -159,6 +161,23 @@ export function FundingApprovalForm({
         (type) => type.fundingApprovalTypeId === approvalTypeId
       ),
     [approvalTypes, approvalTypeId]
+  )
+
+  const selectedClaim = useMemo(
+    () => claims.find((claim) => claim.claimId === claimId) ?? null,
+    [claims, claimId]
+  )
+
+  const isMedicare = isMedicareClaimType(selectedClaim?.claimTypeName)
+
+  const filteredApprovalTypes = useMemo(
+    () =>
+      selectedClaim?.claimTypeId
+        ? approvalTypes.filter(
+            (type) => type.claimTypeId === selectedClaim.claimTypeId
+          )
+        : approvalTypes,
+    [approvalTypes, selectedClaim]
   )
 
   const filteredClaims = useMemo(
@@ -304,37 +323,33 @@ export function FundingApprovalForm({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="funding_approval_type_id">Funding approval type</Label>
-            <select
-              id="funding_approval_type_id"
-              name="funding_approval_type_id"
-              value={approvalTypeId}
-              onChange={(event) => setApprovalTypeId(event.target.value)}
-              className={selectClassName}
-            >
-              <option value="">Select approval type</option>
-              {approvalTypes.map((type) => (
-                <option
-                  key={type.fundingApprovalTypeId}
-                  value={type.fundingApprovalTypeId}
-                >
-                  {type.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="space-y-2">
             <Label htmlFor="claim_id">Claim</Label>
             <div className="flex flex-wrap items-center gap-2">
               <select
                 id="claim_id"
                 name="claim_id"
+                required
                 value={claimId}
-                onChange={(event) => setClaimId(event.target.value)}
+                onChange={(event) => {
+                  const newClaimId = event.target.value
+                  setClaimId(newClaimId)
+
+                  const newClaim = claims.find((c) => c.claimId === newClaimId)
+                  if (newClaim?.claimTypeId && approvalTypeId) {
+                    const stillValid = approvalTypes.some(
+                      (type) =>
+                        type.fundingApprovalTypeId === approvalTypeId &&
+                        type.claimTypeId === newClaim.claimTypeId
+                    )
+                    if (!stillValid) setApprovalTypeId("")
+                  }
+                  if (!newClaimId) setApprovalTypeId("")
+                }}
                 className={selectClassName}
               >
-                <option value="">Select claim</option>
+                <option value="" disabled>
+                  Select claim
+                </option>
                 {filteredClaims.map((claim) => (
                   <option key={claim.claimId} value={claim.claimId}>
                     {claim.claimTypeName}
@@ -359,11 +374,41 @@ export function FundingApprovalForm({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="referrer_id">Referrer</Label>
+            <Label htmlFor="funding_approval_type_id">Funding approval type</Label>
+            <select
+              id="funding_approval_type_id"
+              name="funding_approval_type_id"
+              required
+              value={approvalTypeId}
+              onChange={(event) => setApprovalTypeId(event.target.value)}
+              className={selectClassName}
+            >
+              <option value="" disabled>
+                Select approval type
+              </option>
+              {filteredApprovalTypes.map((type) => (
+                <option
+                  key={type.fundingApprovalTypeId}
+                  value={type.fundingApprovalTypeId}
+                >
+                  {type.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="referrer_id">
+              Referrer
+              {isMedicare ? (
+                <span className="ml-1 text-destructive">*</span>
+              ) : null}
+            </Label>
             <div className="flex flex-wrap items-center gap-2">
               <select
                 id="referrer_id"
                 name="referrer_id"
+                required={isMedicare}
                 value={referrerId}
                 onChange={(event) => setReferrerId(event.target.value)}
                 className={selectClassName}
@@ -395,6 +440,11 @@ export function FundingApprovalForm({
                 Add new referrer
               </Button>
             </div>
+            {isMedicare ? (
+              <p className="text-xs text-muted-foreground">
+                Required for Medicare claims.
+              </p>
+            ) : null}
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">

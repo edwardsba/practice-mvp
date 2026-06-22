@@ -299,6 +299,7 @@ export async function getClaims(practiceId: string) {
       clientId: claims.clientId,
       clientFirstName: clients.firstName,
       clientLastName: clients.lastName,
+      claimTypeId: claims.claimTypeId,
       claimTypeName: claimTypes.claimTypeName,
       startDate: claims.startDate,
       endDate: claims.endDate,
@@ -1014,6 +1015,7 @@ export async function getClaimsForClientDropdown(
   return db
     .select({
       claimId: claims.claimId,
+      claimTypeId: claims.claimTypeId,
       claimTypeName: claimTypes.claimTypeName,
       startDate: claims.startDate,
       endDate: claims.endDate,

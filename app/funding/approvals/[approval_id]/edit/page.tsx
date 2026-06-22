@@ -52,6 +52,7 @@ export default async function EditFundingApprovalPage({
         claims={claims.map((claim) => ({
           claimId: claim.claimId,
           clientId: approval.clientId,
+          claimTypeId: claim.claimTypeId,
           claimTypeName: claim.claimTypeName,
           startDate: claim.startDate,
         }))}

@@ -41,6 +41,8 @@ This link expires on {expiry_date}.
 export const APPOINTMENT_CONTEXT_TEMPLATE_KEYS: string[] = [
   "appointment_reminder",
   "pre_session_questionnaire",
+  "send_assessment",
+  "post_session",
 ]
 
 export type EmailVariableAvailability =

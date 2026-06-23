@@ -2,7 +2,7 @@ import Link from "next/link"
 import { notFound } from "next/navigation"
 
 import { createDraftSessionNote } from "@/app/session-notes/actions"
-import { markAppointmentNoShow } from "@/app/appointments/actions"
+import { AppointmentStatusControl } from "@/components/appointments/appointment-status-control"
 import { AppShell } from "@/components/app-shell"
 import { Button } from "@/components/ui/button"
 import {
@@ -21,7 +21,6 @@ import {
 } from "@/components/ui/table"
 import { formatCurrency } from "@/lib/appointment-types/format"
 import {
-  formatAppointmentStatus,
   formatAppointmentTime,
   formatAutomationTimestamp,
   formatClientNameLastFirst,
@@ -74,9 +73,6 @@ export default async function AppointmentDetailPage({
     "← Back to appointments"
   )
   const notes = appointment.notes?.trim() ?? ""
-  const showNoShowButton = ["scheduled", "confirmed", "completed"].includes(
-    appointment.status
-  )
 
   return (
     <AppShell>
@@ -257,16 +253,21 @@ export default async function AppointmentDetailPage({
             <div>
               <dt className="text-sm text-muted-foreground">Status</dt>
               <dd className="font-medium">
-                {formatAppointmentStatus(appointment.status)}
+                <AppointmentStatusControl
+                  appointmentId={appointmentId}
+                  currentStatus={appointment.status}
+                />
               </dd>
             </div>
-            {showNoShowButton ? (
-              <div className="sm:col-span-2">
-                <form action={markAppointmentNoShow.bind(null, appointmentId)}>
-                  <Button type="submit" variant="outline" size="sm">
-                    Mark as No-show
-                  </Button>
-                </form>
+            {appointment.cancelledAt ? (
+              <div>
+                <dt className="text-sm text-muted-foreground">Cancelled</dt>
+                <dd className="font-medium">
+                  {formatAutomationTimestamp(appointment.cancelledAt)}
+                  {appointment.cancellationSource
+                    ? ` (${appointment.cancellationSource})`
+                    : ""}
+                </dd>
               </div>
             ) : null}
             <div className={notes.length > 80 ? "sm:col-span-2" : undefined}>

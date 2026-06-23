@@ -14,6 +14,31 @@ import {
   countNonFinalisedSessionNotesByAppointment,
   logDeleteAuditEvent,
 } from "@/lib/delete/delete-utils"
+import { APPOINTMENT_STATUS_TRANSITIONS } from "@/lib/status"
+
+type DbTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0]
+
+async function applyAppointmentCancellation(
+  tx: DbTransaction,
+  appointmentId: string,
+  practiceId: string,
+  source: "practitioner" | "client"
+) {
+  await tx
+    .update(appointments)
+    .set({
+      status: "cancelled",
+      cancelledAt: new Date(),
+      cancellationSource: source,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(appointments.appointmentId, appointmentId),
+        eq(appointments.practiceId, practiceId)
+      )
+    )
+}
 
 export type AppointmentFormState = {
   error?: string
@@ -139,7 +164,7 @@ export async function createAppointment(
           fundingApprovalId: parsed.fundingApprovalId,
           appointmentTypeId: parsed.appointmentTypeId,
           membershipId: parsed.membershipId,
-          status: parsed.status,
+          status: "scheduled",
           notes: parsed.notes,
           updatedAt: now,
         })
@@ -209,7 +234,6 @@ export async function updateAppointment(
           fundingApprovalId: parsed.fundingApprovalId,
           appointmentTypeId: parsed.appointmentTypeId,
           membershipId: parsed.membershipId,
-          status: parsed.status,
           notes: parsed.notes,
           updatedAt: now,
         })
@@ -294,15 +318,14 @@ export async function deleteAppointment(
   }
 
   try {
-    await db
-      .update(appointments)
-      .set({ status: "cancelled", updatedAt: new Date() })
-      .where(
-        and(
-          eq(appointments.appointmentId, appointmentId),
-          eq(appointments.practiceId, practiceId)
-        )
+    await db.transaction(async (tx) => {
+      await applyAppointmentCancellation(
+        tx,
+        appointmentId,
+        practiceId,
+        "practitioner"
       )
+    })
 
     await logDeleteAuditEvent({
       practiceId,
@@ -322,6 +345,69 @@ export async function deleteAppointment(
   redirect("/appointments")
 }
 
+export async function transitionAppointmentStatus(
+  appointmentId: string,
+  newStatus: string
+): Promise<{ error?: string }> {
+  const context = await requirePractitionerContext()
+  const appointment = await loadAppointmentForPractice(
+    appointmentId,
+    context.practiceId
+  )
+
+  if (!appointment) {
+    return { error: "Appointment not found." }
+  }
+
+  const allowedTransitions =
+    APPOINTMENT_STATUS_TRANSITIONS[appointment.status] ?? []
+  if (!allowedTransitions.includes(newStatus)) {
+    return { error: "Invalid status transition." }
+  }
+
+  const now = new Date()
+
+  await db.transaction(async (tx) => {
+    if (newStatus === "cancelled") {
+      await applyAppointmentCancellation(
+        tx,
+        appointmentId,
+        context.practiceId,
+        "practitioner"
+      )
+    } else {
+      await tx
+        .update(appointments)
+        .set({
+          status: newStatus,
+          updatedAt: now,
+        })
+        .where(
+          and(
+            eq(appointments.appointmentId, appointmentId),
+            eq(appointments.practiceId, context.practiceId)
+          )
+        )
+    }
+
+    await tx.insert(auditEvents).values({
+      practiceId: context.practiceId,
+      userId: context.userId,
+      clientId: appointment.clientId,
+      eventType: "appointment.status_changed",
+      entityType: "appointment",
+      entityId: appointmentId,
+    })
+  })
+
+  revalidatePath(`/appointments/${appointmentId}`)
+  revalidatePath("/appointments")
+  revalidatePath(`/clients/${appointment.clientId}`)
+
+  return {}
+}
+
+/** @deprecated Use transitionAppointmentStatus instead. */
 export async function markAppointmentNoShow(
   appointmentId: string
 ): Promise<void> {

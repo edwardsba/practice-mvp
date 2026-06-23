@@ -18,6 +18,8 @@ export const appointments = pgTable('appointments', {
   appointmentTypeId: uuid('appointment_type_id'),
   membershipId: uuid('membership_id'),
   status: text('status').notNull().default('scheduled'),
+  cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
+  cancellationSource: text('cancellation_source'),
   notes: text('notes'),
   reminderSentAt: timestamp('reminder_sent_at', { withTimezone: true }),
   preSessionBatterySentAt: timestamp('pre_session_battery_sent_at', {

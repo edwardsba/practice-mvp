@@ -77,7 +77,6 @@ export default async function EditAppointmentPage({
           fundingApprovalId: appointment.fundingApprovalId,
           appointmentTypeId: appointment.appointmentTypeId,
           membershipId: appointment.membershipId ?? "",
-          status: appointment.status,
           notes: appointment.notes,
         }}
         submitLabel="Save appointment"

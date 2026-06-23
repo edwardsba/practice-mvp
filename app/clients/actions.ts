@@ -36,6 +36,7 @@ export async function getActiveClients() {
       email: clients.email,
       phone: clients.phone,
       dateOfBirth: clients.dateOfBirth,
+      clientStatus: clients.clientStatus,
     })
     .from(clients)
     .where(

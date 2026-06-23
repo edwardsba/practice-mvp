@@ -6,8 +6,10 @@ import { ActionItemsSection } from "@/app/clients/[client_id]/action-items-secti
 import { ClientMenuSidebar } from "@/app/clients/[client_id]/client-menu-sidebar"
 import { ExportSessionNotesButton } from "@/components/session-notes/export-session-notes-button"
 import { EmergencyContactsSection } from "@/components/emergency-contacts/emergency-contacts-section"
+import { ClientStatusControl } from "@/components/clients/client-status-control"
 import { AppShell } from "@/components/app-shell"
 import { BackButton } from "@/components/ui/back-button"
+import { StatusBadge } from "@/components/ui/status-badge"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -29,7 +31,7 @@ import {
   formatAppointmentDate,
   formatAppointmentTime,
 } from "@/lib/appointments/format"
-import { loadNextAppointmentForClient } from "@/lib/appointments/load"
+import { loadNextAppointmentForClient, loadAttendanceRiskForClient } from "@/lib/appointments/load"
 import {
   loadActiveCrisisPlanSummary,
   loadEmergencyContacts,
@@ -41,6 +43,7 @@ import { formatApprovalProgress, formatDisplayDate } from "@/lib/funding/format"
 import { buildTemplateVariablesFromLinkResponse } from "@/lib/email/link-response"
 import { getQuestionnaireEmailContext } from "@/lib/email/practitioner-context"
 import { loadActiveTreatmentPlanSummary } from "@/lib/treatment-plans/load"
+import { ATTENDANCE_RISK_CONFIG } from "@/lib/status"
 
 function formatDate(value: Date | string | null) {
   if (!value) return "—"
@@ -83,6 +86,7 @@ export default async function ClientDetailPage({
     emailContext,
     nextAppointment,
     fundingPanelRows,
+    attendanceRisk,
   ] = await Promise.all([
     loadActiveTreatmentPlanSummary(clientId, context.practiceId),
     loadActiveCrisisPlanSummary(clientId, context.practiceId),
@@ -92,6 +96,7 @@ export default async function ClientDetailPage({
     ),
     loadNextAppointmentForClient(clientId, context.practiceId),
     getFundingPanelByClientId(clientId),
+    loadAttendanceRiskForClient(clientId, context.practiceId),
   ])
 
   const clientEmail = client.email?.trim() || null
@@ -152,6 +157,24 @@ export default async function ClientDetailPage({
                   <dt className="text-sm text-muted-foreground">Date of birth</dt>
                   <dd className="font-medium">
                     {formatDate(client.dateOfBirth)}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-sm text-muted-foreground">Client status</dt>
+                  <dd className="font-medium">
+                    <ClientStatusControl
+                      clientId={clientId}
+                      currentStatus={client.clientStatus}
+                    />
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-sm text-muted-foreground">Attendance</dt>
+                  <dd className="font-medium">
+                    <StatusBadge
+                      status={attendanceRisk.tier}
+                      statusMap={ATTENDANCE_RISK_CONFIG}
+                    />
                   </dd>
                 </div>
                 <div className="sm:col-span-2">

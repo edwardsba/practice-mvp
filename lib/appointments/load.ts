@@ -14,6 +14,10 @@ import {
   professionals,
 } from "@/db/schema"
 import type { AppointmentFilter } from "@/lib/appointments/constants"
+import {
+  calculateAttendanceRisk,
+  type AttendanceRisk,
+} from "@/lib/appointments/attendance-score"
 import { pickCurrentFee } from "@/lib/appointment-types/format"
 import { todayDateString } from "@/lib/appointments/format"
 import { db } from "@/lib/db"
@@ -108,6 +112,8 @@ export async function loadAppointmentForPractice(
       appointmentTypeId: appointments.appointmentTypeId,
       membershipId: appointments.membershipId,
       status: appointments.status,
+      cancelledAt: appointments.cancelledAt,
+      cancellationSource: appointments.cancellationSource,
       notes: appointments.notes,
       reminderSentAt: appointments.reminderSentAt,
       preSessionBatterySentAt: appointments.preSessionBatterySentAt,
@@ -283,4 +289,33 @@ export async function loadNextAppointmentForClient(
     .limit(1)
 
   return row ?? null
+}
+
+export async function loadAttendanceRiskForClient(
+  clientId: string,
+  practiceId: string
+): Promise<AttendanceRisk> {
+  const rows = await db
+    .select({
+      status: appointments.status,
+      appointmentDate: appointments.appointmentDate,
+      appointmentTime: appointments.appointmentTime,
+      cancelledAt: appointments.cancelledAt,
+    })
+    .from(appointments)
+    .where(
+      and(
+        eq(appointments.clientId, clientId),
+        eq(appointments.practiceId, practiceId)
+      )
+    )
+
+  return calculateAttendanceRisk(
+    rows.map((row) => ({
+      status: row.status,
+      appointmentDate: row.appointmentDate,
+      appointmentTime: row.appointmentTime,
+      cancelledAt: row.cancelledAt,
+    }))
+  )
 }

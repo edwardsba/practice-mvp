@@ -3,6 +3,7 @@ import Link from "next/link"
 import { AppointmentsFilter } from "@/app/appointments/appointments-filter"
 import { TestAutomationsButton } from "@/app/appointments/test-automations-button"
 import { AppShell } from "@/components/app-shell"
+import { StatusBadge } from "@/components/ui/status-badge"
 import { Button } from "@/components/ui/button"
 import {
   Table,
@@ -19,12 +20,12 @@ import {
 import {
   formatAppointmentDate,
   formatAppointmentDuration,
-  formatAppointmentStatus,
   formatAppointmentTime,
   formatClientNameLastFirst,
 } from "@/lib/appointments/format"
 import { loadAppointmentsForPractice } from "@/lib/appointments/load"
 import { requirePractitionerContext } from "@/lib/auth"
+import { APPOINTMENT_STATUS_CONFIG } from "@/lib/status"
 
 function parseFilter(value: string | undefined): AppointmentFilter {
   if (value && APPOINTMENT_FILTER_VALUES.includes(value as AppointmentFilter)) {
@@ -126,7 +127,10 @@ export default async function AppointmentsPage({
                     </TableCell>
                     <TableCell>
                       <Link href={appointmentHref} className="block">
-                        {formatAppointmentStatus(appointment.status)}
+                        <StatusBadge
+                          status={appointment.status}
+                          statusMap={APPOINTMENT_STATUS_CONFIG}
+                        />
                       </Link>
                     </TableCell>
                   </TableRow>

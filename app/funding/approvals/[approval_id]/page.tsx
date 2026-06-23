@@ -18,15 +18,16 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { BackButton } from "@/components/ui/back-button"
+import { StatusBadge } from "@/components/ui/status-badge"
 import { getFundingApprovalById } from "@/lib/actions/funding"
 import {
-  APPROVAL_STATUS_LABELS,
   formatApprovalProgress,
   formatDisplayDate,
   formatMedicareIdentifier,
   isInsuranceClaimType,
   isMedicareClaimType,
 } from "@/lib/funding/format"
+import { FUNDING_APPROVAL_STATUS_CONFIG } from "@/lib/status"
 import {
   formatAppointmentDate,
   formatAppointmentTime,
@@ -156,9 +157,10 @@ export default async function FundingApprovalDetailPage({
             <div>
               <dt className="text-sm text-muted-foreground">Approval status</dt>
               <dd className="font-medium">
-                {APPROVAL_STATUS_LABELS[
-                  approval.approvalStatus as keyof typeof APPROVAL_STATUS_LABELS
-                ] ?? approval.approvalStatus}
+                <StatusBadge
+                  status={approval.approvalStatus}
+                  statusMap={FUNDING_APPROVAL_STATUS_CONFIG}
+                />
               </dd>
             </div>
           </dl>

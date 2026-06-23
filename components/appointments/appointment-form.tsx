@@ -21,8 +21,6 @@ import {
   APPOINTMENT_DURATIONS,
   APPOINTMENT_MODE_LABELS,
   APPOINTMENT_MODES,
-  APPOINTMENT_STATUS_LABELS,
-  APPOINTMENT_STATUSES,
   buildAppointmentTimeOptions,
 } from "@/lib/appointments/constants"
 import {
@@ -65,7 +63,6 @@ type AppointmentInitialValues = {
   fundingApprovalId?: string | null
   appointmentTypeId?: string | null
   membershipId?: string | null
-  status: string
   notes: string | null
 }
 
@@ -362,22 +359,6 @@ export function AppointmentForm({
                     value={membership.membershipId}
                   >
                     {membership.practiceName}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="status">Status</Label>
-              <select
-                id="status"
-                name="status"
-                required
-                defaultValue={initialValues?.status ?? "scheduled"}
-                className={selectClassName}
-              >
-                {APPOINTMENT_STATUSES.map((status) => (
-                  <option key={status} value={status}>
-                    {APPOINTMENT_STATUS_LABELS[status]}
                   </option>
                 ))}
               </select>

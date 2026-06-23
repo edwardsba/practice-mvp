@@ -4,6 +4,7 @@ import Link from "next/link"
 import { useMemo, useState } from "react"
 
 import { Input } from "@/components/ui/input"
+import { StatusBadge } from "@/components/ui/status-badge"
 import {
   Table,
   TableBody,
@@ -12,6 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { CLIENT_STATUS_CONFIG } from "@/lib/status"
 
 export type ClientRow = {
   clientId: string
@@ -20,6 +22,7 @@ export type ClientRow = {
   email: string | null
   phone: string | null
   dateOfBirth: string | null
+  clientStatus: string
 }
 
 function formatDate(value: string | null) {
@@ -61,6 +64,7 @@ export function ClientsTable({ clients }: { clients: ClientRow[] }) {
             <TableRow>
               <TableHead>First name</TableHead>
               <TableHead>Last name</TableHead>
+              <TableHead>Status</TableHead>
               <TableHead>Email</TableHead>
               <TableHead>Phone</TableHead>
               <TableHead>Date of birth</TableHead>
@@ -69,7 +73,7 @@ export function ClientsTable({ clients }: { clients: ClientRow[] }) {
           <TableBody>
             {filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
+                <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
                   {clients.length === 0
                     ? "No clients yet. Add your first client to get started."
                     : "No clients match your search."}
@@ -92,6 +96,14 @@ export function ClientsTable({ clients }: { clients: ClientRow[] }) {
                     <TableCell>
                       <Link href={clientHref} className="block hover:underline">
                         {client.lastName}
+                      </Link>
+                    </TableCell>
+                    <TableCell>
+                      <Link href={clientHref} className="block">
+                        <StatusBadge
+                          status={client.clientStatus}
+                          statusMap={CLIENT_STATUS_CONFIG}
+                        />
                       </Link>
                     </TableCell>
                     <TableCell>

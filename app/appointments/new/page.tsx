@@ -62,7 +62,6 @@ export default async function NewAppointmentPage({
                 appointmentDate: date,
                 appointmentTime: prefilledTime ?? "",
                 durationMinutes: 50,
-                status: "scheduled",
                 notes: null,
               }
             : undefined

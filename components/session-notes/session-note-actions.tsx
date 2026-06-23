@@ -10,8 +10,9 @@ import {
   type FinaliseSessionNoteState,
   type GenerateSessionNotePdfPreviewState,
 } from "@/app/session-notes/actions"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { StatusBadge } from "@/components/ui/status-badge"
+import { SESSION_NOTE_STATUS_CONFIG } from "@/lib/status"
 
 const initialFinaliseState: FinaliseSessionNoteState = {}
 const initialPreviewState: GenerateSessionNotePdfPreviewState = {}
@@ -71,9 +72,12 @@ export function SessionNoteActions({
   return (
     <>
       <div className="no-print mb-6 flex flex-wrap items-center gap-3">
+        <StatusBadge
+          status={isFinalised ? "finalised" : status}
+          statusMap={SESSION_NOTE_STATUS_CONFIG}
+        />
         {isFinalised ? (
           <>
-            <Badge variant="success">Finalised</Badge>
             {pdfStoragePath ? (
               <Button
                 type="button"

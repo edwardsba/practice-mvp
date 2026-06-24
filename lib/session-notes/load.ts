@@ -1,6 +1,6 @@
 import { and, asc, desc, eq, gt, or } from "drizzle-orm"
 
-import { appointments, clients, sessionNotes } from "@/db/schema"
+import { appointments, batteryInstances, clients, sessionNotes } from "@/db/schema"
 import type { SessionNoteFilter } from "@/lib/session-notes/constants"
 import { db } from "@/lib/db"
 
@@ -31,9 +31,16 @@ export async function loadSessionNotesForPractice(
       pdfStoragePath: sessionNotes.pdfStoragePath,
       clientFirstName: clients.firstName,
       clientLastName: clients.lastName,
+      preSessionBatterySentAt: appointments.preSessionBatterySentAt,
+      batteryStatus: batteryInstances.status,
     })
     .from(sessionNotes)
     .innerJoin(clients, eq(sessionNotes.clientId, clients.clientId))
+    .leftJoin(appointments, eq(sessionNotes.appointmentId, appointments.appointmentId))
+    .leftJoin(
+      batteryInstances,
+      eq(sessionNotes.batteryInstanceId, batteryInstances.batteryInstanceId)
+    )
     .where(and(...conditions))
     .orderBy(desc(sessionNotes.sessionDate), desc(sessionNotes.sessionTime))
 }

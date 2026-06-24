@@ -61,6 +61,11 @@ export const ATTENDANCE_RISK_CONFIG: Record<string, StatusConfig> = {
   insufficient: { label: "New client", variant: "muted" },
 }
 
+export const PSQ_STATUS_CONFIG: Record<string, StatusConfig> = {
+  sent: { label: "Sent", variant: "warning" },
+  completed: { label: "Completed", variant: "success" },
+}
+
 export function getStatusConfig(
   map: Record<string, StatusConfig>,
   status: string

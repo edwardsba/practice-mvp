@@ -40,7 +40,7 @@ export function derivePsqStatus(
   preSessionBatterySentAt: Date | null | undefined,
   batteryStatus: string | null | undefined
 ): PsqStatus {
-  if (batteryStatus === "completed") return "completed"
+  if (batteryStatus === "submitted") return "completed"
   if (preSessionBatterySentAt != null) return "sent"
   return "not_sent"
 }

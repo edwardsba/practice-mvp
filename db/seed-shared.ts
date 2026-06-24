@@ -15,7 +15,7 @@ export const IMPAIRMENT_OPTIONS = [
   { label: "Extremely difficult", value: "extremely_difficult", score: 0, order: 4 },
 ] as const
 
-export const PSQ_RESPONSE_OPTIONS = [
+export const PSF_RESPONSE_OPTIONS = [
   { label: "Strongly disagree", value: "-2", score: -2, order: 1 },
   { label: "Disagree", value: "-1", score: -1, order: 2 },
   { label: "Neutral", value: "0", score: 0, order: 3 },

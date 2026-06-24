@@ -34,7 +34,7 @@ import {
   PHQ9_IMPAIRMENT_ELEMENT_KEY,
 } from "@/lib/assessments/impairment"
 import { getMaxScoreForAssessmentDefinition } from "@/lib/assessments/max-score"
-import { calculatePsqScore } from "@/lib/assessments/psq"
+import { calculatePsfScore } from "@/lib/assessments/psf"
 import { requirePractitionerContext } from "@/lib/auth"
 import { db } from "@/lib/db"
 
@@ -119,7 +119,7 @@ export default async function AssessmentResultDetailPage({
   }
 
   const isAsq = result.assessmentCode === "ASQ"
-  const isPsq = result.assessmentCode === "PSQ"
+  const isPsf = result.assessmentCode === "PSF"
 
   const responses = await db
     .select({
@@ -156,8 +156,8 @@ export default async function AssessmentResultDetailPage({
 
   const clientName = `${client.firstName} ${client.lastName}`
 
-  if (isPsq) {
-    const psqResult = calculatePsqScore(
+  if (isPsf) {
+    const psfResult = calculatePsfScore(
       responses.map((response) => response.scoreValue)
     )
 
@@ -213,7 +213,7 @@ export default async function AssessmentResultDetailPage({
                   Positive feedback
                 </dt>
                 <dd className="font-medium tabular-nums">
-                  {psqResult.positiveFeedback}/10
+                  {psfResult.positiveFeedback}/10
                 </dd>
               </div>
               <div>
@@ -221,7 +221,7 @@ export default async function AssessmentResultDetailPage({
                   Negative feedback
                 </dt>
                 <dd className="font-medium tabular-nums">
-                  {psqResult.negativeFeedback}/10
+                  {psfResult.negativeFeedback}/10
                 </dd>
               </div>
             </dl>

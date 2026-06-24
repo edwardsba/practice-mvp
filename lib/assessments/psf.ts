@@ -1,12 +1,12 @@
-export type PsqScoreResult = {
+export type PsfScoreResult = {
   positiveFeedback: number
   negativeFeedback: number
   netScore: number
 }
 
-export function calculatePsqScore(
+export function calculatePsfScore(
   responseScores: number[]
-): PsqScoreResult {
+): PsfScoreResult {
   let positiveFeedback = 0
   let negativeFeedback = 0
 
@@ -22,6 +22,6 @@ export function calculatePsqScore(
   }
 }
 
-export function formatPsqSeverity(result: PsqScoreResult): string {
+export function formatPsfSeverity(result: PsfScoreResult): string {
   return `Positive ${result.positiveFeedback}/10, Negative ${result.negativeFeedback}/10`
 }

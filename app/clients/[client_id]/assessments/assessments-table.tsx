@@ -20,7 +20,7 @@ const FILTER_OPTIONS = [
   { value: "ASSIST", label: "ASSIST" },
   { value: "ASQ", label: "ASQ" },
   { value: "BTP", label: "BTP" },
-  { value: "PSQ", label: "PSQ" },
+  { value: "PSF", label: "Post-Session Feedback" },
 ] as const
 
 const ASSESSMENT_TYPE_LABELS: Record<string, string> = {
@@ -29,7 +29,7 @@ const ASSESSMENT_TYPE_LABELS: Record<string, string> = {
   ASSIST: "ASSIST",
   ASQ: "ASQ",
   BTP: "BTP",
-  PSQ: "PSQ",
+  PSF: "Post-Session Feedback",
 }
 
 type AssessmentResultRow = {
@@ -57,7 +57,7 @@ function formatAssessmentType(code: string, name: string) {
 }
 
 function formatScore(result: AssessmentResultRow) {
-  if (result.assessmentCode === "PSQ") {
+  if (result.assessmentCode === "PSF") {
     return result.score > 0 ? `+${result.score}` : String(result.score)
   }
   return String(result.score)
@@ -70,7 +70,7 @@ function formatSeverityOrRisk(result: AssessmentResultRow) {
   if (result.assessmentCode === "BTP") {
     return "—"
   }
-  if (result.assessmentCode === "PSQ") {
+  if (result.assessmentCode === "PSF") {
     return result.severity ?? "—"
   }
   return result.severity ?? "—"
@@ -162,7 +162,7 @@ export function AssessmentsTable({
                     <TableCell
                       className={cn(
                         result.assessmentCode !== "ASQ" &&
-                          result.assessmentCode !== "PSQ" &&
+                          result.assessmentCode !== "PSF" &&
                           "capitalize"
                       )}
                     >

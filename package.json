@@ -35,7 +35,7 @@
     "db:assessment-instance-links": "tsx db/apply-assessment-instance-links-migration.ts",
     "db:session-note-pdf-storage-path": "tsx db/apply-session-note-pdf-storage-path-migration.ts",
     "db:seed-email-templates": "tsx db/seed-email-templates.ts",
-    "db:seed-psq": "npx tsx db/seed-psq.ts"
+    "db:seed-psf": "npx tsx db/seed-psf.ts"
   },
   "dependencies": {
     "@react-pdf/renderer": "^4.5.1",

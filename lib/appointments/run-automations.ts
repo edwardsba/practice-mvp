@@ -553,7 +553,7 @@ async function processPostSessionQuestionnaires(
         clientId: row.clientId,
         practiceId: row.practiceId,
         practitionerProfileId: row.practitionerProfileId,
-        assessmentCode: "PSQ",
+        assessmentCode: "PSF",
         userId: null,
         appointmentId: row.appointmentId,
       })

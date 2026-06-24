@@ -8,11 +8,11 @@ import {
   assessmentElements,
   assessmentOptions,
 } from "./schema"
-import { PSQ_RESPONSE_OPTIONS } from "./seed-shared"
+import { PSF_RESPONSE_OPTIONS } from "./seed-shared"
 
 config({ path: ".env.local" })
 
-const PSQ_QUESTIONS = [
+const PSF_QUESTIONS = [
   "I am clearer about my therapeutic goals or how to achieve them",
   "I am making progress in my therapy, I have new solutions to my problem, or more hope",
   "I feel understood, supported, reassured, validated, or encouraged",
@@ -32,11 +32,11 @@ async function main() {
   const [existing] = await db
     .select({ assessmentDefinitionId: assessmentDefinitions.assessmentDefinitionId })
     .from(assessmentDefinitions)
-    .where(eq(assessmentDefinitions.assessmentCode, "PSQ"))
+    .where(eq(assessmentDefinitions.assessmentCode, "PSF"))
     .limit(1)
 
   if (existing) {
-    console.log("PSQ assessment already seeded — skipping.")
+    console.log("PSF assessment already seeded — skipping.")
     await pool.end()
     return
   }
@@ -44,8 +44,8 @@ async function main() {
   const [definition] = await db
     .insert(assessmentDefinitions)
     .values({
-      assessmentCode: "PSQ",
-      assessmentName: "Post-Session Questionnaire",
+      assessmentCode: "PSF",
+      assessmentName: "Post-Session Feedback",
       assessmentType: "psychometric_assessment",
       description:
         "As a result of this session... Please choose the answer that best describes you.",
@@ -56,14 +56,14 @@ async function main() {
     })
     .returning({ assessmentDefinitionId: assessmentDefinitions.assessmentDefinitionId })
 
-  for (let i = 0; i < PSQ_QUESTIONS.length; i++) {
+  for (let i = 0; i < PSF_QUESTIONS.length; i++) {
     const order = i + 1
     const [element] = await db
       .insert(assessmentElements)
       .values({
         assessmentDefinitionId: definition.assessmentDefinitionId,
-        elementKey: `psq_q${order}`,
-        questionText: PSQ_QUESTIONS[i],
+        elementKey: `psf_q${order}`,
+        questionText: PSF_QUESTIONS[i],
         elementType: "radio",
         dataType: "integer",
         displayOrder: order,
@@ -73,7 +73,7 @@ async function main() {
       .returning({ assessmentElementId: assessmentElements.assessmentElementId })
 
     await db.insert(assessmentOptions).values(
-      PSQ_RESPONSE_OPTIONS.map((option) => ({
+      PSF_RESPONSE_OPTIONS.map((option) => ({
         assessmentElementId: element.assessmentElementId,
         assessmentDefinitionId: definition.assessmentDefinitionId,
         optionLabel: option.label,
@@ -84,11 +84,11 @@ async function main() {
     )
   }
 
-  console.log("PSQ assessment seeded successfully (5 items).")
+  console.log("PSF assessment seeded successfully (5 items).")
   await pool.end()
 }
 
 main().catch((error) => {
-  console.error("PSQ seed failed:", error)
+  console.error("PSF seed failed:", error)
   process.exit(1)
 })

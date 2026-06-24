@@ -17,7 +17,7 @@ import {
   markBatteryInProgress,
   validateBatteryNextToken,
 } from "@/lib/assessments/battery-chain"
-import { calculatePsqScore, formatPsqSeverity } from "@/lib/assessments/psq"
+import { calculatePsfScore, formatPsfSeverity } from "@/lib/assessments/psf"
 import { severityFromAssessmentCode } from "@/lib/assessments/severity"
 import { hashAssessmentToken } from "@/lib/assessments/token"
 import { db } from "@/lib/db"
@@ -118,7 +118,7 @@ export async function POST(request: Request) {
   }
 
   const isBtp = definition.assessmentCode === "BTP"
-  const isPsq = definition.assessmentCode === "PSQ"
+  const isPsf = definition.assessmentCode === "PSF"
 
   const elementIds = Object.keys(responses)
   if (elementIds.length === 0) {
@@ -189,7 +189,7 @@ export async function POST(request: Request) {
   }[] = []
 
   let totalScore = 0
-  const psqResponseScores: number[] = []
+  const psfResponseScores: number[] = []
 
   for (const elementId of elementIds) {
     const responseValue = String(responses[elementId] ?? "").trim()
@@ -214,12 +214,12 @@ export async function POST(request: Request) {
       scoreValue,
     })
 
-    if (!isBtp && !isPsq && dataTypeByElementId.get(elementId) === "integer") {
+    if (!isBtp && !isPsf && dataTypeByElementId.get(elementId) === "integer") {
       totalScore += scoreValue
     }
 
-    if (isPsq && dataTypeByElementId.get(elementId) === "integer") {
-      psqResponseScores.push(scoreValue)
+    if (isPsf && dataTypeByElementId.get(elementId) === "integer") {
+      psfResponseScores.push(scoreValue)
     }
   }
 
@@ -255,10 +255,10 @@ export async function POST(request: Request) {
   if (isBtp) {
     resultScore = 0
     severity = null
-  } else if (isPsq) {
-    const psqResult = calculatePsqScore(psqResponseScores)
-    resultScore = psqResult.netScore
-    severity = formatPsqSeverity(psqResult)
+  } else if (isPsf) {
+    const psfResult = calculatePsfScore(psfResponseScores)
+    resultScore = psfResult.netScore
+    severity = formatPsfSeverity(psfResult)
   } else {
     resultScore = totalScore
     severity = severityFromAssessmentCode(definition.assessmentCode, totalScore)

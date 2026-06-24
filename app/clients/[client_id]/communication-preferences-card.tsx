@@ -47,7 +47,7 @@ export function CommunicationPreferencesCard({
       optedOut: preferences.preSessionOptOut,
     },
     {
-      type: "Post-Session Questionnaire",
+      type: "Post-Session Feedback",
       modality: "Email",
       optedOut: preferences.postSessionOptOut,
     },

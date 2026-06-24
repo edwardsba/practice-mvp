@@ -66,6 +66,10 @@ export const PSQ_STATUS_CONFIG: Record<string, StatusConfig> = {
   completed: { label: "Completed", variant: "success" },
 }
 
+export const ASQ_STATUS_CONFIG: Record<string, StatusConfig> = {
+  completed: { label: "Completed", variant: "success" },
+}
+
 export function getStatusConfig(
   map: Record<string, StatusConfig>,
   status: string

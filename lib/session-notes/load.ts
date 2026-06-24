@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gt, or } from "drizzle-orm"
+import { and, asc, desc, eq, gt, or, sql } from "drizzle-orm"
 
 import { appointments, batteryInstances, clients, sessionNotes } from "@/db/schema"
 import type { SessionNoteFilter } from "@/lib/session-notes/constants"
@@ -33,6 +33,16 @@ export async function loadSessionNotesForPractice(
       clientLastName: clients.lastName,
       preSessionBatterySentAt: appointments.preSessionBatterySentAt,
       batteryStatus: batteryInstances.status,
+      asqCompleted: sql<boolean>`EXISTS (
+        SELECT 1
+        FROM assessment_instances ai
+        JOIN assessment_definitions ad
+          ON ai.assessment_definition_id = ad.assessment_definition_id
+        JOIN assessment_results ar
+          ON ar.assessment_instance_id = ai.assessment_instance_id
+        WHERE ai.session_note_id = ${sessionNotes.sessionNoteId}
+        AND ad.assessment_code = 'ASQ'
+      )`.as("asq_completed"),
     })
     .from(sessionNotes)
     .innerJoin(clients, eq(sessionNotes.clientId, clients.clientId))

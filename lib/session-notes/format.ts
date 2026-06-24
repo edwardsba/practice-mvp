@@ -44,3 +44,11 @@ export function derivePsqStatus(
   if (preSessionBatterySentAt != null) return "sent"
   return "not_sent"
 }
+
+export type AsqStatus = "not_done" | "completed"
+
+export function deriveAsqStatus(
+  asqCompleted: boolean | null | undefined
+): AsqStatus {
+  return asqCompleted ? "completed" : "not_done"
+}

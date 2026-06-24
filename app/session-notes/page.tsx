@@ -2,6 +2,7 @@ import Link from "next/link"
 
 import { SessionNotesFilter } from "@/app/session-notes/session-notes-filter"
 import { AppShell } from "@/components/app-shell"
+import { AsqStatusBadge } from "@/components/session-notes/asq-status-badge"
 import { PsqStatusBadge } from "@/components/session-notes/psq-status-badge"
 import {
   Table,
@@ -83,13 +84,14 @@ export default async function SessionNotesPage({
               <TableHead>Client</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>PSQ</TableHead>
+              <TableHead>ASQ</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {notes.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={5}
+                  colSpan={6}
                   className="h-20 text-center text-muted-foreground"
                 >
                   No session notes yet.
@@ -139,6 +141,11 @@ export default async function SessionNotesPage({
                           sentAt={note.preSessionBatterySentAt}
                           batteryStatus={note.batteryStatus}
                         />
+                      </Link>
+                    </TableCell>
+                    <TableCell>
+                      <Link href={noteHref} className="block">
+                        <AsqStatusBadge asqCompleted={note.asqCompleted} />
                       </Link>
                     </TableCell>
                   </TableRow>

@@ -3,6 +3,8 @@ import { notFound } from "next/navigation"
 import { and, eq } from "drizzle-orm"
 
 import { createDraftSessionNote } from "@/app/session-notes/actions"
+import { AsqStatusBadge } from "@/components/session-notes/asq-status-badge"
+import { PsqStatusBadge } from "@/components/session-notes/psq-status-badge"
 import { SessionNotePdfDownloadLink } from "@/components/session-notes/session-note-pdf-download-link"
 import { AppShell } from "@/components/app-shell"
 import { Button } from "@/components/ui/button"
@@ -83,6 +85,8 @@ export default async function ClientSessionNotesPage({
               <TableHead>Date</TableHead>
               <TableHead>Time</TableHead>
               <TableHead>Status</TableHead>
+              <TableHead>PSQ</TableHead>
+              <TableHead>ASQ</TableHead>
               <TableHead>PDF</TableHead>
             </TableRow>
           </TableHeader>
@@ -90,7 +94,7 @@ export default async function ClientSessionNotesPage({
             {notes.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={4}
+                  colSpan={6}
                   className="h-20 text-center text-muted-foreground"
                 >
                   No session notes yet.
@@ -123,6 +127,19 @@ export default async function ClientSessionNotesPage({
                     <TableCell>
                       <Link href={noteHref} className="block hover:underline">
                         {formatSessionNoteStatus(note.status)}
+                      </Link>
+                    </TableCell>
+                    <TableCell>
+                      <Link href={noteHref} className="block">
+                        <PsqStatusBadge
+                          sentAt={note.preSessionBatterySentAt}
+                          psqBatteryStatus={note.psqBatteryStatus}
+                        />
+                      </Link>
+                    </TableCell>
+                    <TableCell>
+                      <Link href={noteHref} className="block">
+                        <AsqStatusBadge asqCompleted={note.asqCompleted} />
                       </Link>
                     </TableCell>
                     <TableCell>

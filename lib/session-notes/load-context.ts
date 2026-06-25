@@ -367,7 +367,11 @@ export async function loadSessionNoteViewContext(
           label: formatNextAppointmentLine(
             nextAppt.appointmentDate,
             nextAppt.appointmentTime,
-            nextAppt.location
+            nextAppt.location,
+            nextAppt.mode,
+            nextAppt.practiceLocationNickname ?? null,
+            nextAppt.practiceAddress ?? null,
+            nextAppt.practiceName ?? ""
           ),
         }
       : null,

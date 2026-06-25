@@ -2,6 +2,7 @@ import {
   formatAppointmentDate,
   formatAppointmentTime,
 } from "@/lib/appointments/format"
+import { resolveAppointmentLocationText } from "@/lib/appointments/location"
 import {
   SESSION_NOTE_STATUS_LABELS,
   type SessionNoteStatus,
@@ -26,11 +27,23 @@ export function formatSessionNoteStatus(status: string): string {
 export function formatNextAppointmentLine(
   appointmentDate: string,
   appointmentTime: string,
-  location: string | null
+  location: string | null,
+  mode: string,
+  locationNickname: string | null,
+  practiceAddress: string | null,
+  practiceName: string
 ): string {
   const datePart = formatAppointmentDate(appointmentDate)
   const timePart = formatAppointmentTime(appointmentTime)
-  const locationPart = location?.trim() || "Practice Location"
+  const locationPart =
+    mode === "online"
+      ? "Online"
+      : resolveAppointmentLocationText(
+          location,
+          locationNickname,
+          practiceAddress,
+          practiceName
+        )
   return `${datePart} at ${timePart} — ${locationPart}`
 }
 

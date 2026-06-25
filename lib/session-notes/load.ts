@@ -1,6 +1,6 @@
 import { and, asc, desc, eq, gt, or, sql } from "drizzle-orm"
 
-import { appointments, clients, sessionNotes } from "@/db/schema"
+import { appointments, clients, practices, sessionNotes } from "@/db/schema"
 import type { SessionNoteFilter } from "@/lib/session-notes/constants"
 import { db } from "@/lib/db"
 
@@ -150,8 +150,13 @@ export async function loadNextAppointmentAfterSession(
       appointmentDate: appointments.appointmentDate,
       appointmentTime: appointments.appointmentTime,
       location: appointments.location,
+      mode: appointments.mode,
+      practiceAddress: practices.address,
+      practiceLocationNickname: practices.locationNickname,
+      practiceName: practices.practiceName,
     })
     .from(appointments)
+    .leftJoin(practices, eq(appointments.practiceId, practices.practiceId))
     .where(
       and(
         eq(appointments.clientId, clientId),

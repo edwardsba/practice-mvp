@@ -50,6 +50,7 @@ export type SessionNoteAsqResult = {
   assessmentResultId: string
   assessmentDate: Date
   score: number
+  maxScore: number | null
   acuteRiskRating: string | null
 } | null
 
@@ -273,10 +274,15 @@ async function loadAsqForSession(
     return null
   }
 
+  const maxScore = await getMaxScoreForAssessmentDefinition(
+    row.assessmentDefinitionId
+  )
+
   return {
     assessmentResultId: row.assessmentResultId,
     assessmentDate: row.assessmentDate,
     score: row.score,
+    maxScore,
     acuteRiskRating: row.severity,
   }
 }

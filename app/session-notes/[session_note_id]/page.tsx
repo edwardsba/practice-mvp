@@ -148,7 +148,7 @@ export default async function SessionNoteViewPage({
                       {viewContext.btpTargets.map((row) => (
                         <TableRow key={row.target}>
                           <TableCell>{row.target}</TableCell>
-                          <TableCell>{row.score}</TableCell>
+                          <TableCell>{row.score} / 5</TableCell>
                           <TableCell>{row.ratingLabel}</TableCell>
                         </TableRow>
                       ))}
@@ -188,6 +188,7 @@ export default async function SessionNoteViewPage({
                     name: "ASQ",
                     assessmentResultId: viewContext.asqResult?.assessmentResultId ?? null,
                     score: viewContext.asqResult?.score ?? null,
+                    maxScore: viewContext.asqResult?.maxScore ?? null,
                     acuteRiskRating: viewContext.asqResult?.acuteRiskRating ?? null,
                     administerHref: `/clients/${note.clientId}/asq/new?session_note_id=${sessionNoteId}`,
                   } satisfies RiskAssessmentRow,

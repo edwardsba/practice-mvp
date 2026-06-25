@@ -16,6 +16,7 @@ export type RiskAssessmentRow = {
   name: string
   assessmentResultId: string | null
   score: number | null
+  maxScore: number | null
   acuteRiskRating: string | null
   administerHref: string
 }
@@ -57,7 +58,10 @@ export function RiskAssessmentTable({
                 <TableCell className="font-medium">{row.name}</TableCell>
                 {hasResult ? (
                   <>
-                    <TableCell>{row.score}</TableCell>
+                    <TableCell>
+                      {row.score}
+                      {row.maxScore != null ? ` / ${row.maxScore}` : ""}
+                    </TableCell>
                     <TableCell>{row.acuteRiskRating ?? "—"}</TableCell>
                   </>
                 ) : (

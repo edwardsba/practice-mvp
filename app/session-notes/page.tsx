@@ -139,7 +139,7 @@ export default async function SessionNotesPage({
                       <Link href={noteHref} className="block">
                         <PsqStatusBadge
                           sentAt={note.preSessionBatterySentAt}
-                          batteryStatus={note.batteryStatus}
+                          psqBatteryStatus={note.psqBatteryStatus}
                         />
                       </Link>
                     </TableCell>

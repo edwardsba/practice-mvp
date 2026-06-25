@@ -4,12 +4,12 @@ import { PSQ_STATUS_CONFIG } from "@/lib/status"
 
 export function PsqStatusBadge({
   sentAt,
-  batteryStatus,
+  psqBatteryStatus,
 }: {
   sentAt: Date | null | undefined
-  batteryStatus: string | null | undefined
+  psqBatteryStatus: string | null | undefined
 }) {
-  const status = derivePsqStatus(sentAt, batteryStatus)
+  const status = derivePsqStatus(sentAt, psqBatteryStatus)
 
   if (status === "not_sent") {
     return <span className="text-sm text-muted-foreground">—</span>

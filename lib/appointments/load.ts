@@ -83,12 +83,17 @@ export async function loadAppointmentsForPractice(
       appointmentTime: appointments.appointmentTime,
       durationMinutes: appointments.durationMinutes,
       location: appointments.location,
+      mode: appointments.mode,
       status: appointments.status,
+      practiceName: practices.practiceName,
+      practiceAddress: practices.address,
+      practiceLocationNickname: practices.locationNickname,
       clientFirstName: clients.firstName,
       clientLastName: clients.lastName,
     })
     .from(appointments)
     .innerJoin(clients, eq(appointments.clientId, clients.clientId))
+    .leftJoin(practices, eq(appointments.practiceId, practices.practiceId))
     .where(and(...conditions))
     .orderBy(asc(appointments.appointmentDate), asc(appointments.appointmentTime))
 }

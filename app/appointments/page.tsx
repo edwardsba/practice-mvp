@@ -23,6 +23,7 @@ import {
   formatAppointmentTime,
   formatClientNameLastFirst,
 } from "@/lib/appointments/format"
+import { resolveAppointmentLocationText } from "@/lib/appointments/location"
 import { loadAppointmentsForPractice } from "@/lib/appointments/load"
 import { requirePractitionerContext } from "@/lib/auth"
 import { APPOINTMENT_STATUS_CONFIG } from "@/lib/status"
@@ -122,7 +123,14 @@ export default async function AppointmentsPage({
                     </TableCell>
                     <TableCell>
                       <Link href={appointmentHref} className="block">
-                        {appointment.location?.trim() || "—"}
+                        {appointment.mode === "online"
+                          ? "Online"
+                          : resolveAppointmentLocationText(
+                              appointment.location,
+                              appointment.practiceLocationNickname ?? null,
+                              appointment.practiceAddress ?? null,
+                              appointment.practiceName ?? ""
+                            )}
                       </Link>
                     </TableCell>
                     <TableCell>

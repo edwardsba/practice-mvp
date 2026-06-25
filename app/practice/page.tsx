@@ -45,6 +45,10 @@ export default async function PracticePage() {
               <dd className="font-medium">{displayValue(practice.practiceName)}</dd>
             </div>
             <div>
+              <dt className="text-sm text-muted-foreground">Location nickname</dt>
+              <dd className="font-medium">{displayValue(practice.locationNickname)}</dd>
+            </div>
+            <div>
               <dt className="text-sm text-muted-foreground">Timezone</dt>
               <dd className="font-medium">{displayValue(practice.timezone)}</dd>
             </div>

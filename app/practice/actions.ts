@@ -2,6 +2,7 @@
 
 import { asc, eq } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
+import { redirect } from "next/navigation"
 
 import { practices } from "@/db/schema"
 import { requirePractitionerContext, getPracticeForContext } from "@/lib/auth"
@@ -116,5 +117,5 @@ export async function updatePractice(
   revalidatePath("/practice")
   revalidatePath("/practice/edit")
   revalidatePath("/practitioner")
-  return { success: true }
+  redirect("/practice")
 }

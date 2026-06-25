@@ -50,6 +50,8 @@ function TimedGridTable({
   startMinutes,
   intervalMinutes,
   availabilityBlocks,
+  clientId,
+  returnTo,
 }: {
   days: string[]
   appointments: CalendarAppointment[]
@@ -57,6 +59,8 @@ function TimedGridTable({
   startMinutes: number
   intervalMinutes: number
   availabilityBlocks: AvailabilityBlock[]
+  clientId?: string
+  returnTo?: string
 }) {
   const today = todayDateString()
   const cellsByDay = new Map(
@@ -141,7 +145,7 @@ function TimedGridTable({
                     className="border-b border-l p-0 align-top"
                   >
                     <Link
-                      href={newAppointmentUrl(day, slot)}
+                      href={newAppointmentUrl(day, slot, clientId, returnTo)}
                       className={cn(
                         "block truncate",
                         available
@@ -167,11 +171,15 @@ export function CalendarTimedGrid({
   appointments,
   calendarSettings,
   availabilityBlocks,
+  clientId,
+  returnTo,
 }: {
   days: string[]
   appointments: CalendarAppointment[]
   calendarSettings: CalendarSettings
   availabilityBlocks: AvailabilityBlock[]
+  clientId?: string
+  returnTo?: string
 }) {
   const startMinutes = parseTimeStringToMinutes(calendarSettings.startTime)
   const mobileSlots = generateCalendarTimeSlotsFromSettings(
@@ -195,6 +203,8 @@ export function CalendarTimedGrid({
           startMinutes={startMinutes}
           intervalMinutes={MOBILE_INTERVAL_MINUTES}
           availabilityBlocks={availabilityBlocks}
+          clientId={clientId}
+          returnTo={returnTo}
         />
       </div>
       <div className="hidden md:block">
@@ -205,6 +215,8 @@ export function CalendarTimedGrid({
           startMinutes={startMinutes}
           intervalMinutes={calendarSettings.intervalMinutes}
           availabilityBlocks={availabilityBlocks}
+          clientId={clientId}
+          returnTo={returnTo}
         />
       </div>
     </>

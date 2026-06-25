@@ -228,7 +228,12 @@ export default async function SessionNoteViewPage({
                   {viewContext.nextAppointment.label}
                 </Link>
               ) : (
-                <p className="text-sm text-muted-foreground">No upcoming appointment</p>
+                <Link
+                  href={`/calendar?view=month&clientId=${note.clientId}&returnTo=/session-notes/${sessionNoteId}`}
+                  className="text-sm text-primary hover:underline"
+                >
+                  Schedule appointment →
+                </Link>
               )}
             </CardContent>
           </Card>

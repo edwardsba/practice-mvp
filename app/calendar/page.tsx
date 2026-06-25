@@ -20,9 +20,19 @@ import { formatTimeForInput } from "@/lib/calendar/time-slots"
 export default async function CalendarPage({
   searchParams,
 }: {
-  searchParams: Promise<{ view?: string; date?: string }>
+  searchParams: Promise<{
+    view?: string
+    date?: string
+    clientId?: string
+    returnTo?: string
+  }>
 }) {
-  const { view: viewParam, date: dateParam } = await searchParams
+  const {
+    view: viewParam,
+    date: dateParam,
+    clientId,
+    returnTo,
+  } = await searchParams
   const context = await requirePractitionerContext()
   const view = parseCalendarView(viewParam)
   const anchorDate = parseAnchorDate(dateParam)
@@ -69,13 +79,20 @@ export default async function CalendarPage({
       </div>
 
       <div className="mb-4 sm:mb-6">
-        <CalendarControls view={view} anchorDate={anchorDate} />
+        <CalendarControls
+          view={view}
+          anchorDate={anchorDate}
+          clientId={clientId}
+          returnTo={returnTo}
+        />
       </div>
 
       {view === "month" ? (
         <CalendarMonthView
           anchorDate={anchorDate}
           appointments={appointments}
+          clientId={clientId}
+          returnTo={returnTo}
         />
       ) : (
         <CalendarTimedGrid
@@ -83,6 +100,8 @@ export default async function CalendarPage({
           appointments={appointments}
           calendarSettings={calendarSettings}
           availabilityBlocks={availabilityBlocks}
+          clientId={clientId}
+          returnTo={returnTo}
         />
       )}
     </AppShell>

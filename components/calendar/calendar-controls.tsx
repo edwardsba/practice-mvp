@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import {
   buildCalendarUrl,
   formatCalendarPeriodLabel,
+  newAppointmentUrl,
   shiftAnchorDate,
   type CalendarView,
 } from "@/lib/calendar/dates"
@@ -22,9 +23,13 @@ const VIEW_OPTIONS: CalendarView[] = ["day", "week", "month"]
 export function CalendarControls({
   view,
   anchorDate,
+  clientId,
+  returnTo,
 }: {
   view: CalendarView
   anchorDate: string
+  clientId?: string
+  returnTo?: string
 }) {
   const previousDate = shiftAnchorDate(anchorDate, view, -1)
   const nextDate = shiftAnchorDate(anchorDate, view, 1)
@@ -39,18 +44,20 @@ export function CalendarControls({
           <div className="flex shrink-0 items-center gap-1">
             <Button variant="outline" size="icon-sm" asChild>
               <Link
-                href={buildCalendarUrl(view, previousDate)}
+                href={buildCalendarUrl(view, previousDate, "week", clientId, returnTo)}
                 aria-label="Previous period"
               >
                 <ChevronLeft />
               </Link>
             </Button>
             <Button variant="outline" size="sm" asChild>
-              <Link href={buildCalendarUrl(view, today)}>Today</Link>
+              <Link href={buildCalendarUrl(view, today, "week", clientId, returnTo)}>
+                Today
+              </Link>
             </Button>
             <Button variant="outline" size="icon-sm" asChild>
               <Link
-                href={buildCalendarUrl(view, nextDate)}
+                href={buildCalendarUrl(view, nextDate, "week", clientId, returnTo)}
                 aria-label="Next period"
               >
                 <ChevronRight />
@@ -66,7 +73,7 @@ export function CalendarControls({
               return (
                 <Link
                   key={option}
-                  href={buildCalendarUrl(option, anchorDate)}
+                  href={buildCalendarUrl(option, anchorDate, "week", clientId, returnTo)}
                   className={cn(
                     "rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
                     isActive
@@ -81,7 +88,7 @@ export function CalendarControls({
           </div>
           <Button size="icon-sm" asChild>
             <Link
-              href="/appointments/new?returnTo=/calendar"
+              href={newAppointmentUrl(anchorDate, undefined, clientId, returnTo)}
               aria-label="New appointment"
             >
               <Plus />
@@ -103,7 +110,9 @@ export function CalendarControls({
                   asChild
                   className={cn(!isActive && "bg-background")}
                 >
-                  <Link href={buildCalendarUrl(option, anchorDate)}>
+                  <Link
+                    href={buildCalendarUrl(option, anchorDate, "week", clientId, returnTo)}
+                  >
                     {VIEW_LABELS[option]}
                   </Link>
                 </Button>
@@ -113,13 +122,19 @@ export function CalendarControls({
 
           <div className="flex flex-wrap items-center gap-2">
             <Button variant="outline" size="sm" asChild>
-              <Link href={buildCalendarUrl(view, previousDate)}>Previous</Link>
+              <Link href={buildCalendarUrl(view, previousDate, "week", clientId, returnTo)}>
+                Previous
+              </Link>
             </Button>
             <Button variant="outline" size="sm" asChild>
-              <Link href={buildCalendarUrl(view, today)}>Today</Link>
+              <Link href={buildCalendarUrl(view, today, "week", clientId, returnTo)}>
+                Today
+              </Link>
             </Button>
             <Button variant="outline" size="sm" asChild>
-              <Link href={buildCalendarUrl(view, nextDate)}>Next</Link>
+              <Link href={buildCalendarUrl(view, nextDate, "week", clientId, returnTo)}>
+                Next
+              </Link>
             </Button>
           </div>
         </div>

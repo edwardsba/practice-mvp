@@ -10,10 +10,15 @@ import { resolveBackNavigation } from "@/lib/navigation/back"
 export default async function NewAppointmentPage({
   searchParams,
 }: {
-  searchParams: Promise<{ date?: string; time?: string; returnTo?: string }>
+  searchParams: Promise<{
+    date?: string
+    time?: string
+    returnTo?: string
+    clientId?: string
+  }>
 }) {
   const context = await requirePractitionerContext()
-  const { date, time, returnTo } = await searchParams
+  const { date, time, returnTo, clientId } = await searchParams
   const back = resolveBackNavigation(
     returnTo,
     "/appointments",
@@ -58,13 +63,21 @@ export default async function NewAppointmentPage({
         initialValues={
           date && /^\d{4}-\d{2}-\d{2}$/.test(date)
             ? {
-                clientId: "",
+                clientId: clientId ?? "",
                 appointmentDate: date,
                 appointmentTime: prefilledTime ?? "",
                 durationMinutes: 50,
                 notes: null,
               }
-            : undefined
+            : clientId
+              ? {
+                  clientId,
+                  appointmentDate: "",
+                  appointmentTime: "",
+                  durationMinutes: 50,
+                  notes: null,
+                }
+              : undefined
         }
         submitLabel="Save appointment"
         cancelHref={back.href}

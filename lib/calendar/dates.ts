@@ -165,23 +165,29 @@ export function formatDayShortLabel(dateStr: string): string {
 export function buildCalendarUrl(
   view: CalendarView,
   date: string,
-  defaultView: CalendarView = "week"
+  defaultView: CalendarView = "week",
+  clientId?: string,
+  returnTo?: string
 ): string {
   const params = new URLSearchParams()
   if (view !== defaultView) {
     params.set("view", view)
   }
-  if (date !== todayDateString()) {
-    params.set("date", date)
-  }
-  const query = params.toString()
-  return query ? `/calendar?${query}` : "/calendar"
+  params.set("date", date)
+  if (clientId) params.set("clientId", clientId)
+  if (returnTo) params.set("returnTo", returnTo)
+  const qs = params.toString()
+  return `/calendar${qs ? `?${qs}` : ""}`
 }
 
-export function newAppointmentUrl(date: string, time?: string): string {
-  const params = new URLSearchParams({ date, returnTo: "/calendar" })
-  if (time) {
-    params.set("time", time)
-  }
+export function newAppointmentUrl(
+  date: string,
+  time?: string,
+  clientId?: string,
+  returnTo?: string
+): string {
+  const params = new URLSearchParams({ date, returnTo: returnTo ?? "/calendar" })
+  if (time) params.set("time", time)
+  if (clientId) params.set("clientId", clientId)
   return `/appointments/new?${params.toString()}`
 }

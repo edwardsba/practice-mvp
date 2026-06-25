@@ -147,7 +147,7 @@ export async function markBatteryInProgress(firstAccessLinkId: string) {
   await db
     .update(batteryInstances)
     .set({ status: "in_progress", updatedAt: new Date() })
-    .where(eq(batteryInstances.phq9LinkId, firstAccessLinkId))
+    .where(eq(batteryInstances.firstLinkId, firstAccessLinkId))
 }
 
 export async function completeBatteryIfLastLink(
@@ -155,31 +155,7 @@ export async function completeBatteryIfLastLink(
   clientId: string,
   practiceId: string
 ): Promise<boolean> {
-  const [link] = await db
-    .select({ nextAccessLinkId: assessmentAccessLinks.nextAccessLinkId })
-    .from(assessmentAccessLinks)
-    .where(eq(assessmentAccessLinks.assessmentAccessLinkId, accessLinkId))
-    .limit(1)
-
-  if (link?.nextAccessLinkId) {
-    return false
-  }
-
-  const { completeBatteryIfGad7Link } = await import("@/lib/assessments/battery")
-  const legacyComplete = await completeBatteryIfGad7Link(
-    accessLinkId,
-    clientId,
-    practiceId
-  )
-  if (legacyComplete) {
-    return true
-  }
-
-  const [previous] = await db
-    .select({ assessmentAccessLinkId: assessmentAccessLinks.assessmentAccessLinkId })
-    .from(assessmentAccessLinks)
-    .where(eq(assessmentAccessLinks.nextAccessLinkId, accessLinkId))
-    .limit(1)
-
-  return Boolean(previous)
+  const { completeBatteryIfLastLink: completeBattery } =
+    await import("@/lib/assessments/battery")
+  return completeBattery(accessLinkId, clientId, practiceId)
 }

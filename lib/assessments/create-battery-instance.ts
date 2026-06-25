@@ -203,6 +203,11 @@ export async function createBatteryInstance(
 
       const phq9 = chain.find((item) => item.code === "PHQ9")
       const gad7 = chain.find((item) => item.code === "GAD7")
+      const btp = chain.find((item) => item.code === "BTP")
+      const assist = chain.find((item) => item.code === "ASSIST")
+
+      const firstItem = chain[0]
+      const lastItem = chain[chain.length - 1]
 
       if (phq9 && gad7) {
         const [battery] = await tx
@@ -216,6 +221,12 @@ export async function createBatteryInstance(
             gad7InstanceId: gad7.instanceId,
             phq9LinkId: phq9.accessLinkId,
             gad7LinkId: gad7.accessLinkId,
+            btpInstanceId: btp?.instanceId ?? null,
+            btpLinkId: btp?.accessLinkId ?? null,
+            assistInstanceId: assist?.instanceId ?? null,
+            assistLinkId: assist?.accessLinkId ?? null,
+            firstLinkId: firstItem.accessLinkId,
+            lastLinkId: lastItem.accessLinkId,
             status: "assigned",
           })
           .returning({ batteryInstanceId: batteryInstances.batteryInstanceId })

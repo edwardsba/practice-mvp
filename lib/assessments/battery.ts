@@ -2,7 +2,6 @@ import { and, eq } from "drizzle-orm"
 
 import {
   assessmentAccessLinks,
-  assessmentInstances,
   batteryInstances,
 } from "@/db/schema"
 import { hashAssessmentToken } from "@/lib/assessments/token"
@@ -58,20 +57,17 @@ export async function validateBatteryNextToken(
   return Boolean(battery)
 }
 
-export async function completeBatteryIfGad7Link(
-  gad7AccessLinkId: string,
+export async function completeBatteryIfLastLink(
+  accessLinkId: string,
   clientId: string,
   practiceId: string
 ): Promise<boolean> {
   const [battery] = await db
-    .select({
-      batteryInstanceId: batteryInstances.batteryInstanceId,
-      phq9InstanceId: batteryInstances.phq9InstanceId,
-    })
+    .select({ batteryInstanceId: batteryInstances.batteryInstanceId })
     .from(batteryInstances)
     .where(
       and(
-        eq(batteryInstances.gad7LinkId, gad7AccessLinkId),
+        eq(batteryInstances.lastLinkId, accessLinkId),
         eq(batteryInstances.clientId, clientId),
         eq(batteryInstances.practiceId, practiceId)
       )
@@ -79,16 +75,6 @@ export async function completeBatteryIfGad7Link(
     .limit(1)
 
   if (!battery) {
-    return false
-  }
-
-  const [phq9Instance] = await db
-    .select({ status: assessmentInstances.status })
-    .from(assessmentInstances)
-    .where(eq(assessmentInstances.assessmentInstanceId, battery.phq9InstanceId))
-    .limit(1)
-
-  if (phq9Instance?.status !== "submitted") {
     return false
   }
 
@@ -100,9 +86,9 @@ export async function completeBatteryIfGad7Link(
   return true
 }
 
-export async function markBatteryInProgress(phq9AccessLinkId: string) {
+export async function markBatteryInProgress(firstAccessLinkId: string) {
   await db
     .update(batteryInstances)
     .set({ status: "in_progress", updatedAt: new Date() })
-    .where(eq(batteryInstances.phq9LinkId, phq9AccessLinkId))
+    .where(eq(batteryInstances.firstLinkId, firstAccessLinkId))
 }

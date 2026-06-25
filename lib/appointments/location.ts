@@ -3,16 +3,19 @@ const ONLINE_APPOINTMENT_PHRASE =
 
 /**
  * The bare location text for an appointment: the appointment's own location
- * if set, else the practice address, else the practice name as a last resort.
+ * if set, else the practice location nickname, else the practice address,
+ * else the practice name as a last resort.
  * Does not consider appointment mode.
  */
 export function resolveAppointmentLocationText(
   appointmentLocation: string | null,
+  locationNickname: string | null,
   practiceAddress: string | null,
   practiceName: string
 ): string {
   return (
     appointmentLocation?.trim() ||
+    locationNickname?.trim() ||
     practiceAddress?.trim() ||
     practiceName
   )
@@ -26,11 +29,17 @@ export function resolveAppointmentLocationText(
 export function resolveAppointmentLocationPhrase(
   mode: string,
   appointmentLocation: string | null,
+  locationNickname: string | null,
   practiceAddress: string | null,
   practiceName: string
 ): string {
   if (mode === "online") {
     return ONLINE_APPOINTMENT_PHRASE
   }
-  return `in person at ${resolveAppointmentLocationText(appointmentLocation, practiceAddress, practiceName)}`
+  return `in person at ${resolveAppointmentLocationText(
+    appointmentLocation,
+    locationNickname,
+    practiceAddress,
+    practiceName
+  )}`
 }

@@ -200,12 +200,14 @@ async function processReminders(
           appointment_time: formatAppointmentTime(row.appointmentTime),
           location: resolveAppointmentLocationText(
             row.location,
+            emailContext.locationNickname,
             emailContext.practiceAddress,
             emailContext.practiceName
           ),
           appointment_location: resolveAppointmentLocationPhrase(
             row.mode,
             row.location,
+            emailContext.locationNickname,
             emailContext.practiceAddress,
             emailContext.practiceName
           ),
@@ -366,12 +368,14 @@ export async function sendPreSessionBatteryForAppointment(
       appointment_time: formatAppointmentTime(row.appointmentTime),
       location: resolveAppointmentLocationText(
         row.location,
+        emailContext.locationNickname,
         emailContext.practiceAddress,
         emailContext.practiceName
       ),
       appointment_location: resolveAppointmentLocationPhrase(
         row.mode,
         row.location,
+        emailContext.locationNickname,
         emailContext.practiceAddress,
         emailContext.practiceName
       ),

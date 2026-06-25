@@ -19,6 +19,7 @@ import { Label } from "@/components/ui/label"
 
 type Practice = {
   practiceName: string
+  locationNickname: string | null
   timezone: string
   address: string | null
   phone: string | null
@@ -51,6 +52,20 @@ export function PracticeForm({ practice }: { practice: Practice }) {
               defaultValue={practice.practiceName}
               required
             />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="location_nickname">Location nickname</Label>
+            <Input
+              id="location_nickname"
+              name="location_nickname"
+              defaultValue={practice.locationNickname ?? ""}
+              placeholder="e.g. Woollahra, 12 Junction St"
+            />
+            <p className="text-sm text-muted-foreground">
+              A short label shown as the appointment location when no specific
+              location is set. E.g. &quot;Woollahra&quot; or &quot;12 Junction
+              St&quot;.
+            </p>
           </div>
           <div className="space-y-2">
             <Label htmlFor="timezone">Timezone</Label>

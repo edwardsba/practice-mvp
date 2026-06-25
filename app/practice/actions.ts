@@ -84,6 +84,8 @@ export async function updatePractice(
   const timezone =
     String(formData.get("timezone") ?? "Australia/Sydney").trim() ||
     "Australia/Sydney"
+  const locationNickname =
+    String(formData.get("location_nickname") ?? "").trim() || null
   const address = String(formData.get("address") ?? "").trim() || null
   const phone = String(formData.get("phone") ?? "").trim() || null
   const fax = String(formData.get("fax") ?? "").trim() || null
@@ -99,6 +101,7 @@ export async function updatePractice(
     .update(practices)
     .set({
       practiceName,
+      locationNickname,
       timezone,
       address,
       phone,

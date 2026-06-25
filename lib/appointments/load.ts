@@ -130,6 +130,8 @@ export async function loadAppointmentForPractice(
       appointmentTypeNickname: appointmentTypes.nickname,
       appointmentTypeReferenceNumber: appointmentTypes.referenceNumber,
       practiceName: practices.practiceName,
+      practiceAddress: practices.address,
+      practiceLocationNickname: practices.locationNickname,
     })
     .from(appointments)
     .innerJoin(clients, eq(appointments.clientId, clients.clientId))
@@ -143,7 +145,7 @@ export async function loadAppointmentForPractice(
     )
     .leftJoin(
       practices,
-      eq(practitionerPracticeMemberships.practiceId, practices.practiceId)
+      eq(appointments.practiceId, practices.practiceId)
     )
     .leftJoin(
       fundingApprovals,

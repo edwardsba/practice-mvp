@@ -30,6 +30,7 @@ import {
   type AppointmentMode,
 } from "@/lib/appointments/constants"
 import { loadAppointmentForPractice } from "@/lib/appointments/load"
+import { resolveAppointmentLocationText } from "@/lib/appointments/location"
 import { requirePractitionerContext } from "@/lib/auth"
 import {
   formatApprovalProgress,
@@ -150,7 +151,14 @@ export default async function AppointmentDetailPage({
             <div>
               <dt className="text-sm text-muted-foreground">Location</dt>
               <dd className="font-medium">
-                {appointment.practiceName?.trim() || "—"}
+                {appointment.mode === "online"
+                  ? "Online"
+                  : resolveAppointmentLocationText(
+                      appointment.location,
+                      appointment.practiceLocationNickname ?? null,
+                      appointment.practiceAddress ?? null,
+                      appointment.practiceName ?? ""
+                    )}
               </dd>
             </div>
           </dl>

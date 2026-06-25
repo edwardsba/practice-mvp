@@ -19,7 +19,11 @@ export async function getQuestionnaireEmailContext(
     .limit(1)
 
   const [practice] = await db
-    .select({ practiceName: practices.practiceName, address: practices.address })
+    .select({
+      practiceName: practices.practiceName,
+      address: practices.address,
+      locationNickname: practices.locationNickname,
+    })
     .from(practices)
     .where(eq(practices.practiceId, practiceId))
     .limit(1)
@@ -33,6 +37,7 @@ export async function getQuestionnaireEmailContext(
   return {
     practiceName: practice.practiceName,
     practiceAddress: practice.address,
+    locationNickname: practice.locationNickname,
     practitionerName,
   }
 }

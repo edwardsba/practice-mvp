@@ -19,6 +19,7 @@ export const users = pgTable('users', {
 export const practices = pgTable('practices', {
   practiceId: uuid('practice_id').primaryKey().defaultRandom(),
   practiceName: text('practice_name').notNull(),
+  locationNickname: text('location_nickname'),
   timezone: text('timezone').notNull().default('Australia/Sydney'),
   address: text('address'),
   phone: text('phone'),

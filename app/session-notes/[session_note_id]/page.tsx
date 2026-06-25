@@ -197,23 +197,13 @@ export default async function SessionNoteViewPage({
               <div>
                 <p className="mb-1 text-sm font-medium">Crisis plan</p>
                 {viewContext.crisisPlan ? (
-                  <div className="space-y-1 text-sm">
-                    <p>
-                      Active plan v{viewContext.crisisPlan.versionNumber} (
-                      {formatSessionNoteDate(viewContext.crisisPlan.dateOfPlan)})
-                    </p>
-                    <p>
-                      {viewContext.crisisPlan.updatedThisSession
-                        ? "Updated this session"
-                        : "Not updated"}
-                    </p>
-                    <Link
-                      href={`/clients/${note.clientId}/crisis-plan/${viewContext.crisisPlan.crisisPlanId}`}
-                      className="text-primary hover:underline"
-                    >
-                      View crisis plan
-                    </Link>
-                  </div>
+                  <Link
+                    href={`/clients/${note.clientId}/crisis-plan/${viewContext.crisisPlan.crisisPlanId}`}
+                    className="text-sm text-primary hover:underline"
+                  >
+                    v{viewContext.crisisPlan.versionNumber} (
+                    {formatSessionNoteDate(viewContext.crisisPlan.dateOfPlan)})
+                  </Link>
                 ) : (
                   <p className="text-sm text-muted-foreground">No active crisis plan.</p>
                 )}

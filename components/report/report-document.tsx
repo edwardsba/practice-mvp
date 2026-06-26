@@ -71,7 +71,44 @@ export function ReportDocument({
     <article className="report-document mx-auto max-w-3xl bg-white text-foreground">
       {/* 1. Header */}
       <header className="report-header space-y-6 pb-6">
-        <div className="flex justify-end text-sm">
+        <div className="flex items-start justify-between text-sm">
+          {snapshot.recipient && snapshot.recipient.type !== "none" ? (
+            <div>
+              {snapshot.recipient.name ? (
+                <p className="font-medium">{snapshot.recipient.name}</p>
+              ) : null}
+              {snapshot.recipient.organisationName ? (
+                <p>{snapshot.recipient.organisationName}</p>
+              ) : null}
+              {snapshot.recipient.streetAddress
+                ? snapshot.recipient.streetAddress
+                    .split(",")
+                    .map((part) => part.trim())
+                    .filter(Boolean)
+                    .map((part, i) => (
+                      <p key={`street-${i}`} className="text-muted-foreground">
+                        {part}
+                      </p>
+                    ))
+                : null}
+              {snapshot.recipient.postalAddress &&
+              snapshot.recipient.postalAddress !==
+                snapshot.recipient.streetAddress
+                ? snapshot.recipient.postalAddress
+                    .split(",")
+                    .map((part) => part.trim())
+                    .filter(Boolean)
+                    .map((part, i) => (
+                      <p key={`postal-${i}`} className="text-muted-foreground">
+                        {part}
+                      </p>
+                    ))
+                : null}
+            </div>
+          ) : (
+            <div />
+          )}
+
           <div className="text-right">
             <p className="font-semibold">{snapshot.practice.practiceName}</p>
             {snapshot.practice.practiceAddress
@@ -88,46 +125,11 @@ export function ReportDocument({
           </div>
         </div>
 
-        {snapshot.recipient && snapshot.recipient.type !== "none" ? (
-          <div className="text-sm">
-            {snapshot.recipient.name ? (
-              <p className="font-medium">{snapshot.recipient.name}</p>
-            ) : null}
-            {snapshot.recipient.organisationName ? (
-              <p>{snapshot.recipient.organisationName}</p>
-            ) : null}
-            {snapshot.recipient.streetAddress
-              ? snapshot.recipient.streetAddress
-                  .split(",")
-                  .map((part) => part.trim())
-                  .filter(Boolean)
-                  .map((part, i) => (
-                    <p key={`street-${i}`} className="text-muted-foreground">
-                      {part}
-                    </p>
-                  ))
-              : null}
-            {snapshot.recipient.postalAddress &&
-            snapshot.recipient.postalAddress !==
-              snapshot.recipient.streetAddress
-              ? snapshot.recipient.postalAddress
-                  .split(",")
-                  .map((part) => part.trim())
-                  .filter(Boolean)
-                  .map((part, i) => (
-                    <p key={`postal-${i}`} className="text-muted-foreground">
-                      {part}
-                    </p>
-                  ))
-              : null}
-          </div>
-        ) : null}
-
         <p className="text-sm text-muted-foreground">
           {formatDisplayDate(snapshot.generatedAt)}
         </p>
 
-        <h2 className="text-2xl font-semibold tracking-tight">{REPORT_TITLE}</h2>
+        <h2 className="text-lg font-semibold">{REPORT_TITLE}</h2>
 
         <dl className="grid gap-4 text-sm sm:grid-cols-2">
           <div>
@@ -219,7 +221,6 @@ export function ReportDocument({
 
       {/* 8. Signature */}
       <section className="report-signature">
-        <p className="text-sm text-muted-foreground">Practitioner signature</p>
         {snapshot.practitioner.signatureDataUrl ? (
           <img
             src={snapshot.practitioner.signatureDataUrl}

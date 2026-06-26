@@ -15,7 +15,7 @@ export type StatusConfig = {
 export const APPOINTMENT_STATUS_CONFIG: Record<string, StatusConfig> = {
   scheduled: { label: "Scheduled", variant: "default" },
   confirmed: { label: "Confirmed", variant: "default" },
-  completed: { label: "Completed", variant: "success" },
+  completed: { label: "Attended", variant: "success" },
   no_show: { label: "No-show", variant: "destructive" },
   cancelled: { label: "Cancelled", variant: "destructive" },
 }

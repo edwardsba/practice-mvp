@@ -11,7 +11,7 @@ export type AppointmentStatus = (typeof APPOINTMENT_STATUSES)[number]
 export const APPOINTMENT_STATUS_LABELS: Record<AppointmentStatus, string> = {
   scheduled: "Scheduled",
   confirmed: "Confirmed",
-  completed: "Completed",
+  completed: "Attended",
   no_show: "No-show",
   cancelled: "Cancelled",
 }

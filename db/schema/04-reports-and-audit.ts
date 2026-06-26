@@ -13,6 +13,7 @@ export const simpleReports = pgTable('simple_reports', {
   clinicalSummaryText: text('clinical_summary_text'),
   recommendationsText: text('recommendations_text'),
   reportStatus: text('report_status').notNull().default('draft'),
+  pdfStoragePath: text('pdf_storage_path'),
   recipientType: text('recipient_type'),
   fundingApprovalId: uuid('funding_approval_id'),
   finalisedAt: timestamp('finalised_at', { withTimezone: true }),

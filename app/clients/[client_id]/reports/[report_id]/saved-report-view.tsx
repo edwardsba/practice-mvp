@@ -29,10 +29,6 @@ export function SavedReportView({
 
   const isFinalised = reportStatus === "finalised" || state.success
 
-  function handlePrint() {
-    window.print()
-  }
-
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center gap-3 no-print">
@@ -52,8 +48,10 @@ export function SavedReportView({
             </Button>
           </>
         )}
-        <Button type="button" variant="outline" onClick={handlePrint}>
-          Print / Save as PDF
+        <Button asChild variant="outline">
+          <a href={`/api/reports/${reportId}/pdf`} download>
+            Download PDF
+          </a>
         </Button>
         {state.error ? (
           <p className="w-full text-sm text-destructive">{state.error}</p>

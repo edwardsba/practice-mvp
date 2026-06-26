@@ -11,6 +11,7 @@ import { requirePractitionerContext } from "@/lib/auth"
 import { db } from "@/lib/db"
 import { parseReportSnapshot } from "@/lib/reports/snapshot"
 
+// Print CSS kept for browser preview; PDF is generated server-side
 import "@/components/report/report-print.css"
 
 export default async function SavedReportPage({

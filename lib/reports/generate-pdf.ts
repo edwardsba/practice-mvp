@@ -47,19 +47,20 @@ function drawTable(
   columns: TableColumn[],
   rows: string[][]
 ) {
-  const startX = doc.x
+  const startX = PAGE_MARGIN
   const rowPadding = 6
-
-  // Pre-flight: ensure enough space for header + at least one row
   const pageBottomMargin = doc.page.height - PAGE_MARGIN
-  const headerHeight = doc.currentLineHeight(true) + rowPadding
-  const minRowHeight = doc.currentLineHeight(true) + rowPadding
+  const lineHeight = doc.currentLineHeight(true)
+
+  // Pre-flight: add new page if not enough room for header + one row
+  const headerHeight = lineHeight + rowPadding * 2
+  const minRowHeight = lineHeight + rowPadding
   if (doc.y + headerHeight + minRowHeight > pageBottomMargin) {
     doc.addPage()
-    doc.x = PAGE_MARGIN
+    doc.x = startX
   }
 
-  // Header row
+  // Draw header row
   let y = doc.y
   doc.font("Helvetica-Bold").fontSize(BASE_FONT_SIZE).fillColor(TEXT_COLOR)
   let x = startX
@@ -67,8 +68,9 @@ function drawTable(
     doc.text(col.header, x, y, { width: col.width, lineBreak: false })
     x += col.width
   }
-  y = doc.y + rowPadding
+  y += lineHeight + rowPadding
 
+  // Header rule
   doc
     .moveTo(startX, y)
     .lineTo(startX + CONTENT_WIDTH, y)
@@ -77,22 +79,51 @@ function drawTable(
     .stroke()
   y += rowPadding
 
+  // Draw data rows
   doc.font("Helvetica").fontSize(BASE_FONT_SIZE).fillColor(TEXT_COLOR)
   for (const row of rows) {
-    const rowStartY = y
-    let maxHeight = 0
+    // Calculate row height (max cell height across all columns)
+    let maxHeight = lineHeight
     for (let i = 0; i < columns.length; i++) {
-      const h = doc.heightOfString(row[i] ?? "—", { width: columns[i].width })
-      maxHeight = Math.max(maxHeight, h)
+      const cellText = row[i] ?? "—"
+      const h = doc.heightOfString(cellText, { width: columns[i].width })
+      if (h > maxHeight) maxHeight = h
     }
+    const rowHeight = maxHeight + rowPadding
+
+    // Page break check before drawing row
+    if (y + rowHeight > pageBottomMargin) {
+      doc.addPage()
+      y = PAGE_MARGIN
+      // Redraw column headers on new page
+      doc.font("Helvetica-Bold").fontSize(BASE_FONT_SIZE).fillColor(TEXT_COLOR)
+      x = startX
+      for (const col of columns) {
+        doc.text(col.header, x, y, { width: col.width, lineBreak: false })
+        x += col.width
+      }
+      y += lineHeight + rowPadding
+      doc
+        .moveTo(startX, y)
+        .lineTo(startX + CONTENT_WIDTH, y)
+        .strokeColor(HEADER_RULE_COLOR)
+        .lineWidth(0.75)
+        .stroke()
+      y += rowPadding
+      doc.font("Helvetica").fontSize(BASE_FONT_SIZE).fillColor(TEXT_COLOR)
+    }
+
+    // Draw each cell in the row
     x = startX
     for (let i = 0; i < columns.length; i++) {
-      doc.text(row[i] ?? "—", x, rowStartY, { width: columns[i].width })
+      const cellText = row[i] ?? "—"
+      doc.text(cellText, x, y, { width: columns[i].width, lineBreak: false })
       x += columns[i].width
     }
-    y = rowStartY + maxHeight + rowPadding
+    y += rowHeight
   }
 
+  // Bottom rule
   doc
     .moveTo(startX, y)
     .lineTo(startX + CONTENT_WIDTH, y)
@@ -101,6 +132,7 @@ function drawTable(
     .stroke()
   y += rowPadding
 
+  // Reset cursor position
   doc.x = startX
   doc.y = y
 }

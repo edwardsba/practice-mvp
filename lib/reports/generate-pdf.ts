@@ -137,6 +137,8 @@ export function generateReportPdf(snapshot: ReportSnapshot): Promise<Buffer> {
     const practitionerLines = [snapshot.practitioner.title, snapshot.practitioner.fullName]
       .filter(Boolean)
       .join(" ")
+      .replace(/\r\n/g, "\n")
+      .replace(/\r/g, "\n")
       .split("\n")
       .map((l) => l.trim())
       .filter(Boolean)
@@ -240,10 +242,7 @@ export function generateReportPdf(snapshot: ReportSnapshot): Promise<Buffer> {
       .text("Practitioner", practColX, metaY, { width: CONTENT_WIDTH / 2 })
     doc.font("Helvetica").fillColor(TEXT_COLOR)
     const displayLine =
-      snapshot.practitioner.displayName ??
-      [snapshot.practitioner.title, snapshot.practitioner.fullName]
-        .filter(Boolean)
-        .join(" ")
+      snapshot.practitioner.displayName ?? snapshot.practitioner.fullName
     doc.text(displayLine, practColX, doc.y, { width: CONTENT_WIDTH / 2 })
     doc
       .fillColor(MUTED_COLOR)
@@ -251,6 +250,11 @@ export function generateReportPdf(snapshot: ReportSnapshot): Promise<Buffer> {
         width: CONTENT_WIDTH / 2,
       })
     doc.fillColor(TEXT_COLOR)
+
+    // Reset cursor to left margin below both columns
+    const metaBottomY = doc.y + LINE_GAP
+    doc.x = PAGE_MARGIN
+    doc.y = metaBottomY
 
     doc.moveDown(0.5)
     doc
@@ -280,10 +284,10 @@ export function generateReportPdf(snapshot: ReportSnapshot): Promise<Buffer> {
       drawTable(
         doc,
         [
-          { header: "Date", width: 100 },
-          { header: "Score", width: 80 },
-          { header: "Severity", width: 170 },
-          { header: "Functional Impairment", width: 145 },
+          { header: "Date", width: 95 },
+          { header: "Score", width: 65 },
+          { header: "Severity", width: 200 },
+          { header: "Functional Impairment", width: 135 },
         ],
         phq9Results.map((r) => [
           formatShortDate(r.date),
@@ -299,10 +303,10 @@ export function generateReportPdf(snapshot: ReportSnapshot): Promise<Buffer> {
       drawTable(
         doc,
         [
-          { header: "Date", width: 100 },
-          { header: "Score", width: 80 },
-          { header: "Severity", width: 170 },
-          { header: "Functional Impairment", width: 145 },
+          { header: "Date", width: 95 },
+          { header: "Score", width: 65 },
+          { header: "Severity", width: 200 },
+          { header: "Functional Impairment", width: 135 },
         ],
         gad7Results.map((r) => [
           formatShortDate(r.date),
@@ -318,9 +322,9 @@ export function generateReportPdf(snapshot: ReportSnapshot): Promise<Buffer> {
       drawTable(
         doc,
         [
-          { header: "Date", width: 100 },
-          { header: "Score", width: 80 },
-          { header: "Screen outcome", width: 315 },
+          { header: "Date", width: 95 },
+          { header: "Score", width: 65 },
+          { header: "Screen outcome", width: 335 },
         ],
         asqResults.map((r) => [
           formatShortDate(r.date),
@@ -335,9 +339,9 @@ export function generateReportPdf(snapshot: ReportSnapshot): Promise<Buffer> {
       drawTable(
         doc,
         [
-          { header: "Date", width: 100 },
-          { header: "Score", width: 80 },
-          { header: "Risk Level", width: 315 },
+          { header: "Date", width: 95 },
+          { header: "Score", width: 65 },
+          { header: "Risk Level", width: 335 },
         ],
         assistResults.map((r) => [
           formatShortDate(r.date),
@@ -383,9 +387,9 @@ export function generateReportPdf(snapshot: ReportSnapshot): Promise<Buffer> {
         drawTable(
           doc,
           [
-            { header: "Date", width: 100 },
-            { header: "Score", width: 80 },
-            { header: "Rating", width: 315 },
+            { header: "Date", width: 95 },
+            { header: "Score", width: 65 },
+            { header: "Rating", width: 335 },
           ],
           rows.map((r) => [
             formatShortDate(r.date),

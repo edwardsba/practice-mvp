@@ -17,7 +17,6 @@ import { requirePractitionerContext } from "@/lib/auth"
 import { db } from "@/lib/db"
 import {
   formatPractitionerName,
-  formatPractitionerViewName,
 } from "@/lib/practitioner/format"
 import {
   GAD7_IMPAIRMENT_ELEMENT_KEY,
@@ -306,7 +305,7 @@ export async function buildSnapshot(
     practitioner: {
       title: practitioner.title,
       fullName: formatPractitionerName(practitioner),
-      displayName: formatPractitionerViewName(practitioner),
+      displayName: formatPractitionerName(practitioner),
     },
     practice: {
       practiceName: practice.practiceName,

@@ -1,5 +1,8 @@
 import { Resend } from "resend"
 
+export const FROM_ADDRESS =
+  process.env.EMAIL_FROM_ADDRESS ?? "onboarding@resend.dev"
+
 let client: Resend | null = null
 
 export function getResendClient(): Resend {

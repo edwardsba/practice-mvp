@@ -1,6 +1,4 @@
-import { getResendClient } from "@/lib/email/resend"
-
-const FROM_ADDRESS = "onboarding@resend.dev"
+import { FROM_ADDRESS, getResendClient } from "@/lib/email/resend"
 
 export type SendQuestionnaireEmailResult =
   | { sent: true }

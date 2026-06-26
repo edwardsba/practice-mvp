@@ -15,9 +15,12 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import {
+  DEFAULT_CRISIS_PLAN_MESSAGE,
+  DEFAULT_CRISIS_PLAN_SUBJECT,
   getDefaultCrisisPlanEmailDraft,
   type CrisisPlanEmailVariables,
 } from "@/lib/email/crisis-plan-templates"
+import { resolveTemplate } from "@/lib/email/templates"
 
 export function SendCrisisPlanEmailModal({
   open,
@@ -41,12 +44,29 @@ export function SendCrisisPlanEmailModal({
 
   useEffect(() => {
     if (!open) return
-
-    const draft = getDefaultCrisisPlanEmailDraft(templateVariables)
-    setSubject(draft.subject)
-    setMessage(draft.message)
     setSendError(null)
     setSending(false)
+
+    fetch("/api/email/template?key=crisis_plan")
+      .then((r) => r.json())
+      .then((data: { subject?: string; message?: string }) => {
+        const vars = templateVariables
+        const subject = resolveTemplate(
+          data.subject ?? DEFAULT_CRISIS_PLAN_SUBJECT,
+          vars
+        )
+        const message = resolveTemplate(
+          data.message ?? DEFAULT_CRISIS_PLAN_MESSAGE,
+          vars
+        )
+        setSubject(subject)
+        setMessage(message)
+      })
+      .catch(() => {
+        const draft = getDefaultCrisisPlanEmailDraft(templateVariables)
+        setSubject(draft.subject)
+        setMessage(draft.message)
+      })
   }, [open, templateVariables])
 
   async function handleSend() {

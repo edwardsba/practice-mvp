@@ -7,7 +7,7 @@ import { AppShell } from "@/components/app-shell"
 import { BackButton } from "@/components/ui/back-button"
 import { clients, practitionerProfiles, practices } from "@/db/schema"
 import { getClientFundingApprovalsForReport } from "@/lib/actions/funding"
-import { formatPractitionerName } from "@/lib/practitioner/format"
+import { formatPractitionerName, formatPractitionerViewName } from "@/lib/practitioner/format"
 import { requirePractitionerContext } from "@/lib/auth"
 import { db } from "@/lib/db"
 
@@ -98,6 +98,7 @@ export default async function NewReportPage({
           practitioner: {
             title: practitioner.title,
             fullName: formatPractitionerName(practitioner),
+            displayName: formatPractitionerViewName(practitioner),
           },
           practice: {
             practiceName: practice.practiceName,

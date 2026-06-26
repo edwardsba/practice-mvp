@@ -47,6 +47,12 @@ export function ReportDocument({
     .filter(Boolean)
     .join(" ")
 
+  const displayLine =
+    snapshot.practitioner.displayName ??
+    [snapshot.practitioner.title, snapshot.practitioner.fullName]
+      .filter(Boolean)
+      .join(" ")
+
   const practitionerLines = practitionerLine
     .split("\n")
     .map((l) => l.trim())
@@ -133,15 +139,11 @@ export function ReportDocument({
               Date of birth: {formatDisplayDate(snapshot.client.dateOfBirth)}
             </dd>
           </div>
-          <div>
-            <dt className="font-medium text-muted-foreground">Practitioner</dt>
-            {practitionerLines.map((line, i) => (
-              <dd key={i} className={i > 0 ? "text-muted-foreground" : undefined}>
-                {line}
-              </dd>
-            ))}
-            <dd className="text-muted-foreground">{snapshot.practice.practiceName}</dd>
-          </div>
+            <div>
+              <dt className="font-medium text-muted-foreground">Practitioner</dt>
+              <dd>{displayLine}</dd>
+              <dd className="text-muted-foreground">{snapshot.practice.practiceName}</dd>
+            </div>
         </dl>
       </header>
 

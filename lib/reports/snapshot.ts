@@ -38,6 +38,7 @@ export type ReportSnapshot = {
   practitioner: {
     title: string | null
     fullName: string
+    displayName: string
   }
   practice: {
     practiceName: string
@@ -119,6 +120,10 @@ export function parseReportSnapshot(value: unknown): ReportSnapshot | null {
       practiceAddress: raw.practice.practiceAddress ?? null,
     },
     recipient: raw.recipient ?? null,
+    practitioner: {
+      ...raw.practitioner,
+      displayName: raw.practitioner.displayName ?? raw.practitioner.fullName,
+    },
     phq9Results,
     gad7Results,
     asqResults,

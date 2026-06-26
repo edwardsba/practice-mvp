@@ -15,7 +15,10 @@ import {
 } from "@/db/schema"
 import { requirePractitionerContext } from "@/lib/auth"
 import { db } from "@/lib/db"
-import { formatPractitionerName } from "@/lib/practitioner/format"
+import {
+  formatPractitionerName,
+  formatPractitionerViewName,
+} from "@/lib/practitioner/format"
 import {
   GAD7_IMPAIRMENT_ELEMENT_KEY,
   getFunctionalImpairmentLabelsByResultId,
@@ -292,6 +295,7 @@ export async function buildSnapshot(
     practitioner: {
       title: practitioner.title,
       fullName: formatPractitionerName(practitioner),
+      displayName: formatPractitionerViewName(practitioner),
     },
     practice: {
       practiceName: practice.practiceName,

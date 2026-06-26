@@ -103,20 +103,20 @@ export default async function AppointmentDetailPage({
                 </Button>
               </form>
             )}
-            <Button asChild variant="outline">
-              <Link
-                href={`/appointments/${appointmentId}/edit?returnTo=${encodeURIComponent(returnTo ?? "/appointments")}`}
-              >
-                Edit
-              </Link>
-            </Button>
           </div>
         </div>
       </div>
 
       <Card className="mb-6">
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between gap-3">
           <CardTitle>Appointment</CardTitle>
+          <Button asChild variant="outline" size="sm">
+            <Link
+              href={`/appointments/${appointmentId}/edit?returnTo=${encodeURIComponent(returnTo ?? "/appointments")}`}
+            >
+              Edit
+            </Link>
+          </Button>
         </CardHeader>
         <CardContent>
           <dl className="grid gap-4 sm:grid-cols-2">

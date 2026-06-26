@@ -32,6 +32,10 @@ import {
   formatAppointmentDate,
   formatAppointmentTime,
 } from "@/lib/appointments/format"
+import {
+  APPOINTMENT_STATUS_LABELS,
+  type AppointmentStatus,
+} from "@/lib/appointments/constants"
 function displayValue(value: string | null | undefined) {
   return value?.trim() || "—"
 }
@@ -229,13 +233,14 @@ export default async function FundingApprovalDetailPage({
                   <TableHead>Date</TableHead>
                   <TableHead>Time</TableHead>
                   <TableHead>Location</TableHead>
+                  <TableHead>Status</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {approval.linkedAppointments.length === 0 ? (
                   <TableRow>
                     <TableCell
-                      colSpan={4}
+                      colSpan={5}
                       className="h-16 text-center text-muted-foreground"
                     >
                       No linked appointments.
@@ -253,6 +258,11 @@ export default async function FundingApprovalDetailPage({
                       </TableCell>
                       <TableCell>
                         {appointment.location?.trim() || "—"}
+                      </TableCell>
+                      <TableCell>
+                        {APPOINTMENT_STATUS_LABELS[
+                          appointment.status as AppointmentStatus
+                        ] ?? appointment.status}
                       </TableCell>
                     </TableRow>
                   ))

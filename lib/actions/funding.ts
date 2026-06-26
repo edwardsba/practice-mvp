@@ -933,6 +933,7 @@ export async function getFundingApprovalById(fundingApprovalId: string) {
       appointmentDate: appointments.appointmentDate,
       appointmentTime: appointments.appointmentTime,
       location: appointments.location,
+      status: appointments.status,
     })
     .from(appointments)
     .where(eq(appointments.fundingApprovalId, fundingApprovalId))

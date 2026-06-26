@@ -57,7 +57,11 @@ export function ReportBtpResultsTable({
                 {result.targets.map((target) => (
                   <TableRow key={`${result.assessmentResultId}-${target.target}`}>
                     <TableCell>{target.target}</TableCell>
-                    <TableCell>{target.score}</TableCell>
+                    <TableCell>
+                      {target.maxScore != null
+                        ? `${target.score} / ${target.maxScore}`
+                        : target.score}
+                    </TableCell>
                     <TableCell>{target.ratingLabel}</TableCell>
                   </TableRow>
                 ))}

@@ -62,7 +62,11 @@ export function ReportResultsTable({
             results.map((row) => (
               <tr key={row.assessmentResultId} className="border-b">
                 <td className="p-2 align-middle">{formatShortDate(row.date)}</td>
-                <td className="p-2 align-middle tabular-nums">{row.score}</td>
+                <td className="p-2 align-middle tabular-nums">
+                  {row.maxScore != null
+                    ? `${row.score} / ${row.maxScore}`
+                    : row.score}
+                </td>
                 <td
                   className={
                     capitalizeSeverity
@@ -122,7 +126,11 @@ export function ReportAsqResultsTable({
             results.map((row) => (
               <tr key={row.assessmentResultId} className="border-b">
                 <td className="p-2 align-middle">{formatShortDate(row.date)}</td>
-                <td className="p-2 align-middle tabular-nums">{row.score}</td>
+                <td className="p-2 align-middle tabular-nums">
+                  {row.maxScore != null
+                    ? `${row.score} / ${row.maxScore}`
+                    : row.score}
+                </td>
                 <td className="p-2 align-middle">{row.acuteRiskRating ?? "—"}</td>
               </tr>
             ))

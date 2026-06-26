@@ -25,6 +25,7 @@ import {
   PHQ9_IMPAIRMENT_ELEMENT_KEY,
 } from "@/lib/assessments/impairment"
 import { loadBtpResultsForDateRange } from "@/lib/assessments/btp-results"
+import { getMaxScoreForAssessmentDefinition } from "@/lib/assessments/max-score"
 import type {
   BtpReportResultRow,
   ReportRecipient,
@@ -83,6 +84,7 @@ async function fetchResultsForAssessment(
       score: assessmentResults.score,
       severity: assessmentResults.severity,
       acuteRiskRating: assessmentResults.acuteRiskRating,
+      assessmentDefinitionId: assessmentDefinitions.assessmentDefinitionId,
     })
     .from(assessmentResults)
     .innerJoin(
@@ -117,10 +119,16 @@ async function fetchResultsForAssessment(
       )
     : new Map<string, string>()
 
+  const assessmentDefinitionId = rows[0]?.assessmentDefinitionId ?? null
+  const maxScore = assessmentDefinitionId
+    ? await getMaxScoreForAssessmentDefinition(assessmentDefinitionId)
+    : null
+
   return rows.map((row) => ({
     assessmentResultId: row.assessmentResultId,
     date: row.assessmentDate.toISOString(),
     score: row.score,
+    maxScore: maxScore ?? null,
     severity: row.severity,
     functionalImpairmentLabel: impairmentLabels.get(row.assessmentResultId) ?? null,
     acuteRiskRating: options?.includeAcuteRisk
@@ -220,7 +228,10 @@ export async function fetchReportResultsForRange(
   const btpResults: BtpReportResultRow[] = btpSummaries.map((result) => ({
     assessmentResultId: result.assessmentResultId,
     date: result.assessmentDate.toISOString(),
-    targets: result.targets,
+    targets: result.targets.map((t) => ({
+      ...t,
+      maxScore: 5,
+    })),
   }))
 
   return {

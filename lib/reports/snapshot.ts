@@ -2,6 +2,7 @@ export type ReportResultRow = {
   assessmentResultId: string
   date: string
   score: number
+  maxScore?: number | null
   severity: string | null
   functionalImpairmentLabel?: string | null
   acuteRiskRating?: string | null
@@ -10,6 +11,7 @@ export type ReportResultRow = {
 export type BtpReportTargetRow = {
   target: string
   score: number
+  maxScore?: number | null
   ratingLabel: string
 }
 

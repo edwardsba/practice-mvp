@@ -39,6 +39,7 @@ const dropdownMenus: NavDropdown[] = [
     items: [
       { href: "/appointments", label: "All Appointments" },
       { href: "/session-notes", label: "All Session Notes" },
+      { href: "/reports", label: "All Reports" },
       { href: "/funding/claims", label: "All Claims" },
       { href: "/funding/approvals", label: "All Funding Approvals" },
       { href: "/contacts/organisations", label: "All Organisations" },
@@ -46,6 +47,7 @@ const dropdownMenus: NavDropdown[] = [
     isActive: (pathname) =>
       pathname.startsWith("/appointments") ||
       pathname.startsWith("/session-notes") ||
+      pathname.startsWith("/reports") ||
       pathname.startsWith("/funding/claims") ||
       pathname.startsWith("/funding/approvals") ||
       pathname.startsWith("/contacts/organisations"),

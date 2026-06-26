@@ -1,12 +1,5 @@
 import type { BtpReportResultRow } from "@/lib/reports/snapshot"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
+import { cn } from "@/lib/utils"
 
 function formatShortDate(value: string) {
   const date = new Date(value.includes("T") ? value : `${value}T00:00:00`)
@@ -16,6 +9,30 @@ function formatShortDate(value: string) {
     month: "short",
     year: "numeric",
   })
+}
+
+type TargetRow = {
+  date: string
+  score: number
+  maxScore?: number | null
+  ratingLabel: string
+}
+
+function pivotBtpResults(results: BtpReportResultRow[]): Map<string, TargetRow[]> {
+  const map = new Map<string, TargetRow[]>()
+  for (const result of results) {
+    for (const target of result.targets) {
+      const rows = map.get(target.target) ?? []
+      rows.push({
+        date: result.date,
+        score: target.score,
+        maxScore: target.maxScore,
+        ratingLabel: target.ratingLabel,
+      })
+      map.set(target.target, rows)
+    }
+  }
+  return map
 }
 
 export function ReportBtpResultsTable({
@@ -29,46 +46,53 @@ export function ReportBtpResultsTable({
 }) {
   if (results.length === 0) {
     return (
-      <section className={`report-results-btp space-y-3 pt-6 ${className ?? ""}`}>
+      <section className={cn("report-results-btp space-y-3 pt-6", className)}>
         <h3 className="text-lg font-semibold">Behavioural Targets Progress</h3>
         <p className="text-sm text-muted-foreground">{emptyMessage}</p>
       </section>
     )
   }
 
+  const byTarget = pivotBtpResults(results)
+
   return (
-    <section className={`report-results-btp space-y-6 pt-6 ${className ?? ""}`}>
+    <section className={cn("report-results-btp space-y-6 pt-6", className)}>
       <h3 className="text-lg font-semibold">Behavioural Targets Progress</h3>
-      {results.map((result) => (
-        <div key={result.assessmentResultId} className="space-y-2">
-          <p className="text-sm font-medium text-muted-foreground">
-            {formatShortDate(result.date)}
-          </p>
-          <div className="rounded-lg border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Target</TableHead>
-                  <TableHead>Score</TableHead>
-                  <TableHead>Rating</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {result.targets.map((target) => (
-                  <TableRow key={`${result.assessmentResultId}-${target.target}`}>
-                    <TableCell>{target.target}</TableCell>
-                    <TableCell>
-                      {target.maxScore != null
-                        ? `${target.score} / ${target.maxScore}`
-                        : target.score}
-                    </TableCell>
-                    <TableCell>{target.ratingLabel}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        </div>
+      {Array.from(byTarget.entries()).map(([target, rows]) => (
+        <section key={target} className="report-results-section space-y-2">
+          <h4 className="text-sm font-medium">{target}</h4>
+          <table className="report-results-table w-full border-collapse text-sm">
+            <thead>
+              <tr>
+                <th className="h-10 border-y border-border/60 px-2 text-left align-middle font-medium">
+                  Date
+                </th>
+                <th className="h-10 border-y border-border/60 px-2 text-left align-middle font-medium">
+                  Score
+                </th>
+                <th className="h-10 border-y border-border/60 px-2 text-left align-middle font-medium">
+                  Rating
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row, i) => (
+                <tr
+                  key={i}
+                  className="border-b border-border/40 last:border-b-2 last:border-border/60"
+                >
+                  <td className="p-2 align-middle">{formatShortDate(row.date)}</td>
+                  <td className="p-2 align-middle tabular-nums">
+                    {row.maxScore != null
+                      ? `${row.score} / ${row.maxScore}`
+                      : row.score}
+                  </td>
+                  <td className="p-2 align-middle">{row.ratingLabel}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
       ))}
     </section>
   )

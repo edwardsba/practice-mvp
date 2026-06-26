@@ -43,7 +43,6 @@
     break-after: avoid;
     padding-bottom: 1rem;
     margin-bottom: 0;
-    border-bottom: 1px solid #ccc;
   }
 
   .report-document .report-period {
@@ -52,7 +51,6 @@
     break-after: avoid;
     margin-bottom: 0.75rem;
     padding-bottom: 0.75rem;
-    border-bottom: 1px solid #eee;
   }
 
   .report-document .text-muted-foreground {

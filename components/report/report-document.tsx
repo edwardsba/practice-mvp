@@ -70,7 +70,7 @@ export function ReportDocument({
   return (
     <article className="report-document mx-auto max-w-3xl bg-white text-foreground">
       {/* 1. Header */}
-      <header className="report-header space-y-6 border-b pb-6">
+      <header className="report-header space-y-6 pb-6">
         <div className="flex justify-end text-sm">
           <div className="text-right">
             <p className="font-semibold">{snapshot.practice.practiceName}</p>

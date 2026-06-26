@@ -11,6 +11,12 @@ function formatShortDate(value: string) {
   })
 }
 
+const thClassName =
+  "h-10 px-2 text-left align-middle font-medium border-y border-border/60"
+
+const dataRowClassName =
+  "border-b border-border/40 last:border-b-2 last:border-border/60"
+
 export function ReportResultsTable({
   title,
   results,
@@ -33,24 +39,20 @@ export function ReportResultsTable({
   return (
     <section className={cn("report-results-section", className)}>
       <h3 className="mb-3 text-lg font-semibold">{title}</h3>
-      <table className="report-results-table w-full text-sm">
+      <table className="report-results-table w-full border-collapse text-sm">
         <thead>
-          <tr className="border-b">
-            <th className="h-10 px-2 text-left align-middle font-medium">Date</th>
-            <th className="h-10 px-2 text-left align-middle font-medium">Score</th>
-            <th className="h-10 px-2 text-left align-middle font-medium">
-              {severityColumnLabel}
-            </th>
+          <tr>
+            <th className={thClassName}>Date</th>
+            <th className={thClassName}>Score</th>
+            <th className={thClassName}>{severityColumnLabel}</th>
             {showImpairment ? (
-              <th className="h-10 px-2 text-left align-middle font-medium">
-                Functional Impairment
-              </th>
+              <th className={thClassName}>Functional Impairment</th>
             ) : null}
           </tr>
         </thead>
         <tbody>
           {results.length === 0 ? (
-            <tr className="border-b">
+            <tr className={dataRowClassName}>
               <td
                 colSpan={columnCount}
                 className="p-2 py-8 text-center text-muted-foreground"
@@ -60,7 +62,7 @@ export function ReportResultsTable({
             </tr>
           ) : (
             results.map((row) => (
-              <tr key={row.assessmentResultId} className="border-b">
+              <tr key={row.assessmentResultId} className={dataRowClassName}>
                 <td className="p-2 align-middle">{formatShortDate(row.date)}</td>
                 <td className="p-2 align-middle tabular-nums">
                   {row.maxScore != null
@@ -102,19 +104,17 @@ export function ReportAsqResultsTable({
   return (
     <section className={cn("report-results-section", className)}>
       <h3 className="mb-3 text-lg font-semibold">ASQ results</h3>
-      <table className="report-results-table w-full text-sm">
+      <table className="report-results-table w-full border-collapse text-sm">
         <thead>
-          <tr className="border-b">
-            <th className="h-10 px-2 text-left align-middle font-medium">Date</th>
-            <th className="h-10 px-2 text-left align-middle font-medium">Score</th>
-            <th className="h-10 px-2 text-left align-middle font-medium">
-              Screen outcome
-            </th>
+          <tr>
+            <th className={thClassName}>Date</th>
+            <th className={thClassName}>Score</th>
+            <th className={thClassName}>Screen outcome</th>
           </tr>
         </thead>
         <tbody>
           {results.length === 0 ? (
-            <tr className="border-b">
+            <tr className={dataRowClassName}>
               <td
                 colSpan={3}
                 className="p-2 py-8 text-center text-muted-foreground"
@@ -124,7 +124,7 @@ export function ReportAsqResultsTable({
             </tr>
           ) : (
             results.map((row) => (
-              <tr key={row.assessmentResultId} className="border-b">
+              <tr key={row.assessmentResultId} className={dataRowClassName}>
                 <td className="p-2 align-middle">{formatShortDate(row.date)}</td>
                 <td className="p-2 align-middle tabular-nums">
                   {row.maxScore != null

@@ -61,26 +61,23 @@ export function ReportBtpResultsTable({
       {Array.from(byTarget.entries()).map(([target, rows]) => (
         <section key={target} className="report-results-section space-y-2">
           <h4 className="text-sm font-medium">{target}</h4>
-          <table className="report-results-table w-full border-collapse text-sm">
+          <table className="report-results-table w-full text-sm border-collapse">
             <thead>
               <tr>
-                <th className="h-10 border-y border-border/60 px-2 text-left align-middle font-medium">
+                <th className="h-10 px-2 text-left align-middle font-medium border-b border-border/40">
                   Date
                 </th>
-                <th className="h-10 border-y border-border/60 px-2 text-left align-middle font-medium">
+                <th className="h-10 px-2 text-left align-middle font-medium border-b border-border/40">
                   Score
                 </th>
-                <th className="h-10 border-y border-border/60 px-2 text-left align-middle font-medium">
+                <th className="h-10 px-2 text-left align-middle font-medium border-b border-border/40">
                   Rating
                 </th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="[&_tr:last-child_td]:border-b [&_tr:last-child_td]:border-border/40">
               {rows.map((row, i) => (
-                <tr
-                  key={i}
-                  className="border-b border-border/40 last:border-b-2 last:border-border/60"
-                >
+                <tr key={i}>
                   <td className="p-2 align-middle">{formatShortDate(row.date)}</td>
                   <td className="p-2 align-middle tabular-nums">
                     {row.maxScore != null

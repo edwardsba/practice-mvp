@@ -17,6 +17,7 @@ import { requirePractitionerContext } from "@/lib/auth"
 import { db } from "@/lib/db"
 import { getSignatureAsDataUrl } from "@/lib/practitioner/signature"
 import {
+  formatPractitionerFormalName,
   formatPractitionerName,
 } from "@/lib/practitioner/format"
 import {
@@ -311,7 +312,7 @@ export async function buildSnapshot(
     practitioner: {
       title: practitioner.title,
       fullName: formatPractitionerName(practitioner),
-      displayName: formatPractitionerName(practitioner),
+      displayName: formatPractitionerFormalName(practitioner),
       signatureDataUrl,
     },
     practice: {

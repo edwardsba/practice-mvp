@@ -52,6 +52,20 @@ export function formatPractitionerViewName(
   return composePractitionerNameParts(profile)
 }
 
+/**
+ * Formal name for printed report headers: title + firstName + lastName only.
+ * Deliberately ignores reportSignature and preferredName — not appropriate
+ * for the client-facing header block of a clinical document.
+ */
+export function formatPractitionerFormalName(
+  profile: Pick<PractitionerNameFields, "title" | "firstName" | "lastName">
+): string {
+  const name = [profile.firstName.trim(), profile.lastName.trim()]
+    .filter(Boolean)
+    .join(" ")
+  return [profile.title?.trim(), name].filter(Boolean).join(" ")
+}
+
 export function formatPractitionerRegistration(
   registrationBody?: string | null,
   registrationNumber?: string | null

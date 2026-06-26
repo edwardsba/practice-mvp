@@ -12,10 +12,10 @@ function formatShortDate(value: string) {
 }
 
 const thClassName =
-  "h-10 px-2 text-left align-middle font-medium border-y border-border/60"
+  "h-10 px-2 text-left align-middle font-medium border-b border-border/40"
 
-const dataRowClassName =
-  "border-b border-border/40 last:border-b-2 last:border-border/60"
+const tbodyClassName =
+  "[&_tr:last-child_td]:border-b [&_tr:last-child_td]:border-border/40"
 
 export function ReportResultsTable({
   title,
@@ -50,9 +50,9 @@ export function ReportResultsTable({
             ) : null}
           </tr>
         </thead>
-        <tbody>
+        <tbody className={tbodyClassName}>
           {results.length === 0 ? (
-            <tr className={dataRowClassName}>
+            <tr>
               <td
                 colSpan={columnCount}
                 className="p-2 py-8 text-center text-muted-foreground"
@@ -62,7 +62,7 @@ export function ReportResultsTable({
             </tr>
           ) : (
             results.map((row) => (
-              <tr key={row.assessmentResultId} className={dataRowClassName}>
+              <tr key={row.assessmentResultId}>
                 <td className="p-2 align-middle">{formatShortDate(row.date)}</td>
                 <td className="p-2 align-middle tabular-nums">
                   {row.maxScore != null
@@ -112,9 +112,9 @@ export function ReportAsqResultsTable({
             <th className={thClassName}>Screen outcome</th>
           </tr>
         </thead>
-        <tbody>
+        <tbody className={tbodyClassName}>
           {results.length === 0 ? (
-            <tr className={dataRowClassName}>
+            <tr>
               <td
                 colSpan={3}
                 className="p-2 py-8 text-center text-muted-foreground"
@@ -124,7 +124,7 @@ export function ReportAsqResultsTable({
             </tr>
           ) : (
             results.map((row) => (
-              <tr key={row.assessmentResultId} className={dataRowClassName}>
+              <tr key={row.assessmentResultId}>
                 <td className="p-2 align-middle">{formatShortDate(row.date)}</td>
                 <td className="p-2 align-middle tabular-nums">
                   {row.maxScore != null

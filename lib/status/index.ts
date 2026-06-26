@@ -23,7 +23,7 @@ export const APPOINTMENT_STATUS_CONFIG: Record<string, StatusConfig> = {
 export const APPOINTMENT_STATUS_TRANSITIONS: Record<string, string[]> = {
   scheduled: ["confirmed", "cancelled"],
   confirmed: ["completed", "no_show", "cancelled"],
-  completed: [],
+  completed: ["no_show"],
   no_show: [],
   cancelled: [],
 }

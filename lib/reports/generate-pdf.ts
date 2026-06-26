@@ -48,13 +48,23 @@ function drawTable(
   rows: string[][]
 ) {
   const startX = doc.x
-  let y = doc.y
   const rowPadding = 6
 
+  // Pre-flight: ensure enough space for header + at least one row
+  const pageBottomMargin = doc.page.height - PAGE_MARGIN
+  const headerHeight = doc.currentLineHeight(true) + rowPadding
+  const minRowHeight = doc.currentLineHeight(true) + rowPadding
+  if (doc.y + headerHeight + minRowHeight > pageBottomMargin) {
+    doc.addPage()
+    doc.x = PAGE_MARGIN
+  }
+
+  // Header row
+  let y = doc.y
   doc.font("Helvetica-Bold").fontSize(BASE_FONT_SIZE).fillColor(TEXT_COLOR)
   let x = startX
   for (const col of columns) {
-    doc.text(col.header, x, y, { width: col.width })
+    doc.text(col.header, x, y, { width: col.width, lineBreak: false })
     x += col.width
   }
   y = doc.y + rowPadding

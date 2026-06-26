@@ -10,6 +10,8 @@ import {
   type SaveReportDraftState,
 } from "@/app/clients/[client_id]/reports/actions"
 import { ReportDocument } from "@/components/report/report-document"
+import { AsqStatusBadge } from "@/components/session-notes/asq-status-badge"
+import { PsqStatusBadge } from "@/components/session-notes/psq-status-badge"
 import { ReportBtpResultsTable } from "@/components/report/btp-results-table"
 import {
   ReportAsqResultsTable,
@@ -341,32 +343,57 @@ export function ReportForm({
                   No appointments linked to this funding approval.
                 </p>
               ) : (
-                selectedApproval.appointments.map((appt) => (
-                  <label
-                    key={appt.appointmentId}
-                    className="flex cursor-pointer items-center gap-3 text-sm"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selectedAppointmentIds.includes(appt.appointmentId)}
-                      onChange={(e) => {
-                        setSelectedAppointmentIds((prev) =>
-                          e.target.checked
-                            ? [...prev, appt.appointmentId]
-                            : prev.filter((id) => id !== appt.appointmentId)
-                        )
-                      }}
-                      className="h-4 w-4 rounded border-border"
-                    />
-                    <span>
-                      {formatAppointmentDate(appt.appointmentDate)}{" "}
-                      {formatAppointmentTime(appt.appointmentTime)}
-                    </span>
-                    <span className="text-muted-foreground capitalize">
-                      {appt.status.replace("_", " ")}
-                    </span>
-                  </label>
-                ))
+                <>
+                  <div className="mb-1 flex items-center gap-3 border-b pb-1 text-xs font-medium text-muted-foreground">
+                    <span className="w-4 shrink-0" />
+                    <span className="w-32 shrink-0">Date</span>
+                    <span className="w-16 shrink-0">Time</span>
+                    <span className="w-20 shrink-0">Status</span>
+                    <span className="w-20 shrink-0">PSQ</span>
+                    <span className="w-20 shrink-0">ASQ</span>
+                    <span className="w-24 shrink-0">Session note</span>
+                  </div>
+                  {selectedApproval.appointments.map((appt) => (
+                    <label
+                      key={appt.appointmentId}
+                      className="flex cursor-pointer items-center gap-3 py-1 text-sm"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedAppointmentIds.includes(appt.appointmentId)}
+                        onChange={(e) => {
+                          setSelectedAppointmentIds((prev) =>
+                            e.target.checked
+                              ? [...prev, appt.appointmentId]
+                              : prev.filter((id) => id !== appt.appointmentId)
+                          )
+                        }}
+                        className="h-4 w-4 rounded border-border"
+                      />
+                      <span className="w-32 shrink-0">
+                        {formatAppointmentDate(appt.appointmentDate)}
+                      </span>
+                      <span className="w-16 shrink-0 text-muted-foreground">
+                        {formatAppointmentTime(appt.appointmentTime)}
+                      </span>
+                      <span className="w-20 shrink-0 capitalize text-muted-foreground">
+                        {appt.status.replace("_", " ")}
+                      </span>
+                      <span className="w-20 shrink-0">
+                        <PsqStatusBadge
+                          sentAt={appt.preSessionBatterySentAt}
+                          psqBatteryStatus={appt.psqBatteryStatus}
+                        />
+                      </span>
+                      <span className="w-20 shrink-0">
+                        <AsqStatusBadge asqCompleted={appt.asqCompleted} />
+                      </span>
+                      <span className="w-24 shrink-0 capitalize text-muted-foreground">
+                        {appt.sessionNoteStatus ?? "—"}
+                      </span>
+                    </label>
+                  ))}
+                </>
               )}
               {selectedAppointmentDates.length > 0 && (
                 <p className="pt-2 text-xs text-muted-foreground">

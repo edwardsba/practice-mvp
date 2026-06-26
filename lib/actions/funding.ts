@@ -1,6 +1,6 @@
 "use server"
 
-import { and, asc, count, desc, eq } from "drizzle-orm"
+import { and, asc, count, desc, eq, sql } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
 
@@ -638,6 +638,10 @@ export async function getClientFundingApprovalsForReport(
       appointmentDate: string
       appointmentTime: string
       status: string
+      preSessionBatterySentAt: Date | null
+      psqBatteryStatus: string | null
+      asqCompleted: boolean
+      sessionNoteStatus: string | null
     }>
   }>
 > {
@@ -798,6 +802,31 @@ export async function getClientFundingApprovalsForReport(
           appointmentDate: appointments.appointmentDate,
           appointmentTime: appointments.appointmentTime,
           status: appointments.status,
+          preSessionBatterySentAt: appointments.preSessionBatterySentAt,
+          psqBatteryStatus: sql<string | null>`(
+            SELECT bi.status
+            FROM battery_instances bi
+            JOIN assessment_instances ai
+              ON bi.phq9_instance_id = ai.assessment_instance_id
+            WHERE ai.appointment_id = ${appointments.appointmentId}
+            LIMIT 1
+          )`.as("psq_battery_status"),
+          asqCompleted: sql<boolean>`EXISTS (
+            SELECT 1
+            FROM assessment_instances ai
+            JOIN assessment_definitions ad
+              ON ai.assessment_definition_id = ad.assessment_definition_id
+            JOIN assessment_results ar
+              ON ar.assessment_instance_id = ai.assessment_instance_id
+            WHERE ai.appointment_id = ${appointments.appointmentId}
+              AND ad.assessment_code = 'ASQ'
+          )`.as("asq_completed"),
+          sessionNoteStatus: sql<string | null>`(
+            SELECT sn.status
+            FROM session_notes sn
+            WHERE sn.appointment_id = ${appointments.appointmentId}
+            LIMIT 1
+          )`.as("session_note_status"),
         })
         .from(appointments)
         .where(eq(appointments.fundingApprovalId, approval.fundingApprovalId))

@@ -47,6 +47,11 @@ export function ReportDocument({
     .filter(Boolean)
     .join(" ")
 
+  const practitionerLines = practitionerLine
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean)
+
   const phq9Results = getPhq9ResultsFromSnapshot(snapshot)
   const gad7Results = getGad7ResultsFromSnapshot(snapshot)
   const asqResults = getAsqResultsFromSnapshot(snapshot)
@@ -63,11 +68,17 @@ export function ReportDocument({
         <div className="flex justify-end text-sm">
           <div className="text-right">
             <p className="font-semibold">{snapshot.practice.practiceName}</p>
-            {snapshot.practice.practiceAddress ? (
-              <p className="text-muted-foreground">
-                {snapshot.practice.practiceAddress}
-              </p>
-            ) : null}
+            {snapshot.practice.practiceAddress
+              ? snapshot.practice.practiceAddress
+                  .split(",")
+                  .map((part) => part.trim())
+                  .filter(Boolean)
+                  .map((part, i) => (
+                    <p key={i} className="text-muted-foreground">
+                      {part}
+                    </p>
+                  ))
+              : null}
           </div>
         </div>
 
@@ -112,7 +123,11 @@ export function ReportDocument({
           </div>
           <div>
             <dt className="font-medium text-muted-foreground">Practitioner</dt>
-            <dd>{practitionerLine}</dd>
+            {practitionerLines.map((line, i) => (
+              <dd key={i} className={i > 0 ? "text-muted-foreground" : undefined}>
+                {line}
+              </dd>
+            ))}
             <dd className="text-muted-foreground">{snapshot.practice.practiceName}</dd>
           </div>
         </dl>
@@ -192,7 +207,11 @@ export function ReportDocument({
       <section className="report-signature">
         <p className="text-sm text-muted-foreground">Practitioner signature</p>
         <div className="mt-12 border-b border-foreground/40" />
-        <p className="mt-2 text-sm">{practitionerLine}</p>
+        {practitionerLines.map((line, i) => (
+          <p key={i} className={i === 0 ? "mt-2 text-sm" : "text-sm text-muted-foreground"}>
+            {line}
+          </p>
+        ))}
       </section>
     </article>
   )

@@ -624,6 +624,15 @@ export async function getClientFundingApprovalsForReport(
     organisationName: string | null
     streetAddress: string | null
     postalAddress: string | null
+    startDate: string | null
+    appointmentsApproved: number | null
+    appointmentsAttended: number
+    requirements: Array<{
+      reportRequirementId: string
+      appointmentNumber: number
+      reportType: string
+      label: string
+    }>
   }>
 > {
   const context = await requirePractitionerContext()
@@ -634,7 +643,10 @@ export async function getClientFundingApprovalsForReport(
   const rows = await db
     .select({
       fundingApprovalId: fundingApprovals.fundingApprovalId,
+      fundingApprovalTypeId: fundingApprovals.fundingApprovalTypeId,
       approvalTypeName: fundingApprovalTypes.name,
+      startDate: fundingApprovals.startDate,
+      appointmentsApproved: fundingApprovals.appointmentsApproved,
       referrerId: fundingApprovals.referrerId,
       referrerLastName: professionals.lastName,
       referrerTitle: professionals.title,
@@ -681,6 +693,7 @@ export async function getClientFundingApprovalsForReport(
     string,
     {
       fundingApprovalId: string
+      fundingApprovalTypeId: string | null
       label: string
       referrerId: string | null
       referrerName: string | null
@@ -688,6 +701,8 @@ export async function getClientFundingApprovalsForReport(
       organisationName: string | null
       streetAddress: string | null
       postalAddress: string | null
+      startDate: string | null
+      appointmentsApproved: number | null
     }
   >()
 
@@ -707,6 +722,7 @@ export async function getClientFundingApprovalsForReport(
 
     byApprovalId.set(row.fundingApprovalId, {
       fundingApprovalId: row.fundingApprovalId,
+      fundingApprovalTypeId: row.fundingApprovalTypeId,
       label,
       referrerId: row.referrerId,
       referrerName: row.referrerLastName,
@@ -714,10 +730,71 @@ export async function getClientFundingApprovalsForReport(
       organisationName: row.organisationName,
       streetAddress: row.streetAddress,
       postalAddress: row.postalAddress,
+      startDate: row.startDate,
+      appointmentsApproved: row.appointmentsApproved,
     })
   }
 
-  return [...byApprovalId.values()]
+  return Promise.all(
+    [...byApprovalId.values()].map(async (approval) => {
+      let requirements: Array<{
+        reportRequirementId: string
+        appointmentNumber: number
+        reportType: string
+        label: string
+      }> = []
+
+      if (approval.fundingApprovalTypeId) {
+        const requirementRows = await db
+          .select({
+            reportRequirementId: fundingApprovalTypeReports.reportRequirementId,
+            appointmentNumber: fundingApprovalTypeReports.appointmentNumber,
+            reportType: fundingApprovalTypeReports.reportType,
+            simpleReportId: fundingApprovalReportLinks.simpleReportId,
+          })
+          .from(fundingApprovalTypeReports)
+          .leftJoin(
+            fundingApprovalReportLinks,
+            and(
+              eq(
+                fundingApprovalReportLinks.fundingApprovalId,
+                approval.fundingApprovalId
+              ),
+              eq(
+                fundingApprovalReportLinks.appointmentNumber,
+                fundingApprovalTypeReports.appointmentNumber
+              )
+            )
+          )
+          .where(
+            eq(
+              fundingApprovalTypeReports.fundingApprovalTypeId,
+              approval.fundingApprovalTypeId
+            )
+          )
+          .orderBy(asc(fundingApprovalTypeReports.appointmentNumber))
+
+        requirements = requirementRows
+          .filter((r) => !r.simpleReportId)
+          .map((r) => ({
+            reportRequirementId: r.reportRequirementId,
+            appointmentNumber: r.appointmentNumber,
+            reportType: r.reportType,
+            label: `Report at appointment ${r.appointmentNumber}`,
+          }))
+      }
+
+      const { fundingApprovalTypeId: _typeId, ...rest } = approval
+
+      return {
+        ...rest,
+        appointmentsAttended: await countAppointmentsAttended(
+          approval.fundingApprovalId
+        ),
+        requirements,
+      }
+    })
+  )
 }
 
 export async function getFundingPanelByClientId(clientId: string) {

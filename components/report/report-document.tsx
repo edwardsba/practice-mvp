@@ -156,6 +156,23 @@ export function ReportDocument({
         {formatShortDate(snapshot.dateRangeEnd)}
       </section>
 
+      {snapshot.fundingApproval ? (
+        <section className="report-funding-approval space-y-1 pt-4 text-sm">
+          <h3 className="font-semibold">Funding approval</h3>
+          <p>{snapshot.fundingApproval.approvalTypeName}</p>
+          {snapshot.fundingApproval.startDate ? (
+            <p className="text-muted-foreground">
+              Approved: {formatDisplayDate(snapshot.fundingApproval.startDate)}
+            </p>
+          ) : null}
+          <p className="text-muted-foreground">
+            Progress: {snapshot.fundingApproval.appointmentsAttended} of{" "}
+            {snapshot.fundingApproval.appointmentsApproved ?? "?"} appointments
+            attended
+          </p>
+        </section>
+      ) : null}
+
       {(!omitEmptySections || phq9Results.length > 0) ? (
         <ReportResultsTable
           title="PHQ-9 results"

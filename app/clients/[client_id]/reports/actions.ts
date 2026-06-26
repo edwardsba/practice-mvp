@@ -1,14 +1,19 @@
 "use server"
 
-import { and, desc, eq, gte, lte } from "drizzle-orm"
+import { and, count, desc, eq, gte, lte } from "drizzle-orm"
 import { redirect } from "next/navigation"
 
 import {
   assessmentDefinitions,
   assessmentInstances,
   assessmentResults,
+  appointments,
   auditEvents,
   clients,
+  fundingApprovalReportLinks,
+  fundingApprovalTypeReports,
+  fundingApprovalTypes,
+  fundingApprovals,
   practitionerProfiles,
   practices,
   simpleReports,
@@ -29,6 +34,7 @@ import { loadBtpResultsForDateRange } from "@/lib/assessments/btp-results"
 import { getMaxScoreForAssessmentDefinition } from "@/lib/assessments/max-score"
 import type {
   BtpReportResultRow,
+  ReportFundingApproval,
   ReportRecipient,
   ReportResultRow,
   ReportSnapshot,
@@ -266,7 +272,9 @@ export async function buildSnapshot(
   btpResults: BtpReportResultRow[],
   clinicalSummaryText: string | null,
   recommendationsText: string | null,
-  recipient: ReportRecipient
+  recipient: ReportRecipient,
+  fundingApprovalId: string | null,
+  reportRequirementId: string | null
 ): Promise<ReportSnapshot | null> {
   const client = await verifyClient(clientId, context.practiceId)
   if (!client) return null
@@ -301,6 +309,68 @@ export async function buildSnapshot(
     ? await getSignatureAsDataUrl(practitioner.signatureImagePath)
     : null
 
+  let fundingApproval: ReportFundingApproval = null
+
+  if (fundingApprovalId) {
+    const [approval] = await db
+      .select({
+        approvalTypeName: fundingApprovalTypes.name,
+        startDate: fundingApprovals.startDate,
+        appointmentsApproved: fundingApprovals.appointmentsApproved,
+        fundingApprovalTypeId: fundingApprovals.fundingApprovalTypeId,
+      })
+      .from(fundingApprovals)
+      .leftJoin(
+        fundingApprovalTypes,
+        eq(
+          fundingApprovals.fundingApprovalTypeId,
+          fundingApprovalTypes.fundingApprovalTypeId
+        )
+      )
+      .where(eq(fundingApprovals.fundingApprovalId, fundingApprovalId))
+      .limit(1)
+
+    if (approval) {
+      const [attendedRow] = await db
+        .select({ total: count() })
+        .from(appointments)
+        .where(
+          and(
+            eq(appointments.fundingApprovalId, fundingApprovalId),
+            eq(appointments.status, "completed")
+          )
+        )
+      const appointmentsAttended = Number(attendedRow?.total ?? 0)
+
+      let requirementLabel: string | null = null
+      if (reportRequirementId) {
+        const [req] = await db
+          .select({
+            appointmentNumber: fundingApprovalTypeReports.appointmentNumber,
+          })
+          .from(fundingApprovalTypeReports)
+          .where(
+            eq(
+              fundingApprovalTypeReports.reportRequirementId,
+              reportRequirementId
+            )
+          )
+          .limit(1)
+        if (req) {
+          requirementLabel = `Report at appointment ${req.appointmentNumber}`
+        }
+      }
+
+      fundingApproval = {
+        approvalTypeName: approval.approvalTypeName ?? "—",
+        startDate: approval.startDate,
+        appointmentsApproved: approval.appointmentsApproved,
+        appointmentsAttended,
+        requirementLabel,
+      }
+    }
+  }
+
   return {
     reportTitle: resolveReportTitle(),
     generatedAt: new Date().toISOString(),
@@ -320,6 +390,7 @@ export async function buildSnapshot(
       practiceAddress: practice.practiceAddress ?? null,
     },
     recipient,
+    fundingApproval,
     dateRangeStart,
     dateRangeEnd,
     phq9Results,
@@ -352,6 +423,8 @@ export async function saveReportDraft(
   const recipientTypeRaw = String(formData.get("recipient_type") ?? "").trim()
   const fundingApprovalIdRaw =
     String(formData.get("funding_approval_id") ?? "").trim() || null
+  const reportRequirementId =
+    String(formData.get("report_requirement_id") ?? "").trim() || null
 
   const isReferrer = recipientTypeRaw.startsWith("referrer:")
   const recipientType = isReferrer
@@ -431,7 +504,9 @@ export async function saveReportDraft(
     preview.btpResults,
     clinicalSummaryText,
     recommendationsText,
-    recipient
+    recipient,
+    fundingApprovalId,
+    reportRequirementId
   )
 
   if (!snapshot) {
@@ -458,8 +533,36 @@ export async function saveReportDraft(
       reportStatus: "draft",
       recipientType: recipientType === "none" ? null : recipientType,
       fundingApprovalId,
+      reportRequirementId,
     })
     .returning({ simpleReportId: simpleReports.simpleReportId })
+
+  if (reportRequirementId && fundingApprovalId) {
+    const [req] = await db
+      .select({
+        appointmentNumber: fundingApprovalTypeReports.appointmentNumber,
+      })
+      .from(fundingApprovalTypeReports)
+      .where(
+        eq(fundingApprovalTypeReports.reportRequirementId, reportRequirementId)
+      )
+      .limit(1)
+
+    if (req) {
+      await db
+        .update(fundingApprovalReportLinks)
+        .set({ simpleReportId: report.simpleReportId, updatedAt: new Date() })
+        .where(
+          and(
+            eq(fundingApprovalReportLinks.fundingApprovalId, fundingApprovalId),
+            eq(
+              fundingApprovalReportLinks.appointmentNumber,
+              req.appointmentNumber
+            )
+          )
+        )
+    }
+  }
 
   await db.insert(auditEvents).values({
     practiceId: context.practiceId,

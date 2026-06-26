@@ -115,6 +115,7 @@ export default async function NewReportPage({
             practiceAddress: practice.practiceAddress ?? null,
           },
           recipient: null,
+          fundingApproval: null,
         }}
       />
     </AppShell>

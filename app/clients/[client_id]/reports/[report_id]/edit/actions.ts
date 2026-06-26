@@ -29,6 +29,8 @@ export async function updateReportDraft(
     .select({
       reportStatus: simpleReports.reportStatus,
       valuesSnapshotJson: simpleReports.valuesSnapshotJson,
+      fundingApprovalId: simpleReports.fundingApprovalId,
+      reportRequirementId: simpleReports.reportRequirementId,
     })
     .from(simpleReports)
     .where(
@@ -94,7 +96,9 @@ export async function updateReportDraft(
     preview.btpResults,
     clinicalSummaryText,
     recommendationsText,
-    recipient
+    recipient,
+    report.fundingApprovalId,
+    report.reportRequirementId
   )
 
   if (!snapshot) {

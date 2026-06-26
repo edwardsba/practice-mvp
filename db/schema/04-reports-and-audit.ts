@@ -16,6 +16,7 @@ export const simpleReports = pgTable('simple_reports', {
   pdfStoragePath: text('pdf_storage_path'),
   recipientType: text('recipient_type'),
   fundingApprovalId: uuid('funding_approval_id'),
+  reportRequirementId: uuid('report_requirement_id'),
   finalisedAt: timestamp('finalised_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),

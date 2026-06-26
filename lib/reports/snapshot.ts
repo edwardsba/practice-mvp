@@ -29,6 +29,14 @@ export type ReportRecipient = {
   postalAddress: string | null
 } | null
 
+export type ReportFundingApproval = {
+  approvalTypeName: string
+  startDate: string | null
+  appointmentsApproved: number | null
+  appointmentsAttended: number
+  requirementLabel: string | null
+} | null
+
 export type ReportSnapshot = {
   reportTitle: string
   generatedAt: string
@@ -48,6 +56,7 @@ export type ReportSnapshot = {
     practiceAddress: string | null
   }
   recipient: ReportRecipient
+  fundingApproval: ReportFundingApproval
   dateRangeStart: string
   dateRangeEnd: string
   phq9Results: ReportResultRow[]
@@ -123,6 +132,7 @@ export function parseReportSnapshot(value: unknown): ReportSnapshot | null {
       practiceAddress: raw.practice.practiceAddress ?? null,
     },
     recipient: raw.recipient ?? null,
+    fundingApproval: raw.fundingApproval ?? null,
     practitioner: {
       ...raw.practitioner,
       displayName: raw.practitioner.displayName ?? raw.practitioner.fullName,

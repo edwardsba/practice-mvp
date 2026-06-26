@@ -1,6 +1,6 @@
 "use client"
 
-import { useActionState, useCallback, useState, useTransition } from "react"
+import { useActionState, useCallback, useEffect, useState, useTransition } from "react"
 
 import {
   fetchReportResultsForRange,
@@ -65,6 +65,7 @@ export function ReportForm({
   >
 }) {
   const [recipientType, setRecipientType] = useState("none")
+  const [requirementId, setRequirementId] = useState<string>("")
   const [dateRangeStart, setDateRangeStart] = useState("")
   const [dateRangeEnd, setDateRangeEnd] = useState("")
   const [phq9Results, setPhq9Results] = useState<ReportPreviewRow[]>([])
@@ -131,6 +132,14 @@ export function ReportForm({
   const selectedApproval =
     fundingApprovals.find((fa) => fa.fundingApprovalId === approvalId) ?? null
 
+  useEffect(() => {
+    if (selectedApproval?.requirements?.length) {
+      setRequirementId(selectedApproval.requirements[0].reportRequirementId)
+    } else {
+      setRequirementId("")
+    }
+  }, [selectedApproval])
+
   const recipient: ReportRecipient =
     recipientType === "client"
       ? {
@@ -175,6 +184,7 @@ export function ReportForm({
           clinicalSummaryText: clinicalSummary,
           recommendationsText: recommendations,
           recipient,
+          fundingApproval: null,
         }
       : null
 
@@ -212,6 +222,32 @@ export function ReportForm({
                 ))}
               </select>
             </div>
+            {selectedApproval && selectedApproval.requirements.length > 0 && (
+              <div className="space-y-2">
+                <Label htmlFor="report_requirement">Report requirement</Label>
+                <select
+                  id="report_requirement"
+                  value={requirementId}
+                  onChange={(e) => setRequirementId(e.target.value)}
+                  className={selectClassName}
+                >
+                  <option value="">No requirement selected</option>
+                  {selectedApproval.requirements.map((req) => (
+                    <option
+                      key={req.reportRequirementId}
+                      value={req.reportRequirementId}
+                    >
+                      {req.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+            {selectedApproval && selectedApproval.requirements.length === 0 && (
+              <p className="text-sm text-muted-foreground">
+                All report requirements for this approval are fulfilled.
+              </p>
+            )}
           </CardContent>
         </Card>
 
@@ -298,6 +334,7 @@ export function ReportForm({
           <input type="hidden" name="date_range_end" value={dateRangeEnd} />
           <input type="hidden" name="recipient_type" value={recipientType} />
           <input type="hidden" name="funding_approval_id" value={approvalId} />
+          <input type="hidden" name="report_requirement_id" value={requirementId} />
 
           <Card>
             <CardHeader>

@@ -310,6 +310,23 @@ export function generateReportPdf(snapshot: ReportSnapshot): Promise<Buffer> {
         { lineGap: LINE_GAP }
       )
 
+    if (snapshot.fundingApproval) {
+      sectionHeading(doc, "Funding approval")
+      bodyText(doc, snapshot.fundingApproval.approvalTypeName)
+      if (snapshot.fundingApproval.startDate) {
+        mutedText(
+          doc,
+          `Approved: ${formatDisplayDate(snapshot.fundingApproval.startDate)}`
+        )
+      }
+      mutedText(
+        doc,
+        `Progress: ${snapshot.fundingApproval.appointmentsAttended} of ${
+          snapshot.fundingApproval.appointmentsApproved ?? "?"
+        } appointments attended`
+      )
+    }
+
     const phq9Results = getPhq9ResultsFromSnapshot(snapshot)
     const gad7Results = getGad7ResultsFromSnapshot(snapshot)
     const asqResults = getAsqResultsFromSnapshot(snapshot)

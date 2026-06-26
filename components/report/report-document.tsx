@@ -59,13 +59,47 @@ export function ReportDocument({
   return (
     <article className="report-document mx-auto max-w-3xl bg-white text-foreground">
       {/* 1. Header */}
-      <header className="report-header space-y-4 border-b pb-4">
-        <h2 className="text-2xl font-semibold tracking-tight">
-          {REPORT_TITLE}
-        </h2>
+      <header className="report-header space-y-6 border-b pb-6">
+        <div className="flex justify-end text-sm">
+          <div className="text-right">
+            <p className="font-semibold">{snapshot.practice.practiceName}</p>
+            {snapshot.practice.practiceAddress ? (
+              <p className="text-muted-foreground">
+                {snapshot.practice.practiceAddress}
+              </p>
+            ) : null}
+          </div>
+        </div>
+
+        {snapshot.recipient && snapshot.recipient.type !== "none" ? (
+          <div className="text-sm">
+            {snapshot.recipient.name ? (
+              <p className="font-medium">{snapshot.recipient.name}</p>
+            ) : null}
+            {snapshot.recipient.organisationName ? (
+              <p>{snapshot.recipient.organisationName}</p>
+            ) : null}
+            {snapshot.recipient.streetAddress ? (
+              <p className="text-muted-foreground">
+                {snapshot.recipient.streetAddress}
+              </p>
+            ) : null}
+            {snapshot.recipient.postalAddress &&
+            snapshot.recipient.postalAddress !==
+              snapshot.recipient.streetAddress ? (
+              <p className="text-muted-foreground">
+                {snapshot.recipient.postalAddress}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
+
         <p className="text-sm text-muted-foreground">
-          Generated {formatDisplayDate(snapshot.generatedAt)}
+          {formatDisplayDate(snapshot.generatedAt)}
         </p>
+
+        <h2 className="text-2xl font-semibold tracking-tight">{REPORT_TITLE}</h2>
+
         <dl className="grid gap-4 text-sm sm:grid-cols-2">
           <div>
             <dt className="font-medium text-muted-foreground">Client</dt>

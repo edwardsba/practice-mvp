@@ -19,6 +19,14 @@ export type BtpReportResultRow = {
   targets: BtpReportTargetRow[]
 }
 
+export type ReportRecipient = {
+  type: "referrer" | "client" | "none"
+  name: string | null
+  organisationName: string | null
+  streetAddress: string | null
+  postalAddress: string | null
+} | null
+
 export type ReportSnapshot = {
   reportTitle: string
   generatedAt: string
@@ -33,7 +41,9 @@ export type ReportSnapshot = {
   }
   practice: {
     practiceName: string
+    practiceAddress: string | null
   }
+  recipient: ReportRecipient
   dateRangeStart: string
   dateRangeEnd: string
   phq9Results: ReportResultRow[]
@@ -104,6 +114,11 @@ export function parseReportSnapshot(value: unknown): ReportSnapshot | null {
   return {
     ...raw,
     reportTitle: REPORT_TITLE,
+    practice: {
+      practiceName: raw.practice.practiceName,
+      practiceAddress: raw.practice.practiceAddress ?? null,
+    },
+    recipient: raw.recipient ?? null,
     phq9Results,
     gad7Results,
     asqResults,

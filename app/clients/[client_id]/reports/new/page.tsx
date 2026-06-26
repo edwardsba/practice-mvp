@@ -6,6 +6,7 @@ import { ReportForm } from "@/app/clients/[client_id]/reports/new/report-form"
 import { AppShell } from "@/components/app-shell"
 import { BackButton } from "@/components/ui/back-button"
 import { clients, practitionerProfiles, practices } from "@/db/schema"
+import { getClientFundingApprovalsForReport } from "@/lib/actions/funding"
 import { formatPractitionerName } from "@/lib/practitioner/format"
 import { requirePractitionerContext } from "@/lib/auth"
 import { db } from "@/lib/db"
@@ -55,7 +56,10 @@ export default async function NewReportPage({
     .limit(1)
 
   const [practice] = await db
-    .select({ practiceName: practices.practiceName })
+    .select({
+      practiceName: practices.practiceName,
+      practiceAddress: practices.address,
+    })
     .from(practices)
     .where(eq(practices.practiceId, context.practiceId))
     .limit(1)
@@ -63,6 +67,11 @@ export default async function NewReportPage({
   if (!practitioner || !practice) {
     notFound()
   }
+
+  const fundingApprovals = await getClientFundingApprovalsForReport(
+    clientId,
+    context.practiceId
+  )
 
   const clientName = `${client.firstName} ${client.lastName}`
 
@@ -79,6 +88,7 @@ export default async function NewReportPage({
 
       <ReportForm
         clientId={clientId}
+        fundingApprovals={fundingApprovals}
         initialSnapshot={{
           client: {
             firstName: client.firstName,
@@ -91,7 +101,9 @@ export default async function NewReportPage({
           },
           practice: {
             practiceName: practice.practiceName,
+            practiceAddress: practice.practiceAddress ?? null,
           },
+          recipient: null,
         }}
       />
     </AppShell>

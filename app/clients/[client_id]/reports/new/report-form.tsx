@@ -24,9 +24,14 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import type { ReportSnapshot } from "@/lib/reports/snapshot"
+import type { getClientFundingApprovalsForReport } from "@/lib/actions/funding"
+import type { ReportRecipient, ReportSnapshot } from "@/lib/reports/snapshot"
 import { resolveReportTitle } from "@/lib/reports/snapshot"
 import { cn } from "@/lib/utils"
+
+const selectClassName = cn(
+  "flex h-9 w-full max-w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-1 text-sm shadow-xs transition-colors outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 dark:bg-input/30"
+)
 
 const dateInputClassName = cn(
   "block h-9 w-full max-w-full min-w-0 appearance-none py-1",
@@ -37,9 +42,13 @@ const initialSaveState: SaveReportDraftState = {}
 
 export function ReportForm({
   clientId,
+  fundingApprovals,
   initialSnapshot,
 }: {
   clientId: string
+  fundingApprovals: Awaited<
+    ReturnType<typeof getClientFundingApprovalsForReport>
+  >
   initialSnapshot: Omit<
     ReportSnapshot,
     | "phq9Results"
@@ -55,6 +64,7 @@ export function ReportForm({
     | "reportTitle"
   >
 }) {
+  const [recipientType, setRecipientType] = useState("none")
   const [dateRangeStart, setDateRangeStart] = useState("")
   const [dateRangeEnd, setDateRangeEnd] = useState("")
   const [phq9Results, setPhq9Results] = useState<ReportPreviewRow[]>([])
@@ -116,6 +126,39 @@ export function ReportForm({
     window.print()
   }
 
+  const isReferrer = recipientType.startsWith("referrer:")
+  const approvalId = isReferrer ? recipientType.split(":")[1] ?? "" : ""
+  const selectedApproval =
+    fundingApprovals.find((fa) => fa.fundingApprovalId === approvalId) ?? null
+
+  const recipient: ReportRecipient =
+    recipientType === "client"
+      ? {
+          type: "client",
+          name: `${initialSnapshot.client.firstName} ${initialSnapshot.client.lastName}`,
+          organisationName: null,
+          streetAddress: null,
+          postalAddress: null,
+        }
+      : selectedApproval
+        ? {
+            type: "referrer",
+            name:
+              [selectedApproval.referrerTitle, selectedApproval.referrerName]
+                .filter(Boolean)
+                .join(" ") || null,
+            organisationName: selectedApproval.organisationName,
+            streetAddress: selectedApproval.streetAddress,
+            postalAddress: selectedApproval.postalAddress,
+          }
+        : {
+            type: "none",
+            name: null,
+            organisationName: null,
+            streetAddress: null,
+            postalAddress: null,
+          }
+
   const previewSnapshot: ReportSnapshot | null =
     dateRangeStart && dateRangeEnd
       ? {
@@ -131,6 +174,7 @@ export function ReportForm({
           btpResults,
           clinicalSummaryText: clinicalSummary,
           recommendationsText: recommendations,
+          recipient,
         }
       : null
 
@@ -139,6 +183,38 @@ export function ReportForm({
   return (
     <>
       <div className="no-print space-y-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Recipient</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="recipient_type">Address report to</Label>
+              <select
+                id="recipient_type"
+                name="recipient_type"
+                value={recipientType}
+                onChange={(e) => setRecipientType(e.target.value)}
+                className={selectClassName}
+              >
+                <option value="none">No recipient</option>
+                <option value="client">Client</option>
+                {fundingApprovals.length > 0 && (
+                  <option disabled>── Funding approvals ──</option>
+                )}
+                {fundingApprovals.map((fa) => (
+                  <option
+                    key={fa.fundingApprovalId}
+                    value={`referrer:${fa.fundingApprovalId}`}
+                  >
+                    {fa.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </CardContent>
+        </Card>
+
         <Card>
           <CardHeader>
             <CardTitle>Date range</CardTitle>
@@ -220,6 +296,8 @@ export function ReportForm({
         <form action={saveAction} className="space-y-6">
           <input type="hidden" name="date_range_start" value={dateRangeStart} />
           <input type="hidden" name="date_range_end" value={dateRangeEnd} />
+          <input type="hidden" name="recipient_type" value={recipientType} />
+          <input type="hidden" name="funding_approval_id" value={approvalId} />
 
           <Card>
             <CardHeader>

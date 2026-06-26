@@ -74,6 +74,14 @@ export async function updateReportDraft(
   }
 
   const existingSnapshot = parseReportSnapshot(report.valuesSnapshotJson)
+  const recipient =
+    existingSnapshot?.recipient ?? {
+      type: "none" as const,
+      name: null,
+      organisationName: null,
+      streetAddress: null,
+      postalAddress: null,
+    }
   const snapshot = await buildSnapshot(
     clientId,
     context,
@@ -85,7 +93,8 @@ export async function updateReportDraft(
     preview.assistResults,
     preview.btpResults,
     clinicalSummaryText,
-    recommendationsText
+    recommendationsText,
+    recipient
   )
 
   if (!snapshot) {
@@ -94,6 +103,9 @@ export async function updateReportDraft(
 
   if (existingSnapshot?.generatedAt) {
     snapshot.generatedAt = existingSnapshot.generatedAt
+  }
+  if (existingSnapshot?.practice.practiceAddress != null) {
+    snapshot.practice.practiceAddress = existingSnapshot.practice.practiceAddress
   }
 
   const reportType = resolveReportType(

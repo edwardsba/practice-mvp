@@ -16,6 +16,7 @@
     "db:battery": "tsx db/apply-battery-migration.ts",
     "db:migrate-battery": "tsx db/apply-battery-variable-assessments-migration.ts",
     "db:migrate-location-nickname": "tsx db/apply-location-nickname-migration.ts",
+    "db:migrate-report-recipient": "tsx db/apply-report-recipient-migration.ts",
     "db:acute-risk": "tsx db/apply-acute-risk-migration.ts",
     "db:treatment-plans": "tsx db/apply-treatment-plans-migration.ts",
     "db:crisis-plans": "tsx db/apply-crisis-plans-migration.ts",

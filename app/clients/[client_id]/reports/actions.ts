@@ -24,6 +24,7 @@ import {
 import { loadBtpResultsForDateRange } from "@/lib/assessments/btp-results"
 import type {
   BtpReportResultRow,
+  ReportRecipient,
   ReportResultRow,
   ReportSnapshot,
 } from "@/lib/reports/snapshot"
@@ -31,6 +32,7 @@ import {
   resolveReportTitle,
   resolveReportType,
 } from "@/lib/reports/snapshot"
+import { getClientFundingApprovalsForReport } from "@/lib/actions/funding"
 
 export type ReportPreviewRow = ReportResultRow
 
@@ -248,7 +250,8 @@ export async function buildSnapshot(
   assistResults: ReportPreviewRow[],
   btpResults: BtpReportResultRow[],
   clinicalSummaryText: string | null,
-  recommendationsText: string | null
+  recommendationsText: string | null,
+  recipient: ReportRecipient
 ): Promise<ReportSnapshot | null> {
   const client = await verifyClient(clientId, context.practiceId)
   if (!client) return null
@@ -268,7 +271,10 @@ export async function buildSnapshot(
     .limit(1)
 
   const [practice] = await db
-    .select({ practiceName: practices.practiceName })
+    .select({
+      practiceName: practices.practiceName,
+      practiceAddress: practices.address,
+    })
     .from(practices)
     .where(eq(practices.practiceId, context.practiceId))
     .limit(1)
@@ -289,7 +295,9 @@ export async function buildSnapshot(
     },
     practice: {
       practiceName: practice.practiceName,
+      practiceAddress: practice.practiceAddress ?? null,
     },
+    recipient,
     dateRangeStart,
     dateRangeEnd,
     phq9Results,
@@ -319,6 +327,19 @@ export async function saveReportDraft(
     String(formData.get("clinical_summary_text") ?? "").trim() || null
   const recommendationsText =
     String(formData.get("recommendations_text") ?? "").trim() || null
+  const recipientTypeRaw = String(formData.get("recipient_type") ?? "").trim()
+  const fundingApprovalIdRaw =
+    String(formData.get("funding_approval_id") ?? "").trim() || null
+
+  const isReferrer = recipientTypeRaw.startsWith("referrer:")
+  const recipientType = isReferrer
+    ? "referrer"
+    : recipientTypeRaw === "client"
+      ? "client"
+      : "none"
+  const fundingApprovalId = isReferrer
+    ? (recipientTypeRaw.split(":")[1] ?? fundingApprovalIdRaw)
+    : null
 
   if (!dateRangeStart || !dateRangeEnd) {
     return { error: "Please select a start and end date." }
@@ -338,6 +359,44 @@ export async function saveReportDraft(
     return { error }
   }
 
+  let recipient: ReportRecipient = {
+    type: "none",
+    name: null,
+    organisationName: null,
+    streetAddress: null,
+    postalAddress: null,
+  }
+
+  if (recipientType === "client") {
+    const client = await verifyClient(clientId, context.practiceId)
+    recipient = {
+      type: "client",
+      name: client ? `${client.firstName} ${client.lastName}` : null,
+      organisationName: null,
+      streetAddress: null,
+      postalAddress: null,
+    }
+  } else if (recipientType === "referrer" && fundingApprovalId) {
+    const approvals = await getClientFundingApprovalsForReport(
+      clientId,
+      context.practiceId
+    )
+    const approval =
+      approvals.find((a) => a.fundingApprovalId === fundingApprovalId) ?? null
+    if (approval) {
+      recipient = {
+        type: "referrer",
+        name:
+          [approval.referrerTitle, approval.referrerName]
+            .filter(Boolean)
+            .join(" ") || null,
+        organisationName: approval.organisationName,
+        streetAddress: approval.streetAddress,
+        postalAddress: approval.postalAddress,
+      }
+    }
+  }
+
   const snapshot = await buildSnapshot(
     clientId,
     context,
@@ -349,7 +408,8 @@ export async function saveReportDraft(
     preview.assistResults,
     preview.btpResults,
     clinicalSummaryText,
-    recommendationsText
+    recommendationsText,
+    recipient
   )
 
   if (!snapshot) {
@@ -374,6 +434,8 @@ export async function saveReportDraft(
       clinicalSummaryText,
       recommendationsText,
       reportStatus: "draft",
+      recipientType: recipientType === "none" ? null : recipientType,
+      fundingApprovalId,
     })
     .returning({ simpleReportId: simpleReports.simpleReportId })
 

@@ -611,6 +611,115 @@ export async function getFundingApprovalsByClientId(clientId: string) {
   )
 }
 
+export async function getClientFundingApprovalsForReport(
+  clientId: string,
+  practiceId: string
+): Promise<
+  Array<{
+    fundingApprovalId: string
+    label: string
+    referrerId: string | null
+    referrerName: string | null
+    referrerTitle: string | null
+    organisationName: string | null
+    streetAddress: string | null
+    postalAddress: string | null
+  }>
+> {
+  const context = await requirePractitionerContext()
+  if (context.practiceId !== practiceId) {
+    return []
+  }
+
+  const rows = await db
+    .select({
+      fundingApprovalId: fundingApprovals.fundingApprovalId,
+      approvalTypeName: fundingApprovalTypes.name,
+      referrerId: fundingApprovals.referrerId,
+      referrerLastName: professionals.lastName,
+      referrerTitle: professionals.title,
+      organisationName: professionalOrganisations.organisationName,
+      streetAddress: professionalOrganisations.streetAddress,
+      postalAddress: professionalOrganisations.postalAddress,
+    })
+    .from(fundingApprovals)
+    .leftJoin(
+      fundingApprovalTypes,
+      eq(
+        fundingApprovals.fundingApprovalTypeId,
+        fundingApprovalTypes.fundingApprovalTypeId
+      )
+    )
+    .leftJoin(
+      professionals,
+      eq(fundingApprovals.referrerId, professionals.professionalId)
+    )
+    .leftJoin(
+      professionalOrganisationLinks,
+      and(
+        eq(professionalOrganisationLinks.professionalId, professionals.professionalId),
+        eq(professionalOrganisationLinks.isActive, true)
+      )
+    )
+    .leftJoin(
+      professionalOrganisations,
+      eq(
+        professionalOrganisationLinks.organisationId,
+        professionalOrganisations.organisationId
+      )
+    )
+    .where(
+      and(
+        eq(fundingApprovals.clientId, clientId),
+        eq(fundingApprovals.practiceId, practiceId),
+        eq(fundingApprovals.isActive, true)
+      )
+    )
+    .orderBy(desc(fundingApprovals.startDate))
+
+  const byApprovalId = new Map<
+    string,
+    {
+      fundingApprovalId: string
+      label: string
+      referrerId: string | null
+      referrerName: string | null
+      referrerTitle: string | null
+      organisationName: string | null
+      streetAddress: string | null
+      postalAddress: string | null
+    }
+  >()
+
+  for (const row of rows) {
+    if (byApprovalId.has(row.fundingApprovalId)) {
+      continue
+    }
+
+    const approvalTypeName = row.approvalTypeName?.trim() || "Funding approval"
+    const referrerLabel = [row.referrerTitle, row.referrerLastName]
+      .filter(Boolean)
+      .join(" ")
+      .trim()
+    const label = referrerLabel
+      ? `${approvalTypeName} — ${referrerLabel}`
+      : approvalTypeName
+
+    byApprovalId.set(row.fundingApprovalId, {
+      fundingApprovalId: row.fundingApprovalId,
+      label,
+      referrerId: row.referrerId,
+      referrerName: row.referrerLastName,
+      referrerTitle: row.referrerTitle,
+      organisationName: row.organisationName,
+      streetAddress: row.streetAddress,
+      postalAddress: row.postalAddress,
+    })
+  }
+
+  return [...byApprovalId.values()]
+}
+
 export async function getFundingPanelByClientId(clientId: string) {
   const context = await requirePractitionerContext()
 

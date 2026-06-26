@@ -220,7 +220,15 @@ export function ReportDocument({
       {/* 8. Signature */}
       <section className="report-signature">
         <p className="text-sm text-muted-foreground">Practitioner signature</p>
-        <div className="mt-12 border-b border-foreground/40" />
+        {snapshot.practitioner.signatureDataUrl ? (
+          <img
+            src={snapshot.practitioner.signatureDataUrl}
+            alt="Signature"
+            className="mt-4 h-16 w-auto object-contain"
+          />
+        ) : (
+          <div className="mt-16" />
+        )}
         {practitionerLines.map((line, i) => (
           <p key={i} className={i === 0 ? "mt-2 text-sm" : "text-sm text-muted-foreground"}>
             {line}

@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { useActionState } from "react"
+import { useActionState, useEffect, useState } from "react"
 
 import {
   updatePractitionerProfile,
@@ -39,6 +39,7 @@ type Profile = {
   phone: string | null
   email: string | null
   reportSignature: string | null
+  signatureImagePath: string | null
   calendarStartTime: string
   calendarEndTime: string
   calendarIntervalMinutes: number
@@ -51,6 +52,41 @@ export function PractitionerForm({ profile }: { profile: Profile }) {
     updatePractitionerProfile,
     initialState
   )
+  const [sigPreviewUrl, setSigPreviewUrl] = useState<string | null>(null)
+  const [sigUploading, setSigUploading] = useState(false)
+  const [sigError, setSigError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!profile.signatureImagePath) return
+    fetch("/api/practitioner/signature")
+      .then((r) => r.json())
+      .then((data: { dataUrl?: string }) => {
+        if (data.dataUrl) setSigPreviewUrl(data.dataUrl)
+      })
+      .catch(() => {})
+  }, [profile.signatureImagePath])
+
+  async function handleSignatureUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setSigUploading(true)
+    setSigError(null)
+    const fd = new FormData()
+    fd.append("file", file)
+    const res = await fetch("/api/practitioner/signature", {
+      method: "POST",
+      body: fd,
+    })
+    const data = (await res.json()) as { ok?: boolean; error?: string }
+    if (data.ok) {
+      const preview = await fetch("/api/practitioner/signature")
+      const pd = (await preview.json()) as { dataUrl?: string }
+      if (pd.dataUrl) setSigPreviewUrl(pd.dataUrl)
+    } else {
+      setSigError(data.error ?? "Upload failed")
+    }
+    setSigUploading(false)
+  }
 
   return (
     <Card className="max-w-xl">
@@ -147,6 +183,41 @@ export function PractitionerForm({ profile }: { profile: Profile }) {
               />
               <p className="text-xs text-muted-foreground">
                 Used in report footers e.g. Benjamin Edwards MAPS FCCLP
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label>Signature image</Label>
+              {sigPreviewUrl ? (
+                <div className="space-y-2">
+                  <img
+                    src={sigPreviewUrl}
+                    alt="Signature preview"
+                    className="h-16 w-auto rounded border object-contain p-1"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Upload a new image to replace.
+                  </p>
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  No signature image uploaded.
+                </p>
+              )}
+              <Input
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                onChange={handleSignatureUpload}
+                disabled={sigUploading}
+              />
+              {sigUploading ? (
+                <p className="text-xs text-muted-foreground">Uploading…</p>
+              ) : null}
+              {sigError ? (
+                <p className="text-xs text-destructive">{sigError}</p>
+              ) : null}
+              <p className="text-xs text-muted-foreground">
+                PNG, JPEG or WebP, max 2MB. White or transparent background
+                recommended.
               </p>
             </div>
           </div>

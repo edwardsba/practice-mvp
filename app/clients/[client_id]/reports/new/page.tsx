@@ -7,7 +7,8 @@ import { AppShell } from "@/components/app-shell"
 import { BackButton } from "@/components/ui/back-button"
 import { clients, practitionerProfiles, practices } from "@/db/schema"
 import { getClientFundingApprovalsForReport } from "@/lib/actions/funding"
-import { formatPractitionerName, formatPractitionerViewName } from "@/lib/practitioner/format"
+import { formatPractitionerName } from "@/lib/practitioner/format"
+import { getSignatureAsDataUrl } from "@/lib/practitioner/signature"
 import { requirePractitionerContext } from "@/lib/auth"
 import { db } from "@/lib/db"
 
@@ -48,6 +49,7 @@ export default async function NewReportPage({
       preferredName: practitionerProfiles.preferredName,
       lastName: practitionerProfiles.lastName,
       reportSignature: practitionerProfiles.reportSignature,
+      signatureImagePath: practitionerProfiles.signatureImagePath,
     })
     .from(practitionerProfiles)
     .where(
@@ -72,6 +74,10 @@ export default async function NewReportPage({
     clientId,
     context.practiceId
   )
+
+  const signatureDataUrl = practitioner.signatureImagePath
+    ? await getSignatureAsDataUrl(practitioner.signatureImagePath)
+    : null
 
   const clientName = `${client.firstName} ${client.lastName}`
 
@@ -98,7 +104,8 @@ export default async function NewReportPage({
           practitioner: {
             title: practitioner.title,
             fullName: formatPractitionerName(practitioner),
-            displayName: formatPractitionerViewName(practitioner),
+            displayName: formatPractitionerName(practitioner),
+            signatureDataUrl,
           },
           practice: {
             practiceName: practice.practiceName,

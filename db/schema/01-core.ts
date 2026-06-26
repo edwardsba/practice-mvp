@@ -44,6 +44,7 @@ export const practitionerProfiles = pgTable('practitioner_profiles', {
   phone: text('phone'),
   email: citext('email'),
   reportSignature: text('report_signature'),
+  signatureImagePath: text('signature_image_path'),
   calendarStartTime: time('calendar_start_time').notNull().default('07:00'),
   calendarEndTime: time('calendar_end_time').notNull().default('20:00'),
   calendarIntervalMinutes: integer('calendar_interval_minutes').notNull().default(30),

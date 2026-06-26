@@ -15,6 +15,7 @@ import {
 } from "@/db/schema"
 import { requirePractitionerContext } from "@/lib/auth"
 import { db } from "@/lib/db"
+import { getSignatureAsDataUrl } from "@/lib/practitioner/signature"
 import {
   formatPractitionerName,
 } from "@/lib/practitioner/format"
@@ -276,6 +277,7 @@ export async function buildSnapshot(
       preferredName: practitionerProfiles.preferredName,
       lastName: practitionerProfiles.lastName,
       reportSignature: practitionerProfiles.reportSignature,
+      signatureImagePath: practitionerProfiles.signatureImagePath,
     })
     .from(practitionerProfiles)
     .where(
@@ -294,6 +296,10 @@ export async function buildSnapshot(
 
   if (!practitioner || !practice) return null
 
+  const signatureDataUrl = practitioner.signatureImagePath
+    ? await getSignatureAsDataUrl(practitioner.signatureImagePath)
+    : null
+
   return {
     reportTitle: resolveReportTitle(),
     generatedAt: new Date().toISOString(),
@@ -306,6 +312,7 @@ export async function buildSnapshot(
       title: practitioner.title,
       fullName: formatPractitionerName(practitioner),
       displayName: formatPractitionerName(practitioner),
+      signatureDataUrl,
     },
     practice: {
       practiceName: practice.practiceName,

@@ -90,18 +90,30 @@ export function ReportDocument({
             {snapshot.recipient.organisationName ? (
               <p>{snapshot.recipient.organisationName}</p>
             ) : null}
-            {snapshot.recipient.streetAddress ? (
-              <p className="text-muted-foreground">
-                {snapshot.recipient.streetAddress}
-              </p>
-            ) : null}
+            {snapshot.recipient.streetAddress
+              ? snapshot.recipient.streetAddress
+                  .split(",")
+                  .map((part) => part.trim())
+                  .filter(Boolean)
+                  .map((part, i) => (
+                    <p key={`street-${i}`} className="text-muted-foreground">
+                      {part}
+                    </p>
+                  ))
+              : null}
             {snapshot.recipient.postalAddress &&
             snapshot.recipient.postalAddress !==
-              snapshot.recipient.streetAddress ? (
-              <p className="text-muted-foreground">
-                {snapshot.recipient.postalAddress}
-              </p>
-            ) : null}
+              snapshot.recipient.streetAddress
+              ? snapshot.recipient.postalAddress
+                  .split(",")
+                  .map((part) => part.trim())
+                  .filter(Boolean)
+                  .map((part, i) => (
+                    <p key={`postal-${i}`} className="text-muted-foreground">
+                      {part}
+                    </p>
+                  ))
+              : null}
           </div>
         ) : null}
 

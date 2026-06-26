@@ -18,6 +18,7 @@ const HEADER_RULE_COLOR = "#e0e0e0"
 const BOTTOM_RULE_COLOR = "#e0e0e0"
 const TEXT_COLOR = "#111111"
 const MUTED_COLOR = "#555555"
+const SECTION_GAP = 16
 
 function formatDisplayDate(value: string | null): string {
   if (!value) return "—"
@@ -248,19 +249,19 @@ export function generateReportPdf(snapshot: ReportSnapshot): Promise<Buffer> {
     }
 
     const addrBottomY = Math.max(doc.y, addrStartY + 40)
-    doc.y = addrBottomY + 12
+    doc.y = addrBottomY + SECTION_GAP
     doc.font("Helvetica").fontSize(BASE_FONT_SIZE).fillColor(MUTED_COLOR)
     doc.text(formatDisplayDate(snapshot.generatedAt), PAGE_MARGIN, doc.y)
     doc.fillColor(TEXT_COLOR)
+    doc.y = doc.y + SECTION_GAP
 
-    doc.moveDown(0.5)
     doc
       .font("Helvetica-Bold")
       .fontSize(BASE_FONT_SIZE)
       .fillColor(TEXT_COLOR)
       .text("Progress Report", { lineGap: LINE_GAP })
 
-    doc.moveDown(0.5)
+    doc.y = doc.y + SECTION_GAP
     const metaY = doc.y
     doc
       .font("Helvetica-Bold")
@@ -294,11 +295,9 @@ export function generateReportPdf(snapshot: ReportSnapshot): Promise<Buffer> {
     doc.fillColor(TEXT_COLOR)
 
     // Reset cursor to left margin below both columns
-    const metaBottomY = doc.y + LINE_GAP
     doc.x = PAGE_MARGIN
-    doc.y = metaBottomY
+    doc.y = doc.y + SECTION_GAP
 
-    doc.moveDown(0.5)
     doc
       .font("Helvetica-Bold")
       .fontSize(BASE_FONT_SIZE)

@@ -633,6 +633,12 @@ export async function getClientFundingApprovalsForReport(
       reportType: string
       label: string
     }>
+    appointments: Array<{
+      appointmentId: string
+      appointmentDate: string
+      appointmentTime: string
+      status: string
+    }>
   }>
 > {
   const context = await requirePractitionerContext()
@@ -786,12 +792,27 @@ export async function getClientFundingApprovalsForReport(
 
       const { fundingApprovalTypeId: _typeId, ...rest } = approval
 
+      const apptRows = await db
+        .select({
+          appointmentId: appointments.appointmentId,
+          appointmentDate: appointments.appointmentDate,
+          appointmentTime: appointments.appointmentTime,
+          status: appointments.status,
+        })
+        .from(appointments)
+        .where(eq(appointments.fundingApprovalId, approval.fundingApprovalId))
+        .orderBy(
+          asc(appointments.appointmentDate),
+          asc(appointments.appointmentTime)
+        )
+
       return {
         ...rest,
         appointmentsAttended: await countAppointmentsAttended(
           approval.fundingApprovalId
         ),
         requirements,
+        appointments: apptRows,
       }
     })
   )

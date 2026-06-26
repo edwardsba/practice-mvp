@@ -1,6 +1,6 @@
 "use server"
 
-import { and, count, desc, eq, gte, lte } from "drizzle-orm"
+import { and, count, desc, eq, gte, inArray, lte } from "drizzle-orm"
 import { redirect } from "next/navigation"
 
 import {
@@ -30,7 +30,10 @@ import {
   getFunctionalImpairmentLabelsByResultId,
   PHQ9_IMPAIRMENT_ELEMENT_KEY,
 } from "@/lib/assessments/impairment"
-import { loadBtpResultsForDateRange } from "@/lib/assessments/btp-results"
+import {
+  loadBtpResultsForAppointments,
+  loadBtpResultsForDateRange,
+} from "@/lib/assessments/btp-results"
 import { getMaxScoreForAssessmentDefinition } from "@/lib/assessments/max-score"
 import type {
   BtpReportResultRow,
@@ -146,6 +149,77 @@ async function fetchResultsForAssessment(
   }))
 }
 
+async function fetchResultsForAppointments(
+  clientId: string,
+  practiceId: string,
+  assessmentCode: string,
+  appointmentIds: string[],
+  options?: { includeAcuteRisk?: boolean; impairmentElementKey?: string }
+): Promise<ReportPreviewRow[]> {
+  if (appointmentIds.length === 0) return []
+
+  const rows = await db
+    .select({
+      assessmentResultId: assessmentResults.assessmentResultId,
+      assessmentDate: assessmentResults.assessmentDate,
+      score: assessmentResults.score,
+      severity: assessmentResults.severity,
+      acuteRiskRating: assessmentResults.acuteRiskRating,
+      assessmentDefinitionId: assessmentDefinitions.assessmentDefinitionId,
+    })
+    .from(assessmentResults)
+    .innerJoin(
+      assessmentInstances,
+      eq(
+        assessmentResults.assessmentInstanceId,
+        assessmentInstances.assessmentInstanceId
+      )
+    )
+    .innerJoin(
+      assessmentDefinitions,
+      eq(
+        assessmentInstances.assessmentDefinitionId,
+        assessmentDefinitions.assessmentDefinitionId
+      )
+    )
+    .where(
+      and(
+        eq(assessmentResults.clientId, clientId),
+        eq(assessmentResults.practiceId, practiceId),
+        eq(assessmentDefinitions.assessmentCode, assessmentCode),
+        inArray(assessmentInstances.appointmentId, appointmentIds)
+      )
+    )
+    .orderBy(desc(assessmentResults.assessmentDate))
+
+  const impairmentLabels = options?.impairmentElementKey
+    ? await getFunctionalImpairmentLabelsByResultId(
+        rows.map((row) => row.assessmentResultId),
+        options.impairmentElementKey
+      )
+    : new Map<string, string>()
+
+  const assessmentDefinitionId = rows[0]?.assessmentDefinitionId ?? null
+  const maxScore = assessmentDefinitionId
+    ? await getMaxScoreForAssessmentDefinition(assessmentDefinitionId)
+    : null
+
+  return rows.map((row) => ({
+    assessmentResultId: row.assessmentResultId,
+    date: row.assessmentDate.toISOString(),
+    score: row.score,
+    maxScore: maxScore ?? null,
+    severity: row.severity,
+    functionalImpairmentLabel:
+      impairmentLabels.get(row.assessmentResultId) ?? null,
+    acuteRiskRating: options?.includeAcuteRisk
+      ? assessmentCode === "ASQ"
+        ? row.severity
+        : row.acuteRiskRating
+      : undefined,
+  }))
+}
+
 export async function fetchReportResultsForRange(
   clientId: string,
   dateRangeStart: string,
@@ -246,6 +320,86 @@ export async function fetchReportResultsForRange(
   }
 }
 
+export async function fetchReportResultsForAppointments(
+  clientId: string,
+  appointmentIds: string[]
+): Promise<{ preview: ReportRangePreview; error?: string }> {
+  const context = await requirePractitionerContext()
+
+  if (appointmentIds.length === 0) {
+    return {
+      preview: {
+        phq9Results: [],
+        gad7Results: [],
+        asqResults: [],
+        assistResults: [],
+        btpResults: [],
+      },
+      error: "Please select at least one appointment.",
+    }
+  }
+
+  const client = await verifyClient(clientId, context.practiceId)
+  if (!client) {
+    return {
+      preview: {
+        phq9Results: [],
+        gad7Results: [],
+        asqResults: [],
+        assistResults: [],
+        btpResults: [],
+      },
+      error: "Client not found.",
+    }
+  }
+
+  const [phq9Results, gad7Results, asqResults, assistResults, btpSummaries] =
+    await Promise.all([
+      fetchResultsForAppointments(
+        clientId,
+        context.practiceId,
+        "PHQ9",
+        appointmentIds,
+        { impairmentElementKey: PHQ9_IMPAIRMENT_ELEMENT_KEY }
+      ),
+      fetchResultsForAppointments(
+        clientId,
+        context.practiceId,
+        "GAD7",
+        appointmentIds,
+        { impairmentElementKey: GAD7_IMPAIRMENT_ELEMENT_KEY }
+      ),
+      fetchResultsForAppointments(
+        clientId,
+        context.practiceId,
+        "ASQ",
+        appointmentIds,
+        { includeAcuteRisk: true }
+      ),
+      fetchResultsForAppointments(
+        clientId,
+        context.practiceId,
+        "ASSIST",
+        appointmentIds
+      ),
+      loadBtpResultsForAppointments(
+        clientId,
+        context.practiceId,
+        appointmentIds
+      ),
+    ])
+
+  const btpResults: BtpReportResultRow[] = btpSummaries.map((result) => ({
+    assessmentResultId: result.assessmentResultId,
+    date: result.assessmentDate.toISOString(),
+    targets: result.targets.map((t) => ({ ...t, maxScore: 5 })),
+  }))
+
+  return {
+    preview: { phq9Results, gad7Results, asqResults, assistResults, btpResults },
+  }
+}
+
 /** @deprecated Use fetchReportResultsForRange */
 export async function fetchPhq9ResultsForRange(
   clientId: string,
@@ -274,7 +428,8 @@ export async function buildSnapshot(
   recommendationsText: string | null,
   recipient: ReportRecipient,
   fundingApprovalId: string | null,
-  reportRequirementId: string | null
+  reportRequirementId: string | null,
+  selectedAppointmentIds: string[]
 ): Promise<ReportSnapshot | null> {
   const client = await verifyClient(clientId, context.practiceId)
   if (!client) return null
@@ -400,6 +555,7 @@ export async function buildSnapshot(
     btpResults,
     clinicalSummaryText,
     recommendationsText,
+    selectedAppointmentIds,
   }
 }
 
@@ -414,8 +570,8 @@ export async function saveReportDraft(
 ): Promise<SaveReportDraftState> {
   const context = await requirePractitionerContext()
 
-  const dateRangeStart = String(formData.get("date_range_start") ?? "").trim()
-  const dateRangeEnd = String(formData.get("date_range_end") ?? "").trim()
+  let dateRangeStart = String(formData.get("date_range_start") ?? "").trim()
+  let dateRangeEnd = String(formData.get("date_range_end") ?? "").trim()
   const clinicalSummaryText =
     String(formData.get("clinical_summary_text") ?? "").trim() || null
   const recommendationsText =
@@ -425,6 +581,11 @@ export async function saveReportDraft(
     String(formData.get("funding_approval_id") ?? "").trim() || null
   const reportRequirementId =
     String(formData.get("report_requirement_id") ?? "").trim() || null
+  const appointmentIdsRaw =
+    String(formData.get("appointment_ids") ?? "").trim()
+  const appointmentIds = appointmentIdsRaw
+    ? appointmentIdsRaw.split(",").map((id) => id.trim()).filter(Boolean)
+    : []
 
   const isReferrer = recipientTypeRaw.startsWith("referrer:")
   const recipientType = isReferrer
@@ -436,22 +597,34 @@ export async function saveReportDraft(
     ? (recipientTypeRaw.split(":")[1] ?? fundingApprovalIdRaw)
     : null
 
-  if (!dateRangeStart || !dateRangeEnd) {
-    return { error: "Please select a start and end date." }
+  let preview: ReportRangePreview
+  let previewError: string | undefined
+
+  if (appointmentIds.length > 0) {
+    const result = await fetchReportResultsForAppointments(
+      clientId,
+      appointmentIds
+    )
+    preview = result.preview
+    previewError = result.error
+  } else {
+    if (!dateRangeStart || !dateRangeEnd) {
+      return { error: "Please select a start and end date." }
+    }
+    if (dateRangeStart > dateRangeEnd) {
+      return { error: "Start date must be on or before end date." }
+    }
+    const result = await fetchReportResultsForRange(
+      clientId,
+      dateRangeStart,
+      dateRangeEnd
+    )
+    preview = result.preview
+    previewError = result.error
   }
 
-  if (dateRangeStart > dateRangeEnd) {
-    return { error: "Start date must be on or before end date." }
-  }
-
-  const { preview, error } = await fetchReportResultsForRange(
-    clientId,
-    dateRangeStart,
-    dateRangeEnd
-  )
-
-  if (error) {
-    return { error }
+  if (previewError) {
+    return { error: previewError }
   }
 
   let recipient: ReportRecipient = {
@@ -506,7 +679,8 @@ export async function saveReportDraft(
     recommendationsText,
     recipient,
     fundingApprovalId,
-    reportRequirementId
+    reportRequirementId,
+    appointmentIds
   )
 
   if (!snapshot) {

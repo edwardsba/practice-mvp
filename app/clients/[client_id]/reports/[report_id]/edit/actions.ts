@@ -98,7 +98,8 @@ export async function updateReportDraft(
     recommendationsText,
     recipient,
     report.fundingApprovalId,
-    report.reportRequirementId
+    report.reportRequirementId,
+    existingSnapshot?.selectedAppointmentIds ?? []
   )
 
   if (!snapshot) {

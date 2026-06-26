@@ -68,6 +68,7 @@ export type ReportSnapshot = {
   results?: ReportResultRow[]
   clinicalSummaryText: string | null
   recommendationsText: string | null
+  selectedAppointmentIds?: string[]
 }
 
 export function getPhq9ResultsFromSnapshot(snapshot: ReportSnapshot): ReportResultRow[] {
@@ -143,5 +144,6 @@ export function parseReportSnapshot(value: unknown): ReportSnapshot | null {
     asqResults,
     assistResults,
     btpResults,
+    selectedAppointmentIds: raw.selectedAppointmentIds ?? [],
   }
 }

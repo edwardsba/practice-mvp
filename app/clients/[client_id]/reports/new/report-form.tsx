@@ -3,6 +3,7 @@
 import { useActionState, useCallback, useEffect, useState, useTransition } from "react"
 
 import {
+  fetchReportResultsForAppointments,
   fetchReportResultsForRange,
   saveReportDraft,
   type ReportPreviewRow,
@@ -25,6 +26,10 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import type { getClientFundingApprovalsForReport } from "@/lib/actions/funding"
+import {
+  formatAppointmentDate,
+  formatAppointmentTime,
+} from "@/lib/appointments/format"
 import type { ReportRecipient, ReportSnapshot } from "@/lib/reports/snapshot"
 import { resolveReportTitle } from "@/lib/reports/snapshot"
 import { cn } from "@/lib/utils"
@@ -66,6 +71,9 @@ export function ReportForm({
 }) {
   const [recipientType, setRecipientType] = useState("none")
   const [requirementId, setRequirementId] = useState<string>("")
+  const [selectedAppointmentIds, setSelectedAppointmentIds] = useState<string[]>(
+    []
+  )
   const [dateRangeStart, setDateRangeStart] = useState("")
   const [dateRangeEnd, setDateRangeEnd] = useState("")
   const [phq9Results, setPhq9Results] = useState<ReportPreviewRow[]>([])
@@ -84,53 +92,107 @@ export function ReportForm({
     initialSaveState
   )
 
-  const loadPreview = useCallback(
-    (start: string, end: string) => {
-      if (!start || !end) {
-        setPhq9Results([])
-        setGad7Results([])
-        setAsqResults([])
-        setAssistResults([])
-        setBtpResults([])
-        setPreviewError(null)
-        return
-      }
+  const isReferrer = recipientType.startsWith("referrer:")
+  const approvalId = isReferrer ? recipientType.split(":")[1] ?? "" : ""
+  const selectedApproval =
+    fundingApprovals.find((fa) => fa.fundingApprovalId === approvalId) ?? null
 
-      startPreviewTransition(async () => {
-        const { preview, error } = await fetchReportResultsForRange(
-          clientId,
-          start,
-          end
-        )
-        setPhq9Results(preview.phq9Results)
-        setGad7Results(preview.gad7Results)
-        setAsqResults(preview.asqResults)
-        setAssistResults(preview.assistResults)
-        setBtpResults(preview.btpResults)
-        setPreviewError(error ?? null)
-      })
+  const selectedAppointmentDates = selectedApproval
+    ? selectedApproval.appointments
+        .filter((a) => selectedAppointmentIds.includes(a.appointmentId))
+        .map((a) => a.appointmentDate)
+        .sort()
+    : []
+
+  const derivedDateRangeStart = selectedAppointmentDates[0] ?? ""
+  const derivedDateRangeEnd =
+    selectedAppointmentDates[selectedAppointmentDates.length - 1] ?? ""
+
+  const effectiveDateRangeStart = selectedApproval
+    ? derivedDateRangeStart
+    : dateRangeStart
+  const effectiveDateRangeEnd = selectedApproval
+    ? derivedDateRangeEnd
+    : dateRangeEnd
+
+  const loadPreview = useCallback(
+    (apptIds: string[], start: string, end: string) => {
+      if (selectedApproval) {
+        if (apptIds.length === 0) {
+          setPhq9Results([])
+          setGad7Results([])
+          setAsqResults([])
+          setAssistResults([])
+          setBtpResults([])
+          setPreviewError(null)
+          return
+        }
+
+        startPreviewTransition(async () => {
+          const { preview, error } = await fetchReportResultsForAppointments(
+            clientId,
+            apptIds
+          )
+          setPhq9Results(preview.phq9Results)
+          setGad7Results(preview.gad7Results)
+          setAsqResults(preview.asqResults)
+          setAssistResults(preview.assistResults)
+          setBtpResults(preview.btpResults)
+          setPreviewError(error ?? null)
+        })
+      } else {
+        if (!start || !end) {
+          setPhq9Results([])
+          setGad7Results([])
+          setAsqResults([])
+          setAssistResults([])
+          setBtpResults([])
+          setPreviewError(null)
+          return
+        }
+
+        startPreviewTransition(async () => {
+          const { preview, error } = await fetchReportResultsForRange(
+            clientId,
+            start,
+            end
+          )
+          setPhq9Results(preview.phq9Results)
+          setGad7Results(preview.gad7Results)
+          setAsqResults(preview.asqResults)
+          setAssistResults(preview.assistResults)
+          setBtpResults(preview.btpResults)
+          setPreviewError(error ?? null)
+        })
+      }
     },
-    [clientId]
+    [clientId, selectedApproval]
   )
 
   function handleStartChange(value: string) {
     setDateRangeStart(value)
-    loadPreview(value, dateRangeEnd)
+    loadPreview([], value, dateRangeEnd)
   }
 
   function handleEndChange(value: string) {
     setDateRangeEnd(value)
-    loadPreview(dateRangeStart, value)
+    loadPreview([], dateRangeStart, value)
   }
 
   function handlePrint() {
     window.print()
   }
 
-  const isReferrer = recipientType.startsWith("referrer:")
-  const approvalId = isReferrer ? recipientType.split(":")[1] ?? "" : ""
-  const selectedApproval =
-    fundingApprovals.find((fa) => fa.fundingApprovalId === approvalId) ?? null
+  useEffect(() => {
+    if (selectedApproval) {
+      const completed = selectedApproval.appointments
+        .filter((a) => a.status === "completed")
+        .map((a) => a.appointmentId)
+      setSelectedAppointmentIds(completed)
+    } else {
+      setSelectedAppointmentIds([])
+    }
+  }, [selectedApproval])
 
   useEffect(() => {
     if (selectedApproval?.requirements?.length) {
@@ -139,6 +201,18 @@ export function ReportForm({
       setRequirementId("")
     }
   }, [selectedApproval])
+
+  useEffect(() => {
+    if (selectedApproval) {
+      loadPreview(selectedAppointmentIds, derivedDateRangeStart, derivedDateRangeEnd)
+    }
+  }, [
+    selectedApproval,
+    selectedAppointmentIds,
+    derivedDateRangeStart,
+    derivedDateRangeEnd,
+    loadPreview,
+  ])
 
   const recipient: ReportRecipient =
     recipientType === "client"
@@ -169,13 +243,13 @@ export function ReportForm({
           }
 
   const previewSnapshot: ReportSnapshot | null =
-    dateRangeStart && dateRangeEnd
+    effectiveDateRangeStart && effectiveDateRangeEnd
       ? {
           ...initialSnapshot,
           reportTitle: resolveReportTitle(),
           generatedAt: new Date().toISOString(),
-          dateRangeStart,
-          dateRangeEnd,
+          dateRangeStart: effectiveDateRangeStart,
+          dateRangeEnd: effectiveDateRangeEnd,
           phq9Results,
           gad7Results,
           asqResults,
@@ -185,10 +259,15 @@ export function ReportForm({
           recommendationsText: recommendations,
           recipient,
           fundingApproval: null,
+          selectedAppointmentIds: selectedApproval ? selectedAppointmentIds : [],
         }
       : null
 
-  const previewLoading = isPendingPreview && Boolean(dateRangeStart && dateRangeEnd)
+  const hasPreviewSource = selectedApproval
+    ? selectedAppointmentIds.length > 0
+    : Boolean(dateRangeStart && dateRangeEnd)
+
+  const previewLoading = isPendingPreview && hasPreviewSource
 
   return (
     <>
@@ -251,47 +330,99 @@ export function ReportForm({
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Date range</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid min-w-0 gap-4 sm:grid-cols-2">
-              <div className="min-w-0 space-y-2">
-                <Label htmlFor="date_range_start">Start date</Label>
-                <Input
-                  id="date_range_start"
-                  type="date"
-                  value={dateRangeStart}
-                  onChange={(e) => handleStartChange(e.target.value)}
-                  className={dateInputClassName}
-                />
+        {selectedApproval ? (
+          <Card>
+            <CardHeader>
+              <CardTitle>Appointments</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {selectedApproval.appointments.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  No appointments linked to this funding approval.
+                </p>
+              ) : (
+                selectedApproval.appointments.map((appt) => (
+                  <label
+                    key={appt.appointmentId}
+                    className="flex cursor-pointer items-center gap-3 text-sm"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedAppointmentIds.includes(appt.appointmentId)}
+                      onChange={(e) => {
+                        setSelectedAppointmentIds((prev) =>
+                          e.target.checked
+                            ? [...prev, appt.appointmentId]
+                            : prev.filter((id) => id !== appt.appointmentId)
+                        )
+                      }}
+                      className="h-4 w-4 rounded border-border"
+                    />
+                    <span>
+                      {formatAppointmentDate(appt.appointmentDate)}{" "}
+                      {formatAppointmentTime(appt.appointmentTime)}
+                    </span>
+                    <span className="text-muted-foreground capitalize">
+                      {appt.status.replace("_", " ")}
+                    </span>
+                  </label>
+                ))
+              )}
+              {selectedAppointmentDates.length > 0 && (
+                <p className="pt-2 text-xs text-muted-foreground">
+                  Reporting period: {derivedDateRangeStart} – {derivedDateRangeEnd}
+                </p>
+              )}
+              {previewError ? (
+                <p className="pt-2 text-sm text-destructive">{previewError}</p>
+              ) : null}
+            </CardContent>
+          </Card>
+        ) : (
+          <Card>
+            <CardHeader>
+              <CardTitle>Date range</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid min-w-0 gap-4 sm:grid-cols-2">
+                <div className="min-w-0 space-y-2">
+                  <Label htmlFor="date_range_start">Start date</Label>
+                  <Input
+                    id="date_range_start"
+                    type="date"
+                    value={dateRangeStart}
+                    onChange={(e) => handleStartChange(e.target.value)}
+                    className={dateInputClassName}
+                  />
+                </div>
+                <div className="min-w-0 space-y-2">
+                  <Label htmlFor="date_range_end">End date</Label>
+                  <Input
+                    id="date_range_end"
+                    type="date"
+                    value={dateRangeEnd}
+                    onChange={(e) => handleEndChange(e.target.value)}
+                    className={dateInputClassName}
+                  />
+                </div>
               </div>
-              <div className="min-w-0 space-y-2">
-                <Label htmlFor="date_range_end">End date</Label>
-                <Input
-                  id="date_range_end"
-                  type="date"
-                  value={dateRangeEnd}
-                  onChange={(e) => handleEndChange(e.target.value)}
-                  className={dateInputClassName}
-                />
-              </div>
-            </div>
-            {previewError ? (
-              <p className="mt-3 text-sm text-destructive">{previewError}</p>
-            ) : null}
-          </CardContent>
-        </Card>
+              {previewError ? (
+                <p className="mt-3 text-sm text-destructive">{previewError}</p>
+              ) : null}
+            </CardContent>
+          </Card>
+        )}
 
         <Card>
           <CardHeader>
             <CardTitle>Results preview</CardTitle>
           </CardHeader>
           <CardContent className="space-y-8">
-            {!dateRangeStart || !dateRangeEnd ? (
+            {!hasPreviewSource ? (
               <p className="text-sm text-muted-foreground">
-                Select a date range to preview results.
+                {selectedApproval
+                  ? "Select at least one appointment to preview results."
+                  : "Select a date range to preview results."}
               </p>
             ) : previewLoading ? (
               <p className="text-sm text-muted-foreground">Loading results…</p>
@@ -330,8 +461,21 @@ export function ReportForm({
         </Card>
 
         <form action={saveAction} className="space-y-6">
-          <input type="hidden" name="date_range_start" value={dateRangeStart} />
-          <input type="hidden" name="date_range_end" value={dateRangeEnd} />
+          <input
+            type="hidden"
+            name="date_range_start"
+            value={selectedApproval ? derivedDateRangeStart : dateRangeStart}
+          />
+          <input
+            type="hidden"
+            name="date_range_end"
+            value={selectedApproval ? derivedDateRangeEnd : dateRangeEnd}
+          />
+          <input
+            type="hidden"
+            name="appointment_ids"
+            value={selectedAppointmentIds.join(",")}
+          />
           <input type="hidden" name="recipient_type" value={recipientType} />
           <input type="hidden" name="funding_approval_id" value={approvalId} />
           <input type="hidden" name="report_requirement_id" value={requirementId} />
@@ -371,7 +515,17 @@ export function ReportForm({
           ) : null}
 
           <div className="flex flex-wrap gap-3">
-            <Button type="submit" disabled={savePending || !dateRangeStart || !dateRangeEnd}>
+            <Button
+              type="submit"
+              disabled={
+                savePending ||
+                (selectedApproval
+                  ? !derivedDateRangeStart ||
+                    !derivedDateRangeEnd ||
+                    selectedAppointmentIds.length === 0
+                  : !dateRangeStart || !dateRangeEnd)
+              }
+            >
               {savePending ? "Saving…" : "Save Draft"}
             </Button>
             <Button

@@ -1,11 +1,15 @@
 "use server"
 
-import { and, asc, count, desc, eq, sql } from "drizzle-orm"
+import { and, asc, count, desc, eq, inArray } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
 
 import {
   appointments,
+  assessmentDefinitions,
+  assessmentInstances,
+  assessmentResults,
+  batteryInstances,
   claimTypes,
   claims,
   clients,
@@ -17,6 +21,7 @@ import {
   professionalOrganisations,
   professionals,
   reportTypes,
+  sessionNotes,
   simpleReports,
 } from "@/db/schema"
 import { requirePractitionerContext } from "@/lib/auth"
@@ -801,40 +806,13 @@ export async function getClientFundingApprovalsForReport(
 
       const { fundingApprovalTypeId: _typeId, ...rest } = approval
 
-      const apptRows = await db
+      const baseAppts = await db
         .select({
           appointmentId: appointments.appointmentId,
           appointmentDate: appointments.appointmentDate,
           appointmentTime: appointments.appointmentTime,
           status: appointments.status,
           preSessionBatterySentAt: appointments.preSessionBatterySentAt,
-            psqBatteryStatus: sql<string | null>`(
-              SELECT bi.status
-              FROM battery_instances bi
-              JOIN assessment_instances ai
-                ON bi.phq9_instance_id = ai.assessment_instance_id
-              JOIN assessment_definitions ad
-                ON ai.assessment_definition_id = ad.assessment_definition_id
-              WHERE ai.appointment_id = ${appointments.appointmentId}
-                AND ad.assessment_code = 'PHQ9'
-              LIMIT 1
-            )`.as("psq_battery_status"),
-          asqCompleted: sql<boolean>`EXISTS (
-            SELECT 1
-            FROM assessment_instances ai
-            JOIN assessment_definitions ad
-              ON ai.assessment_definition_id = ad.assessment_definition_id
-            JOIN assessment_results ar
-              ON ar.assessment_instance_id = ai.assessment_instance_id
-            WHERE ai.appointment_id = ${appointments.appointmentId}
-              AND ad.assessment_code = 'ASQ'
-          )`.as("asq_completed"),
-          sessionNoteStatus: sql<string | null>`(
-            SELECT sn.status
-            FROM session_notes sn
-            WHERE sn.appointment_id = ${appointments.appointmentId}
-            LIMIT 1
-          )`.as("session_note_status"),
         })
         .from(appointments)
         .where(eq(appointments.fundingApprovalId, approval.fundingApprovalId))
@@ -842,6 +820,101 @@ export async function getClientFundingApprovalsForReport(
           asc(appointments.appointmentDate),
           asc(appointments.appointmentTime)
         )
+
+      const apptIds = baseAppts.map((a) => a.appointmentId)
+
+      const psqRows = apptIds.length
+        ? await db
+            .select({
+              appointmentId: assessmentInstances.appointmentId,
+              status: batteryInstances.status,
+            })
+            .from(batteryInstances)
+            .innerJoin(
+              assessmentInstances,
+              eq(
+                batteryInstances.phq9InstanceId,
+                assessmentInstances.assessmentInstanceId
+              )
+            )
+            .innerJoin(
+              assessmentDefinitions,
+              eq(
+                assessmentInstances.assessmentDefinitionId,
+                assessmentDefinitions.assessmentDefinitionId
+              )
+            )
+            .where(
+              and(
+                inArray(assessmentInstances.appointmentId, apptIds),
+                eq(assessmentDefinitions.assessmentCode, "PHQ9")
+              )
+            )
+        : []
+
+      const psqByAppt = new Map<string, string | null>()
+      for (const row of psqRows) {
+        if (row.appointmentId) psqByAppt.set(row.appointmentId, row.status)
+      }
+
+      const asqRows = apptIds.length
+        ? await db
+            .selectDistinct({
+              appointmentId: assessmentInstances.appointmentId,
+            })
+            .from(assessmentInstances)
+            .innerJoin(
+              assessmentDefinitions,
+              eq(
+                assessmentInstances.assessmentDefinitionId,
+                assessmentDefinitions.assessmentDefinitionId
+              )
+            )
+            .innerJoin(
+              assessmentResults,
+              eq(
+                assessmentResults.assessmentInstanceId,
+                assessmentInstances.assessmentInstanceId
+              )
+            )
+            .where(
+              and(
+                inArray(assessmentInstances.appointmentId, apptIds),
+                eq(assessmentDefinitions.assessmentCode, "ASQ")
+              )
+            )
+        : []
+
+      const asqByAppt = new Set<string>()
+      for (const row of asqRows) {
+        if (row.appointmentId) asqByAppt.add(row.appointmentId)
+      }
+
+      const snRows = apptIds.length
+        ? await db
+            .select({
+              appointmentId: sessionNotes.appointmentId,
+              status: sessionNotes.status,
+            })
+            .from(sessionNotes)
+            .where(inArray(sessionNotes.appointmentId, apptIds))
+        : []
+
+      const snByAppt = new Map<string, string | null>()
+      for (const row of snRows) {
+        if (row.appointmentId) snByAppt.set(row.appointmentId, row.status)
+      }
+
+      const apptRows = baseAppts.map((a) => ({
+        appointmentId: a.appointmentId,
+        appointmentDate: a.appointmentDate,
+        appointmentTime: a.appointmentTime,
+        status: a.status,
+        preSessionBatterySentAt: a.preSessionBatterySentAt,
+        psqBatteryStatus: psqByAppt.get(a.appointmentId) ?? null,
+        asqCompleted: asqByAppt.has(a.appointmentId),
+        sessionNoteStatus: snByAppt.get(a.appointmentId) ?? null,
+      }))
 
       return {
         ...rest,

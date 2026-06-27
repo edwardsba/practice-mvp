@@ -24,6 +24,7 @@ export async function GET(
       clientId: simpleReports.clientId,
       pdfStoragePath: simpleReports.pdfStoragePath,
       valuesSnapshotJson: simpleReports.valuesSnapshotJson,
+      reportDate: simpleReports.reportDate,
       dateRangeEnd: simpleReports.dateRangeEnd,
     })
     .from(simpleReports)
@@ -52,7 +53,11 @@ export async function GET(
 
   const clientLastName = client?.lastName ?? "Unknown"
   const clientFirstInitial = client?.firstName?.[0] ?? ""
-  const datePrefix = snapshot.dateRangeEnd.slice(0, 10)
+  const datePrefix =
+    snapshot.reportDate?.slice(0, 10) ||
+    (report.reportDate ? String(report.reportDate).slice(0, 10) : "") ||
+    (snapshot.dateRangeEnd ? snapshot.dateRangeEnd.slice(0, 10) : "") ||
+    new Date().toISOString().slice(0, 10)
   const titleSlug = (snapshot.reportTitle || "Report")
     .replace(/[^a-zA-Z0-9]+/g, "_")
     .replace(/^_+|_+$/g, "")

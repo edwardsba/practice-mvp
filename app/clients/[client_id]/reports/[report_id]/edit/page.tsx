@@ -41,6 +41,7 @@ export default async function EditReportPage({
   const [report] = await db
     .select({
       reportStatus: simpleReports.reportStatus,
+      reportDate: simpleReports.reportDate,
       dateRangeStart: simpleReports.dateRangeStart,
       dateRangeEnd: simpleReports.dateRangeEnd,
       clinicalSummaryText: simpleReports.clinicalSummaryText,
@@ -81,6 +82,7 @@ export default async function EditReportPage({
         clientId={clientId}
         reportId={reportId}
         initial={{
+          reportDate: report.reportDate,
           dateRangeStart: report.dateRangeStart,
           dateRangeEnd: report.dateRangeEnd,
           clinicalSummaryText: report.clinicalSummaryText,

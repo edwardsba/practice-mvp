@@ -91,7 +91,7 @@ function LetterHeader({ snapshot }: { snapshot: ReportSnapshot }) {
       </div>
 
       <p className="text-sm text-muted-foreground">
-        {formatDisplayDate(snapshot.generatedAt)}
+        {formatDisplayDate(snapshot.reportDate)}
       </p>
     </>
   )

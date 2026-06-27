@@ -47,6 +47,7 @@ import {
 } from "@/lib/reports/snapshot"
 import { resolveTemplateKey } from "@/lib/reports/templates"
 import { getClientFundingApprovalsForReport } from "@/lib/actions/funding"
+import { todayDateString } from "@/lib/appointments/format"
 
 export type ReportPreviewRow = ReportResultRow
 
@@ -459,7 +460,8 @@ export async function buildSnapshot(
   reportRequirementId: string | null,
   selectedAppointmentIds: string[],
   reportTitle: string,
-  templateKey: string
+  templateKey: string,
+  reportDate: string
 ): Promise<ReportSnapshot | null> {
   const client = await verifyClient(clientId, context.practiceId)
   if (!client) return null
@@ -560,6 +562,7 @@ export async function buildSnapshot(
     reportTitle: reportTitle?.trim() || "Progress Report",
     templateKey: resolveTemplateKey(templateKey),
     generatedAt: new Date().toISOString(),
+    reportDate: reportDate?.trim() || todayDateString(),
     client: {
       firstName: client.firstName,
       lastName: client.lastName,
@@ -624,6 +627,8 @@ export async function saveReportDraft(
   )
   const reportTitle =
     String(formData.get("report_title") ?? "").trim() || "Progress Report"
+  const reportDate =
+    String(formData.get("report_date") ?? "").trim() || todayDateString()
 
   const isReferrer = recipientTypeRaw.startsWith("referrer:")
   const recipientType = isReferrer
@@ -674,7 +679,8 @@ export async function saveReportDraft(
       null,
       [],
       reportTitle,
-      templateKey
+      templateKey,
+      reportDate
     )
 
     if (!snapshot) {
@@ -689,6 +695,7 @@ export async function saveReportDraft(
         practitionerProfileId: context.practitionerProfileId,
         reportType: "referral_acknowledgement",
         reportTypeId,
+        reportDate,
         dateRangeStart: today,
         dateRangeEnd: today,
         valuesSnapshotJson: snapshot,
@@ -785,7 +792,8 @@ export async function saveReportDraft(
     reportRequirementId,
     appointmentIds,
     reportTitle,
-    templateKey
+    templateKey,
+    reportDate
   )
 
   if (!snapshot) {
@@ -805,6 +813,7 @@ export async function saveReportDraft(
       practitionerProfileId: context.practitionerProfileId,
       reportType,
       reportTypeId,
+      reportDate,
       dateRangeStart,
       dateRangeEnd,
       valuesSnapshotJson: snapshot,

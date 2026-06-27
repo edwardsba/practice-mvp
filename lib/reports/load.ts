@@ -9,6 +9,7 @@ export async function loadReportsForPractice(practiceId: string) {
       simpleReportId: simpleReports.simpleReportId,
       reportType: simpleReports.reportType,
       reportTypeName: reportTypes.name,
+      reportDate: simpleReports.reportDate,
       reportStatus: simpleReports.reportStatus,
       dateRangeStart: simpleReports.dateRangeStart,
       dateRangeEnd: simpleReports.dateRangeEnd,

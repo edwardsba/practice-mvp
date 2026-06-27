@@ -225,7 +225,7 @@ function drawLetterHeader(doc: PDFKit.PDFDocument, snapshot: ReportSnapshot) {
   const addrBottomY = Math.max(doc.y, addrStartY + 40)
   doc.y = addrBottomY + SECTION_GAP
   doc.font("Helvetica").fontSize(BASE_FONT_SIZE).fillColor(MUTED_COLOR)
-  doc.text(formatDisplayDate(snapshot.generatedAt), PAGE_MARGIN, doc.y)
+  doc.text(formatDisplayDate(snapshot.reportDate), PAGE_MARGIN, doc.y)
   doc.fillColor(TEXT_COLOR)
   doc.y = doc.y + SECTION_GAP
 

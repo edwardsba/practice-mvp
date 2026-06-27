@@ -49,12 +49,16 @@ export function EditReportForm({
   clientId: string
   reportId: string
   initial: {
+    reportDate: string | Date | null
     dateRangeStart: string | Date
     dateRangeEnd: string | Date
     clinicalSummaryText: string | null
     recommendationsText: string | null
   }
 }) {
+  const [reportDate, setReportDate] = useState(
+    formatDateInput(initial.reportDate)
+  )
   const [dateRangeStart, setDateRangeStart] = useState(
     formatDateInput(initial.dateRangeStart)
   )
@@ -128,6 +132,23 @@ export function EditReportForm({
 
   return (
     <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>Report date</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-2 sm:max-w-xs">
+            <Label htmlFor="report_date">Report date</Label>
+            <Input
+              id="report_date"
+              type="date"
+              value={reportDate}
+              onChange={(e) => setReportDate(e.target.value)}
+            />
+          </div>
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader>
           <CardTitle>Date range</CardTitle>
@@ -207,6 +228,7 @@ export function EditReportForm({
       <form action={saveAction} className="space-y-6">
         <input type="hidden" name="date_range_start" value={dateRangeStart} />
         <input type="hidden" name="date_range_end" value={dateRangeEnd} />
+        <input type="hidden" name="report_date" value={reportDate} />
 
         <Card>
           <CardHeader>

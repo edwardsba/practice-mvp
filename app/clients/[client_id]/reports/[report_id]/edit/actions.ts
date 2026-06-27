@@ -13,6 +13,7 @@ import { requirePractitionerContext } from "@/lib/auth"
 import { db } from "@/lib/db"
 import { parseReportSnapshot, resolveReportType } from "@/lib/reports/snapshot"
 import { resolveTemplateKey } from "@/lib/reports/templates"
+import { todayDateString } from "@/lib/appointments/format"
 
 export type UpdateReportDraftState = {
   error?: string
@@ -56,6 +57,11 @@ export async function updateReportDraft(
   const templateKey = resolveTemplateKey(existingSnapshot?.templateKey)
   const reportTitle =
     existingSnapshot?.reportTitle?.trim() || "Progress Report"
+  const reportDateRaw = String(formData.get("report_date") ?? "").trim()
+  const reportDate =
+    reportDateRaw ||
+    existingSnapshot?.reportDate?.trim() ||
+    todayDateString()
 
   const dateRangeStart = String(formData.get("date_range_start") ?? "").trim()
   const dateRangeEnd = String(formData.get("date_range_end") ?? "").trim()
@@ -95,7 +101,8 @@ export async function updateReportDraft(
       report.reportRequirementId,
       existingSnapshot.selectedAppointmentIds ?? [],
       reportTitle,
-      templateKey
+      templateKey,
+      reportDate
     )
 
     if (!snapshot) {
@@ -112,6 +119,7 @@ export async function updateReportDraft(
     await db
       .update(simpleReports)
       .set({
+        reportDate,
         valuesSnapshotJson: snapshot,
         clinicalSummaryText,
         recommendationsText: null,
@@ -171,7 +179,8 @@ export async function updateReportDraft(
     report.reportRequirementId,
     existingSnapshot?.selectedAppointmentIds ?? [],
     reportTitle,
-    templateKey
+    templateKey,
+    reportDate
   )
 
   if (!snapshot) {
@@ -195,6 +204,7 @@ export async function updateReportDraft(
     .update(simpleReports)
     .set({
       reportType,
+      reportDate,
       dateRangeStart,
       dateRangeEnd,
       valuesSnapshotJson: snapshot,

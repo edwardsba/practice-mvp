@@ -32,6 +32,7 @@ import type { getClientFundingApprovalsForReport } from "@/lib/actions/funding"
 import {
   formatAppointmentDate,
   formatAppointmentTime,
+  todayDateString,
 } from "@/lib/appointments/format"
 import type { ReportRecipient, ReportSnapshot } from "@/lib/reports/snapshot"
 import { resolveTemplateKey } from "@/lib/reports/templates"
@@ -73,9 +74,11 @@ export function ReportForm({
     | "generatedAt"
     | "reportTitle"
     | "templateKey"
+    | "reportDate"
   >
 }) {
   const [reportTypeId, setReportTypeId] = useState<string>("")
+  const [reportDate, setReportDate] = useState<string>(todayDateString())
   const [recipientType, setRecipientType] = useState("none")
   const [requirementId, setRequirementId] = useState<string>("")
   const [selectedAppointmentIds, setSelectedAppointmentIds] = useState<string[]>(
@@ -261,6 +264,7 @@ export function ReportForm({
           ...initialSnapshot,
           reportTitle,
           templateKey,
+          reportDate,
           generatedAt: new Date().toISOString(),
           dateRangeStart: "",
           dateRangeEnd: "",
@@ -281,6 +285,7 @@ export function ReportForm({
           ...initialSnapshot,
           reportTitle,
           templateKey,
+          reportDate,
           generatedAt: new Date().toISOString(),
           dateRangeStart: effectiveDateRangeStart,
           dateRangeEnd: effectiveDateRangeEnd,
@@ -325,6 +330,16 @@ export function ReportForm({
                 </option>
               ))}
             </select>
+            <div className="space-y-2">
+              <Label htmlFor="report_date">Report date</Label>
+              <Input
+                id="report_date"
+                type="date"
+                value={reportDate}
+                onChange={(e) => setReportDate(e.target.value)}
+                className={dateInputClassName}
+              />
+            </div>
           </CardContent>
         </Card>
 
@@ -368,6 +383,7 @@ export function ReportForm({
               <input type="hidden" name="report_type_id" value={reportTypeId} />
               <input type="hidden" name="template_key" value={templateKey} />
               <input type="hidden" name="report_title" value={reportTitle} />
+              <input type="hidden" name="report_date" value={reportDate} />
 
               <Card>
                 <CardHeader>
@@ -643,6 +659,7 @@ export function ReportForm({
           <input type="hidden" name="report_type_id" value={reportTypeId} />
           <input type="hidden" name="template_key" value={templateKey} />
           <input type="hidden" name="report_title" value={reportTitle} />
+          <input type="hidden" name="report_date" value={reportDate} />
 
           <Card>
             <CardHeader>

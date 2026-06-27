@@ -31,6 +31,7 @@ export default async function AllReportsPage() {
           <TableHeader>
             <TableRow>
               <TableHead>Client</TableHead>
+              <TableHead>Report date</TableHead>
               <TableHead>Type</TableHead>
               <TableHead>Period</TableHead>
               <TableHead>Status</TableHead>
@@ -40,7 +41,7 @@ export default async function AllReportsPage() {
             {reports.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={4}
+                  colSpan={5}
                   className="h-20 text-center text-muted-foreground"
                 >
                   No reports yet.
@@ -63,6 +64,13 @@ export default async function AllReportsPage() {
                     <TableCell>
                       <Link href={href} className="block font-medium">
                         {clientName}
+                      </Link>
+                    </TableCell>
+                    <TableCell>
+                      <Link href={href} className="block text-sm">
+                        {report.reportDate
+                          ? formatDisplayDate(String(report.reportDate))
+                          : "—"}
                       </Link>
                     </TableCell>
                     <TableCell>

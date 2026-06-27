@@ -41,6 +41,7 @@ export type ReportSnapshot = {
   reportTitle: string
   templateKey: string
   generatedAt: string
+  reportDate: string
   client: {
     firstName: string
     lastName: string
@@ -131,6 +132,10 @@ export function parseReportSnapshot(value: unknown): ReportSnapshot | null {
     ...raw,
     reportTitle: raw.reportTitle?.trim() || REPORT_TITLE,
     templateKey: raw.templateKey?.trim() || "progress_report",
+    reportDate:
+      raw.reportDate?.trim() ||
+      raw.dateRangeEnd?.trim() ||
+      (raw.generatedAt ? raw.generatedAt.slice(0, 10) : ""),
     practice: {
       practiceName: raw.practice.practiceName,
       practiceAddress: raw.practice.practiceAddress ?? null,

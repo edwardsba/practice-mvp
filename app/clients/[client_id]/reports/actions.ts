@@ -597,6 +597,39 @@ export type SaveReportDraftState = {
   error?: string
 }
 
+async function linkReportToRequirement(
+  reportRequirementId: string | null,
+  fundingApprovalId: string | null,
+  simpleReportId: string
+) {
+  if (!reportRequirementId || !fundingApprovalId) return
+
+  const [req] = await db
+    .select({
+      appointmentNumber: fundingApprovalTypeReports.appointmentNumber,
+    })
+    .from(fundingApprovalTypeReports)
+    .where(
+      eq(fundingApprovalTypeReports.reportRequirementId, reportRequirementId)
+    )
+    .limit(1)
+
+  if (!req) return
+
+  await db
+    .update(fundingApprovalReportLinks)
+    .set({ simpleReportId, updatedAt: new Date() })
+    .where(
+      and(
+        eq(fundingApprovalReportLinks.fundingApprovalId, fundingApprovalId),
+        eq(
+          fundingApprovalReportLinks.appointmentNumber,
+          req.appointmentNumber
+        )
+      )
+    )
+}
+
 export async function saveReportDraft(
   clientId: string,
   _prevState: SaveReportDraftState,
@@ -705,7 +738,7 @@ export async function saveReportDraft(
         reportStatus: "draft",
         recipientType: "referrer",
         fundingApprovalId,
-        reportRequirementId: null,
+        reportRequirementId,
       })
       .returning({ simpleReportId: simpleReports.simpleReportId })
 
@@ -717,6 +750,12 @@ export async function saveReportDraft(
       entityType: "simple_report",
       entityId: report.simpleReportId,
     })
+
+    await linkReportToRequirement(
+      reportRequirementId,
+      fundingApprovalId,
+      report.simpleReportId
+    )
 
     redirect(`/clients/${clientId}/reports/${report.simpleReportId}`)
   }
@@ -827,32 +866,11 @@ export async function saveReportDraft(
     })
     .returning({ simpleReportId: simpleReports.simpleReportId })
 
-  if (reportRequirementId && fundingApprovalId) {
-    const [req] = await db
-      .select({
-        appointmentNumber: fundingApprovalTypeReports.appointmentNumber,
-      })
-      .from(fundingApprovalTypeReports)
-      .where(
-        eq(fundingApprovalTypeReports.reportRequirementId, reportRequirementId)
-      )
-      .limit(1)
-
-    if (req) {
-      await db
-        .update(fundingApprovalReportLinks)
-        .set({ simpleReportId: report.simpleReportId, updatedAt: new Date() })
-        .where(
-          and(
-            eq(fundingApprovalReportLinks.fundingApprovalId, fundingApprovalId),
-            eq(
-              fundingApprovalReportLinks.appointmentNumber,
-              req.appointmentNumber
-            )
-          )
-        )
-    }
-  }
+  await linkReportToRequirement(
+    reportRequirementId,
+    fundingApprovalId,
+    report.simpleReportId
+  )
 
   await db.insert(auditEvents).values({
     practiceId: context.practiceId,

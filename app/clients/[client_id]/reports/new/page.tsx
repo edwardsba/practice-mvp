@@ -3,6 +3,7 @@ import { notFound } from "next/navigation"
 import { and, eq } from "drizzle-orm"
 
 import { ReportForm } from "@/app/clients/[client_id]/reports/new/report-form"
+import { saveReportDraft } from "@/app/clients/[client_id]/reports/actions"
 import { AppShell } from "@/components/app-shell"
 import { BackButton } from "@/components/ui/back-button"
 import { clients, practitionerProfiles, practices } from "@/db/schema"
@@ -130,6 +131,8 @@ export default async function NewReportPage({
           recipient: null,
           fundingApproval: null,
         }}
+        saveAction={saveReportDraft.bind(null, clientId)}
+        submitLabel="Save Draft"
       />
     </AppShell>
   )

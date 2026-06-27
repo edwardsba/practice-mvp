@@ -1,11 +1,10 @@
 "use client"
 
-import { useActionState, useCallback, useEffect, useState, useTransition } from "react"
+import { useActionState, useCallback, useEffect, useRef, useState, useTransition } from "react"
 
 import {
   fetchReportResultsForAppointments,
   fetchReportResultsForRange,
-  saveReportDraft,
   type ReportPreviewRow,
   type SaveReportDraftState,
 } from "@/app/clients/[client_id]/reports/actions"
@@ -55,7 +54,17 @@ export function ReportForm({
   reportTypes,
   initialFundingApprovalId = null,
   initialRequirementId = null,
+  initialReportTypeId = null,
+  initialReportDate,
+  initialRecipientType,
+  initialSelectedAppointmentIds,
+  initialDateRangeStart,
+  initialDateRangeEnd,
+  initialClinicalSummary,
+  initialRecommendations,
   initialSnapshot,
+  saveAction,
+  submitLabel,
 }: {
   clientId: string
   fundingApprovals: Awaited<
@@ -64,6 +73,14 @@ export function ReportForm({
   reportTypes: Awaited<ReturnType<typeof getReportTypes>>
   initialFundingApprovalId?: string | null
   initialRequirementId?: string | null
+  initialReportTypeId?: string | null
+  initialReportDate?: string
+  initialRecipientType?: string
+  initialSelectedAppointmentIds?: string[]
+  initialDateRangeStart?: string
+  initialDateRangeEnd?: string
+  initialClinicalSummary?: string
+  initialRecommendations?: string
   initialSnapshot: Omit<
     ReportSnapshot,
     | "phq9Results"
@@ -80,6 +97,11 @@ export function ReportForm({
     | "templateKey"
     | "reportDate"
   >
+  saveAction: (
+    prevState: SaveReportDraftState,
+    formData: FormData
+  ) => Promise<SaveReportDraftState>
+  submitLabel?: string
 }) {
   const validInitialApprovalId =
     initialFundingApprovalId &&
@@ -89,22 +111,36 @@ export function ReportForm({
       ? initialFundingApprovalId
       : ""
 
+  const prePopulatedApptIdsOnce = useRef(Boolean(initialSelectedAppointmentIds?.length))
+  const skipRecipientAutoOnce = useRef(initialRecipientType !== undefined)
+  const skipReportTypeResetOnce = useRef(Boolean(initialReportTypeId))
+
   const [fundingApprovalId, setFundingApprovalId] = useState<string>(
     validInitialApprovalId
   )
-  const [initialRequirementApplied, setInitialRequirementApplied] =
-    useState(false)
-  const [reportTypeId, setReportTypeId] = useState<string>("")
-  const [reportTypeManuallyChanged, setReportTypeManuallyChanged] =
-    useState(false)
-  const [reportDate, setReportDate] = useState<string>(todayDateString())
-  const [recipientType, setRecipientType] = useState<string>("client")
-  const [requirementId, setRequirementId] = useState<string>("")
-  const [selectedAppointmentIds, setSelectedAppointmentIds] = useState<string[]>(
-    []
+  const [initialRequirementApplied, setInitialRequirementApplied] = useState(
+    Boolean(initialFundingApprovalId && initialRequirementId)
   )
-  const [dateRangeStart, setDateRangeStart] = useState("")
-  const [dateRangeEnd, setDateRangeEnd] = useState("")
+  const [reportTypeId, setReportTypeId] = useState<string>(
+    initialReportTypeId ?? ""
+  )
+  const [reportTypeManuallyChanged, setReportTypeManuallyChanged] = useState(
+    Boolean(initialReportTypeId)
+  )
+  const [reportDate, setReportDate] = useState<string>(
+    initialReportDate ?? todayDateString()
+  )
+  const [recipientType, setRecipientType] = useState<string>(
+    initialRecipientType ?? "client"
+  )
+  const [requirementId, setRequirementId] = useState<string>(
+    validInitialApprovalId && initialRequirementId ? initialRequirementId : ""
+  )
+  const [selectedAppointmentIds, setSelectedAppointmentIds] = useState<string[]>(
+    initialSelectedAppointmentIds ?? []
+  )
+  const [dateRangeStart, setDateRangeStart] = useState(initialDateRangeStart ?? "")
+  const [dateRangeEnd, setDateRangeEnd] = useState(initialDateRangeEnd ?? "")
   const [phq9Results, setPhq9Results] = useState<ReportPreviewRow[]>([])
   const [gad7Results, setGad7Results] = useState<ReportPreviewRow[]>([])
   const [asqResults, setAsqResults] = useState<ReportPreviewRow[]>([])
@@ -113,11 +149,15 @@ export function ReportForm({
     import("@/lib/reports/snapshot").BtpReportResultRow[]
   >([])
   const [previewError, setPreviewError] = useState<string | null>(null)
-  const [clinicalSummary, setClinicalSummary] = useState("")
-  const [recommendations, setRecommendations] = useState("")
+  const [clinicalSummary, setClinicalSummary] = useState(
+    initialClinicalSummary ?? ""
+  )
+  const [recommendations, setRecommendations] = useState(
+    initialRecommendations ?? ""
+  )
   const [isPendingPreview, startPreviewTransition] = useTransition()
-  const [saveState, saveAction, savePending] = useActionState(
-    saveReportDraft.bind(null, clientId),
+  const [saveState, boundSaveAction, savePending] = useActionState(
+    saveAction,
     initialSaveState
   )
 
@@ -229,36 +269,52 @@ export function ReportForm({
       fundingApprovals.find((fa) => fa.fundingApprovalId === fundingApprovalId) ??
       null
     if (approval) {
-      setRecipientType("referrer")
-      setSelectedAppointmentIds(
-        approval.appointments.map((a) => a.appointmentId)
-      )
+      if (skipRecipientAutoOnce.current) {
+        skipRecipientAutoOnce.current = false
+      } else {
+        setRecipientType("referrer")
+      }
 
-      const preferredReqId =
-        !initialRequirementApplied &&
-        initialRequirementId &&
-        approval.requirements.some(
-          (r) => r.reportRequirementId === initialRequirementId
+      if (prePopulatedApptIdsOnce.current) {
+        prePopulatedApptIdsOnce.current = false
+      } else {
+        setSelectedAppointmentIds(
+          approval.appointments.map((a) => a.appointmentId)
         )
-          ? initialRequirementId
-          : (approval.requirements[0]?.reportRequirementId ?? "")
+      }
 
-      setRequirementId(preferredReqId)
-      if (
-        !initialRequirementApplied &&
-        initialRequirementId &&
-        approval.requirements.some(
-          (r) => r.reportRequirementId === initialRequirementId
-        )
-      ) {
-        setInitialRequirementApplied(true)
+      if (!initialRequirementApplied) {
+        const preferredReqId =
+          initialRequirementId &&
+          approval.requirements.some(
+            (r) => r.reportRequirementId === initialRequirementId
+          )
+            ? initialRequirementId
+            : (approval.requirements[0]?.reportRequirementId ?? "")
+
+        setRequirementId(preferredReqId)
+        if (
+          initialRequirementId &&
+          approval.requirements.some(
+            (r) => r.reportRequirementId === initialRequirementId
+          )
+        ) {
+          setInitialRequirementApplied(true)
+        }
+      } else if (initialRequirementId) {
+        setRequirementId(initialRequirementId)
       }
     } else {
       setRecipientType("client")
       setSelectedAppointmentIds([])
       setRequirementId("")
     }
-    setReportTypeManuallyChanged(false)
+
+    if (skipReportTypeResetOnce.current) {
+      skipReportTypeResetOnce.current = false
+    } else {
+      setReportTypeManuallyChanged(false)
+    }
   }, [fundingApprovalId, fundingApprovals, initialRequirementId])
 
   useEffect(() => {
@@ -519,7 +575,7 @@ export function ReportForm({
         </Card>
 
         {isReferralAck ? (
-          <form action={saveAction} className="space-y-6">
+          <form action={boundSaveAction} className="space-y-6">
             {hiddenFormInputs}
 
             <Card>
@@ -548,7 +604,7 @@ export function ReportForm({
                   savePending || !reportTypeId || !fundingApprovalId
                 }
               >
-                {savePending ? "Saving…" : "Save Draft"}
+                {savePending ? "Saving…" : (submitLabel ?? "Save Draft")}
               </Button>
               <Button
                 type="button"
@@ -720,7 +776,7 @@ export function ReportForm({
               </CardContent>
             </Card>
 
-            <form action={saveAction} className="space-y-6">
+            <form action={boundSaveAction} className="space-y-6">
               {hiddenFormInputs}
 
               <Card>
@@ -770,7 +826,7 @@ export function ReportForm({
                       : !dateRangeStart || !dateRangeEnd)
                   }
                 >
-                  {savePending ? "Saving…" : "Save Draft"}
+                  {savePending ? "Saving…" : (submitLabel ?? "Save Draft")}
                 </Button>
                 <Button
                   type="button"

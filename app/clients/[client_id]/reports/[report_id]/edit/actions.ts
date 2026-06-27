@@ -6,7 +6,9 @@ import { redirect } from "next/navigation"
 
 import {
   buildSnapshot,
+  fetchReportResultsForAppointments,
   fetchReportResultsForRange,
+  type ReportRangePreview,
 } from "@/app/clients/[client_id]/reports/actions"
 import { auditEvents, simpleReports } from "@/db/schema"
 import { requirePractitionerContext } from "@/lib/auth"
@@ -69,6 +71,10 @@ export async function updateReportDraft(
     String(formData.get("clinical_summary_text") ?? "").trim() || null
   const recommendationsText =
     String(formData.get("recommendations_text") ?? "").trim() || null
+  const appointmentIdsRaw = String(formData.get("appointment_ids") ?? "").trim()
+  const appointmentIds = appointmentIdsRaw
+    ? appointmentIdsRaw.split(",").map((id) => id.trim()).filter(Boolean)
+    : []
 
   const recipient =
     existingSnapshot?.recipient ?? {
@@ -124,6 +130,7 @@ export async function updateReportDraft(
         clinicalSummaryText,
         recommendationsText: null,
         reportStatus: "draft",
+        pdfStoragePath: null,
         updatedAt: now,
       })
       .where(eq(simpleReports.simpleReportId, reportId))
@@ -144,22 +151,34 @@ export async function updateReportDraft(
     redirect(`/clients/${clientId}/reports/${reportId}`)
   }
 
-  if (!dateRangeStart || !dateRangeEnd) {
-    return { error: "Please select a start and end date." }
+  let preview: ReportRangePreview
+  let previewError: string | undefined
+
+  if (appointmentIds.length > 0) {
+    const result = await fetchReportResultsForAppointments(
+      clientId,
+      appointmentIds
+    )
+    preview = result.preview
+    previewError = result.error
+  } else {
+    if (!dateRangeStart || !dateRangeEnd) {
+      return { error: "Please select a start and end date." }
+    }
+    if (dateRangeStart > dateRangeEnd) {
+      return { error: "Start date must be on or before end date." }
+    }
+    const result = await fetchReportResultsForRange(
+      clientId,
+      dateRangeStart,
+      dateRangeEnd
+    )
+    preview = result.preview
+    previewError = result.error
   }
 
-  if (dateRangeStart > dateRangeEnd) {
-    return { error: "Start date must be on or before end date." }
-  }
-
-  const { preview, error } = await fetchReportResultsForRange(
-    clientId,
-    dateRangeStart,
-    dateRangeEnd
-  )
-
-  if (error) {
-    return { error }
+  if (previewError) {
+    return { error: previewError }
   }
 
   const snapshot = await buildSnapshot(
@@ -177,7 +196,7 @@ export async function updateReportDraft(
     recipient,
     report.fundingApprovalId,
     report.reportRequirementId,
-    existingSnapshot?.selectedAppointmentIds ?? [],
+    appointmentIds,
     reportTitle,
     templateKey,
     reportDate
@@ -211,6 +230,7 @@ export async function updateReportDraft(
       clinicalSummaryText,
       recommendationsText,
       reportStatus: "draft",
+      pdfStoragePath: null,
       updatedAt: now,
     })
     .where(eq(simpleReports.simpleReportId, reportId))

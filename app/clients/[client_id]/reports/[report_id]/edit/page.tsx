@@ -1,15 +1,32 @@
-import Link from "next/link"
 import { notFound, redirect } from "next/navigation"
 import { and, eq } from "drizzle-orm"
 
-import { EditReportForm } from "@/app/clients/[client_id]/reports/[report_id]/edit/edit-report-form"
-import { deleteSimpleReport } from "@/app/clients/[client_id]/reports/[report_id]/edit/actions"
+import { ReportForm } from "@/app/clients/[client_id]/reports/new/report-form"
+import {
+  deleteSimpleReport,
+  updateReportDraft,
+} from "@/app/clients/[client_id]/reports/[report_id]/edit/actions"
 import { AppShell } from "@/components/app-shell"
 import { BackButton } from "@/components/ui/back-button"
 import { EntityDeleteSection } from "@/components/entity-delete-section"
-import { clients, simpleReports } from "@/db/schema"
+import {
+  clients,
+  practitionerProfiles,
+  practices,
+  simpleReports,
+} from "@/db/schema"
+import { getClientFundingApprovalsForReport } from "@/lib/actions/funding"
+import { getReportTypes } from "@/lib/actions/report-types"
 import { requirePractitionerContext } from "@/lib/auth"
 import { db } from "@/lib/db"
+import { parseReportSnapshot } from "@/lib/reports/snapshot"
+import {
+  formatPractitionerFormalName,
+  formatPractitionerName,
+} from "@/lib/practitioner/format"
+import { getSignatureAsDataUrl } from "@/lib/practitioner/signature"
+
+import "@/components/report/report-print.css"
 
 export default async function EditReportPage({
   params,
@@ -41,6 +58,11 @@ export default async function EditReportPage({
   const [report] = await db
     .select({
       reportStatus: simpleReports.reportStatus,
+      valuesSnapshotJson: simpleReports.valuesSnapshotJson,
+      reportTypeId: simpleReports.reportTypeId,
+      fundingApprovalId: simpleReports.fundingApprovalId,
+      reportRequirementId: simpleReports.reportRequirementId,
+      recipientType: simpleReports.recipientType,
       reportDate: simpleReports.reportDate,
       dateRangeStart: simpleReports.dateRangeStart,
       dateRangeEnd: simpleReports.dateRangeEnd,
@@ -65,6 +87,52 @@ export default async function EditReportPage({
     redirect(`/clients/${clientId}/reports/${reportId}`)
   }
 
+  const snapshot = parseReportSnapshot(report.valuesSnapshotJson)
+  if (!snapshot) {
+    notFound()
+  }
+
+  const [fundingApprovals, reportTypes, practitioner, practice] =
+    await Promise.all([
+      getClientFundingApprovalsForReport(clientId, context.practiceId),
+      getReportTypes(context.practiceId),
+      db
+        .select({
+          title: practitionerProfiles.title,
+          firstName: practitionerProfiles.firstName,
+          preferredName: practitionerProfiles.preferredName,
+          lastName: practitionerProfiles.lastName,
+          reportSignature: practitionerProfiles.reportSignature,
+          signatureImagePath: practitionerProfiles.signatureImagePath,
+        })
+        .from(practitionerProfiles)
+        .where(
+          eq(
+            practitionerProfiles.practitionerProfileId,
+            context.practitionerProfileId
+          )
+        )
+        .limit(1)
+        .then((rows) => rows[0] ?? null),
+      db
+        .select({
+          practiceName: practices.practiceName,
+          practiceAddress: practices.address,
+        })
+        .from(practices)
+        .where(eq(practices.practiceId, context.practiceId))
+        .limit(1)
+        .then((rows) => rows[0] ?? null),
+    ])
+
+  if (!practitioner || !practice) {
+    notFound()
+  }
+
+  const signatureDataUrl = practitioner.signatureImagePath
+    ? await getSignatureAsDataUrl(practitioner.signatureImagePath)
+    : null
+
   const clientName = `${client.firstName} ${client.lastName}`
 
   return (
@@ -78,16 +146,43 @@ export default async function EditReportPage({
         <p className="mt-1 text-muted-foreground">{clientName}</p>
       </div>
 
-      <EditReportForm
+      <ReportForm
         clientId={clientId}
-        reportId={reportId}
-        initial={{
-          reportDate: report.reportDate,
-          dateRangeStart: report.dateRangeStart,
-          dateRangeEnd: report.dateRangeEnd,
-          clinicalSummaryText: report.clinicalSummaryText,
-          recommendationsText: report.recommendationsText,
+        fundingApprovals={fundingApprovals}
+        reportTypes={reportTypes}
+        initialFundingApprovalId={report.fundingApprovalId ?? null}
+        initialRequirementId={report.reportRequirementId ?? null}
+        initialReportTypeId={report.reportTypeId ?? null}
+        initialReportDate={
+          report.reportDate ? String(report.reportDate) : undefined
+        }
+        initialRecipientType={report.recipientType ?? "client"}
+        initialSelectedAppointmentIds={snapshot.selectedAppointmentIds ?? []}
+        initialDateRangeStart={
+          report.dateRangeStart ? String(report.dateRangeStart) : undefined
+        }
+        initialDateRangeEnd={
+          report.dateRangeEnd ? String(report.dateRangeEnd) : undefined
+        }
+        initialClinicalSummary={report.clinicalSummaryText ?? ""}
+        initialRecommendations={report.recommendationsText ?? ""}
+        initialSnapshot={{
+          client: snapshot.client,
+          practitioner: {
+            title: practitioner.title,
+            fullName: formatPractitionerName(practitioner),
+            displayName: formatPractitionerFormalName(practitioner),
+            signatureDataUrl,
+          },
+          practice: {
+            practiceName: practice.practiceName,
+            practiceAddress: practice.practiceAddress ?? null,
+          },
+          recipient: snapshot.recipient,
+          fundingApproval: snapshot.fundingApproval,
         }}
+        saveAction={updateReportDraft.bind(null, clientId, reportId)}
+        submitLabel="Save changes"
       />
 
       <EntityDeleteSection

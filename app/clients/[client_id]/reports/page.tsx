@@ -15,17 +15,8 @@ import {
 import { clients, reportTypes, simpleReports } from "@/db/schema"
 import { requirePractitionerContext } from "@/lib/auth"
 import { db } from "@/lib/db"
+import { formatDisplayDate } from "@/lib/funding/format"
 import { formatReportType } from "@/lib/reports/snapshot"
-
-function formatDate(value: Date | string) {
-  const date = value instanceof Date ? value : new Date(value)
-  if (Number.isNaN(date.getTime())) return String(value)
-  return date.toLocaleDateString("en-AU", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  })
-}
 
 function formatReportDateRange(start: string, end: string) {
   const formatPart = (value: string) => {
@@ -78,10 +69,11 @@ export default async function ClientReportsPage({
     .select({
       simpleReportId: simpleReports.simpleReportId,
       reportTypeName: reportTypes.name,
+      templateKey: reportTypes.templateKey,
       reportStatus: simpleReports.reportStatus,
+      reportDate: simpleReports.reportDate,
       dateRangeStart: simpleReports.dateRangeStart,
       dateRangeEnd: simpleReports.dateRangeEnd,
-      createdAt: simpleReports.createdAt,
     })
     .from(simpleReports)
     .leftJoin(
@@ -95,7 +87,7 @@ export default async function ClientReportsPage({
         ne(simpleReports.reportStatus, "deleted")
       )
     )
-    .orderBy(desc(simpleReports.createdAt))
+    .orderBy(desc(simpleReports.reportDate), desc(simpleReports.createdAt))
 
   const clientName = `${client.firstName} ${client.lastName}`
 
@@ -119,7 +111,7 @@ export default async function ClientReportsPage({
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Date created</TableHead>
+              <TableHead>Report date</TableHead>
               <TableHead>Report type</TableHead>
               <TableHead>Date range</TableHead>
               <TableHead>Status</TableHead>
@@ -148,7 +140,9 @@ export default async function ClientReportsPage({
                         href={reportHref}
                         className="block font-medium text-primary hover:underline"
                       >
-                        {formatDate(report.createdAt)}
+                        {report.reportDate
+                          ? formatDisplayDate(String(report.reportDate))
+                          : "—"}
                       </Link>
                     </TableCell>
                     <TableCell>
@@ -158,10 +152,14 @@ export default async function ClientReportsPage({
                     </TableCell>
                     <TableCell>
                       <Link href={reportHref} className="block hover:underline">
-                        {formatReportDateRange(
-                          report.dateRangeStart,
-                          report.dateRangeEnd
-                        )}
+                        {report.templateKey === "referral_acknowledgement"
+                          ? "—"
+                          : report.dateRangeStart && report.dateRangeEnd
+                            ? formatReportDateRange(
+                                String(report.dateRangeStart),
+                                String(report.dateRangeEnd)
+                              )
+                            : "—"}
                       </Link>
                     </TableCell>
                     <TableCell>

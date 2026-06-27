@@ -27,6 +27,10 @@ import {
   isInsuranceClaimType,
   isMedicareClaimType,
 } from "@/lib/funding/format"
+import {
+  REPORTING_REQUIREMENT_STATUS_CONFIG,
+  deriveReportingRequirementStatus,
+} from "@/lib/funding/reporting-status"
 import { FUNDING_APPROVAL_STATUS_CONFIG } from "@/lib/status"
 import {
   formatAppointmentDate,
@@ -282,48 +286,59 @@ export default async function FundingApprovalDetailPage({
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Report</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>PDF</TableHead>
+                  <TableHead>App #</TableHead>
+                  <TableHead>Report Type</TableHead>
+                  <TableHead>Linked Report</TableHead>
+                  <TableHead>Report Status</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {approval.reportLinks.length === 0 ? (
+                {approval.typeReports.length === 0 ? (
                   <TableRow>
                     <TableCell
                       colSpan={4}
                       className="h-16 text-center text-muted-foreground"
                     >
-                      No reports yet.
+                      No reporting requirements configured for this approval type.
                     </TableCell>
                   </TableRow>
                 ) : (
-                  approval.reportLinks.map((report) => (
-                    <TableRow key={report.linkId}>
-                      <TableCell>
-                        {report.createdAt
-                          ? formatDisplayDate(
-                              report.createdAt.toString().slice(0, 10)
-                            )
-                          : "—"}
-                      </TableCell>
-                      <TableCell>{report.reportType}</TableCell>
-                      <TableCell>{report.reportStatus ?? "—"}</TableCell>
-                      <TableCell>
-                        {report.simpleReportId ? (
-                          <Link
-                            href={`/clients/${approval.clientId}/reports/${report.simpleReportId}`}
-                            className="text-primary hover:underline"
-                          >
-                            View
-                          </Link>
-                        ) : (
-                          "—"
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))
+                  approval.typeReports.map((requirement) => {
+                    const linked = approval.reportLinks.find(
+                      (link) =>
+                        link.appointmentNumber === requirement.appointmentNumber &&
+                        link.simpleReportId
+                    )
+                    const status = deriveReportingRequirementStatus({
+                      hasLinkedReport: Boolean(linked),
+                      appointmentNumber: requirement.appointmentNumber,
+                      appointmentsAttended: approval.appointmentsAttended,
+                    })
+                    return (
+                      <TableRow key={requirement.reportRequirementId}>
+                        <TableCell>{requirement.appointmentNumber}</TableCell>
+                        <TableCell>{requirement.reportType}</TableCell>
+                        <TableCell>
+                          {linked?.simpleReportId ? (
+                            <Link
+                              href={`/clients/${approval.clientId}/reports/${linked.simpleReportId}`}
+                              className="text-primary hover:underline"
+                            >
+                              View
+                            </Link>
+                          ) : (
+                            "—"
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <StatusBadge
+                            status={status}
+                            statusMap={REPORTING_REQUIREMENT_STATUS_CONFIG}
+                          />
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })
                 )}
               </TableBody>
             </Table>

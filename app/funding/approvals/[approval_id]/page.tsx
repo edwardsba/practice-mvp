@@ -327,7 +327,12 @@ export default async function FundingApprovalDetailPage({
                               View
                             </Link>
                           ) : (
-                            "—"
+                            <Link
+                              href={`/clients/${approval.clientId}/reports/new?fundingApprovalId=${approval.fundingApprovalId}&reportRequirementId=${requirement.reportRequirementId}`}
+                              className="text-primary hover:underline"
+                            >
+                              Create report
+                            </Link>
                           )}
                         </TableCell>
                         <TableCell>

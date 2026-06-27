@@ -20,10 +20,19 @@ import "@/components/report/report-print.css"
 
 export default async function NewReportPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ client_id: string }>
+  searchParams: Promise<{
+    fundingApprovalId?: string
+    reportRequirementId?: string
+  }>
 }) {
   const { client_id: clientId } = await params
+  const {
+    fundingApprovalId: initialFundingApprovalId,
+    reportRequirementId: initialRequirementId,
+  } = await searchParams
   const context = await requirePractitionerContext()
 
   const [client] = await db
@@ -100,6 +109,8 @@ export default async function NewReportPage({
         clientId={clientId}
         fundingApprovals={fundingApprovals}
         reportTypes={reportTypes}
+        initialFundingApprovalId={initialFundingApprovalId ?? null}
+        initialRequirementId={initialRequirementId ?? null}
         initialSnapshot={{
           client: {
             firstName: client.firstName,

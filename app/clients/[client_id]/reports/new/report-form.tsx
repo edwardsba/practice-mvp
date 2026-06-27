@@ -53,6 +53,8 @@ export function ReportForm({
   clientId,
   fundingApprovals,
   reportTypes,
+  initialFundingApprovalId = null,
+  initialRequirementId = null,
   initialSnapshot,
 }: {
   clientId: string
@@ -60,6 +62,8 @@ export function ReportForm({
     ReturnType<typeof getClientFundingApprovalsForReport>
   >
   reportTypes: Awaited<ReturnType<typeof getReportTypes>>
+  initialFundingApprovalId?: string | null
+  initialRequirementId?: string | null
   initialSnapshot: Omit<
     ReportSnapshot,
     | "phq9Results"
@@ -77,7 +81,19 @@ export function ReportForm({
     | "reportDate"
   >
 }) {
-  const [fundingApprovalId, setFundingApprovalId] = useState<string>("")
+  const validInitialApprovalId =
+    initialFundingApprovalId &&
+    fundingApprovals.some(
+      (fa) => fa.fundingApprovalId === initialFundingApprovalId
+    )
+      ? initialFundingApprovalId
+      : ""
+
+  const [fundingApprovalId, setFundingApprovalId] = useState<string>(
+    validInitialApprovalId
+  )
+  const [initialRequirementApplied, setInitialRequirementApplied] =
+    useState(false)
   const [reportTypeId, setReportTypeId] = useState<string>("")
   const [reportTypeManuallyChanged, setReportTypeManuallyChanged] =
     useState(false)
@@ -217,15 +233,33 @@ export function ReportForm({
       setSelectedAppointmentIds(
         approval.appointments.map((a) => a.appointmentId)
       )
-      const firstReq = approval.requirements[0]
-      setRequirementId(firstReq?.reportRequirementId ?? "")
+
+      const preferredReqId =
+        !initialRequirementApplied &&
+        initialRequirementId &&
+        approval.requirements.some(
+          (r) => r.reportRequirementId === initialRequirementId
+        )
+          ? initialRequirementId
+          : (approval.requirements[0]?.reportRequirementId ?? "")
+
+      setRequirementId(preferredReqId)
+      if (
+        !initialRequirementApplied &&
+        initialRequirementId &&
+        approval.requirements.some(
+          (r) => r.reportRequirementId === initialRequirementId
+        )
+      ) {
+        setInitialRequirementApplied(true)
+      }
     } else {
       setRecipientType("client")
       setSelectedAppointmentIds([])
       setRequirementId("")
     }
     setReportTypeManuallyChanged(false)
-  }, [fundingApprovalId, fundingApprovals])
+  }, [fundingApprovalId, fundingApprovals, initialRequirementId])
 
   useEffect(() => {
     if (reportTypeManuallyChanged) return

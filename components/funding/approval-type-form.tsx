@@ -34,6 +34,11 @@ type ReportRequirement = {
   reportType: string
 }
 
+type ReportTypeOption = {
+  reportTypeId: string
+  name: string
+}
+
 type InitialValues = {
   fundingApprovalTypeId?: string
   name?: string
@@ -46,11 +51,13 @@ type InitialValues = {
 export function ApprovalTypeForm({
   practiceId,
   claimTypes,
+  reportTypes,
   initialValues,
   cancelHref,
 }: {
   practiceId: string
   claimTypes: ClaimTypeOption[]
+  reportTypes: ReportTypeOption[]
   initialValues?: InitialValues
   cancelHref: string
 }) {
@@ -196,7 +203,7 @@ export function ApprovalTypeForm({
                 </div>
                 <div className="space-y-1">
                   <Label className="text-xs">Report type</Label>
-                  <Input
+                  <select
                     value={report.reportType}
                     onChange={(event) =>
                       setReports((current) =>
@@ -207,8 +214,15 @@ export function ApprovalTypeForm({
                         )
                       )
                     }
-                    placeholder="Progress Report"
-                  />
+                    className={selectClassName}
+                  >
+                    <option value="">Select report type</option>
+                    {reportTypes.map((rt) => (
+                      <option key={rt.reportTypeId} value={rt.name}>
+                        {rt.name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 <div className="flex items-end">
                   <Button

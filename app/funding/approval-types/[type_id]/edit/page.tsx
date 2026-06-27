@@ -4,6 +4,7 @@ import { ApprovalTypeForm } from "@/components/funding/approval-type-form"
 import { AppShell } from "@/components/app-shell"
 import { BackButton } from "@/components/ui/back-button"
 import { getClaimTypes, getFundingApprovalTypeById, deleteFundingApprovalType, getFundingApprovalTypeDeleteStatus } from "@/lib/actions/funding"
+import { getReportTypes } from "@/lib/actions/report-types"
 import { requirePractitionerContext } from "@/lib/auth"
 import { EntityDeleteSection } from "@/components/entity-delete-section"
 
@@ -14,9 +15,10 @@ export default async function EditFundingApprovalTypePage({
 }) {
   const { type_id: typeId } = await params
   const context = await requirePractitionerContext()
-  const [type, claimTypes] = await Promise.all([
+  const [type, claimTypes, reportTypes] = await Promise.all([
     getFundingApprovalTypeById(context.practiceId, typeId),
     getClaimTypes(context.practiceId),
+    getReportTypes(context.practiceId),
   ])
 
   if (!type) {
@@ -57,6 +59,7 @@ export default async function EditFundingApprovalTypePage({
             reportType: report.reportType,
           })),
         }}
+        reportTypes={reportTypes}
         cancelHref={`/funding/approval-types/${typeId}`}
       />
 

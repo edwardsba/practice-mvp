@@ -7,6 +7,7 @@ import { AppShell } from "@/components/app-shell"
 import { BackButton } from "@/components/ui/back-button"
 import { clients, practitionerProfiles, practices } from "@/db/schema"
 import { getClientFundingApprovalsForReport } from "@/lib/actions/funding"
+import { getReportTypes } from "@/lib/actions/report-types"
 import {
   formatPractitionerFormalName,
   formatPractitionerName,
@@ -73,10 +74,10 @@ export default async function NewReportPage({
     notFound()
   }
 
-  const fundingApprovals = await getClientFundingApprovalsForReport(
-    clientId,
-    context.practiceId
-  )
+  const [fundingApprovals, reportTypes] = await Promise.all([
+    getClientFundingApprovalsForReport(clientId, context.practiceId),
+    getReportTypes(context.practiceId),
+  ])
 
   const signatureDataUrl = practitioner.signatureImagePath
     ? await getSignatureAsDataUrl(practitioner.signatureImagePath)
@@ -92,12 +93,13 @@ export default async function NewReportPage({
           label="← Back to client"
         />
         <h1 className="text-2xl font-semibold tracking-tight">{clientName}</h1>
-        <p className="mt-1 text-muted-foreground">Create progress report</p>
+        <p className="mt-1 text-muted-foreground">Create report</p>
       </div>
 
       <ReportForm
         clientId={clientId}
         fundingApprovals={fundingApprovals}
+        reportTypes={reportTypes}
         initialSnapshot={{
           client: {
             firstName: client.firstName,

@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/table"
 import { getReportTypes } from "@/lib/actions/report-types"
 import { requirePractitionerContext } from "@/lib/auth"
+import { REPORT_TEMPLATE_LABELS, resolveTemplateKey } from "@/lib/reports/templates"
 
 export default async function ReportTypesPage() {
   const context = await requirePractitionerContext()
@@ -42,13 +43,14 @@ export default async function ReportTypesPage() {
           <TableHeader>
             <TableRow>
               <TableHead>Name</TableHead>
+              <TableHead>Template</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {types.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={1}
+                  colSpan={2}
                   className="h-20 text-center text-muted-foreground"
                 >
                   No report types yet.
@@ -69,6 +71,11 @@ export default async function ReportTypesPage() {
                         className="block font-medium text-primary hover:underline"
                       >
                         {rt.name}
+                      </Link>
+                    </TableCell>
+                    <TableCell>
+                      <Link href={typeHref} className="block">
+                        {REPORT_TEMPLATE_LABELS[resolveTemplateKey(rt.templateKey)]}
                       </Link>
                     </TableCell>
                   </TableRow>

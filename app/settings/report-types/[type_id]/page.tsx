@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/card"
 import { getReportTypeById } from "@/lib/actions/report-types"
 import { requirePractitionerContext } from "@/lib/auth"
+import { REPORT_TEMPLATE_LABELS, resolveTemplateKey } from "@/lib/reports/templates"
 
 export default async function ReportTypeDetailPage({
   params,
@@ -50,6 +51,12 @@ export default async function ReportTypeDetailPage({
             <div>
               <dt className="text-sm text-muted-foreground">Name</dt>
               <dd className="font-medium">{reportType.name}</dd>
+            </div>
+            <div>
+              <dt className="text-sm text-muted-foreground">Template</dt>
+              <dd className="font-medium">
+                {REPORT_TEMPLATE_LABELS[resolveTemplateKey(reportType.templateKey)]}
+              </dd>
             </div>
           </dl>
         </CardContent>

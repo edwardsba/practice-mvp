@@ -46,6 +46,7 @@ export default async function EditReportTypePage({
         initialValues={{
           reportTypeId: reportType.reportTypeId,
           name: reportType.name,
+          templateKey: reportType.templateKey,
         }}
         cancelHref={`/settings/report-types/${typeId}`}
       />

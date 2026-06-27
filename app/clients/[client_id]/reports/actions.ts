@@ -43,9 +43,9 @@ import type {
   ReportSnapshot,
 } from "@/lib/reports/snapshot"
 import {
-  resolveReportTitle,
   resolveReportType,
 } from "@/lib/reports/snapshot"
+import { resolveTemplateKey } from "@/lib/reports/templates"
 import { getClientFundingApprovalsForReport } from "@/lib/actions/funding"
 
 export type ReportPreviewRow = ReportResultRow
@@ -77,6 +77,34 @@ async function verifyClient(clientId: string, practiceId: string) {
     .limit(1)
 
   return client ?? null
+}
+
+async function buildReferrerRecipient(
+  clientId: string,
+  practiceId: string,
+  fundingApprovalId: string
+): Promise<ReportRecipient> {
+  const approvals = await getClientFundingApprovalsForReport(clientId, practiceId)
+  const approval =
+    approvals.find((a) => a.fundingApprovalId === fundingApprovalId) ?? null
+  if (!approval) {
+    return {
+      type: "referrer",
+      name: null,
+      organisationName: null,
+      streetAddress: null,
+      postalAddress: null,
+    }
+  }
+  return {
+    type: "referrer",
+    name:
+      [approval.referrerTitle, approval.referrerName].filter(Boolean).join(" ") ||
+      null,
+    organisationName: approval.organisationName,
+    streetAddress: approval.streetAddress,
+    postalAddress: approval.postalAddress,
+  }
 }
 
 async function fetchResultsForAssessment(
@@ -429,7 +457,9 @@ export async function buildSnapshot(
   recipient: ReportRecipient,
   fundingApprovalId: string | null,
   reportRequirementId: string | null,
-  selectedAppointmentIds: string[]
+  selectedAppointmentIds: string[],
+  reportTitle: string,
+  templateKey: string
 ): Promise<ReportSnapshot | null> {
   const client = await verifyClient(clientId, context.practiceId)
   if (!client) return null
@@ -527,7 +557,8 @@ export async function buildSnapshot(
   }
 
   return {
-    reportTitle: resolveReportTitle(),
+    reportTitle: reportTitle?.trim() || "Progress Report",
+    templateKey: resolveTemplateKey(templateKey),
     generatedAt: new Date().toISOString(),
     client: {
       firstName: client.firstName,
@@ -586,6 +617,13 @@ export async function saveReportDraft(
   const appointmentIds = appointmentIdsRaw
     ? appointmentIdsRaw.split(",").map((id) => id.trim()).filter(Boolean)
     : []
+  const reportTypeId =
+    String(formData.get("report_type_id") ?? "").trim() || null
+  const templateKey = resolveTemplateKey(
+    String(formData.get("template_key") ?? "")
+  )
+  const reportTitle =
+    String(formData.get("report_title") ?? "").trim() || "Progress Report"
 
   const isReferrer = recipientTypeRaw.startsWith("referrer:")
   const recipientType = isReferrer
@@ -596,6 +634,84 @@ export async function saveReportDraft(
   const fundingApprovalId = isReferrer
     ? (recipientTypeRaw.split(":")[1] ?? fundingApprovalIdRaw)
     : null
+
+  const emptyPreview: ReportRangePreview = {
+    phq9Results: [],
+    gad7Results: [],
+    asqResults: [],
+    assistResults: [],
+    btpResults: [],
+  }
+
+  if (templateKey === "referral_acknowledgement") {
+    if (!fundingApprovalId) {
+      return {
+        error: "Select a funding approval to address the acknowledgement to.",
+      }
+    }
+
+    const recipient = await buildReferrerRecipient(
+      clientId,
+      context.practiceId,
+      fundingApprovalId
+    )
+    const today = new Date().toISOString().slice(0, 10)
+
+    const snapshot = await buildSnapshot(
+      clientId,
+      context,
+      "",
+      "",
+      emptyPreview.phq9Results,
+      emptyPreview.gad7Results,
+      emptyPreview.asqResults,
+      emptyPreview.assistResults,
+      emptyPreview.btpResults,
+      clinicalSummaryText,
+      null,
+      recipient,
+      fundingApprovalId,
+      null,
+      [],
+      reportTitle,
+      templateKey
+    )
+
+    if (!snapshot) {
+      return { error: "Unable to save report. Client or practice not found." }
+    }
+
+    const [report] = await db
+      .insert(simpleReports)
+      .values({
+        clientId,
+        practiceId: context.practiceId,
+        practitionerProfileId: context.practitionerProfileId,
+        reportType: "referral_acknowledgement",
+        reportTypeId,
+        dateRangeStart: today,
+        dateRangeEnd: today,
+        valuesSnapshotJson: snapshot,
+        clinicalSummaryText,
+        recommendationsText: null,
+        reportStatus: "draft",
+        recipientType: "referrer",
+        fundingApprovalId,
+        reportRequirementId: null,
+      })
+      .returning({ simpleReportId: simpleReports.simpleReportId })
+
+    await db.insert(auditEvents).values({
+      practiceId: context.practiceId,
+      userId: context.userId,
+      clientId,
+      eventType: "report.created",
+      entityType: "simple_report",
+      entityId: report.simpleReportId,
+    })
+
+    redirect(`/clients/${clientId}/reports/${report.simpleReportId}`)
+  }
 
   let preview: ReportRangePreview
   let previewError: string | undefined
@@ -645,24 +761,11 @@ export async function saveReportDraft(
       postalAddress: null,
     }
   } else if (recipientType === "referrer" && fundingApprovalId) {
-    const approvals = await getClientFundingApprovalsForReport(
+    recipient = await buildReferrerRecipient(
       clientId,
-      context.practiceId
+      context.practiceId,
+      fundingApprovalId
     )
-    const approval =
-      approvals.find((a) => a.fundingApprovalId === fundingApprovalId) ?? null
-    if (approval) {
-      recipient = {
-        type: "referrer",
-        name:
-          [approval.referrerTitle, approval.referrerName]
-            .filter(Boolean)
-            .join(" ") || null,
-        organisationName: approval.organisationName,
-        streetAddress: approval.streetAddress,
-        postalAddress: approval.postalAddress,
-      }
-    }
   }
 
   const snapshot = await buildSnapshot(
@@ -680,7 +783,9 @@ export async function saveReportDraft(
     recipient,
     fundingApprovalId,
     reportRequirementId,
-    appointmentIds
+    appointmentIds,
+    reportTitle,
+    templateKey
   )
 
   if (!snapshot) {
@@ -699,6 +804,7 @@ export async function saveReportDraft(
       practiceId: context.practiceId,
       practitionerProfileId: context.practitionerProfileId,
       reportType,
+      reportTypeId,
       dateRangeStart,
       dateRangeEnd,
       valuesSnapshotJson: snapshot,

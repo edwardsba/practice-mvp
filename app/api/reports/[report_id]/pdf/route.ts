@@ -53,7 +53,10 @@ export async function GET(
   const clientLastName = client?.lastName ?? "Unknown"
   const clientFirstInitial = client?.firstName?.[0] ?? ""
   const datePrefix = snapshot.dateRangeEnd.slice(0, 10)
-  const filename = `${datePrefix}_Confidential_Progress_Report_${clientLastName}_${clientFirstInitial}.pdf`
+  const titleSlug = (snapshot.reportTitle || "Report")
+    .replace(/[^a-zA-Z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+  const filename = `${datePrefix}_Confidential_${titleSlug}_${clientLastName}_${clientFirstInitial}.pdf`
 
   let pdfBuffer: Buffer
 

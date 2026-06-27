@@ -1,6 +1,6 @@
 import { and, desc, eq, ne } from "drizzle-orm"
 
-import { clients, simpleReports } from "@/db/schema"
+import { clients, reportTypes, simpleReports } from "@/db/schema"
 import { db } from "@/lib/db"
 
 export async function loadReportsForPractice(practiceId: string) {
@@ -8,6 +8,7 @@ export async function loadReportsForPractice(practiceId: string) {
     .select({
       simpleReportId: simpleReports.simpleReportId,
       reportType: simpleReports.reportType,
+      reportTypeName: reportTypes.name,
       reportStatus: simpleReports.reportStatus,
       dateRangeStart: simpleReports.dateRangeStart,
       dateRangeEnd: simpleReports.dateRangeEnd,
@@ -19,6 +20,10 @@ export async function loadReportsForPractice(practiceId: string) {
     })
     .from(simpleReports)
     .innerJoin(clients, eq(simpleReports.clientId, clients.clientId))
+    .leftJoin(
+      reportTypes,
+      eq(simpleReports.reportTypeId, reportTypes.reportTypeId)
+    )
     .where(
       and(
         eq(simpleReports.practiceId, practiceId),

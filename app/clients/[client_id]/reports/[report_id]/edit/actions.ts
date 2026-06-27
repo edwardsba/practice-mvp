@@ -12,6 +12,7 @@ import { auditEvents, simpleReports } from "@/db/schema"
 import { requirePractitionerContext } from "@/lib/auth"
 import { db } from "@/lib/db"
 import { parseReportSnapshot, resolveReportType } from "@/lib/reports/snapshot"
+import { resolveTemplateKey } from "@/lib/reports/templates"
 
 export type UpdateReportDraftState = {
   error?: string
@@ -31,6 +32,7 @@ export async function updateReportDraft(
       valuesSnapshotJson: simpleReports.valuesSnapshotJson,
       fundingApprovalId: simpleReports.fundingApprovalId,
       reportRequirementId: simpleReports.reportRequirementId,
+      reportTypeId: simpleReports.reportTypeId,
     })
     .from(simpleReports)
     .where(
@@ -50,12 +52,89 @@ export async function updateReportDraft(
     redirect(`/clients/${clientId}/reports/${reportId}`)
   }
 
+  const existingSnapshot = parseReportSnapshot(report.valuesSnapshotJson)
+  const templateKey = resolveTemplateKey(existingSnapshot?.templateKey)
+  const reportTitle =
+    existingSnapshot?.reportTitle?.trim() || "Progress Report"
+
   const dateRangeStart = String(formData.get("date_range_start") ?? "").trim()
   const dateRangeEnd = String(formData.get("date_range_end") ?? "").trim()
   const clinicalSummaryText =
     String(formData.get("clinical_summary_text") ?? "").trim() || null
   const recommendationsText =
     String(formData.get("recommendations_text") ?? "").trim() || null
+
+  const recipient =
+    existingSnapshot?.recipient ?? {
+      type: "none" as const,
+      name: null,
+      organisationName: null,
+      streetAddress: null,
+      postalAddress: null,
+    }
+
+  if (templateKey === "referral_acknowledgement") {
+    if (!existingSnapshot) {
+      return { error: "Unable to save report." }
+    }
+
+    const snapshot = await buildSnapshot(
+      clientId,
+      context,
+      existingSnapshot.dateRangeStart,
+      existingSnapshot.dateRangeEnd,
+      existingSnapshot.phq9Results,
+      existingSnapshot.gad7Results,
+      existingSnapshot.asqResults,
+      existingSnapshot.assistResults,
+      existingSnapshot.btpResults,
+      clinicalSummaryText,
+      null,
+      recipient,
+      report.fundingApprovalId,
+      report.reportRequirementId,
+      existingSnapshot.selectedAppointmentIds ?? [],
+      reportTitle,
+      templateKey
+    )
+
+    if (!snapshot) {
+      return { error: "Unable to save report. Client or practice not found." }
+    }
+
+    snapshot.generatedAt = existingSnapshot.generatedAt
+    if (existingSnapshot.practice.practiceAddress != null) {
+      snapshot.practice.practiceAddress = existingSnapshot.practice.practiceAddress
+    }
+
+    const now = new Date()
+
+    await db
+      .update(simpleReports)
+      .set({
+        valuesSnapshotJson: snapshot,
+        clinicalSummaryText,
+        recommendationsText: null,
+        reportStatus: "draft",
+        updatedAt: now,
+      })
+      .where(eq(simpleReports.simpleReportId, reportId))
+
+    await db.insert(auditEvents).values({
+      practiceId: context.practiceId,
+      userId: context.userId,
+      clientId,
+      eventType: "report.updated",
+      entityType: "simple_report",
+      entityId: reportId,
+    })
+
+    revalidatePath(`/clients/${clientId}/reports/${reportId}`)
+    revalidatePath(`/clients/${clientId}/reports/${reportId}/edit`)
+    revalidatePath(`/clients/${clientId}`)
+
+    redirect(`/clients/${clientId}/reports/${reportId}`)
+  }
 
   if (!dateRangeStart || !dateRangeEnd) {
     return { error: "Please select a start and end date." }
@@ -75,15 +154,6 @@ export async function updateReportDraft(
     return { error }
   }
 
-  const existingSnapshot = parseReportSnapshot(report.valuesSnapshotJson)
-  const recipient =
-    existingSnapshot?.recipient ?? {
-      type: "none" as const,
-      name: null,
-      organisationName: null,
-      streetAddress: null,
-      postalAddress: null,
-    }
   const snapshot = await buildSnapshot(
     clientId,
     context,
@@ -99,7 +169,9 @@ export async function updateReportDraft(
     recipient,
     report.fundingApprovalId,
     report.reportRequirementId,
-    existingSnapshot?.selectedAppointmentIds ?? []
+    existingSnapshot?.selectedAppointmentIds ?? [],
+    reportTitle,
+    templateKey
   )
 
   if (!snapshot) {

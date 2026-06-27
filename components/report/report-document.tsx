@@ -1,5 +1,5 @@
 import { ReportBtpResultsTable } from "@/components/report/btp-results-table"
-import { REPORT_TITLE, type ReportSnapshot } from "@/lib/reports/snapshot"
+import type { ReportSnapshot } from "@/lib/reports/snapshot"
 import {
   getAsqResultsFromSnapshot,
   getAssistResultsFromSnapshot,
@@ -7,6 +7,7 @@ import {
   getGad7ResultsFromSnapshot,
   getPhq9ResultsFromSnapshot,
 } from "@/lib/reports/snapshot"
+import { resolveTemplateKey } from "@/lib/reports/templates"
 import {
   ReportAsqResultsTable,
   ReportResultsTable,
@@ -33,30 +34,113 @@ function formatShortDate(value: string) {
   })
 }
 
-export function ReportDocument({
+function LetterHeader({ snapshot }: { snapshot: ReportSnapshot }) {
+  return (
+    <>
+      <div className="flex items-start justify-between text-sm">
+        {snapshot.recipient && snapshot.recipient.type !== "none" ? (
+          <div>
+            {snapshot.recipient.name ? (
+              <p className="font-medium">{snapshot.recipient.name}</p>
+            ) : null}
+            {snapshot.recipient.organisationName ? (
+              <p>{snapshot.recipient.organisationName}</p>
+            ) : null}
+            {snapshot.recipient.streetAddress
+              ? snapshot.recipient.streetAddress
+                  .split(",")
+                  .map((part) => part.trim())
+                  .filter(Boolean)
+                  .map((part, i) => (
+                    <p key={`street-${i}`} className="text-muted-foreground">
+                      {part}
+                    </p>
+                  ))
+              : null}
+            {snapshot.recipient.postalAddress &&
+            snapshot.recipient.postalAddress !== snapshot.recipient.streetAddress
+              ? snapshot.recipient.postalAddress
+                  .split(",")
+                  .map((part) => part.trim())
+                  .filter(Boolean)
+                  .map((part, i) => (
+                    <p key={`postal-${i}`} className="text-muted-foreground">
+                      {part}
+                    </p>
+                  ))
+              : null}
+          </div>
+        ) : (
+          <div />
+        )}
+
+        <div className="text-right">
+          <p className="font-semibold">{snapshot.practice.practiceName}</p>
+          {snapshot.practice.practiceAddress
+            ? snapshot.practice.practiceAddress
+                .split(",")
+                .map((part) => part.trim())
+                .filter(Boolean)
+                .map((part, i) => (
+                  <p key={i} className="text-muted-foreground">
+                    {part}
+                  </p>
+                ))
+            : null}
+        </div>
+      </div>
+
+      <p className="text-sm text-muted-foreground">
+        {formatDisplayDate(snapshot.generatedAt)}
+      </p>
+    </>
+  )
+}
+
+function SignatureBlock({ snapshot }: { snapshot: ReportSnapshot }) {
+  const practitionerLine = [snapshot.practitioner.title, snapshot.practitioner.fullName]
+    .filter(Boolean)
+    .join(" ")
+
+  const practitionerLines = practitionerLine
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean)
+
+  return (
+    <section className="report-signature">
+      {snapshot.practitioner.signatureDataUrl ? (
+        <img
+          src={snapshot.practitioner.signatureDataUrl}
+          alt="Signature"
+          className="mt-4 h-16 w-auto object-contain"
+        />
+      ) : (
+        <div className="mt-16" />
+      )}
+      {practitionerLines.map((line, i) => (
+        <p key={i} className={i === 0 ? "mt-2 text-sm" : "text-sm text-muted-foreground"}>
+          {line}
+        </p>
+      ))}
+    </section>
+  )
+}
+
+function ProgressReportBody({
   snapshot,
   readOnly = false,
   omitEmptySections = false,
 }: {
   snapshot: ReportSnapshot
   readOnly?: boolean
-  /** Saved/printed reports: hide assessment sections with no rows. */
   omitEmptySections?: boolean
 }) {
-  const practitionerLine = [snapshot.practitioner.title, snapshot.practitioner.fullName]
-    .filter(Boolean)
-    .join(" ")
-
   const displayLine =
     snapshot.practitioner.displayName ??
     [snapshot.practitioner.title, snapshot.practitioner.fullName]
       .filter(Boolean)
       .join(" ")
-
-  const practitionerLines = practitionerLine
-    .split("\n")
-    .map((l) => l.trim())
-    .filter(Boolean)
 
   const phq9Results = getPhq9ResultsFromSnapshot(snapshot)
   const gad7Results = getGad7ResultsFromSnapshot(snapshot)
@@ -68,88 +152,24 @@ export function ReportDocument({
   const recommendations = snapshot.recommendationsText?.trim() || "—"
 
   return (
-    <article className="report-document mx-auto max-w-3xl bg-white text-foreground">
-      {/* 1. Header */}
-      <header className="report-header space-y-6 pb-6">
-        <div className="flex items-start justify-between text-sm">
-          {snapshot.recipient && snapshot.recipient.type !== "none" ? (
-            <div>
-              {snapshot.recipient.name ? (
-                <p className="font-medium">{snapshot.recipient.name}</p>
-              ) : null}
-              {snapshot.recipient.organisationName ? (
-                <p>{snapshot.recipient.organisationName}</p>
-              ) : null}
-              {snapshot.recipient.streetAddress
-                ? snapshot.recipient.streetAddress
-                    .split(",")
-                    .map((part) => part.trim())
-                    .filter(Boolean)
-                    .map((part, i) => (
-                      <p key={`street-${i}`} className="text-muted-foreground">
-                        {part}
-                      </p>
-                    ))
-                : null}
-              {snapshot.recipient.postalAddress &&
-              snapshot.recipient.postalAddress !==
-                snapshot.recipient.streetAddress
-                ? snapshot.recipient.postalAddress
-                    .split(",")
-                    .map((part) => part.trim())
-                    .filter(Boolean)
-                    .map((part, i) => (
-                      <p key={`postal-${i}`} className="text-muted-foreground">
-                        {part}
-                      </p>
-                    ))
-                : null}
-            </div>
-          ) : (
-            <div />
-          )}
-
-          <div className="text-right">
-            <p className="font-semibold">{snapshot.practice.practiceName}</p>
-            {snapshot.practice.practiceAddress
-              ? snapshot.practice.practiceAddress
-                  .split(",")
-                  .map((part) => part.trim())
-                  .filter(Boolean)
-                  .map((part, i) => (
-                    <p key={i} className="text-muted-foreground">
-                      {part}
-                    </p>
-                  ))
-              : null}
-          </div>
+    <>
+      <dl className="grid gap-4 text-sm sm:grid-cols-2">
+        <div>
+          <dt className="font-medium text-muted-foreground">Client</dt>
+          <dd>
+            {snapshot.client.firstName} {snapshot.client.lastName}
+          </dd>
+          <dd className="text-muted-foreground">
+            Date of birth: {formatDisplayDate(snapshot.client.dateOfBirth)}
+          </dd>
         </div>
+        <div>
+          <dt className="font-medium text-muted-foreground">Practitioner</dt>
+          <dd>{displayLine}</dd>
+          <dd className="text-muted-foreground">{snapshot.practice.practiceName}</dd>
+        </div>
+      </dl>
 
-        <p className="text-sm text-muted-foreground">
-          {formatDisplayDate(snapshot.generatedAt)}
-        </p>
-
-        <h2 className="text-lg font-semibold">{REPORT_TITLE}</h2>
-
-        <dl className="grid gap-4 text-sm sm:grid-cols-2">
-          <div>
-            <dt className="font-medium text-muted-foreground">Client</dt>
-            <dd>
-              {snapshot.client.firstName} {snapshot.client.lastName}
-            </dd>
-            <dd className="text-muted-foreground">
-              Date of birth: {formatDisplayDate(snapshot.client.dateOfBirth)}
-            </dd>
-          </div>
-            <div>
-              <dt className="font-medium text-muted-foreground">Practitioner</dt>
-              <dd>{displayLine}</dd>
-              <dd className="text-muted-foreground">{snapshot.practice.practiceName}</dd>
-            </div>
-        </dl>
-      </header>
-
-      {/* 2. Reporting period */}
       <section className="report-period pt-4 text-sm">
         <span className="font-medium">Reporting period: </span>
         {formatShortDate(snapshot.dateRangeStart)} –{" "}
@@ -220,7 +240,6 @@ export function ReportDocument({
         />
       ) : null}
 
-      {/* 6. Clinical summary */}
       <section className="report-clinical-summary space-y-2">
         <h3 className="text-lg font-semibold">Clinical summary</h3>
         <p className="whitespace-pre-wrap text-sm leading-relaxed">
@@ -228,31 +247,97 @@ export function ReportDocument({
         </p>
       </section>
 
-      {/* 7. Recommendations */}
       <section className="report-recommendations space-y-2">
         <h3 className="text-lg font-semibold">Recommendations</h3>
         <p className="whitespace-pre-wrap text-sm leading-relaxed">
           {readOnly ? recommendations : recommendations === "—" ? "" : recommendations}
         </p>
       </section>
+    </>
+  )
+}
 
-      {/* 8. Signature */}
-      <section className="report-signature">
-        {snapshot.practitioner.signatureDataUrl ? (
-          <img
-            src={snapshot.practitioner.signatureDataUrl}
-            alt="Signature"
-            className="mt-4 h-16 w-auto object-contain"
-          />
-        ) : (
-          <div className="mt-16" />
-        )}
-        {practitionerLines.map((line, i) => (
-          <p key={i} className={i === 0 ? "mt-2 text-sm" : "text-sm text-muted-foreground"}>
-            {line}
-          </p>
-        ))}
-      </section>
+function ReferralAcknowledgementBody({
+  snapshot,
+}: {
+  snapshot: ReportSnapshot
+  readOnly?: boolean
+}) {
+  const clientName = `${snapshot.client.firstName} ${snapshot.client.lastName}`
+  const recipientName = snapshot.recipient?.name?.trim()
+  const salutation = recipientName ? `Dear ${recipientName},` : "Dear Colleague,"
+  const fa = snapshot.fundingApproval
+  const notes = snapshot.clinicalSummaryText?.trim() || ""
+
+  return (
+    <div className="report-referral-ack space-y-4 pt-4 text-sm leading-relaxed">
+      <p>
+        <span className="font-medium">Re: </span>
+        {clientName}
+        {snapshot.client.dateOfBirth
+          ? ` (DOB ${formatDisplayDate(snapshot.client.dateOfBirth)})`
+          : ""}
+      </p>
+
+      <p>{salutation}</p>
+
+      <p>
+        Thank you for your referral of {clientName} to{" "}
+        {snapshot.practice.practiceName}. I am writing to confirm that the
+        referral has been received
+        {fa ? ` under the ${fa.approvalTypeName}` : ""}
+        {fa?.startDate ? `, dated ${formatDisplayDate(fa.startDate)}` : ""}
+        {fa?.appointmentsApproved != null
+          ? `, approving ${fa.appointmentsApproved} session${
+              fa.appointmentsApproved === 1 ? "" : "s"
+            }`
+          : ""}
+        .
+      </p>
+
+      <p>
+        An appointment has been arranged and {clientName} will be contacted to
+        commence treatment. I will provide progress reports in accordance with
+        the referral&apos;s reporting requirements.
+      </p>
+
+      {notes ? <p className="whitespace-pre-wrap">{notes}</p> : null}
+
+      <p>
+        Please do not hesitate to contact me should you require any further
+        information.
+      </p>
+    </div>
+  )
+}
+
+export function ReportDocument({
+  snapshot,
+  readOnly = false,
+  omitEmptySections = false,
+}: {
+  snapshot: ReportSnapshot
+  readOnly?: boolean
+  omitEmptySections?: boolean
+}) {
+  const templateKey = resolveTemplateKey(snapshot.templateKey)
+
+  return (
+    <article className="report-document mx-auto max-w-3xl bg-white text-foreground">
+      <header className="report-header space-y-6 pb-6">
+        <LetterHeader snapshot={snapshot} />
+        <h2 className="text-lg font-semibold">{snapshot.reportTitle}</h2>
+      </header>
+      {templateKey === "referral_acknowledgement" ? (
+        <ReferralAcknowledgementBody snapshot={snapshot} readOnly={readOnly} />
+      ) : (
+        <ProgressReportBody
+          snapshot={snapshot}
+          readOnly={readOnly}
+          omitEmptySections={omitEmptySections}
+        />
+      )}
+      <SignatureBlock snapshot={snapshot} />
     </article>
   )
 }

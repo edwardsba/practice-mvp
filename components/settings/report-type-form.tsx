@@ -14,6 +14,16 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { upsertReportType } from "@/lib/actions/report-types"
+import {
+  DEFAULT_TEMPLATE_KEY,
+  REPORT_TEMPLATE_LABELS,
+  REPORT_TEMPLATE_KEYS,
+} from "@/lib/reports/templates"
+import { cn } from "@/lib/utils"
+
+const selectClassName = cn(
+  "flex h-9 w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-1 text-sm shadow-xs transition-colors outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 dark:bg-input/30"
+)
 
 export function ReportTypeForm({
   practiceId,
@@ -21,7 +31,7 @@ export function ReportTypeForm({
   cancelHref,
 }: {
   practiceId: string
-  initialValues?: { reportTypeId?: string; name?: string }
+  initialValues?: { reportTypeId?: string; name?: string; templateKey?: string }
   cancelHref: string
 }) {
   const router = useRouter()
@@ -54,6 +64,22 @@ export function ReportTypeForm({
               required
               defaultValue={initialValues?.name ?? ""}
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="template_key">Template</Label>
+            <select
+              id="template_key"
+              name="template_key"
+              defaultValue={initialValues?.templateKey ?? DEFAULT_TEMPLATE_KEY}
+              className={selectClassName}
+            >
+              {REPORT_TEMPLATE_KEYS.map((key) => (
+                <option key={key} value={key}>
+                  {REPORT_TEMPLATE_LABELS[key]}
+                </option>
+              ))}
+            </select>
           </div>
 
           {state.error ? (

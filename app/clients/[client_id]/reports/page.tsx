@@ -12,7 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { clients, simpleReports } from "@/db/schema"
+import { clients, reportTypes, simpleReports } from "@/db/schema"
 import { requirePractitionerContext } from "@/lib/auth"
 import { db } from "@/lib/db"
 import { formatReportType } from "@/lib/reports/snapshot"
@@ -77,13 +77,17 @@ export default async function ClientReportsPage({
   const reports = await db
     .select({
       simpleReportId: simpleReports.simpleReportId,
-      reportType: simpleReports.reportType,
+      reportTypeName: reportTypes.name,
       reportStatus: simpleReports.reportStatus,
       dateRangeStart: simpleReports.dateRangeStart,
       dateRangeEnd: simpleReports.dateRangeEnd,
       createdAt: simpleReports.createdAt,
     })
     .from(simpleReports)
+    .leftJoin(
+      reportTypes,
+      eq(simpleReports.reportTypeId, reportTypes.reportTypeId)
+    )
     .where(
       and(
         eq(simpleReports.clientId, clientId),
@@ -149,7 +153,7 @@ export default async function ClientReportsPage({
                     </TableCell>
                     <TableCell>
                       <Link href={reportHref} className="block hover:underline">
-                        {formatReportType(report.reportType)}
+                        {formatReportType(report.reportTypeName)}
                       </Link>
                     </TableCell>
                     <TableCell>

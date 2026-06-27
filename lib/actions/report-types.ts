@@ -8,6 +8,10 @@ import { fundingApprovalTypeReports, reportTypes } from "@/db/schema"
 import { requirePractitionerContext } from "@/lib/auth"
 import { db } from "@/lib/db"
 import { performSoftDelete } from "@/lib/delete/delete-utils"
+import {
+  DEFAULT_TEMPLATE_KEY,
+  isReportTemplateKey,
+} from "@/lib/reports/templates"
 
 export async function getReportTypes(practiceId: string) {
   const context = await requirePractitionerContext()
@@ -17,6 +21,7 @@ export async function getReportTypes(practiceId: string) {
     .select({
       reportTypeId: reportTypes.reportTypeId,
       name: reportTypes.name,
+      templateKey: reportTypes.templateKey,
     })
     .from(reportTypes)
     .where(
@@ -39,6 +44,7 @@ export async function getReportTypeById(
     .select({
       reportTypeId: reportTypes.reportTypeId,
       name: reportTypes.name,
+      templateKey: reportTypes.templateKey,
     })
     .from(reportTypes)
     .where(
@@ -65,6 +71,11 @@ export async function upsertReportType(
   const name = String(formData.get("name") ?? "").trim()
   if (!name) return { error: "Name is required." }
 
+  const templateKeyRaw = String(formData.get("template_key") ?? "").trim()
+  const templateKey = isReportTemplateKey(templateKeyRaw)
+    ? templateKeyRaw
+    : DEFAULT_TEMPLATE_KEY
+
   const now = new Date()
   let savedId = reportTypeId
 
@@ -72,7 +83,7 @@ export async function upsertReportType(
     if (reportTypeId) {
       await db
         .update(reportTypes)
-        .set({ name, updatedAt: now })
+        .set({ name, templateKey, updatedAt: now })
         .where(
           and(
             eq(reportTypes.reportTypeId, reportTypeId),
@@ -82,7 +93,7 @@ export async function upsertReportType(
     } else {
       const [created] = await db
         .insert(reportTypes)
-        .values({ practiceId, name })
+        .values({ practiceId, name, templateKey })
         .returning({ reportTypeId: reportTypes.reportTypeId })
       savedId = created.reportTypeId
     }

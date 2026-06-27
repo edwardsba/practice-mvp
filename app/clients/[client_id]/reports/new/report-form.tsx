@@ -27,13 +27,14 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import type { getReportTypes } from "@/lib/actions/report-types"
 import type { getClientFundingApprovalsForReport } from "@/lib/actions/funding"
 import {
   formatAppointmentDate,
   formatAppointmentTime,
 } from "@/lib/appointments/format"
 import type { ReportRecipient, ReportSnapshot } from "@/lib/reports/snapshot"
-import { resolveReportTitle } from "@/lib/reports/snapshot"
+import { resolveTemplateKey } from "@/lib/reports/templates"
 import { cn } from "@/lib/utils"
 
 const selectClassName = cn(
@@ -50,12 +51,14 @@ const initialSaveState: SaveReportDraftState = {}
 export function ReportForm({
   clientId,
   fundingApprovals,
+  reportTypes,
   initialSnapshot,
 }: {
   clientId: string
   fundingApprovals: Awaited<
     ReturnType<typeof getClientFundingApprovalsForReport>
   >
+  reportTypes: Awaited<ReturnType<typeof getReportTypes>>
   initialSnapshot: Omit<
     ReportSnapshot,
     | "phq9Results"
@@ -69,8 +72,10 @@ export function ReportForm({
     | "dateRangeEnd"
     | "generatedAt"
     | "reportTitle"
+    | "templateKey"
   >
 }) {
+  const [reportTypeId, setReportTypeId] = useState<string>("")
   const [recipientType, setRecipientType] = useState("none")
   const [requirementId, setRequirementId] = useState<string>("")
   const [selectedAppointmentIds, setSelectedAppointmentIds] = useState<string[]>(
@@ -98,6 +103,12 @@ export function ReportForm({
   const approvalId = isReferrer ? recipientType.split(":")[1] ?? "" : ""
   const selectedApproval =
     fundingApprovals.find((fa) => fa.fundingApprovalId === approvalId) ?? null
+
+  const selectedReportType =
+    reportTypes.find((rt) => rt.reportTypeId === reportTypeId) ?? null
+  const templateKey = resolveTemplateKey(selectedReportType?.templateKey)
+  const reportTitle = selectedReportType?.name ?? "Progress Report"
+  const isReferralAck = templateKey === "referral_acknowledgement"
 
   const selectedAppointmentDates = selectedApproval
     ? selectedApproval.appointments
@@ -244,11 +255,32 @@ export function ReportForm({
             postalAddress: null,
           }
 
-  const previewSnapshot: ReportSnapshot | null =
-    effectiveDateRangeStart && effectiveDateRangeEnd
+  const previewSnapshot: ReportSnapshot | null = isReferralAck
+    ? isReferrer && approvalId
       ? {
           ...initialSnapshot,
-          reportTitle: resolveReportTitle(),
+          reportTitle,
+          templateKey,
+          generatedAt: new Date().toISOString(),
+          dateRangeStart: "",
+          dateRangeEnd: "",
+          phq9Results: [],
+          gad7Results: [],
+          asqResults: [],
+          assistResults: [],
+          btpResults: [],
+          clinicalSummaryText: clinicalSummary,
+          recommendationsText: null,
+          recipient,
+          fundingApproval: null,
+          selectedAppointmentIds: [],
+        }
+      : null
+    : effectiveDateRangeStart && effectiveDateRangeEnd
+      ? {
+          ...initialSnapshot,
+          reportTitle,
+          templateKey,
           generatedAt: new Date().toISOString(),
           dateRangeStart: effectiveDateRangeStart,
           dateRangeEnd: effectiveDateRangeEnd,
@@ -265,15 +297,117 @@ export function ReportForm({
         }
       : null
 
-  const hasPreviewSource = selectedApproval
-    ? selectedAppointmentIds.length > 0
-    : Boolean(dateRangeStart && dateRangeEnd)
+  const hasPreviewSource = isReferralAck
+    ? Boolean(isReferrer && approvalId)
+    : selectedApproval
+      ? selectedAppointmentIds.length > 0
+      : Boolean(dateRangeStart && dateRangeEnd)
 
   const previewLoading = isPendingPreview && hasPreviewSource
 
   return (
     <>
       <div className="no-print space-y-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Report type</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <select
+              className={selectClassName}
+              value={reportTypeId}
+              onChange={(e) => setReportTypeId(e.target.value)}
+            >
+              <option value="">Select report type</option>
+              {reportTypes.map((rt) => (
+                <option key={rt.reportTypeId} value={rt.reportTypeId}>
+                  {rt.name}
+                </option>
+              ))}
+            </select>
+          </CardContent>
+        </Card>
+
+        {isReferralAck ? (
+          <>
+            <Card>
+              <CardHeader>
+                <CardTitle>Recipient</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="recipient_type">Address report to</Label>
+                  <select
+                    id="recipient_type"
+                    name="recipient_type"
+                    value={recipientType}
+                    onChange={(e) => setRecipientType(e.target.value)}
+                    className={selectClassName}
+                  >
+                    <option value="">Select funding approval</option>
+                    {fundingApprovals.map((fa) => (
+                      <option
+                        key={fa.fundingApprovalId}
+                        value={`referrer:${fa.fundingApprovalId}`}
+                      >
+                        {fa.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </CardContent>
+            </Card>
+
+            <form action={saveAction} className="space-y-6">
+              <input type="hidden" name="date_range_start" value="" />
+              <input type="hidden" name="date_range_end" value="" />
+              <input type="hidden" name="appointment_ids" value="" />
+              <input type="hidden" name="recipient_type" value={recipientType} />
+              <input type="hidden" name="funding_approval_id" value={approvalId} />
+              <input type="hidden" name="report_requirement_id" value="" />
+              <input type="hidden" name="report_type_id" value={reportTypeId} />
+              <input type="hidden" name="template_key" value={templateKey} />
+              <input type="hidden" name="report_title" value={reportTitle} />
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Notes (optional)</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <Textarea
+                    name="clinical_summary_text"
+                    value={clinicalSummary}
+                    onChange={(e) => setClinicalSummary(e.target.value)}
+                    placeholder="Additional notes for the letter…"
+                    rows={6}
+                  />
+                </CardContent>
+              </Card>
+
+              {saveState.error ? (
+                <p className="text-sm text-destructive">{saveState.error}</p>
+              ) : null}
+
+              <div className="flex flex-wrap gap-3">
+                <Button
+                  type="submit"
+                  disabled={savePending || !isReferrer || !approvalId || !reportTypeId}
+                >
+                  {savePending ? "Saving…" : "Save Draft"}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handlePrint}
+                  disabled={!previewSnapshot}
+                >
+                  Print / Save as PDF
+                </Button>
+              </div>
+            </form>
+          </>
+        ) : (
+          <>
         <Card>
           <CardHeader>
             <CardTitle>Recipient</CardTitle>
@@ -506,6 +640,9 @@ export function ReportForm({
           <input type="hidden" name="recipient_type" value={recipientType} />
           <input type="hidden" name="funding_approval_id" value={approvalId} />
           <input type="hidden" name="report_requirement_id" value={requirementId} />
+          <input type="hidden" name="report_type_id" value={reportTypeId} />
+          <input type="hidden" name="template_key" value={templateKey} />
+          <input type="hidden" name="report_title" value={reportTitle} />
 
           <Card>
             <CardHeader>
@@ -546,6 +683,7 @@ export function ReportForm({
               type="submit"
               disabled={
                 savePending ||
+                !reportTypeId ||
                 (selectedApproval
                   ? !derivedDateRangeStart ||
                     !derivedDateRangeEnd ||
@@ -565,6 +703,8 @@ export function ReportForm({
             </Button>
           </div>
         </form>
+          </>
+        )}
       </div>
 
       {previewSnapshot ? (

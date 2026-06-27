@@ -16,6 +16,7 @@ import {
   professionalOrganisationLinks,
   professionalOrganisations,
   professionals,
+  reportTypes,
   simpleReports,
 } from "@/db/schema"
 import { requirePractitionerContext } from "@/lib/auth"
@@ -378,7 +379,7 @@ export async function getClaimById(claimId: string) {
   const reports = await db
     .selectDistinct({
       simpleReportId: simpleReports.simpleReportId,
-      reportType: simpleReports.reportType,
+      reportTypeName: reportTypes.name,
       reportStatus: simpleReports.reportStatus,
       createdAt: simpleReports.createdAt,
     })
@@ -393,6 +394,10 @@ export async function getClaimById(claimId: string) {
     .innerJoin(
       simpleReports,
       eq(fundingApprovalReportLinks.simpleReportId, simpleReports.simpleReportId)
+    )
+    .leftJoin(
+      reportTypes,
+      eq(simpleReports.reportTypeId, reportTypes.reportTypeId)
     )
     .where(
       and(

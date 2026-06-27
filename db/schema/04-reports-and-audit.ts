@@ -7,6 +7,7 @@ export const simpleReports = pgTable('simple_reports', {
   practiceId: uuid('practice_id').notNull().references(() => practices.practiceId),
   practitionerProfileId: uuid('practitioner_profile_id').notNull().references(() => practitionerProfiles.practitionerProfileId),
   reportType: text('report_type').notNull().default('phq9_progress'),
+  reportTypeId: uuid('report_type_id'),
   dateRangeStart: date('date_range_start').notNull(),
   dateRangeEnd: date('date_range_end').notNull(),
   valuesSnapshotJson: jsonb('values_snapshot_json'),

@@ -302,7 +302,7 @@ export default async function ClaimDetailPage({
                           report.createdAt.toISOString().slice(0, 10)
                         )}
                       </TableCell>
-                      <TableCell>{formatReportType(report.reportType)}</TableCell>
+                      <TableCell>{formatReportType(report.reportTypeName)}</TableCell>
                       <TableCell>{report.reportStatus}</TableCell>
                       <TableCell>
                         <Link

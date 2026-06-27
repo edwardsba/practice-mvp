@@ -76,7 +76,7 @@ export default async function SavedReportPage({
           label="← Back to client"
         />
         <h1 className="text-2xl font-semibold tracking-tight">{clientName}</h1>
-        <p className="mt-1 text-muted-foreground">Saved report</p>
+        <p className="mt-1 text-muted-foreground">{snapshot.reportTitle}</p>
       </div>
 
       <SavedReportView

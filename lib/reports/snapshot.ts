@@ -39,6 +39,7 @@ export type ReportFundingApproval = {
 
 export type ReportSnapshot = {
   reportTitle: string
+  templateKey: string
   generatedAt: string
   client: {
     firstName: string
@@ -94,13 +95,14 @@ export function getBtpResultsFromSnapshot(snapshot: ReportSnapshot): BtpReportRe
 
 export const REPORT_TITLE = "Progress Report"
 
-/** Display label for report_type values stored in the database. */
-export function formatReportType(_reportType: string) {
-  return REPORT_TITLE
+/** Report list display: prefer the stored report type name, fall back to legacy label. */
+export function formatReportType(reportTypeName: string | null | undefined): string {
+  return reportTypeName?.trim() || REPORT_TITLE
 }
 
-export function resolveReportTitle(): string {
-  return REPORT_TITLE
+/** @deprecated Title now comes from the selected report type name. Kept for callers that pass nothing. */
+export function resolveReportTitle(reportTitle?: string | null): string {
+  return reportTitle?.trim() || REPORT_TITLE
 }
 
 export function resolveReportType(
@@ -115,7 +117,7 @@ export function resolveReportType(
 export function parseReportSnapshot(value: unknown): ReportSnapshot | null {
   if (!value || typeof value !== "object") return null
   const raw = value as ReportSnapshot
-  if (!raw.reportTitle || !raw.client || !raw.practice) {
+  if (!raw.client || !raw.practice) {
     return null
   }
 
@@ -127,7 +129,8 @@ export function parseReportSnapshot(value: unknown): ReportSnapshot | null {
 
   return {
     ...raw,
-    reportTitle: REPORT_TITLE,
+    reportTitle: raw.reportTitle?.trim() || REPORT_TITLE,
+    templateKey: raw.templateKey?.trim() || "progress_report",
     practice: {
       practiceName: raw.practice.practiceName,
       practiceAddress: raw.practice.practiceAddress ?? null,

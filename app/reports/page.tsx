@@ -67,7 +67,7 @@ export default async function AllReportsPage() {
                     </TableCell>
                     <TableCell>
                       <Link href={href} className="block">
-                        {formatReportType(report.reportType)}
+                        {formatReportType(report.reportTypeName)}
                       </Link>
                     </TableCell>
                     <TableCell>

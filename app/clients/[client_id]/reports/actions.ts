@@ -630,15 +630,16 @@ export async function saveReportDraft(
   const reportDate =
     String(formData.get("report_date") ?? "").trim() || todayDateString()
 
-  const isReferrer = recipientTypeRaw.startsWith("referrer:")
-  const recipientType = isReferrer
-    ? "referrer"
-    : recipientTypeRaw === "client"
-      ? "client"
-      : "none"
-  const fundingApprovalId = isReferrer
+  const isReferrerLegacy = recipientTypeRaw.startsWith("referrer:")
+  const recipientType =
+    recipientTypeRaw === "referrer" || isReferrerLegacy
+      ? "referrer"
+      : recipientTypeRaw === "client"
+        ? "client"
+        : "none"
+  const fundingApprovalId = isReferrerLegacy
     ? (recipientTypeRaw.split(":")[1] ?? fundingApprovalIdRaw)
-    : null
+    : fundingApprovalIdRaw
 
   const emptyPreview: ReportRangePreview = {
     phq9Results: [],

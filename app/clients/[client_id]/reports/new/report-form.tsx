@@ -77,9 +77,12 @@ export function ReportForm({
     | "reportDate"
   >
 }) {
+  const [fundingApprovalId, setFundingApprovalId] = useState<string>("")
   const [reportTypeId, setReportTypeId] = useState<string>("")
+  const [reportTypeManuallyChanged, setReportTypeManuallyChanged] =
+    useState(false)
   const [reportDate, setReportDate] = useState<string>(todayDateString())
-  const [recipientType, setRecipientType] = useState("none")
+  const [recipientType, setRecipientType] = useState<string>("client")
   const [requirementId, setRequirementId] = useState<string>("")
   const [selectedAppointmentIds, setSelectedAppointmentIds] = useState<string[]>(
     []
@@ -102,10 +105,16 @@ export function ReportForm({
     initialSaveState
   )
 
-  const isReferrer = recipientType.startsWith("referrer:")
-  const approvalId = isReferrer ? recipientType.split(":")[1] ?? "" : ""
   const selectedApproval =
-    fundingApprovals.find((fa) => fa.fundingApprovalId === approvalId) ?? null
+    fundingApprovals.find((fa) => fa.fundingApprovalId === fundingApprovalId) ??
+    null
+
+  function findReportTypeByName(name: string) {
+    const trimmed = name.trim().toLowerCase()
+    return (
+      reportTypes.find((rt) => rt.name.trim().toLowerCase() === trimmed) ?? null
+    )
+  }
 
   const selectedReportType =
     reportTypes.find((rt) => rt.reportTypeId === reportTypeId) ?? null
@@ -200,23 +209,46 @@ export function ReportForm({
   }
 
   useEffect(() => {
-    if (selectedApproval) {
-      const completed = selectedApproval.appointments
-        .filter((a) => a.status === "completed")
-        .map((a) => a.appointmentId)
-      setSelectedAppointmentIds(completed)
+    const approval =
+      fundingApprovals.find((fa) => fa.fundingApprovalId === fundingApprovalId) ??
+      null
+    if (approval) {
+      setRecipientType("referrer")
+      setSelectedAppointmentIds(
+        approval.appointments.map((a) => a.appointmentId)
+      )
+      const firstReq = approval.requirements[0]
+      setRequirementId(firstReq?.reportRequirementId ?? "")
     } else {
+      setRecipientType("client")
       setSelectedAppointmentIds([])
-    }
-  }, [selectedApproval])
-
-  useEffect(() => {
-    if (selectedApproval?.requirements?.length) {
-      setRequirementId(selectedApproval.requirements[0].reportRequirementId)
-    } else {
       setRequirementId("")
     }
-  }, [selectedApproval])
+    setReportTypeManuallyChanged(false)
+  }, [fundingApprovalId, fundingApprovals])
+
+  useEffect(() => {
+    if (reportTypeManuallyChanged) return
+    if (!requirementId || !fundingApprovalId) return
+    const approval = fundingApprovals.find(
+      (fa) => fa.fundingApprovalId === fundingApprovalId
+    )
+    if (!approval) return
+    const req = approval.requirements.find(
+      (r) => r.reportRequirementId === requirementId
+    )
+    if (!req) return
+    const matched = findReportTypeByName(req.reportType)
+    if (matched) {
+      setReportTypeId(matched.reportTypeId)
+    }
+  }, [
+    requirementId,
+    fundingApprovalId,
+    reportTypeManuallyChanged,
+    reportTypes,
+    fundingApprovals,
+  ])
 
   useEffect(() => {
     if (selectedApproval) {
@@ -230,25 +262,31 @@ export function ReportForm({
     loadPreview,
   ])
 
+  useEffect(() => {
+    if (!selectedApproval) {
+      loadPreview([], dateRangeStart, dateRangeEnd)
+    }
+  }, [selectedApproval, dateRangeStart, dateRangeEnd, loadPreview])
+
   const recipient: ReportRecipient =
-    recipientType === "client"
+    recipientType === "referrer" && selectedApproval
       ? {
-          type: "client",
-          name: `${initialSnapshot.client.firstName} ${initialSnapshot.client.lastName}`,
-          organisationName: null,
-          streetAddress: null,
-          postalAddress: null,
+          type: "referrer",
+          name:
+            [selectedApproval.referrerTitle, selectedApproval.referrerName]
+              .filter(Boolean)
+              .join(" ") || null,
+          organisationName: selectedApproval.organisationName,
+          streetAddress: selectedApproval.streetAddress,
+          postalAddress: selectedApproval.postalAddress,
         }
-      : selectedApproval
+      : recipientType === "client"
         ? {
-            type: "referrer",
-            name:
-              [selectedApproval.referrerTitle, selectedApproval.referrerName]
-                .filter(Boolean)
-                .join(" ") || null,
-            organisationName: selectedApproval.organisationName,
-            streetAddress: selectedApproval.streetAddress,
-            postalAddress: selectedApproval.postalAddress,
+            type: "client",
+            name: `${initialSnapshot.client.firstName} ${initialSnapshot.client.lastName}`,
+            organisationName: null,
+            streetAddress: null,
+            postalAddress: null,
           }
         : {
             type: "none",
@@ -259,7 +297,7 @@ export function ReportForm({
           }
 
   const previewSnapshot: ReportSnapshot | null = isReferralAck
-    ? isReferrer && approvalId
+    ? fundingApprovalId
       ? {
           ...initialSnapshot,
           reportTitle,
@@ -303,33 +341,136 @@ export function ReportForm({
       : null
 
   const hasPreviewSource = isReferralAck
-    ? Boolean(isReferrer && approvalId)
+    ? Boolean(fundingApprovalId)
     : selectedApproval
       ? selectedAppointmentIds.length > 0
       : Boolean(dateRangeStart && dateRangeEnd)
 
   const previewLoading = isPendingPreview && hasPreviewSource
 
+  const hiddenFormInputs = (
+    <>
+      <input
+        type="hidden"
+        name="date_range_start"
+        value={selectedApproval ? derivedDateRangeStart : dateRangeStart}
+      />
+      <input
+        type="hidden"
+        name="date_range_end"
+        value={selectedApproval ? derivedDateRangeEnd : dateRangeEnd}
+      />
+      <input
+        type="hidden"
+        name="appointment_ids"
+        value={isReferralAck ? "" : selectedAppointmentIds.join(",")}
+      />
+      <input
+        type="hidden"
+        name="recipient_type"
+        value={recipientType === "referrer" ? "referrer" : recipientType}
+      />
+      <input type="hidden" name="funding_approval_id" value={fundingApprovalId} />
+      <input type="hidden" name="report_requirement_id" value={requirementId} />
+      <input type="hidden" name="report_type_id" value={reportTypeId} />
+      <input type="hidden" name="template_key" value={templateKey} />
+      <input type="hidden" name="report_title" value={reportTitle} />
+      <input type="hidden" name="report_date" value={reportDate} />
+    </>
+  )
+
   return (
     <>
       <div className="no-print space-y-6">
         <Card>
           <CardHeader>
-            <CardTitle>Report type</CardTitle>
+            <CardTitle>Report details</CardTitle>
           </CardHeader>
-          <CardContent>
-            <select
-              className={selectClassName}
-              value={reportTypeId}
-              onChange={(e) => setReportTypeId(e.target.value)}
-            >
-              <option value="">Select report type</option>
-              {reportTypes.map((rt) => (
-                <option key={rt.reportTypeId} value={rt.reportTypeId}>
-                  {rt.name}
-                </option>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="funding_approval">Funding approval</Label>
+              <select
+                id="funding_approval"
+                className={selectClassName}
+                value={fundingApprovalId}
+                onChange={(e) => setFundingApprovalId(e.target.value)}
+              >
+                <option value="">No funding approval</option>
+                {fundingApprovals.map((fa) => (
+                  <option key={fa.fundingApprovalId} value={fa.fundingApprovalId}>
+                    {fa.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {selectedApproval &&
+              (selectedApproval.requirements.length > 0 ? (
+                <div className="space-y-2">
+                  <Label htmlFor="report_requirement">
+                    Outstanding required reporting
+                  </Label>
+                  <select
+                    id="report_requirement"
+                    className={selectClassName}
+                    value={requirementId}
+                    onChange={(e) => setRequirementId(e.target.value)}
+                  >
+                    <option value="">No specific requirement</option>
+                    {selectedApproval.requirements.map((req) => (
+                      <option
+                        key={req.reportRequirementId}
+                        value={req.reportRequirementId}
+                      >
+                        {req.label} — {req.reportType}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  All report requirements for this approval are fulfilled.
+                </p>
               ))}
-            </select>
+
+            <div className="space-y-2">
+              <Label htmlFor="report_type">Report type</Label>
+              <select
+                id="report_type"
+                className={selectClassName}
+                value={reportTypeId}
+                onChange={(e) => {
+                  setReportTypeId(e.target.value)
+                  setReportTypeManuallyChanged(true)
+                }}
+              >
+                <option value="">Select report type</option>
+                {reportTypes.map((rt) => (
+                  <option key={rt.reportTypeId} value={rt.reportTypeId}>
+                    {rt.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="recipient_type">Address report to</Label>
+              <select
+                id="recipient_type"
+                className={selectClassName}
+                value={recipientType}
+                onChange={(e) => setRecipientType(e.target.value)}
+              >
+                {selectedApproval && (
+                  <option value="referrer">
+                    Referrer ({selectedApproval.referrerName ?? "—"})
+                  </option>
+                )}
+                <option value="client">Client</option>
+                <option value="none">No recipient</option>
+              </select>
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="report_date">Report date</Label>
               <Input
@@ -344,57 +485,235 @@ export function ReportForm({
         </Card>
 
         {isReferralAck ? (
-          <>
+          <form action={saveAction} className="space-y-6">
+            {hiddenFormInputs}
+
             <Card>
               <CardHeader>
-                <CardTitle>Recipient</CardTitle>
+                <CardTitle>Notes (optional)</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="recipient_type">Address report to</Label>
-                  <select
-                    id="recipient_type"
-                    name="recipient_type"
-                    value={recipientType}
-                    onChange={(e) => setRecipientType(e.target.value)}
-                    className={selectClassName}
-                  >
-                    <option value="">Select funding approval</option>
-                    {fundingApprovals.map((fa) => (
-                      <option
-                        key={fa.fundingApprovalId}
-                        value={`referrer:${fa.fundingApprovalId}`}
-                      >
-                        {fa.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+              <CardContent>
+                <Textarea
+                  name="clinical_summary_text"
+                  value={clinicalSummary}
+                  onChange={(e) => setClinicalSummary(e.target.value)}
+                  placeholder="Additional notes for the letter…"
+                  rows={6}
+                />
+              </CardContent>
+            </Card>
+
+            {saveState.error ? (
+              <p className="text-sm text-destructive">{saveState.error}</p>
+            ) : null}
+
+            <div className="flex flex-wrap gap-3">
+              <Button
+                type="submit"
+                disabled={
+                  savePending || !reportTypeId || !fundingApprovalId
+                }
+              >
+                {savePending ? "Saving…" : "Save Draft"}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handlePrint}
+                disabled={!previewSnapshot}
+              >
+                Print / Save as PDF
+              </Button>
+            </div>
+          </form>
+        ) : (
+          <>
+            {selectedApproval ? (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Appointments</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {selectedApproval.appointments.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">
+                      No appointments linked to this funding approval.
+                    </p>
+                  ) : (
+                    <>
+                      <div className="mb-1 flex items-center gap-3 border-b pb-1 text-xs font-medium text-muted-foreground">
+                        <span className="w-4 shrink-0" />
+                        <span className="w-32 shrink-0">Date</span>
+                        <span className="w-16 shrink-0">Time</span>
+                        <span className="w-20 shrink-0">Status</span>
+                        <span className="w-20 shrink-0">PSQ</span>
+                        <span className="w-20 shrink-0">ASQ</span>
+                        <span className="w-24 shrink-0">Session note</span>
+                      </div>
+                      {selectedApproval.appointments.map((appt) => (
+                        <label
+                          key={appt.appointmentId}
+                          className="flex cursor-pointer items-center gap-3 py-1 text-sm"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selectedAppointmentIds.includes(
+                              appt.appointmentId
+                            )}
+                            onChange={(e) => {
+                              setSelectedAppointmentIds((prev) =>
+                                e.target.checked
+                                  ? [...prev, appt.appointmentId]
+                                  : prev.filter((id) => id !== appt.appointmentId)
+                              )
+                            }}
+                            className="h-4 w-4 rounded border-border"
+                          />
+                          <span className="w-32 shrink-0">
+                            {formatAppointmentDate(appt.appointmentDate)}
+                          </span>
+                          <span className="w-16 shrink-0 text-muted-foreground">
+                            {formatAppointmentTime(appt.appointmentTime)}
+                          </span>
+                          <span className="w-20 shrink-0 capitalize text-muted-foreground">
+                            {appt.status.replace("_", " ")}
+                          </span>
+                          <span className="w-20 shrink-0">
+                            <PsqStatusBadge
+                              sentAt={appt.preSessionBatterySentAt}
+                              psqBatteryStatus={appt.psqBatteryStatus}
+                            />
+                          </span>
+                          <span className="w-20 shrink-0">
+                            <AsqStatusBadge asqCompleted={appt.asqCompleted} />
+                          </span>
+                          <span className="w-24 shrink-0 capitalize text-muted-foreground">
+                            {appt.sessionNoteStatus ?? "—"}
+                          </span>
+                        </label>
+                      ))}
+                    </>
+                  )}
+                  {selectedAppointmentDates.length > 0 && (
+                    <p className="pt-2 text-xs text-muted-foreground">
+                      Reporting period: {derivedDateRangeStart} –{" "}
+                      {derivedDateRangeEnd}
+                    </p>
+                  )}
+                  {previewError ? (
+                    <p className="pt-2 text-sm text-destructive">{previewError}</p>
+                  ) : null}
+                </CardContent>
+              </Card>
+            ) : (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Date range</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid min-w-0 gap-4 sm:grid-cols-2">
+                    <div className="min-w-0 space-y-2">
+                      <Label htmlFor="date_range_start">Start date</Label>
+                      <Input
+                        id="date_range_start"
+                        type="date"
+                        value={dateRangeStart}
+                        onChange={(e) => handleStartChange(e.target.value)}
+                        className={dateInputClassName}
+                      />
+                    </div>
+                    <div className="min-w-0 space-y-2">
+                      <Label htmlFor="date_range_end">End date</Label>
+                      <Input
+                        id="date_range_end"
+                        type="date"
+                        value={dateRangeEnd}
+                        onChange={(e) => handleEndChange(e.target.value)}
+                        className={dateInputClassName}
+                      />
+                    </div>
+                  </div>
+                  {previewError ? (
+                    <p className="mt-3 text-sm text-destructive">{previewError}</p>
+                  ) : null}
+                </CardContent>
+              </Card>
+            )}
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Results preview</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-8">
+                {!hasPreviewSource ? (
+                  <p className="text-sm text-muted-foreground">
+                    {selectedApproval
+                      ? "Select at least one appointment to preview results."
+                      : "Select a date range to preview results."}
+                  </p>
+                ) : previewLoading ? (
+                  <p className="text-sm text-muted-foreground">Loading results…</p>
+                ) : (
+                  <>
+                    <ReportResultsTable
+                      title="PHQ-9 Results"
+                      results={phq9Results}
+                      emptyMessage="No PHQ-9 results in this date range."
+                      showImpairment
+                    />
+                    <ReportResultsTable
+                      title="GAD-7 Results"
+                      results={gad7Results}
+                      emptyMessage="No GAD-7 results in this date range."
+                      showImpairment
+                    />
+                    <ReportAsqResultsTable
+                      results={asqResults}
+                      emptyMessage="No ASQ results in this date range."
+                    />
+                    <ReportResultsTable
+                      title="ASSIST Results"
+                      results={assistResults}
+                      emptyMessage="No ASSIST results in this date range."
+                      severityColumnLabel="Risk Level"
+                      capitalizeSeverity={false}
+                    />
+                    <ReportBtpResultsTable
+                      results={btpResults}
+                      emptyMessage="No Behavioural Targets Progress results in this date range."
+                    />
+                  </>
+                )}
               </CardContent>
             </Card>
 
             <form action={saveAction} className="space-y-6">
-              <input type="hidden" name="date_range_start" value="" />
-              <input type="hidden" name="date_range_end" value="" />
-              <input type="hidden" name="appointment_ids" value="" />
-              <input type="hidden" name="recipient_type" value={recipientType} />
-              <input type="hidden" name="funding_approval_id" value={approvalId} />
-              <input type="hidden" name="report_requirement_id" value="" />
-              <input type="hidden" name="report_type_id" value={reportTypeId} />
-              <input type="hidden" name="template_key" value={templateKey} />
-              <input type="hidden" name="report_title" value={reportTitle} />
-              <input type="hidden" name="report_date" value={reportDate} />
+              {hiddenFormInputs}
 
               <Card>
                 <CardHeader>
-                  <CardTitle>Notes (optional)</CardTitle>
+                  <CardTitle>Clinical summary</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <Textarea
                     name="clinical_summary_text"
                     value={clinicalSummary}
                     onChange={(e) => setClinicalSummary(e.target.value)}
-                    placeholder="Additional notes for the letter…"
+                    placeholder="Enter clinical summary…"
+                    rows={6}
+                  />
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Recommendations</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <Textarea
+                    name="recommendations_text"
+                    value={recommendations}
+                    onChange={(e) => setRecommendations(e.target.value)}
+                    placeholder="Enter recommendations…"
                     rows={6}
                   />
                 </CardContent>
@@ -407,7 +726,15 @@ export function ReportForm({
               <div className="flex flex-wrap gap-3">
                 <Button
                   type="submit"
-                  disabled={savePending || !isReferrer || !approvalId || !reportTypeId}
+                  disabled={
+                    savePending ||
+                    !reportTypeId ||
+                    (selectedApproval
+                      ? !derivedDateRangeStart ||
+                        !derivedDateRangeEnd ||
+                        selectedAppointmentIds.length === 0
+                      : !dateRangeStart || !dateRangeEnd)
+                  }
                 >
                   {savePending ? "Saving…" : "Save Draft"}
                 </Button>
@@ -421,305 +748,6 @@ export function ReportForm({
                 </Button>
               </div>
             </form>
-          </>
-        ) : (
-          <>
-        <Card>
-          <CardHeader>
-            <CardTitle>Recipient</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="recipient_type">Address report to</Label>
-              <select
-                id="recipient_type"
-                name="recipient_type"
-                value={recipientType}
-                onChange={(e) => setRecipientType(e.target.value)}
-                className={selectClassName}
-              >
-                <option value="none">No recipient</option>
-                <option value="client">Client</option>
-                {fundingApprovals.length > 0 && (
-                  <option disabled>── Funding approvals ──</option>
-                )}
-                {fundingApprovals.map((fa) => (
-                  <option
-                    key={fa.fundingApprovalId}
-                    value={`referrer:${fa.fundingApprovalId}`}
-                  >
-                    {fa.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            {selectedApproval && selectedApproval.requirements.length > 0 && (
-              <div className="space-y-2">
-                <Label htmlFor="report_requirement">Report requirement</Label>
-                <select
-                  id="report_requirement"
-                  value={requirementId}
-                  onChange={(e) => setRequirementId(e.target.value)}
-                  className={selectClassName}
-                >
-                  <option value="">No requirement selected</option>
-                  {selectedApproval.requirements.map((req) => (
-                    <option
-                      key={req.reportRequirementId}
-                      value={req.reportRequirementId}
-                    >
-                      {req.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-            {selectedApproval && selectedApproval.requirements.length === 0 && (
-              <p className="text-sm text-muted-foreground">
-                All report requirements for this approval are fulfilled.
-              </p>
-            )}
-          </CardContent>
-        </Card>
-
-        {selectedApproval ? (
-          <Card>
-            <CardHeader>
-              <CardTitle>Appointments</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              {selectedApproval.appointments.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  No appointments linked to this funding approval.
-                </p>
-              ) : (
-                <>
-                  <div className="mb-1 flex items-center gap-3 border-b pb-1 text-xs font-medium text-muted-foreground">
-                    <span className="w-4 shrink-0" />
-                    <span className="w-32 shrink-0">Date</span>
-                    <span className="w-16 shrink-0">Time</span>
-                    <span className="w-20 shrink-0">Status</span>
-                    <span className="w-20 shrink-0">PSQ</span>
-                    <span className="w-20 shrink-0">ASQ</span>
-                    <span className="w-24 shrink-0">Session note</span>
-                  </div>
-                  {selectedApproval.appointments.map((appt) => (
-                    <label
-                      key={appt.appointmentId}
-                      className="flex cursor-pointer items-center gap-3 py-1 text-sm"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={selectedAppointmentIds.includes(appt.appointmentId)}
-                        onChange={(e) => {
-                          setSelectedAppointmentIds((prev) =>
-                            e.target.checked
-                              ? [...prev, appt.appointmentId]
-                              : prev.filter((id) => id !== appt.appointmentId)
-                          )
-                        }}
-                        className="h-4 w-4 rounded border-border"
-                      />
-                      <span className="w-32 shrink-0">
-                        {formatAppointmentDate(appt.appointmentDate)}
-                      </span>
-                      <span className="w-16 shrink-0 text-muted-foreground">
-                        {formatAppointmentTime(appt.appointmentTime)}
-                      </span>
-                      <span className="w-20 shrink-0 capitalize text-muted-foreground">
-                        {appt.status.replace("_", " ")}
-                      </span>
-                      <span className="w-20 shrink-0">
-                        <PsqStatusBadge
-                          sentAt={appt.preSessionBatterySentAt}
-                          psqBatteryStatus={appt.psqBatteryStatus}
-                        />
-                      </span>
-                      <span className="w-20 shrink-0">
-                        <AsqStatusBadge asqCompleted={appt.asqCompleted} />
-                      </span>
-                      <span className="w-24 shrink-0 capitalize text-muted-foreground">
-                        {appt.sessionNoteStatus ?? "—"}
-                      </span>
-                    </label>
-                  ))}
-                </>
-              )}
-              {selectedAppointmentDates.length > 0 && (
-                <p className="pt-2 text-xs text-muted-foreground">
-                  Reporting period: {derivedDateRangeStart} – {derivedDateRangeEnd}
-                </p>
-              )}
-              {previewError ? (
-                <p className="pt-2 text-sm text-destructive">{previewError}</p>
-              ) : null}
-            </CardContent>
-          </Card>
-        ) : (
-          <Card>
-            <CardHeader>
-              <CardTitle>Date range</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid min-w-0 gap-4 sm:grid-cols-2">
-                <div className="min-w-0 space-y-2">
-                  <Label htmlFor="date_range_start">Start date</Label>
-                  <Input
-                    id="date_range_start"
-                    type="date"
-                    value={dateRangeStart}
-                    onChange={(e) => handleStartChange(e.target.value)}
-                    className={dateInputClassName}
-                  />
-                </div>
-                <div className="min-w-0 space-y-2">
-                  <Label htmlFor="date_range_end">End date</Label>
-                  <Input
-                    id="date_range_end"
-                    type="date"
-                    value={dateRangeEnd}
-                    onChange={(e) => handleEndChange(e.target.value)}
-                    className={dateInputClassName}
-                  />
-                </div>
-              </div>
-              {previewError ? (
-                <p className="mt-3 text-sm text-destructive">{previewError}</p>
-              ) : null}
-            </CardContent>
-          </Card>
-        )}
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Results preview</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-8">
-            {!hasPreviewSource ? (
-              <p className="text-sm text-muted-foreground">
-                {selectedApproval
-                  ? "Select at least one appointment to preview results."
-                  : "Select a date range to preview results."}
-              </p>
-            ) : previewLoading ? (
-              <p className="text-sm text-muted-foreground">Loading results…</p>
-            ) : (
-              <>
-                <ReportResultsTable
-                  title="PHQ-9 Results"
-                  results={phq9Results}
-                  emptyMessage="No PHQ-9 results in this date range."
-                  showImpairment
-                />
-                <ReportResultsTable
-                  title="GAD-7 Results"
-                  results={gad7Results}
-                  emptyMessage="No GAD-7 results in this date range."
-                  showImpairment
-                />
-                <ReportAsqResultsTable
-                  results={asqResults}
-                  emptyMessage="No ASQ results in this date range."
-                />
-                <ReportResultsTable
-                  title="ASSIST Results"
-                  results={assistResults}
-                  emptyMessage="No ASSIST results in this date range."
-                  severityColumnLabel="Risk Level"
-                  capitalizeSeverity={false}
-                />
-                <ReportBtpResultsTable
-                  results={btpResults}
-                  emptyMessage="No Behavioural Targets Progress results in this date range."
-                />
-              </>
-            )}
-          </CardContent>
-        </Card>
-
-        <form action={saveAction} className="space-y-6">
-          <input
-            type="hidden"
-            name="date_range_start"
-            value={selectedApproval ? derivedDateRangeStart : dateRangeStart}
-          />
-          <input
-            type="hidden"
-            name="date_range_end"
-            value={selectedApproval ? derivedDateRangeEnd : dateRangeEnd}
-          />
-          <input
-            type="hidden"
-            name="appointment_ids"
-            value={selectedAppointmentIds.join(",")}
-          />
-          <input type="hidden" name="recipient_type" value={recipientType} />
-          <input type="hidden" name="funding_approval_id" value={approvalId} />
-          <input type="hidden" name="report_requirement_id" value={requirementId} />
-          <input type="hidden" name="report_type_id" value={reportTypeId} />
-          <input type="hidden" name="template_key" value={templateKey} />
-          <input type="hidden" name="report_title" value={reportTitle} />
-          <input type="hidden" name="report_date" value={reportDate} />
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Clinical summary</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Textarea
-                name="clinical_summary_text"
-                value={clinicalSummary}
-                onChange={(e) => setClinicalSummary(e.target.value)}
-                placeholder="Enter clinical summary…"
-                rows={6}
-              />
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Recommendations</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Textarea
-                name="recommendations_text"
-                value={recommendations}
-                onChange={(e) => setRecommendations(e.target.value)}
-                placeholder="Enter recommendations…"
-                rows={6}
-              />
-            </CardContent>
-          </Card>
-
-          {saveState.error ? (
-            <p className="text-sm text-destructive">{saveState.error}</p>
-          ) : null}
-
-          <div className="flex flex-wrap gap-3">
-            <Button
-              type="submit"
-              disabled={
-                savePending ||
-                !reportTypeId ||
-                (selectedApproval
-                  ? !derivedDateRangeStart ||
-                    !derivedDateRangeEnd ||
-                    selectedAppointmentIds.length === 0
-                  : !dateRangeStart || !dateRangeEnd)
-              }
-            >
-              {savePending ? "Saving…" : "Save Draft"}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={handlePrint}
-              disabled={!previewSnapshot}
-            >
-              Print / Save as PDF
-            </Button>
-          </div>
-        </form>
           </>
         )}
       </div>

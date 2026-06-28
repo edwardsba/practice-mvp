@@ -102,8 +102,8 @@ export default async function NewReportPage({
           fallbackHref={`/clients/${clientId}`}
           label="← Back to client"
         />
-        <h1 className="text-2xl font-semibold tracking-tight">{clientName}</h1>
-        <p className="mt-1 text-muted-foreground">Create report</p>
+        <h1 className="text-2xl font-semibold tracking-tight">Create report</h1>
+        <p className="mt-1 text-muted-foreground">{clientName}</p>
       </div>
 
       <ReportForm

@@ -16,6 +16,7 @@ import {
   fundingApprovals,
   practitionerProfiles,
   practices,
+  sessionNotes,
   simpleReports,
 } from "@/db/schema"
 import { requirePractitionerContext } from "@/lib/auth"
@@ -183,43 +184,80 @@ async function fetchResultsForAppointments(
   practiceId: string,
   assessmentCode: string,
   appointmentIds: string[],
-  options?: { includeAcuteRisk?: boolean; impairmentElementKey?: string }
+  options?: {
+    includeAcuteRisk?: boolean
+    impairmentElementKey?: string
+    linkViaSessionNote?: boolean
+  }
 ): Promise<ReportPreviewRow[]> {
   if (appointmentIds.length === 0) return []
 
-  const rows = await db
-    .select({
-      assessmentResultId: assessmentResults.assessmentResultId,
-      assessmentDate: assessmentResults.assessmentDate,
-      score: assessmentResults.score,
-      severity: assessmentResults.severity,
-      acuteRiskRating: assessmentResults.acuteRiskRating,
-      assessmentDefinitionId: assessmentDefinitions.assessmentDefinitionId,
-    })
-    .from(assessmentResults)
-    .innerJoin(
-      assessmentInstances,
-      eq(
-        assessmentResults.assessmentInstanceId,
-        assessmentInstances.assessmentInstanceId
-      )
-    )
-    .innerJoin(
-      assessmentDefinitions,
-      eq(
-        assessmentInstances.assessmentDefinitionId,
-        assessmentDefinitions.assessmentDefinitionId
-      )
-    )
-    .where(
-      and(
-        eq(assessmentResults.clientId, clientId),
-        eq(assessmentResults.practiceId, practiceId),
-        eq(assessmentDefinitions.assessmentCode, assessmentCode),
-        inArray(assessmentInstances.appointmentId, appointmentIds)
-      )
-    )
-    .orderBy(desc(assessmentResults.assessmentDate))
+  const selectFields = {
+    assessmentResultId: assessmentResults.assessmentResultId,
+    assessmentDate: assessmentResults.assessmentDate,
+    score: assessmentResults.score,
+    severity: assessmentResults.severity,
+    acuteRiskRating: assessmentResults.acuteRiskRating,
+    assessmentDefinitionId: assessmentDefinitions.assessmentDefinitionId,
+  }
+
+  const rows = options?.linkViaSessionNote
+    ? await db
+        .select(selectFields)
+        .from(assessmentResults)
+        .innerJoin(
+          assessmentInstances,
+          eq(
+            assessmentResults.assessmentInstanceId,
+            assessmentInstances.assessmentInstanceId
+          )
+        )
+        .innerJoin(
+          assessmentDefinitions,
+          eq(
+            assessmentInstances.assessmentDefinitionId,
+            assessmentDefinitions.assessmentDefinitionId
+          )
+        )
+        .innerJoin(
+          sessionNotes,
+          eq(sessionNotes.sessionNoteId, assessmentInstances.sessionNoteId)
+        )
+        .where(
+          and(
+            eq(assessmentResults.clientId, clientId),
+            eq(assessmentResults.practiceId, practiceId),
+            eq(assessmentDefinitions.assessmentCode, assessmentCode),
+            inArray(sessionNotes.appointmentId, appointmentIds)
+          )
+        )
+        .orderBy(desc(assessmentResults.assessmentDate))
+    : await db
+        .select(selectFields)
+        .from(assessmentResults)
+        .innerJoin(
+          assessmentInstances,
+          eq(
+            assessmentResults.assessmentInstanceId,
+            assessmentInstances.assessmentInstanceId
+          )
+        )
+        .innerJoin(
+          assessmentDefinitions,
+          eq(
+            assessmentInstances.assessmentDefinitionId,
+            assessmentDefinitions.assessmentDefinitionId
+          )
+        )
+        .where(
+          and(
+            eq(assessmentResults.clientId, clientId),
+            eq(assessmentResults.practiceId, practiceId),
+            eq(assessmentDefinitions.assessmentCode, assessmentCode),
+            inArray(assessmentInstances.appointmentId, appointmentIds)
+          )
+        )
+        .orderBy(desc(assessmentResults.assessmentDate))
 
   const impairmentLabels = options?.impairmentElementKey
     ? await getFunctionalImpairmentLabelsByResultId(
@@ -403,7 +441,7 @@ export async function fetchReportResultsForAppointments(
         context.practiceId,
         "ASQ",
         appointmentIds,
-        { includeAcuteRisk: true }
+        { includeAcuteRisk: true, linkViaSessionNote: true }
       ),
       fetchResultsForAppointments(
         clientId,

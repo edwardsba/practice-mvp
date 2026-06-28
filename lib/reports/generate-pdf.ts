@@ -19,7 +19,9 @@ const HEADER_RULE_COLOR = "#e0e0e0"
 const BOTTOM_RULE_COLOR = "#e0e0e0"
 const TEXT_COLOR = "#111111"
 const MUTED_COLOR = "#555555"
-const SECTION_GAP = 16
+const SECTION_GAP = 12
+const ROW_PADDING = 5
+const INSTRUMENT_GAP = 8
 
 function formatDisplayDate(value: string | null): string {
   if (!value) return "—"
@@ -50,7 +52,7 @@ function drawTable(
   rows: string[][]
 ) {
   const startX = PAGE_MARGIN
-  const rowPadding = 6
+  const rowPadding = ROW_PADDING
   const pageBottomMargin = doc.page.height - PAGE_MARGIN
   const lineHeight = doc.currentLineHeight(true)
 
@@ -62,7 +64,7 @@ function drawTable(
   }
 
   let y = doc.y
-  doc.font("Helvetica-Bold").fontSize(BASE_FONT_SIZE).fillColor(TEXT_COLOR)
+  doc.font("Helvetica").fontSize(BASE_FONT_SIZE).fillColor(TEXT_COLOR)
   let x = startX
   for (const col of columns) {
     doc.text(col.header, x, y, { width: col.width, lineBreak: false })
@@ -91,7 +93,7 @@ function drawTable(
     if (y + rowHeight > pageBottomMargin) {
       doc.addPage()
       y = PAGE_MARGIN
-      doc.font("Helvetica-Bold").fontSize(BASE_FONT_SIZE).fillColor(TEXT_COLOR)
+      doc.font("Helvetica").fontSize(BASE_FONT_SIZE).fillColor(TEXT_COLOR)
       x = startX
       for (const col of columns) {
         doc.text(col.header, x, y, { width: col.width, lineBreak: false })
@@ -137,6 +139,26 @@ function sectionHeading(doc: PDFKit.PDFDocument, text: string) {
     .fillColor(TEXT_COLOR)
     .text(text, { lineGap: LINE_GAP })
   doc.moveDown(0.4)
+}
+
+function groupHeading(doc: PDFKit.PDFDocument, text: string) {
+  doc.moveDown(0.6)
+  doc
+    .font("Helvetica-Bold")
+    .fontSize(BASE_FONT_SIZE)
+    .fillColor(TEXT_COLOR)
+    .text(text, { lineGap: LINE_GAP })
+  doc.moveDown(0.25)
+}
+
+function instrumentHeading(doc: PDFKit.PDFDocument, text: string) {
+  doc.moveDown(0.4)
+  doc
+    .font("Helvetica-Oblique")
+    .fontSize(BASE_FONT_SIZE)
+    .fillColor(TEXT_COLOR)
+    .text(text, { lineGap: LINE_GAP })
+  doc.moveDown(0.2)
 }
 
 function bodyText(
@@ -240,42 +262,39 @@ function drawLetterHeader(doc: PDFKit.PDFDocument, snapshot: ReportSnapshot) {
 }
 
 function drawProgressReportBody(doc: PDFKit.PDFDocument, snapshot: ReportSnapshot) {
-  const metaY = doc.y
-  doc
-    .font("Helvetica-Bold")
-    .fontSize(BASE_FONT_SIZE)
-    .fillColor(MUTED_COLOR)
-    .text("Client", PAGE_MARGIN, metaY, { width: CONTENT_WIDTH / 2 })
-  doc.font("Helvetica").fillColor(TEXT_COLOR)
+  doc.font("Helvetica").fontSize(BASE_FONT_SIZE).fillColor(TEXT_COLOR)
   doc.text(
-    `${snapshot.client.firstName} ${snapshot.client.lastName}`,
+    `Client name: ${snapshot.client.firstName} ${snapshot.client.lastName}`,
     PAGE_MARGIN,
     doc.y,
-    { width: CONTENT_WIDTH / 2 }
+    { lineGap: LINE_GAP }
   )
-  mutedText(doc, `Date of birth: ${formatDisplayDate(snapshot.client.dateOfBirth)}`)
-
-  const practColX = PAGE_MARGIN + CONTENT_WIDTH / 2
-  doc
-    .font("Helvetica-Bold")
-    .fontSize(BASE_FONT_SIZE)
-    .fillColor(MUTED_COLOR)
-    .text("Practitioner", practColX, metaY, { width: CONTENT_WIDTH / 2 })
-  doc.font("Helvetica").fillColor(TEXT_COLOR)
-  const displayLine =
-    snapshot.practitioner.displayName ?? snapshot.practitioner.fullName
-  doc.text(displayLine, practColX, doc.y, { width: CONTENT_WIDTH / 2 })
-  doc
-    .fillColor(MUTED_COLOR)
-    .text(snapshot.practice.practiceName, practColX, doc.y, {
-      width: CONTENT_WIDTH / 2,
+  if (snapshot.client.dateOfBirth) {
+    doc.text(`Date of birth: ${formatDisplayDate(snapshot.client.dateOfBirth)}`, {
+      lineGap: LINE_GAP,
     })
-  doc.fillColor(TEXT_COLOR)
-
+  }
   doc.x = PAGE_MARGIN
   doc.y = doc.y + SECTION_GAP
 
-  if (snapshot.dateRangeStart && snapshot.dateRangeEnd) {
+  if (snapshot.fundingApproval) {
+    const fa = snapshot.fundingApproval
+    doc.font("Helvetica").fontSize(BASE_FONT_SIZE).fillColor(TEXT_COLOR)
+    doc.text(`Approval type: ${fa.approvalTypeName}`, { lineGap: LINE_GAP })
+    if (fa.startDate) {
+      doc.text(`Approval date: ${formatDisplayDate(fa.startDate)}`, {
+        lineGap: LINE_GAP,
+      })
+    }
+    doc.text(
+      `Progress: ${fa.appointmentsAttended} of ${fa.appointmentsApproved ?? "?"} appointments attended`,
+      { lineGap: LINE_GAP }
+    )
+    doc.x = PAGE_MARGIN
+    doc.y = doc.y + SECTION_GAP
+  }
+
+  if (!snapshot.fundingApproval && snapshot.dateRangeStart && snapshot.dateRangeEnd) {
     doc
       .font("Helvetica-Bold")
       .fontSize(BASE_FONT_SIZE)
@@ -287,23 +306,7 @@ function drawProgressReportBody(doc: PDFKit.PDFDocument, snapshot: ReportSnapsho
         `${formatShortDate(snapshot.dateRangeStart)} – ${formatShortDate(snapshot.dateRangeEnd)}`,
         { lineGap: LINE_GAP }
       )
-  }
-
-  if (snapshot.fundingApproval) {
-    sectionHeading(doc, "Funding approval")
-    bodyText(doc, snapshot.fundingApproval.approvalTypeName)
-    if (snapshot.fundingApproval.startDate) {
-      mutedText(
-        doc,
-        `Approved: ${formatDisplayDate(snapshot.fundingApproval.startDate)}`
-      )
-    }
-    mutedText(
-      doc,
-      `Progress: ${snapshot.fundingApproval.appointmentsAttended} of ${
-        snapshot.fundingApproval.appointmentsApproved ?? "?"
-      } appointments attended`
-    )
+    doc.y = doc.y + SECTION_GAP
   }
 
   const phq9Results = getPhq9ResultsFromSnapshot(snapshot)
@@ -316,46 +319,75 @@ function drawProgressReportBody(doc: PDFKit.PDFDocument, snapshot: ReportSnapsho
     return maxScore != null ? `${score} / ${maxScore}` : String(score)
   }
 
-  if (phq9Results.length > 0) {
-    sectionHeading(doc, "PHQ-9 results")
-    drawTable(
-      doc,
-      [
-        { header: "Date", width: 95 },
-        { header: "Score", width: 65 },
-        { header: "Severity", width: 200 },
-        { header: "Functional Impairment", width: 135 },
-      ],
-      phq9Results.map((r) => [
-        formatShortDate(r.date),
-        scoreCell(r.score, r.maxScore),
-        r.severity ?? "—",
-        r.functionalImpairmentLabel ?? "—",
-      ])
-    )
-  }
+  if (
+    phq9Results.length > 0 ||
+    gad7Results.length > 0 ||
+    assistResults.length > 0
+  ) {
+    groupHeading(doc, "Ongoing objective assessments")
 
-  if (gad7Results.length > 0) {
-    sectionHeading(doc, "GAD-7 results")
-    drawTable(
-      doc,
-      [
-        { header: "Date", width: 95 },
-        { header: "Score", width: 65 },
-        { header: "Severity", width: 200 },
-        { header: "Functional Impairment", width: 135 },
-      ],
-      gad7Results.map((r) => [
-        formatShortDate(r.date),
-        scoreCell(r.score, r.maxScore),
-        r.severity ?? "—",
-        r.functionalImpairmentLabel ?? "—",
-      ])
-    )
+    if (phq9Results.length > 0) {
+      instrumentHeading(doc, "Patient Health Questionnaire 9 (PHQ-9) results")
+      drawTable(
+        doc,
+        [
+          { header: "Date", width: 95 },
+          { header: "Score", width: 65 },
+          { header: "Severity", width: 200 },
+          { header: "Functional Impairment", width: 135 },
+        ],
+        phq9Results.map((r) => [
+          formatShortDate(r.date),
+          scoreCell(r.score, r.maxScore),
+          r.severity ?? "—",
+          r.functionalImpairmentLabel ?? "—",
+        ])
+      )
+    }
+
+    if (gad7Results.length > 0) {
+      instrumentHeading(doc, "Generalised Anxiety Disorder 7 (GAD-7) results")
+      drawTable(
+        doc,
+        [
+          { header: "Date", width: 95 },
+          { header: "Score", width: 65 },
+          { header: "Severity", width: 200 },
+          { header: "Functional Impairment", width: 135 },
+        ],
+        gad7Results.map((r) => [
+          formatShortDate(r.date),
+          scoreCell(r.score, r.maxScore),
+          r.severity ?? "—",
+          r.functionalImpairmentLabel ?? "—",
+        ])
+      )
+    }
+
+    if (assistResults.length > 0) {
+      instrumentHeading(
+        doc,
+        "Alcohol, Smoking and Substance Involvement Screening Test (ASSIST) results"
+      )
+      drawTable(
+        doc,
+        [
+          { header: "Date", width: 95 },
+          { header: "Score", width: 65 },
+          { header: "Risk Level", width: 335 },
+        ],
+        assistResults.map((r) => [
+          formatShortDate(r.date),
+          scoreCell(r.score, r.maxScore),
+          r.severity ?? "—",
+        ])
+      )
+    }
   }
 
   if (asqResults.length > 0) {
-    sectionHeading(doc, "ASQ results")
+    groupHeading(doc, "Risk assessments")
+    instrumentHeading(doc, "ASQ results")
     drawTable(
       doc,
       [
@@ -371,26 +403,7 @@ function drawProgressReportBody(doc: PDFKit.PDFDocument, snapshot: ReportSnapsho
     )
   }
 
-  if (assistResults.length > 0) {
-    sectionHeading(doc, "ASSIST results")
-    drawTable(
-      doc,
-      [
-        { header: "Date", width: 95 },
-        { header: "Score", width: 65 },
-        { header: "Risk Level", width: 335 },
-      ],
-      assistResults.map((r) => [
-        formatShortDate(r.date),
-        scoreCell(r.score, r.maxScore),
-        r.severity ?? "—",
-      ])
-    )
-  }
-
   if (btpResults.length > 0) {
-    sectionHeading(doc, "Behavioural Targets Progress")
-
     const targetMap = new Map<
       string,
       Array<{
@@ -413,14 +426,11 @@ function drawProgressReportBody(doc: PDFKit.PDFDocument, snapshot: ReportSnapsho
       }
     }
 
+    groupHeading(doc, "Behavioural targets progress")
+
     for (const [target, rows] of targetMap.entries()) {
-      doc.moveDown(0.4)
-      doc
-        .font("Helvetica-Oblique")
-        .fontSize(BASE_FONT_SIZE)
-        .fillColor(TEXT_COLOR)
-        .text(target, { lineGap: LINE_GAP })
-      doc.moveDown(0.2)
+      doc.moveDown(0.3)
+      instrumentHeading(doc, target)
       drawTable(
         doc,
         [

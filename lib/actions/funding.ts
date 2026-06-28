@@ -860,7 +860,7 @@ export async function getClientFundingApprovalsForReport(
       const asqRows = apptIds.length
         ? await db
             .selectDistinct({
-              appointmentId: assessmentInstances.appointmentId,
+              appointmentId: sessionNotes.appointmentId,
             })
             .from(assessmentInstances)
             .innerJoin(
@@ -877,9 +877,13 @@ export async function getClientFundingApprovalsForReport(
                 assessmentInstances.assessmentInstanceId
               )
             )
+            .innerJoin(
+              sessionNotes,
+              eq(sessionNotes.sessionNoteId, assessmentInstances.sessionNoteId)
+            )
             .where(
               and(
-                inArray(assessmentInstances.appointmentId, apptIds),
+                inArray(sessionNotes.appointmentId, apptIds),
                 eq(assessmentDefinitions.assessmentCode, "ASQ")
               )
             )

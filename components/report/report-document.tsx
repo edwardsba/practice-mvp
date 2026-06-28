@@ -136,12 +136,6 @@ function ProgressReportBody({
   readOnly?: boolean
   omitEmptySections?: boolean
 }) {
-  const displayLine =
-    snapshot.practitioner.displayName ??
-    [snapshot.practitioner.title, snapshot.practitioner.fullName]
-      .filter(Boolean)
-      .join(" ")
-
   const phq9Results = getPhq9ResultsFromSnapshot(snapshot)
   const gad7Results = getGad7ResultsFromSnapshot(snapshot)
   const asqResults = getAsqResultsFromSnapshot(snapshot)
@@ -152,40 +146,28 @@ function ProgressReportBody({
   const recommendations = snapshot.recommendationsText?.trim() || "—"
 
   return (
-    <>
-      <dl className="grid gap-4 text-sm sm:grid-cols-2">
-        <div>
-          <dt className="font-medium text-muted-foreground">Client</dt>
-          <dd>
-            {snapshot.client.firstName} {snapshot.client.lastName}
-          </dd>
-          <dd className="text-muted-foreground">
-            Date of birth: {formatDisplayDate(snapshot.client.dateOfBirth)}
-          </dd>
-        </div>
-        <div>
-          <dt className="font-medium text-muted-foreground">Practitioner</dt>
-          <dd>{displayLine}</dd>
-          <dd className="text-muted-foreground">{snapshot.practice.practiceName}</dd>
-        </div>
-      </dl>
-
-      <section className="report-period pt-4 text-sm">
-        <span className="font-medium">Reporting period: </span>
-        {formatShortDate(snapshot.dateRangeStart)} –{" "}
-        {formatShortDate(snapshot.dateRangeEnd)}
+    <div className="space-y-4">
+      <section className="report-client-details space-y-0.5 text-sm">
+        <p>
+          <span>Client name: </span>
+          {snapshot.client.firstName} {snapshot.client.lastName}
+        </p>
+        <p>
+          <span>Date of birth: </span>
+          {formatDisplayDate(snapshot.client.dateOfBirth)}
+        </p>
       </section>
 
       {snapshot.fundingApproval ? (
-        <section className="report-funding-approval space-y-1 pt-4 text-sm">
-          <h3 className="font-semibold">Funding approval</h3>
-          <p>{snapshot.fundingApproval.approvalTypeName}</p>
+        <section className="report-funding-approval space-y-0.5 text-sm">
+          <p>Approval type: {snapshot.fundingApproval.approvalTypeName}</p>
           {snapshot.fundingApproval.startDate ? (
-            <p className="text-muted-foreground">
-              Approved: {formatDisplayDate(snapshot.fundingApproval.startDate)}
+            <p>
+              Approval date:{" "}
+              {formatDisplayDate(snapshot.fundingApproval.startDate)}
             </p>
           ) : null}
-          <p className="text-muted-foreground">
+          <p>
             Progress: {snapshot.fundingApproval.appointmentsAttended} of{" "}
             {snapshot.fundingApproval.appointmentsApproved ?? "?"} appointments
             attended
@@ -193,49 +175,76 @@ function ProgressReportBody({
         </section>
       ) : null}
 
-      {(!omitEmptySections || phq9Results.length > 0) ? (
-        <ReportResultsTable
-          title="PHQ-9 results"
-          results={phq9Results}
-          emptyMessage="No PHQ-9 results in this date range."
-          className="report-results-phq9"
-          showImpairment
-        />
+      {!snapshot.fundingApproval &&
+      snapshot.dateRangeStart &&
+      snapshot.dateRangeEnd ? (
+        <section className="report-period text-sm">
+          <p>
+            <span className="font-medium">Reporting period: </span>
+            {formatShortDate(snapshot.dateRangeStart)} –{" "}
+            {formatShortDate(snapshot.dateRangeEnd)}
+          </p>
+        </section>
       ) : null}
 
-      {(!omitEmptySections || gad7Results.length > 0) ? (
-        <ReportResultsTable
-          title="GAD-7 results"
-          results={gad7Results}
-          emptyMessage="No GAD-7 results in this date range."
-          className="report-results-gad7"
-          showImpairment
-        />
+      {(!omitEmptySections ||
+        phq9Results.length > 0 ||
+        gad7Results.length > 0 ||
+        assistResults.length > 0) ? (
+        <section className="report-group-ongoing space-y-3">
+          <h3 className="text-sm font-semibold">Ongoing objective assessments</h3>
+
+          {!omitEmptySections || phq9Results.length > 0 ? (
+            <ReportResultsTable
+              title="Patient Health Questionnaire 9 (PHQ-9) results"
+              results={phq9Results}
+              emptyMessage="No PHQ-9 results in this period."
+              className="report-results-phq9"
+              showImpairment
+            />
+          ) : null}
+
+          {!omitEmptySections || gad7Results.length > 0 ? (
+            <ReportResultsTable
+              title="Generalised Anxiety Disorder 7 (GAD-7) results"
+              results={gad7Results}
+              emptyMessage="No GAD-7 results in this period."
+              className="report-results-gad7"
+              showImpairment
+            />
+          ) : null}
+
+          {!omitEmptySections || assistResults.length > 0 ? (
+            <ReportResultsTable
+              title="Alcohol, Smoking and Substance Involvement Screening Test (ASSIST) results"
+              results={assistResults}
+              emptyMessage="No ASSIST results in this period."
+              className="report-results-assist"
+              severityColumnLabel="Risk Level"
+              capitalizeSeverity={false}
+            />
+          ) : null}
+        </section>
       ) : null}
 
-      {(!omitEmptySections || asqResults.length > 0) ? (
-        <ReportAsqResultsTable
-          results={asqResults}
-          emptyMessage="No ASQ results in this date range."
-          className="report-results-asq"
-        />
+      {!omitEmptySections || asqResults.length > 0 ? (
+        <section className="report-group-risk space-y-3">
+          <h3 className="text-sm font-semibold">Risk assessments</h3>
+
+          {!omitEmptySections || asqResults.length > 0 ? (
+            <ReportAsqResultsTable
+              results={asqResults}
+              emptyMessage="No ASQ results in this period."
+              className="report-results-asq"
+            />
+          ) : null}
+        </section>
       ) : null}
 
-      {(!omitEmptySections || assistResults.length > 0) ? (
-        <ReportResultsTable
-          title="ASSIST results"
-          results={assistResults}
-          emptyMessage="No ASSIST results in this date range."
-          className="report-results-assist"
-          severityColumnLabel="Risk Level"
-          capitalizeSeverity={false}
-        />
-      ) : null}
-
-      {(!omitEmptySections || btpResults.length > 0) ? (
+      {!omitEmptySections || btpResults.length > 0 ? (
         <ReportBtpResultsTable
           results={btpResults}
-          emptyMessage="No Behavioural Targets Progress results in this date range."
+          emptyMessage="No Behavioural Targets Progress results in this period."
           className="report-results-btp"
         />
       ) : null}
@@ -253,7 +262,7 @@ function ProgressReportBody({
           {readOnly ? recommendations : recommendations === "—" ? "" : recommendations}
         </p>
       </section>
-    </>
+    </div>
   )
 }
 

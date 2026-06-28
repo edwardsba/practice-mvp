@@ -733,7 +733,7 @@ export function ReportForm({
               <CardHeader>
                 <CardTitle>Results preview</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-8">
+              <CardContent className="space-y-4">
                 {!hasPreviewSource ? (
                   <p className="text-sm text-muted-foreground">
                     {selectedApproval
@@ -744,32 +744,40 @@ export function ReportForm({
                   <p className="text-sm text-muted-foreground">Loading results…</p>
                 ) : (
                   <>
-                    <ReportResultsTable
-                      title="PHQ-9 Results"
-                      results={phq9Results}
-                      emptyMessage="No PHQ-9 results in this date range."
-                      showImpairment
-                    />
-                    <ReportResultsTable
-                      title="GAD-7 Results"
-                      results={gad7Results}
-                      emptyMessage="No GAD-7 results in this date range."
-                      showImpairment
-                    />
-                    <ReportAsqResultsTable
-                      results={asqResults}
-                      emptyMessage="No ASQ results in this date range."
-                    />
-                    <ReportResultsTable
-                      title="ASSIST Results"
-                      results={assistResults}
-                      emptyMessage="No ASSIST results in this date range."
-                      severityColumnLabel="Risk Level"
-                      capitalizeSeverity={false}
-                    />
+                    <div className="space-y-3">
+                      <h3 className="text-sm font-semibold">Ongoing objective assessments</h3>
+                      <ReportResultsTable
+                        title="Patient Health Questionnaire 9 (PHQ-9) results"
+                        results={phq9Results}
+                        emptyMessage="No PHQ-9 results in this period."
+                        showImpairment
+                      />
+                      <ReportResultsTable
+                        title="Generalised Anxiety Disorder 7 (GAD-7) results"
+                        results={gad7Results}
+                        emptyMessage="No GAD-7 results in this period."
+                        showImpairment
+                      />
+                      <ReportResultsTable
+                        title="Alcohol, Smoking and Substance Involvement Screening Test (ASSIST) results"
+                        results={assistResults}
+                        emptyMessage="No ASSIST results in this period."
+                        severityColumnLabel="Risk Level"
+                        capitalizeSeverity={false}
+                      />
+                    </div>
+
+                    <div className="space-y-3">
+                      <h3 className="text-sm font-semibold">Risk assessments</h3>
+                      <ReportAsqResultsTable
+                        results={asqResults}
+                        emptyMessage="No ASQ results in this period."
+                      />
+                    </div>
+
                     <ReportBtpResultsTable
                       results={btpResults}
-                      emptyMessage="No Behavioural Targets Progress results in this date range."
+                      emptyMessage="No Behavioural Targets Progress results in this period."
                     />
                   </>
                 )}

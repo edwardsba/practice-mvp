@@ -11,6 +11,11 @@ function formatShortDate(value: string) {
   })
 }
 
+const thClassName =
+  "py-1.5 px-2 text-left align-middle font-normal border-b border-border/40"
+
+const tdClassName = "py-1.5 px-2 align-middle"
+
 type TargetRow = {
   date: string
   score: number
@@ -46,8 +51,8 @@ export function ReportBtpResultsTable({
 }) {
   if (results.length === 0) {
     return (
-      <section className={cn("report-results-btp space-y-3 pt-6", className)}>
-        <h3 className="text-lg font-semibold">Behavioural Targets Progress</h3>
+      <section className={cn("report-results-btp space-y-3 pt-4", className)}>
+        <h3 className="mb-1 text-sm font-semibold">Behavioural targets progress</h3>
         <p className="text-sm text-muted-foreground">{emptyMessage}</p>
       </section>
     )
@@ -56,35 +61,29 @@ export function ReportBtpResultsTable({
   const byTarget = pivotBtpResults(results)
 
   return (
-    <section className={cn("report-results-btp space-y-6 pt-6", className)}>
-      <h3 className="text-lg font-semibold">Behavioural Targets Progress</h3>
+    <section className={cn("report-results-btp space-y-3 pt-4", className)}>
+      <h3 className="mb-1 text-sm font-semibold">Behavioural targets progress</h3>
       {Array.from(byTarget.entries()).map(([target, rows]) => (
-        <section key={target} className="report-results-section space-y-2">
-          <h4 className="text-sm font-medium">{target}</h4>
-          <table className="report-results-table w-full text-sm border-collapse">
+        <section key={target} className="report-results-section space-y-1">
+          <h4 className="mb-1 text-sm italic">{target}</h4>
+          <table className="report-results-table w-full border-collapse text-sm">
             <thead>
               <tr>
-                <th className="h-10 px-2 text-left align-middle font-medium border-b border-border/40">
-                  Date
-                </th>
-                <th className="h-10 px-2 text-left align-middle font-medium border-b border-border/40">
-                  Score
-                </th>
-                <th className="h-10 px-2 text-left align-middle font-medium border-b border-border/40">
-                  Rating
-                </th>
+                <th className={thClassName}>Date</th>
+                <th className={thClassName}>Score</th>
+                <th className={thClassName}>Rating</th>
               </tr>
             </thead>
             <tbody className="[&_tr:last-child_td]:border-b [&_tr:last-child_td]:border-border/40">
               {rows.map((row, i) => (
                 <tr key={i}>
-                  <td className="p-2 align-middle">{formatShortDate(row.date)}</td>
-                  <td className="p-2 align-middle tabular-nums">
+                  <td className={tdClassName}>{formatShortDate(row.date)}</td>
+                  <td className={cn(tdClassName, "tabular-nums")}>
                     {row.maxScore != null
                       ? `${row.score} / ${row.maxScore}`
                       : row.score}
                   </td>
-                  <td className="p-2 align-middle">{row.ratingLabel}</td>
+                  <td className={tdClassName}>{row.ratingLabel}</td>
                 </tr>
               ))}
             </tbody>

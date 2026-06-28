@@ -12,7 +12,9 @@ function formatShortDate(value: string) {
 }
 
 const thClassName =
-  "h-10 px-2 text-left align-middle font-medium border-b border-border/40"
+  "py-1.5 px-2 text-left align-middle font-normal border-b border-border/40"
+
+const tdClassName = "py-1.5 px-2 align-middle"
 
 const tbodyClassName =
   "[&_tr:last-child_td]:border-b [&_tr:last-child_td]:border-border/40"
@@ -38,7 +40,7 @@ export function ReportResultsTable({
 
   return (
     <section className={cn("report-results-section", className)}>
-      <h3 className="mb-3 text-lg font-semibold">{title}</h3>
+      <h4 className="mb-1 text-sm italic">{title}</h4>
       <table className="report-results-table w-full border-collapse text-sm">
         <thead>
           <tr>
@@ -55,7 +57,7 @@ export function ReportResultsTable({
             <tr>
               <td
                 colSpan={columnCount}
-                className="p-2 py-8 text-center text-muted-foreground"
+                className="px-2 py-8 text-center text-muted-foreground"
               >
                 {emptyMessage}
               </td>
@@ -63,8 +65,8 @@ export function ReportResultsTable({
           ) : (
             results.map((row) => (
               <tr key={row.assessmentResultId}>
-                <td className="p-2 align-middle">{formatShortDate(row.date)}</td>
-                <td className="p-2 align-middle tabular-nums">
+                <td className={tdClassName}>{formatShortDate(row.date)}</td>
+                <td className={cn(tdClassName, "tabular-nums")}>
                   {row.maxScore != null
                     ? `${row.score} / ${row.maxScore}`
                     : row.score}
@@ -72,14 +74,14 @@ export function ReportResultsTable({
                 <td
                   className={
                     capitalizeSeverity
-                      ? "p-2 align-middle capitalize"
-                      : "p-2 align-middle"
+                      ? cn(tdClassName, "capitalize")
+                      : tdClassName
                   }
                 >
                   {row.severity ?? "—"}
                 </td>
                 {showImpairment ? (
-                  <td className="p-2 align-middle">
+                  <td className={tdClassName}>
                     {row.functionalImpairmentLabel ?? "—"}
                   </td>
                 ) : null}
@@ -103,7 +105,7 @@ export function ReportAsqResultsTable({
 }) {
   return (
     <section className={cn("report-results-section", className)}>
-      <h3 className="mb-3 text-lg font-semibold">ASQ results</h3>
+      <h4 className="mb-1 text-sm italic">ASQ results</h4>
       <table className="report-results-table w-full border-collapse text-sm">
         <thead>
           <tr>
@@ -117,7 +119,7 @@ export function ReportAsqResultsTable({
             <tr>
               <td
                 colSpan={3}
-                className="p-2 py-8 text-center text-muted-foreground"
+                className="px-2 py-8 text-center text-muted-foreground"
               >
                 {emptyMessage}
               </td>
@@ -125,13 +127,13 @@ export function ReportAsqResultsTable({
           ) : (
             results.map((row) => (
               <tr key={row.assessmentResultId}>
-                <td className="p-2 align-middle">{formatShortDate(row.date)}</td>
-                <td className="p-2 align-middle tabular-nums">
+                <td className={tdClassName}>{formatShortDate(row.date)}</td>
+                <td className={cn(tdClassName, "tabular-nums")}>
                   {row.maxScore != null
                     ? `${row.score} / ${row.maxScore}`
                     : row.score}
                 </td>
-                <td className="p-2 align-middle">{row.acuteRiskRating ?? "—"}</td>
+                <td className={tdClassName}>{row.acuteRiskRating ?? "—"}</td>
               </tr>
             ))
           )}

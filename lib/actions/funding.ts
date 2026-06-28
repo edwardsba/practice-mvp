@@ -630,6 +630,7 @@ export async function getClientFundingApprovalsForReport(
     label: string
     referrerId: string | null
     referrerName: string | null
+    referrerFirstName: string | null
     referrerTitle: string | null
     organisationName: string | null
     streetAddress: string | null
@@ -668,6 +669,7 @@ export async function getClientFundingApprovalsForReport(
       startDate: fundingApprovals.startDate,
       appointmentsApproved: fundingApprovals.appointmentsApproved,
       referrerId: fundingApprovals.referrerId,
+      referrerFirstName: professionals.firstName,
       referrerLastName: professionals.lastName,
       referrerTitle: professionals.title,
       organisationName: professionalOrganisations.organisationName,
@@ -717,6 +719,7 @@ export async function getClientFundingApprovalsForReport(
       label: string
       referrerId: string | null
       referrerName: string | null
+      referrerFirstName: string | null
       referrerTitle: string | null
       organisationName: string | null
       streetAddress: string | null
@@ -745,6 +748,7 @@ export async function getClientFundingApprovalsForReport(
       fundingApprovalTypeId: row.fundingApprovalTypeId,
       label,
       referrerId: row.referrerId,
+      referrerFirstName: row.referrerFirstName ?? null,
       referrerName: row.referrerLastName,
       referrerTitle: row.referrerTitle,
       organisationName: row.organisationName,

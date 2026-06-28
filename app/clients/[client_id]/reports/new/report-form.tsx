@@ -65,6 +65,7 @@ export function ReportForm({
   initialSnapshot,
   saveAction,
   submitLabel,
+  therapeuticTarget,
 }: {
   clientId: string
   fundingApprovals: Awaited<
@@ -102,6 +103,7 @@ export function ReportForm({
     formData: FormData
   ) => Promise<SaveReportDraftState>
   submitLabel?: string
+  therapeuticTarget?: string | null
 }) {
   const validInitialApprovalId =
     initialFundingApprovalId &&
@@ -363,9 +365,16 @@ export function ReportForm({
       ? {
           type: "referrer",
           name:
-            [selectedApproval.referrerTitle, selectedApproval.referrerName]
+            [
+              selectedApproval.referrerTitle,
+              selectedApproval.referrerFirstName,
+              selectedApproval.referrerName,
+            ]
               .filter(Boolean)
               .join(" ") || null,
+          title: selectedApproval.referrerTitle ?? null,
+          firstName: selectedApproval.referrerFirstName ?? null,
+          lastName: selectedApproval.referrerName ?? null,
           organisationName: selectedApproval.organisationName,
           streetAddress: selectedApproval.streetAddress,
           postalAddress: selectedApproval.postalAddress,
@@ -374,6 +383,9 @@ export function ReportForm({
         ? {
             type: "client",
             name: `${initialSnapshot.client.firstName} ${initialSnapshot.client.lastName}`,
+            title: null,
+            firstName: null,
+            lastName: null,
             organisationName: null,
             streetAddress: null,
             postalAddress: null,
@@ -381,6 +393,9 @@ export function ReportForm({
         : {
             type: "none",
             name: null,
+            title: null,
+            firstName: null,
+            lastName: null,
             organisationName: null,
             streetAddress: null,
             postalAddress: null,
@@ -778,6 +793,8 @@ export function ReportForm({
                     <ReportBtpResultsTable
                       results={btpResults}
                       emptyMessage="No Behavioural Targets Progress results in this period."
+                      therapeuticTarget={therapeuticTarget ?? null}
+                      clientFirstName={initialSnapshot.client.firstName}
                     />
                   </>
                 )}

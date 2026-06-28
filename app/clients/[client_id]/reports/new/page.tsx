@@ -1,12 +1,12 @@
 import Link from "next/link"
 import { notFound } from "next/navigation"
-import { and, eq } from "drizzle-orm"
+import { and, desc, eq } from "drizzle-orm"
 
 import { ReportForm } from "@/app/clients/[client_id]/reports/new/report-form"
 import { saveReportDraft } from "@/app/clients/[client_id]/reports/actions"
 import { AppShell } from "@/components/app-shell"
 import { BackButton } from "@/components/ui/back-button"
-import { clients, practitionerProfiles, practices } from "@/db/schema"
+import { clients, practitionerProfiles, practices, treatmentPlans } from "@/db/schema"
 import { getClientFundingApprovalsForReport } from "@/lib/actions/funding"
 import { getReportTypes } from "@/lib/actions/report-types"
 import {
@@ -93,6 +93,21 @@ export default async function NewReportPage({
     ? await getSignatureAsDataUrl(practitioner.signatureImagePath)
     : null
 
+  const [activePlan] = await db
+    .select({ therapeuticTarget: treatmentPlans.therapeuticTarget })
+    .from(treatmentPlans)
+    .where(
+      and(
+        eq(treatmentPlans.clientId, clientId),
+        eq(treatmentPlans.practiceId, context.practiceId),
+        eq(treatmentPlans.isActive, true)
+      )
+    )
+    .orderBy(desc(treatmentPlans.versionNumber))
+    .limit(1)
+
+  const therapeuticTarget = activePlan?.therapeuticTarget ?? null
+
   const clientName = `${client.firstName} ${client.lastName}`
 
   return (
@@ -130,9 +145,11 @@ export default async function NewReportPage({
           },
           recipient: null,
           fundingApproval: null,
+          therapeuticTarget: null,
         }}
         saveAction={saveReportDraft.bind(null, clientId)}
         submitLabel="Save Draft"
+        therapeuticTarget={therapeuticTarget}
       />
     </AppShell>
   )

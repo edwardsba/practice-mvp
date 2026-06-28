@@ -24,6 +24,9 @@ export type BtpReportResultRow = {
 export type ReportRecipient = {
   type: "referrer" | "client" | "none"
   name: string | null
+  title: string | null
+  firstName: string | null
+  lastName: string | null
   organisationName: string | null
   streetAddress: string | null
   postalAddress: string | null
@@ -70,6 +73,7 @@ export type ReportSnapshot = {
   results?: ReportResultRow[]
   clinicalSummaryText: string | null
   recommendationsText: string | null
+  therapeuticTarget: string | null
   selectedAppointmentIds?: string[]
 }
 
@@ -140,7 +144,14 @@ export function parseReportSnapshot(value: unknown): ReportSnapshot | null {
       practiceName: raw.practice.practiceName,
       practiceAddress: raw.practice.practiceAddress ?? null,
     },
-    recipient: raw.recipient ?? null,
+    recipient: raw.recipient
+      ? {
+          ...raw.recipient,
+          title: raw.recipient.title ?? null,
+          firstName: raw.recipient.firstName ?? null,
+          lastName: raw.recipient.lastName ?? null,
+        }
+      : null,
     fundingApproval: raw.fundingApproval ?? null,
     practitioner: {
       ...raw.practitioner,
@@ -152,6 +163,7 @@ export function parseReportSnapshot(value: unknown): ReportSnapshot | null {
     asqResults,
     assistResults,
     btpResults,
+    therapeuticTarget: raw.therapeuticTarget ?? null,
     selectedAppointmentIds: raw.selectedAppointmentIds ?? [],
   }
 }

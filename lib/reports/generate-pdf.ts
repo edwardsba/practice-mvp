@@ -195,7 +195,15 @@ function drawLetterHeader(doc: PDFKit.PDFDocument, snapshot: ReportSnapshot) {
   const hasRecipient = snapshot.recipient && snapshot.recipient.type !== "none"
   const recipientLines: string[] = []
   if (hasRecipient && snapshot.recipient) {
-    if (snapshot.recipient.name) recipientLines.push(snapshot.recipient.name)
+    const recipientName =
+      [
+        snapshot.recipient.title,
+        snapshot.recipient.firstName,
+        snapshot.recipient.lastName,
+      ]
+        .filter(Boolean)
+        .join(" ") || snapshot.recipient.name
+    if (recipientName) recipientLines.push(recipientName)
     if (snapshot.recipient.organisationName) {
       recipientLines.push(snapshot.recipient.organisationName)
     }
@@ -315,6 +323,27 @@ function drawProgressReportBody(doc: PDFKit.PDFDocument, snapshot: ReportSnapsho
   const assistResults = getAssistResultsFromSnapshot(snapshot)
   const btpResults = getBtpResultsFromSnapshot(snapshot)
 
+  const referrerFirstName =
+    snapshot.recipient?.type === "referrer"
+      ? snapshot.recipient.firstName ||
+        snapshot.recipient.name?.split(" ")[0] ||
+        null
+      : null
+
+  if (referrerFirstName) {
+    doc.font("Helvetica").fontSize(BASE_FONT_SIZE).fillColor(TEXT_COLOR)
+    doc.text(`Dear ${referrerFirstName},`, PAGE_MARGIN, doc.y, {
+      lineGap: LINE_GAP,
+    })
+    doc.moveDown(0.4)
+    doc.text(
+      `Thank you for your referral of ${snapshot.client.firstName} ${snapshot.client.lastName}. ` +
+        `Please find below a summary of the objective assessments completed across this referral period.`,
+      { lineGap: LINE_GAP, width: PAGE_WIDTH - PAGE_MARGIN * 2 }
+    )
+    doc.y = doc.y + SECTION_GAP
+  }
+
   function scoreCell(score: number, maxScore?: number | null): string {
     return maxScore != null ? `${score} / ${maxScore}` : String(score)
   }
@@ -387,7 +416,7 @@ function drawProgressReportBody(doc: PDFKit.PDFDocument, snapshot: ReportSnapsho
 
   if (asqResults.length > 0) {
     groupHeading(doc, "Risk assessments")
-    instrumentHeading(doc, "ASQ results")
+    instrumentHeading(doc, "Ask Suicide-Screening Questions (ASQ) results")
     drawTable(
       doc,
       [
@@ -426,7 +455,27 @@ function drawProgressReportBody(doc: PDFKit.PDFDocument, snapshot: ReportSnapsho
       }
     }
 
-    groupHeading(doc, "Behavioural targets progress")
+    groupHeading(doc, "Treatment plan progress")
+
+    if (snapshot.therapeuticTarget) {
+      doc.font("Helvetica").fontSize(BASE_FONT_SIZE).fillColor(TEXT_COLOR)
+      doc.moveDown(0.3)
+      doc.text(
+        `${snapshot.client.firstName} has chosen a therapeutic target of: ${snapshot.therapeuticTarget}.`,
+        PAGE_MARGIN,
+        doc.y,
+        { lineGap: LINE_GAP, width: PAGE_WIDTH - PAGE_MARGIN * 2 }
+      )
+      doc.moveDown(0.4)
+      doc.text(
+        `Below are the behavioural targets selected by ${snapshot.client.firstName}, ` +
+          `and their self-assessment of progress across the referral period.`,
+        PAGE_MARGIN,
+        doc.y,
+        { lineGap: LINE_GAP, width: PAGE_WIDTH - PAGE_MARGIN * 2 }
+      )
+      doc.y = doc.y + SECTION_GAP * 0.75
+    }
 
     for (const [target, rows] of targetMap.entries()) {
       doc.moveDown(0.3)

@@ -1,5 +1,5 @@
 import { notFound, redirect } from "next/navigation"
-import { and, eq } from "drizzle-orm"
+import { and, desc, eq } from "drizzle-orm"
 
 import { ReportForm } from "@/app/clients/[client_id]/reports/new/report-form"
 import {
@@ -14,6 +14,7 @@ import {
   practitionerProfiles,
   practices,
   simpleReports,
+  treatmentPlans,
 } from "@/db/schema"
 import { getClientFundingApprovalsForReport } from "@/lib/actions/funding"
 import { getReportTypes } from "@/lib/actions/report-types"
@@ -133,6 +134,21 @@ export default async function EditReportPage({
     ? await getSignatureAsDataUrl(practitioner.signatureImagePath)
     : null
 
+  const [activePlan] = await db
+    .select({ therapeuticTarget: treatmentPlans.therapeuticTarget })
+    .from(treatmentPlans)
+    .where(
+      and(
+        eq(treatmentPlans.clientId, clientId),
+        eq(treatmentPlans.practiceId, context.practiceId),
+        eq(treatmentPlans.isActive, true)
+      )
+    )
+    .orderBy(desc(treatmentPlans.versionNumber))
+    .limit(1)
+
+  const therapeuticTarget = activePlan?.therapeuticTarget ?? null
+
   const clientName = `${client.firstName} ${client.lastName}`
 
   return (
@@ -180,9 +196,11 @@ export default async function EditReportPage({
           },
           recipient: snapshot.recipient,
           fundingApproval: snapshot.fundingApproval,
+          therapeuticTarget: snapshot.therapeuticTarget ?? null,
         }}
         saveAction={updateReportDraft.bind(null, clientId, reportId)}
         submitLabel="Save changes"
+        therapeuticTarget={therapeuticTarget}
       />
 
       <EntityDeleteSection

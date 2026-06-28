@@ -105,7 +105,7 @@ export function ReportAsqResultsTable({
 }) {
   return (
     <section className={cn("report-results-section", className)}>
-      <h4 className="mb-1 text-sm italic">ASQ results</h4>
+      <h4 className="mb-1 text-sm italic">Ask Suicide-Screening Questions (ASQ) results</h4>
       <table className="report-results-table w-full border-collapse text-sm">
         <thead>
           <tr>

@@ -44,15 +44,19 @@ export function ReportBtpResultsTable({
   results,
   emptyMessage,
   className,
+  therapeuticTarget,
+  clientFirstName,
 }: {
   results: BtpReportResultRow[]
   emptyMessage: string
   className?: string
+  therapeuticTarget?: string | null
+  clientFirstName?: string | null
 }) {
   if (results.length === 0) {
     return (
       <section className={cn("report-results-btp space-y-3 pt-4", className)}>
-        <h3 className="mb-1 text-sm font-semibold">Behavioural targets progress</h3>
+        <h3 className="mb-1 text-sm font-semibold">Treatment plan progress</h3>
         <p className="text-sm text-muted-foreground">{emptyMessage}</p>
       </section>
     )
@@ -62,7 +66,18 @@ export function ReportBtpResultsTable({
 
   return (
     <section className={cn("report-results-btp space-y-3 pt-4", className)}>
-      <h3 className="mb-1 text-sm font-semibold">Behavioural targets progress</h3>
+      <h3 className="mb-1 text-sm font-semibold">Treatment plan progress</h3>
+      {therapeuticTarget && clientFirstName ? (
+        <>
+          <p className="text-sm text-foreground">
+            {clientFirstName} has chosen a therapeutic target of: {therapeuticTarget}.
+          </p>
+          <p className="text-sm text-foreground">
+            Below are the behavioural targets selected by {clientFirstName}, and their
+            self-assessment of progress across the referral period.
+          </p>
+        </>
+      ) : null}
       {Array.from(byTarget.entries()).map(([target, rows]) => (
         <section key={target} className="report-results-section space-y-1">
           <h4 className="mb-1 text-sm italic">{target}</h4>

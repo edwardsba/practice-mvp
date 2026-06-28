@@ -80,6 +80,9 @@ export async function updateReportDraft(
     existingSnapshot?.recipient ?? {
       type: "none" as const,
       name: null,
+      title: null,
+      firstName: null,
+      lastName: null,
       organisationName: null,
       streetAddress: null,
       postalAddress: null,

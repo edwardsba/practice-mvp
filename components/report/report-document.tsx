@@ -35,13 +35,22 @@ function formatShortDate(value: string) {
 }
 
 function LetterHeader({ snapshot }: { snapshot: ReportSnapshot }) {
+  const recipientDisplayName =
+    [
+      snapshot.recipient?.title,
+      snapshot.recipient?.firstName,
+      snapshot.recipient?.lastName,
+    ]
+      .filter(Boolean)
+      .join(" ") || snapshot.recipient?.name
+
   return (
     <>
       <div className="flex items-start justify-between text-sm">
         {snapshot.recipient && snapshot.recipient.type !== "none" ? (
           <div>
-            {snapshot.recipient.name ? (
-              <p className="font-medium">{snapshot.recipient.name}</p>
+            {recipientDisplayName ? (
+              <p className="font-medium">{recipientDisplayName}</p>
             ) : null}
             {snapshot.recipient.organisationName ? (
               <p>{snapshot.recipient.organisationName}</p>
@@ -187,6 +196,24 @@ function ProgressReportBody({
         </section>
       ) : null}
 
+      {snapshot.recipient?.type === "referrer" &&
+      (snapshot.recipient.firstName || snapshot.recipient.name) ? (
+        <section className="report-greeting space-y-2 text-sm">
+          <p>
+            Dear{" "}
+            {snapshot.recipient.firstName ||
+              snapshot.recipient.name?.split(" ")[0] ||
+              "Doctor"}
+            ,
+          </p>
+          <p>
+            Thank you for your referral of {snapshot.client.firstName}{" "}
+            {snapshot.client.lastName}. Please find below a summary of the objective
+            assessments completed across this referral period.
+          </p>
+        </section>
+      ) : null}
+
       {(!omitEmptySections ||
         phq9Results.length > 0 ||
         gad7Results.length > 0 ||
@@ -246,6 +273,8 @@ function ProgressReportBody({
           results={btpResults}
           emptyMessage="No Behavioural Targets Progress results in this period."
           className="report-results-btp"
+          therapeuticTarget={snapshot.therapeuticTarget ?? null}
+          clientFirstName={snapshot.client.firstName}
         />
       ) : null}
 

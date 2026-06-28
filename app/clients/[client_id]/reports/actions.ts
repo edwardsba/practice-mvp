@@ -18,6 +18,7 @@ import {
   practices,
   sessionNotes,
   simpleReports,
+  treatmentPlans,
 } from "@/db/schema"
 import { requirePractitionerContext } from "@/lib/auth"
 import { db } from "@/lib/db"
@@ -93,6 +94,9 @@ async function buildReferrerRecipient(
     return {
       type: "referrer",
       name: null,
+      title: null,
+      firstName: null,
+      lastName: null,
       organisationName: null,
       streetAddress: null,
       postalAddress: null,
@@ -101,8 +105,12 @@ async function buildReferrerRecipient(
   return {
     type: "referrer",
     name:
-      [approval.referrerTitle, approval.referrerName].filter(Boolean).join(" ") ||
-      null,
+      [approval.referrerTitle, approval.referrerFirstName, approval.referrerName]
+        .filter(Boolean)
+        .join(" ") || null,
+    title: approval.referrerTitle ?? null,
+    firstName: approval.referrerFirstName ?? null,
+    lastName: approval.referrerName ?? null,
     organisationName: approval.organisationName,
     streetAddress: approval.streetAddress,
     postalAddress: approval.postalAddress,
@@ -596,6 +604,21 @@ export async function buildSnapshot(
     }
   }
 
+  const [activeTreatmentPlan] = await db
+    .select({ therapeuticTarget: treatmentPlans.therapeuticTarget })
+    .from(treatmentPlans)
+    .where(
+      and(
+        eq(treatmentPlans.clientId, clientId),
+        eq(treatmentPlans.practiceId, context.practiceId),
+        eq(treatmentPlans.isActive, true)
+      )
+    )
+    .orderBy(desc(treatmentPlans.versionNumber))
+    .limit(1)
+
+  const therapeuticTarget = activeTreatmentPlan?.therapeuticTarget ?? null
+
   return {
     reportTitle: reportTitle?.trim() || "Progress Report",
     templateKey: resolveTemplateKey(templateKey),
@@ -627,6 +650,7 @@ export async function buildSnapshot(
     btpResults,
     clinicalSummaryText,
     recommendationsText,
+    therapeuticTarget,
     selectedAppointmentIds,
   }
 }
@@ -831,6 +855,9 @@ export async function saveReportDraft(
   let recipient: ReportRecipient = {
     type: "none",
     name: null,
+    title: null,
+    firstName: null,
+    lastName: null,
     organisationName: null,
     streetAddress: null,
     postalAddress: null,
@@ -841,6 +868,9 @@ export async function saveReportDraft(
     recipient = {
       type: "client",
       name: client ? `${client.firstName} ${client.lastName}` : null,
+      title: null,
+      firstName: null,
+      lastName: null,
       organisationName: null,
       streetAddress: null,
       postalAddress: null,

@@ -31,7 +31,7 @@ import {
   REPORTING_REQUIREMENT_STATUS_CONFIG,
   deriveReportingRequirementStatus,
 } from "@/lib/funding/reporting-status"
-import { FUNDING_APPROVAL_STATUS_CONFIG, APPOINTMENT_STATUS_CONFIG } from "@/lib/status"
+import { FUNDING_APPROVAL_STATUS_CONFIG, APPOINTMENT_STATUS_CONFIG, type StatusConfig } from "@/lib/status"
 import {
   formatAppointmentDate,
   formatAppointmentTime,
@@ -67,6 +67,43 @@ export default async function FundingApprovalDetailPage({
   const showMedicare = isMedicareClaimType(approval.claimTypeName)
   const showInsurance = isInsuranceClaimType(approval.claimTypeName)
 
+  const reportingStatuses = approval.typeReports.map((req) => {
+    const linked = approval.reportLinks.find(
+      (link) =>
+        link.appointmentNumber === req.appointmentNumber && link.simpleReportId
+    )
+    return deriveReportingRequirementStatus({
+      hasLinkedReport: Boolean(linked),
+      appointmentNumber: req.appointmentNumber,
+      appointmentsAttended: approval.appointmentsAttended,
+    })
+  })
+
+  const reportingOverallStatus = (() => {
+    if (reportingStatuses.length === 0) return null
+    if (reportingStatuses.every((s) => s === "completed")) return "completed"
+    if (reportingStatuses.some((s) => s === "overdue")) return "overdue"
+    if (reportingStatuses.some((s) => s === "completed")) return "in_progress"
+    return "not_due"
+  })()
+
+  const REPORTING_OVERALL_CONFIG: Record<string, StatusConfig> = {
+    completed: { label: "All complete", variant: "success" },
+    overdue: { label: "Overdue", variant: "destructive" },
+    in_progress: { label: "In progress", variant: "warning" },
+    not_due: { label: "Not due yet", variant: "muted" },
+  }
+
+  const expiryPercent = (() => {
+    if (!approval.startDate || !approval.endDate) return null
+    const start = new Date(approval.startDate + "T00:00:00").getTime()
+    const end = new Date(approval.endDate + "T00:00:00").getTime()
+    const now = Date.now()
+    const total = end - start
+    if (total <= 0) return null
+    return Math.min(100, Math.max(0, ((now - start) / total) * 100))
+  })()
+
   return (
     <AppShell>
       <div className="mb-6">
@@ -84,8 +121,77 @@ export default async function FundingApprovalDetailPage({
       </div>
 
       <Card className="mb-6">
+        <CardHeader>
+          <CardTitle>Status</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <dl className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <dt className="text-sm text-muted-foreground">Approval status</dt>
+              <dd className="mt-0.5">
+                <StatusBadge
+                  status={approval.approvalStatus}
+                  statusMap={FUNDING_APPROVAL_STATUS_CONFIG}
+                />
+              </dd>
+            </div>
+            <div>
+              <dt className="text-sm text-muted-foreground">Reporting status</dt>
+              <dd className="mt-0.5">
+                {reportingOverallStatus ? (
+                  <StatusBadge
+                    status={reportingOverallStatus}
+                    statusMap={REPORTING_OVERALL_CONFIG}
+                  />
+                ) : (
+                  <span className="text-sm text-muted-foreground">
+                    No requirements
+                  </span>
+                )}
+              </dd>
+            </div>
+            <div>
+              <dt className="mb-2 text-sm text-muted-foreground">
+                Appointment progress ({progress})
+              </dt>
+              <dd>
+                <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+                  <div
+                    className="h-full rounded-full bg-primary"
+                    style={{ width: `${progressPercent}%` }}
+                  />
+                </div>
+              </dd>
+            </div>
+            <div>
+              <dt className="mb-2 text-sm text-muted-foreground">
+                Expiry
+                {approval.startDate && approval.endDate
+                  ? ` (${formatDisplayDate(approval.startDate)} – ${formatDisplayDate(approval.endDate)})`
+                  : ""}
+              </dt>
+              <dd>
+                {expiryPercent !== null ? (
+                  <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+                    <div
+                      className="h-full rounded-full bg-primary"
+                      style={{ width: `${expiryPercent}%` }}
+                    />
+                  </div>
+                ) : (
+                  <span className="text-sm text-muted-foreground">
+                    No end date set
+                  </span>
+                )}
+              </dd>
+            </div>
+          </dl>
+        </CardContent>
+      </Card>
+
+      <Card className="mb-6">
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>Overview</CardTitle>
+          <CardTitle>Approval details</CardTitle>
           <Button variant="outline" size="sm" asChild>
             <Link href={`/funding/approvals/${approvalId}/edit`}>Edit</Link>
           </Button>
@@ -148,28 +254,6 @@ export default async function FundingApprovalDetailPage({
                 Appointments attended
               </dt>
               <dd className="font-medium">{approval.appointmentsAttended}</dd>
-            </div>
-            <div className="sm:col-span-2">
-              <dt className="mb-2 text-sm text-muted-foreground">
-                Appointment progress ({progress})
-              </dt>
-              <dd>
-                <div className="h-2 w-full max-w-md overflow-hidden rounded-full bg-muted">
-                  <div
-                    className="h-full rounded-full bg-primary"
-                    style={{ width: `${progressPercent}%` }}
-                  />
-                </div>
-              </dd>
-            </div>
-            <div>
-              <dt className="text-sm text-muted-foreground">Approval status</dt>
-              <dd className="font-medium">
-                <StatusBadge
-                  status={approval.approvalStatus}
-                  statusMap={FUNDING_APPROVAL_STATUS_CONFIG}
-                />
-              </dd>
             </div>
           </dl>
         </CardContent>

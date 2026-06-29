@@ -2,6 +2,7 @@ import Link from "next/link"
 
 import { AppShell } from "@/components/app-shell"
 import { BackButton } from "@/components/ui/back-button"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
   Table,
@@ -80,6 +81,11 @@ export default async function AppointmentTypesPage() {
                       <Link href={typeHref} className="block font-medium text-primary hover:underline">
                         {type.nickname}
                       </Link>
+                      {type.isNoShowType ? (
+                        <Badge variant="outline" className="mt-1 text-xs">
+                          No-show
+                        </Badge>
+                      ) : null}
                     </TableCell>
                     <TableCell>
                       <Link href={typeHref} className="block">

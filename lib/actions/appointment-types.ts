@@ -1,6 +1,6 @@
 "use server"
 
-import { and, asc, desc, eq, inArray } from "drizzle-orm"
+import { and, asc, desc, eq, inArray, ne } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
 
@@ -208,6 +208,7 @@ export async function getAppointmentTypes(practiceId: string) {
       durationMinutes: appointmentTypes.durationMinutes,
       mode: appointmentTypes.mode,
       status: appointmentTypes.status,
+      isNoShowType: appointmentTypes.isNoShowType,
       claimTypeName: claimTypes.claimTypeName,
       practiceName: practices.practiceName,
     })
@@ -276,6 +277,7 @@ export async function getAppointmentTypeById(
       mode: appointmentTypes.mode,
       durationMinutes: appointmentTypes.durationMinutes,
       status: appointmentTypes.status,
+      isNoShowType: appointmentTypes.isNoShowType,
       claimTypeName: claimTypes.claimTypeName,
     })
     .from(appointmentTypes)
@@ -313,6 +315,25 @@ export async function getAppointmentTypeById(
   }
 }
 
+export async function getNoShowAppointmentType(practiceId: string) {
+  const [type] = await db
+    .select({
+      appointmentTypeId: appointmentTypes.appointmentTypeId,
+      nickname: appointmentTypes.nickname,
+    })
+    .from(appointmentTypes)
+    .where(
+      and(
+        eq(appointmentTypes.practiceId, practiceId),
+        eq(appointmentTypes.isNoShowType, true),
+        eq(appointmentTypes.isActive, true)
+      )
+    )
+    .limit(1)
+
+  return type ?? null
+}
+
 export async function upsertAppointmentType(
   practiceId: string,
   appointmentTypeId: string | undefined,
@@ -331,6 +352,7 @@ export async function upsertAppointmentType(
   const mode = modeRaw || null
   const durationMinutes = Number(formData.get("duration_minutes") ?? 50)
   const status = String(formData.get("status") ?? "active").trim()
+  const isNoShowType = formData.get("is_no_show_type") === "on"
   const feesRaw = String(formData.get("fee_rows") ?? "")
 
   if (!nickname || !name) {
@@ -358,6 +380,21 @@ export async function upsertAppointmentType(
   let savedAppointmentTypeId = appointmentTypeId
 
   try {
+    if (isNoShowType) {
+      await db
+        .update(appointmentTypes)
+        .set({ isNoShowType: false, updatedAt: now })
+        .where(
+          and(
+            eq(appointmentTypes.practiceId, practiceId),
+            eq(appointmentTypes.isNoShowType, true),
+            ...(appointmentTypeId
+              ? [ne(appointmentTypes.appointmentTypeId, appointmentTypeId)]
+              : [])
+          )
+        )
+    }
+
     if (appointmentTypeId) {
       const [existing] = await db
         .select({ appointmentTypeId: appointmentTypes.appointmentTypeId })
@@ -386,6 +423,7 @@ export async function upsertAppointmentType(
           mode,
           durationMinutes,
           status,
+          isNoShowType,
           updatedAt: now,
         })
         .where(eq(appointmentTypes.appointmentTypeId, appointmentTypeId))
@@ -402,6 +440,7 @@ export async function upsertAppointmentType(
           mode,
           durationMinutes,
           status,
+          isNoShowType,
           updatedAt: now,
         })
         .returning({ appointmentTypeId: appointmentTypes.appointmentTypeId })

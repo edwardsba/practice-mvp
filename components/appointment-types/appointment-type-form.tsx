@@ -45,6 +45,7 @@ type InitialValues = {
   mode?: string | null
   durationMinutes?: number
   status?: string
+  isNoShowType?: boolean
   fees?: FeeRow[]
 }
 
@@ -221,6 +222,26 @@ export function AppointmentTypeForm({
                 <option value="inactive">Inactive</option>
               </select>
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label>No-show fee type</Label>
+            <label className="flex cursor-pointer items-center gap-3">
+              <input
+                type="checkbox"
+                name="is_no_show_type"
+                defaultChecked={initialValues?.isNoShowType ?? false}
+                className="h-4 w-4 rounded border-input accent-primary"
+              />
+              <span className="text-sm">
+                Use as the default no-show fee type
+              </span>
+            </label>
+            <p className="text-xs text-muted-foreground">
+              When an appointment is marked as no-show, the funding approval link
+              is removed and the fee type switches to this appointment type
+              automatically. Only one type can be designated at a time.
+            </p>
           </div>
 
           <div className="space-y-3">

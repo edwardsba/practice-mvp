@@ -27,6 +27,7 @@ export const appointmentTypes = pgTable("appointment_types", {
   durationMinutes: integer("duration_minutes").notNull().default(50),
   mode: text("mode"),
   status: text("status").notNull().default("active"),
+  isNoShowType: boolean("is_no_show_type").notNull().default(false),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()

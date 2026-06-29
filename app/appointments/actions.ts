@@ -14,6 +14,7 @@ import {
   countNonFinalisedSessionNotesByAppointment,
   logDeleteAuditEvent,
 } from "@/lib/delete/delete-utils"
+import { getNoShowAppointmentType } from "@/lib/actions/appointment-types"
 import { APPOINTMENT_STATUS_TRANSITIONS } from "@/lib/status"
 
 type DbTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0]
@@ -367,6 +368,13 @@ export async function transitionAppointmentStatus(
 
   const now = new Date()
 
+  const noShowType =
+    newStatus === "no_show"
+      ? await getNoShowAppointmentType(context.practiceId)
+      : null
+
+  const previousFundingApprovalId = appointment.fundingApprovalId
+
   await db.transaction(async (tx) => {
     if (newStatus === "cancelled") {
       await applyAppointmentCancellation(
@@ -375,6 +383,21 @@ export async function transitionAppointmentStatus(
         context.practiceId,
         "practitioner"
       )
+    } else if (newStatus === "no_show") {
+      await tx
+        .update(appointments)
+        .set({
+          status: "no_show",
+          fundingApprovalId: null,
+          appointmentTypeId: noShowType?.appointmentTypeId ?? null,
+          updatedAt: now,
+        })
+        .where(
+          and(
+            eq(appointments.appointmentId, appointmentId),
+            eq(appointments.practiceId, context.practiceId)
+          )
+        )
     } else {
       await tx
         .update(appointments)
@@ -403,6 +426,11 @@ export async function transitionAppointmentStatus(
   revalidatePath(`/appointments/${appointmentId}`)
   revalidatePath("/appointments")
   revalidatePath(`/clients/${appointment.clientId}`)
+
+  if (newStatus === "no_show" && previousFundingApprovalId) {
+    revalidatePath(`/funding/approvals/${previousFundingApprovalId}`)
+    revalidatePath("/funding/approvals")
+  }
 
   return {}
 }

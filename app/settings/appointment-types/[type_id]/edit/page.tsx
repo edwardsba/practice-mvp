@@ -59,6 +59,7 @@ export default async function EditAppointmentTypePage({
           mode: type.mode,
           durationMinutes: type.durationMinutes,
           status: type.status,
+          isNoShowType: type.isNoShowType,
           fees: type.fees.map((fee) => ({
             fee: fee.fee,
             tax: fee.tax,

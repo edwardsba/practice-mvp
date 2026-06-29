@@ -102,6 +102,12 @@ export default async function AppointmentTypeDetailPage({
                 {formatAppointmentTypeStatus(type.status)}
               </dd>
             </div>
+            <div>
+              <dt className="text-sm text-muted-foreground">No-show fee type</dt>
+              <dd className="font-medium">
+                {type.isNoShowType ? "Yes — used for no-show appointments" : "No"}
+              </dd>
+            </div>
           </dl>
         </CardContent>
       </Card>

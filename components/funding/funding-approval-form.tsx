@@ -80,6 +80,7 @@ type ReferrerOption = {
 type ReportOption = {
   simpleReportId: string
   reportType: string
+  reportDate: string | null
   createdAt: Date
 }
 
@@ -521,38 +522,6 @@ export function FundingApprovalForm({
             </select>
           </div>
 
-          {initialValues?.linkedAppointments?.length ? (
-            <div className="space-y-2">
-              <Label>Linked appointments</Label>
-              <div className="rounded-lg border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Time</TableHead>
-                      <TableHead>Location</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {initialValues.linkedAppointments.map((appointment, index) => (
-                      <TableRow key={index}>
-                        <TableCell>
-                          {formatAppointmentDate(appointment.appointmentDate)}
-                        </TableCell>
-                        <TableCell>
-                          {formatAppointmentTime(appointment.appointmentTime)}
-                        </TableCell>
-                        <TableCell>
-                          {appointment.location?.trim() || "—"}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </div>
-          ) : null}
-
           {reportLinks.length > 0 ? (
             <div className="space-y-2">
               <Label>Reporting</Label>
@@ -596,7 +565,8 @@ export function FundingApprovalForm({
                               >
                                 {report.reportType} —{" "}
                                 {formatDisplayDate(
-                                  report.createdAt.toISOString().slice(0, 10)
+                                  report.reportDate ??
+                                    report.createdAt.toISOString().slice(0, 10)
                                 )}
                               </option>
                             ))}

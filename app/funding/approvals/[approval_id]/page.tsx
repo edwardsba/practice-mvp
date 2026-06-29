@@ -31,15 +31,11 @@ import {
   REPORTING_REQUIREMENT_STATUS_CONFIG,
   deriveReportingRequirementStatus,
 } from "@/lib/funding/reporting-status"
-import { FUNDING_APPROVAL_STATUS_CONFIG } from "@/lib/status"
+import { FUNDING_APPROVAL_STATUS_CONFIG, APPOINTMENT_STATUS_CONFIG } from "@/lib/status"
 import {
   formatAppointmentDate,
   formatAppointmentTime,
 } from "@/lib/appointments/format"
-import {
-  APPOINTMENT_STATUS_LABELS,
-  type AppointmentStatus,
-} from "@/lib/appointments/constants"
 function displayValue(value: string | null | undefined) {
   return value?.trim() || "—"
 }
@@ -81,6 +77,10 @@ export default async function FundingApprovalDetailPage({
         <h1 className="text-2xl font-semibold tracking-tight">
           Funding approval
         </h1>
+        <p className="mt-1 text-muted-foreground">
+          {approval.clientLastName}, {approval.clientFirstName}
+          {approval.approvalTypeName ? ` — ${approval.approvalTypeName}` : ""}
+        </p>
       </div>
 
       <Card className="mb-6">
@@ -252,21 +252,52 @@ export default async function FundingApprovalDetailPage({
                   </TableRow>
                 ) : (
                   approval.linkedAppointments.map((appointment, index) => (
-                    <TableRow key={index}>
-                      <TableCell>{index + 1}</TableCell>
+                    <TableRow
+                      key={appointment.appointmentId}
+                      className="cursor-pointer hover:bg-muted/50"
+                    >
                       <TableCell>
-                        {formatAppointmentDate(appointment.appointmentDate)}
+                        <Link
+                          href={`/appointments/${appointment.appointmentId}`}
+                          className="block"
+                        >
+                          {index + 1}
+                        </Link>
                       </TableCell>
                       <TableCell>
-                        {formatAppointmentTime(appointment.appointmentTime)}
+                        <Link
+                          href={`/appointments/${appointment.appointmentId}`}
+                          className="block"
+                        >
+                          {formatAppointmentDate(appointment.appointmentDate)}
+                        </Link>
                       </TableCell>
                       <TableCell>
-                        {appointment.location?.trim() || "—"}
+                        <Link
+                          href={`/appointments/${appointment.appointmentId}`}
+                          className="block"
+                        >
+                          {formatAppointmentTime(appointment.appointmentTime)}
+                        </Link>
                       </TableCell>
                       <TableCell>
-                        {APPOINTMENT_STATUS_LABELS[
-                          appointment.status as AppointmentStatus
-                        ] ?? appointment.status}
+                        <Link
+                          href={`/appointments/${appointment.appointmentId}`}
+                          className="block"
+                        >
+                          {appointment.location?.trim() || "—"}
+                        </Link>
+                      </TableCell>
+                      <TableCell>
+                        <Link
+                          href={`/appointments/${appointment.appointmentId}`}
+                          className="block"
+                        >
+                          <StatusBadge
+                            status={appointment.status}
+                            statusMap={APPOINTMENT_STATUS_CONFIG}
+                          />
+                        </Link>
                       </TableCell>
                     </TableRow>
                   ))
@@ -286,7 +317,7 @@ export default async function FundingApprovalDetailPage({
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>App #</TableHead>
+                  <TableHead>Session</TableHead>
                   <TableHead>Report Type</TableHead>
                   <TableHead>Linked Report</TableHead>
                   <TableHead>Report Status</TableHead>
@@ -327,12 +358,13 @@ export default async function FundingApprovalDetailPage({
                               View
                             </Link>
                           ) : (
-                            <Link
-                              href={`/clients/${approval.clientId}/reports/new?fundingApprovalId=${approval.fundingApprovalId}&reportRequirementId=${requirement.reportRequirementId}`}
-                              className="text-primary hover:underline"
-                            >
-                              Create report
-                            </Link>
+                            <Button variant="outline" size="sm" asChild>
+                              <Link
+                                href={`/clients/${approval.clientId}/reports/new?fundingApprovalId=${approval.fundingApprovalId}&reportRequirementId=${requirement.reportRequirementId}`}
+                              >
+                                Create report
+                              </Link>
+                            </Button>
                           )}
                         </TableCell>
                         <TableCell>

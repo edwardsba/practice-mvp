@@ -1172,6 +1172,7 @@ export async function getFundingApprovalById(fundingApprovalId: string) {
       simpleReportId: simpleReports.simpleReportId,
       reportType: simpleReports.reportType,
       reportStatus: simpleReports.reportStatus,
+      reportDate: simpleReports.reportDate,
       createdAt: simpleReports.createdAt,
     })
     .from(simpleReports)

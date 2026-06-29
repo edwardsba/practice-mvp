@@ -301,50 +301,50 @@ function ReferralAcknowledgementBody({
   snapshot: ReportSnapshot
   readOnly?: boolean
 }) {
-  const clientName = `${snapshot.client.firstName} ${snapshot.client.lastName}`
-  const recipientName = snapshot.recipient?.name?.trim()
-  const salutation = recipientName ? `Dear ${recipientName},` : "Dear Colleague,"
   const fa = snapshot.fundingApproval
   const notes = snapshot.clinicalSummaryText?.trim() || ""
 
+  const referrerFirstName =
+    snapshot.recipient?.firstName?.trim() || null
+
   return (
-    <div className="report-referral-ack space-y-4 pt-4 text-sm leading-relaxed">
+    <div className="report-referral-ack space-y-4 text-sm">
+      <section className="report-client-details space-y-0.5">
+        <p>Client name: {snapshot.client.firstName} {snapshot.client.lastName}</p>
+        {snapshot.client.dateOfBirth ? (
+          <p>Date of birth: {formatDisplayDate(snapshot.client.dateOfBirth)}</p>
+        ) : null}
+      </section>
+
+      {fa ? (
+        <section className="report-funding-approval space-y-0.5">
+          <p>Approval type: {fa.approvalTypeName}</p>
+          {fa.startDate ? (
+            <p>Approval date: {formatDisplayDate(fa.startDate)}</p>
+          ) : null}
+          <p>
+            Progress: {fa.appointmentsAttended} of{" "}
+            {fa.appointmentsApproved ?? "?"} appointments attended
+          </p>
+        </section>
+      ) : null}
+
+      <p>Dear {referrerFirstName ?? "Colleague"},</p>
+
       <p>
-        <span className="font-medium">Re: </span>
-        {clientName}
-        {snapshot.client.dateOfBirth
-          ? ` (DOB ${formatDisplayDate(snapshot.client.dateOfBirth)})`
-          : ""}
+        Thank you for your referral of {snapshot.client.firstName}{" "}
+        {snapshot.client.lastName}. I am writing to confirm that the referral
+        has been received and treatment has commenced.
       </p>
 
-      <p>{salutation}</p>
-
       <p>
-        Thank you for your referral of {clientName} to{" "}
-        {snapshot.practice.practiceName}. I am writing to confirm that the
-        referral has been received
-        {fa ? ` under the ${fa.approvalTypeName}` : ""}
-        {fa?.startDate ? `, dated ${formatDisplayDate(fa.startDate)}` : ""}
-        {fa?.appointmentsApproved != null
-          ? `, approving ${fa.appointmentsApproved} session${
-              fa.appointmentsApproved === 1 ? "" : "s"
-            }`
-          : ""}
-        .
-      </p>
-
-      <p>
-        An appointment has been arranged and {clientName} will be contacted to
-        commence treatment. I will provide progress reports in accordance with
-        the referral&apos;s reporting requirements.
+        I will update you with progress in due course. Please do not hesitate
+        to contact me should you require any further information.
       </p>
 
       {notes ? <p className="whitespace-pre-wrap">{notes}</p> : null}
 
-      <p>
-        Please do not hesitate to contact me should you require any further
-        information.
-      </p>
+      <p>Yours sincerely,</p>
     </div>
   )
 }

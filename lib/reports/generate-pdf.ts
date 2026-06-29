@@ -511,41 +511,55 @@ function drawReferralAcknowledgementBody(
   doc: PDFKit.PDFDocument,
   snapshot: ReportSnapshot
 ) {
-  const clientName = `${snapshot.client.firstName} ${snapshot.client.lastName}`
-  const dob = snapshot.client.dateOfBirth
-    ? ` (DOB ${formatDisplayDate(snapshot.client.dateOfBirth)})`
-    : ""
   const fa = snapshot.fundingApproval
-  const recipientName = snapshot.recipient?.name?.trim()
-  const salutation = recipientName ? `Dear ${recipientName},` : "Dear Colleague,"
   const notes = snapshot.clinicalSummaryText?.trim()
+  const referrerFirstName = snapshot.recipient?.firstName?.trim() || null
 
-  doc.moveDown(0.5)
-  bodyText(doc, `Re: ${clientName}${dob}`)
-  doc.moveDown(0.5)
-  bodyText(doc, salutation)
-  doc.moveDown(0.5)
+  doc.font("Helvetica").fontSize(BASE_FONT_SIZE).fillColor(TEXT_COLOR)
+  doc.text(
+    `Client name: ${snapshot.client.firstName} ${snapshot.client.lastName}`,
+    PAGE_MARGIN,
+    doc.y,
+    { lineGap: LINE_GAP }
+  )
+  if (snapshot.client.dateOfBirth) {
+    doc.text(`Date of birth: ${formatDisplayDate(snapshot.client.dateOfBirth)}`, {
+      lineGap: LINE_GAP,
+    })
+  }
+  doc.y = doc.y + SECTION_GAP
 
-  const approvalClause = fa
-    ? ` under the ${fa.approvalTypeName}${
-        fa.startDate ? `, dated ${formatDisplayDate(fa.startDate)}` : ""
-      }${
-        fa.appointmentsApproved != null
-          ? `, approving ${fa.appointmentsApproved} session${
-              fa.appointmentsApproved === 1 ? "" : "s"
-            }`
-          : ""
-      }`
-    : ""
+  if (fa) {
+    doc.font("Helvetica").fontSize(BASE_FONT_SIZE).fillColor(TEXT_COLOR)
+    if (fa.approvalTypeName) {
+      doc.text(`Approval type: ${fa.approvalTypeName}`, { lineGap: LINE_GAP })
+    }
+    if (fa.startDate) {
+      doc.text(`Approval date: ${formatDisplayDate(fa.startDate)}`, {
+        lineGap: LINE_GAP,
+      })
+    }
+    doc.text(
+      `Progress: ${fa.appointmentsAttended} of ${fa.appointmentsApproved ?? "?"} appointments attended`,
+      { lineGap: LINE_GAP }
+    )
+    doc.y = doc.y + SECTION_GAP
+  }
+
+  bodyText(doc, `Dear ${referrerFirstName ?? "Colleague"},`)
+  doc.moveDown(0.5)
 
   bodyText(
     doc,
-    `Thank you for your referral of ${clientName} to ${snapshot.practice.practiceName}. I am writing to confirm that the referral has been received${approvalClause}.`
+    `Thank you for your referral of ${snapshot.client.firstName} ${snapshot.client.lastName}. ` +
+      `I am writing to confirm that the referral has been received and treatment has commenced.`
   )
   doc.moveDown(0.5)
+
   bodyText(
     doc,
-    `An appointment has been arranged and ${clientName} will be contacted to commence treatment. I will provide progress reports in accordance with the referral's reporting requirements.`
+    `I will update you with progress in due course. Please do not hesitate to contact me ` +
+      `should you require any further information.`
   )
 
   if (notes) {
@@ -554,10 +568,7 @@ function drawReferralAcknowledgementBody(
   }
 
   doc.moveDown(0.5)
-  bodyText(
-    doc,
-    "Please do not hesitate to contact me should you require any further information."
-  )
+  bodyText(doc, "Yours sincerely,")
 }
 
 function drawSignature(doc: PDFKit.PDFDocument, snapshot: ReportSnapshot) {

@@ -1,10 +1,15 @@
 "use server"
 
-import { and, asc, eq, notInArray } from "drizzle-orm"
+import { and, asc, desc, eq, notInArray } from "drizzle-orm"
 import { redirect } from "next/navigation"
 import { revalidatePath } from "next/cache"
 
 import {
+  claimTypes,
+  claims,
+  clients,
+  fundingApprovalTypes,
+  fundingApprovals,
   professionalOrganisationLinks,
   professionalOrganisations,
   professionals,
@@ -313,15 +318,40 @@ export async function getProfessionalById(professionalId: string) {
     )
     .orderBy(asc(professionalOrganisations.organisationName))
 
+  const referrals = await db
+    .select({
+      fundingApprovalId: fundingApprovals.fundingApprovalId,
+      clientId: clients.clientId,
+      clientFirstName: clients.firstName,
+      clientLastName: clients.lastName,
+      dateStart: fundingApprovals.startDate,
+      approvalTypeName: fundingApprovalTypes.name,
+      claimType: claimTypes.claimTypeName,
+    })
+    .from(fundingApprovals)
+    .innerJoin(clients, eq(fundingApprovals.clientId, clients.clientId))
+    .leftJoin(
+      fundingApprovalTypes,
+      eq(
+        fundingApprovals.fundingApprovalTypeId,
+        fundingApprovalTypes.fundingApprovalTypeId
+      )
+    )
+    .leftJoin(claims, eq(fundingApprovals.claimId, claims.claimId))
+    .leftJoin(claimTypes, eq(claims.claimTypeId, claimTypes.claimTypeId))
+    .where(
+      and(
+        eq(fundingApprovals.referrerId, professionalId),
+        eq(fundingApprovals.practiceId, context.practiceId),
+        eq(fundingApprovals.isActive, true)
+      )
+    )
+    .orderBy(desc(fundingApprovals.startDate), asc(clients.lastName))
+
   return {
     professional,
     organisationLinks,
-    referrals: [] as Array<{
-      dateStart: string
-      clientLastName: string
-      clientFirstName: string
-      claimType: string
-    }>,
+    referrals,
   }
 }
 

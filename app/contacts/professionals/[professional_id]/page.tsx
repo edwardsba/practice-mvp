@@ -23,6 +23,7 @@ import {
   formatOrganisationAddress,
   formatProfessionalName,
 } from "@/lib/contacts/format"
+import { formatDisplayDate } from "@/lib/funding/format"
 
 export default async function ProfessionalDetailPage({
   params,
@@ -157,8 +158,9 @@ export default async function ProfessionalDetailPage({
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Date start</TableHead>
+                  <TableHead>Date</TableHead>
                   <TableHead>Client</TableHead>
+                  <TableHead>Approval type</TableHead>
                   <TableHead>Claim type</TableHead>
                 </TableRow>
               </TableHeader>
@@ -166,22 +168,48 @@ export default async function ProfessionalDetailPage({
                 {referrals.length === 0 ? (
                   <TableRow>
                     <TableCell
-                      colSpan={3}
+                      colSpan={4}
                       className="h-20 text-center text-muted-foreground"
                     >
                       No linked referrals yet.
                     </TableCell>
                   </TableRow>
                 ) : (
-                  referrals.map((referral, index) => (
-                    <TableRow key={index}>
-                      <TableCell>{referral.dateStart}</TableCell>
-                      <TableCell>
-                        {referral.clientLastName}, {referral.clientFirstName}
-                      </TableCell>
-                      <TableCell>{referral.claimType}</TableCell>
-                    </TableRow>
-                  ))
+                  referrals.map((referral) => {
+                    const clientHref = `/clients/${referral.clientId}`
+                    return (
+                      <TableRow
+                        key={referral.fundingApprovalId}
+                        className="cursor-pointer hover:bg-muted/50"
+                      >
+                        <TableCell>
+                          <Link href={clientHref} className="block">
+                            {referral.dateStart
+                              ? formatDisplayDate(referral.dateStart)
+                              : "—"}
+                          </Link>
+                        </TableCell>
+                        <TableCell>
+                          <Link
+                            href={clientHref}
+                            className="block font-medium text-primary hover:underline"
+                          >
+                            {referral.clientLastName}, {referral.clientFirstName}
+                          </Link>
+                        </TableCell>
+                        <TableCell>
+                          <Link href={clientHref} className="block">
+                            {referral.approvalTypeName ?? "—"}
+                          </Link>
+                        </TableCell>
+                        <TableCell>
+                          <Link href={clientHref} className="block">
+                            {referral.claimType ?? "—"}
+                          </Link>
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })
                 )}
               </TableBody>
             </Table>

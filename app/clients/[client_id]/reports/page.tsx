@@ -3,6 +3,7 @@ import { notFound } from "next/navigation"
 import { and, desc, eq, ne } from "drizzle-orm"
 
 import { AppShell } from "@/components/app-shell"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
   Table,
@@ -30,12 +31,6 @@ function formatReportDateRange(start: string, end: string) {
   }
 
   return `${formatPart(start)} – ${formatPart(end)}`
-}
-
-function formatReportStatus(status: string) {
-  if (status === "draft") return "Draft"
-  if (status === "finalised") return "Finalised"
-  return status.charAt(0).toUpperCase() + status.slice(1)
 }
 
 export default async function ClientReportsPage({
@@ -163,8 +158,18 @@ export default async function ClientReportsPage({
                       </Link>
                     </TableCell>
                     <TableCell>
-                      <Link href={reportHref} className="block hover:underline">
-                        {formatReportStatus(report.reportStatus)}
+                      <Link href={reportHref} className="block">
+                        <Badge
+                          variant={
+                            report.reportStatus === "finalised"
+                              ? "success"
+                              : "outline"
+                          }
+                        >
+                          {report.reportStatus === "finalised"
+                            ? "Finalised"
+                            : "Draft"}
+                        </Badge>
                       </Link>
                     </TableCell>
                   </TableRow>

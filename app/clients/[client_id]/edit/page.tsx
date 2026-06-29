@@ -32,6 +32,7 @@ export default async function EditClientPage({
       dateOfBirth: clients.dateOfBirth,
       email: clients.email,
       phone: clients.phone,
+      address: clients.address,
       commsOptOut: clients.commsOptOut,
       reminderOptOut: clients.reminderOptOut,
       preSessionOptOut: clients.preSessionOptOut,

@@ -1,8 +1,8 @@
 "use client"
 
-import { useState, useTransition } from "react"
+import Link from "next/link"
+import { useState } from "react"
 
-import { deleteEmergencyContact } from "@/app/clients/[client_id]/emergency-contacts/actions"
 import { EmergencyContactDialog } from "@/components/emergency-contacts/emergency-contact-dialog"
 import { Button } from "@/components/ui/button"
 import {
@@ -28,46 +28,16 @@ export function EmergencyContactsSection({
   contacts: EmergencyContactRow[]
 }) {
   const [dialogOpen, setDialogOpen] = useState(false)
-  const [editingContact, setEditingContact] =
-    useState<EmergencyContactRow | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [pending, startTransition] = useTransition()
-
-  function openCreate() {
-    setEditingContact(null)
-    setDialogOpen(true)
-  }
-
-  function openEdit(contact: EmergencyContactRow) {
-    setEditingContact(contact)
-    setDialogOpen(true)
-  }
-
-  function handleRemove(contactId: string) {
-    setError(null)
-    startTransition(async () => {
-      const result = await deleteEmergencyContact(clientId, contactId)
-      if (result.error) {
-        setError(result.error)
-      }
-    })
-  }
 
   return (
     <>
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle>Emergency contacts</CardTitle>
-        <Button type="button" size="sm" onClick={openCreate}>
+        <Button type="button" size="sm" onClick={() => setDialogOpen(true)}>
           Add emergency contact
         </Button>
       </CardHeader>
-      <CardContent className="space-y-4">
-        {error ? (
-          <p className="text-sm text-destructive" role="alert">
-            {error}
-          </p>
-        ) : null}
-
+      <CardContent>
         <div className="rounded-lg border">
           <Table>
             <TableHeader>
@@ -76,9 +46,6 @@ export function EmergencyContactsSection({
                 <TableHead>Name</TableHead>
                 <TableHead>Phone</TableHead>
                 <TableHead>Email</TableHead>
-                {contacts.length > 0 ? (
-                  <TableHead className="text-right">Actions</TableHead>
-                ) : null}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -92,35 +59,36 @@ export function EmergencyContactsSection({
                   </TableCell>
                 </TableRow>
               ) : (
-                contacts.map((contact) => (
-                  <TableRow key={contact.contactId}>
-                    <TableCell>{contact.role ?? "—"}</TableCell>
-                    <TableCell>{contact.name}</TableCell>
-                    <TableCell>{contact.phone ?? "—"}</TableCell>
-                    <TableCell>{contact.email ?? "—"}</TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => openEdit(contact)}
-                        >
-                          Edit
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          disabled={pending}
-                          onClick={() => handleRemove(contact.contactId)}
-                        >
-                          Remove
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
+                contacts.map((contact) => {
+                  const editHref = `/clients/${clientId}/emergency-contacts/${contact.contactId}/edit`
+                  return (
+                    <TableRow
+                      key={contact.contactId}
+                      className="cursor-pointer hover:bg-muted/50"
+                    >
+                      <TableCell>
+                        <Link href={editHref} className="block">
+                          {contact.role ?? "—"}
+                        </Link>
+                      </TableCell>
+                      <TableCell>
+                        <Link href={editHref} className="block font-medium">
+                          {contact.name}
+                        </Link>
+                      </TableCell>
+                      <TableCell>
+                        <Link href={editHref} className="block">
+                          {contact.phone ?? "—"}
+                        </Link>
+                      </TableCell>
+                      <TableCell>
+                        <Link href={editHref} className="block">
+                          {contact.email ?? "—"}
+                        </Link>
+                      </TableCell>
+                    </TableRow>
+                  )
+                })
               )}
             </TableBody>
           </Table>
@@ -131,7 +99,7 @@ export function EmergencyContactsSection({
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         clientId={clientId}
-        contact={editingContact}
+        contact={null}
       />
     </>
   )

@@ -33,6 +33,7 @@ export function EditClientForm({
     dateOfBirth: string | null
     email: string | null
     phone: string | null
+    address: string | null
     commsOptOut: boolean
     reminderOptOut: boolean
     preSessionOptOut: boolean
@@ -96,6 +97,16 @@ export function EditClientForm({
           name="phone"
           type="tel"
           defaultValue={client.phone ?? ""}
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="address">Address</Label>
+        <Input
+          id="address"
+          name="address"
+          defaultValue={client.address ?? ""}
+          placeholder="e.g. 123 Smith St, Sydney NSW 2000"
         />
       </div>
 

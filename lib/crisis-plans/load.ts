@@ -112,3 +112,24 @@ export async function loadActiveCrisisPlanSummary(
 
   return row ?? null
 }
+
+export async function loadEmergencyContactById(
+  contactId: string,
+  clientId: string,
+  practiceId: string
+): Promise<EmergencyContactRow | null> {
+  const [row] = await db
+    .select()
+    .from(clientEmergencyContacts)
+    .where(
+      and(
+        eq(clientEmergencyContacts.contactId, contactId),
+        eq(clientEmergencyContacts.clientId, clientId),
+        eq(clientEmergencyContacts.practiceId, practiceId)
+      )
+    )
+    .limit(1)
+
+  if (!row) return null
+  return rowToEmergencyContact(row)
+}

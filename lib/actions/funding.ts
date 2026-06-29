@@ -31,6 +31,10 @@ import {
   formatApprovalProgress,
 } from "@/lib/funding/format"
 import {
+  deriveReportingRequirementStatus,
+  type ReportingRequirementStatus,
+} from "@/lib/funding/reporting-status"
+import {
   countActiveAppointmentsLinkedToClaim,
   countActiveFundingApprovalsByType,
   countActiveFundingApprovalsForClaim,
@@ -942,6 +946,7 @@ export async function getFundingPanelByClientId(clientId: string) {
   const rows = await db
     .select({
       fundingApprovalId: fundingApprovals.fundingApprovalId,
+      fundingApprovalTypeId: fundingApprovals.fundingApprovalTypeId,
       claimTypeName: claimTypes.claimTypeName,
       approvalTypeName: fundingApprovalTypes.name,
       startDate: fundingApprovals.startDate,
@@ -967,12 +972,66 @@ export async function getFundingPanelByClientId(clientId: string) {
     .orderBy(desc(fundingApprovals.startDate))
 
   return Promise.all(
-    rows.map(async (row) => ({
-      ...row,
-      appointmentsAttended: await countAppointmentsAttended(
+    rows.map(async (row) => {
+      const appointmentsAttended = await countAppointmentsAttended(
         row.fundingApprovalId
-      ),
-    }))
+      )
+
+      let reportingRequirements: Array<{
+        appointmentNumber: number
+        reportType: string
+        status: ReportingRequirementStatus
+      }> = []
+
+      if (row.fundingApprovalTypeId) {
+        const reqs = await db
+          .select({
+            appointmentNumber:
+              fundingApprovalTypeReports.appointmentNumber,
+            reportType: fundingApprovalTypeReports.reportType,
+            simpleReportId: fundingApprovalReportLinks.simpleReportId,
+          })
+          .from(fundingApprovalTypeReports)
+          .leftJoin(
+            fundingApprovalReportLinks,
+            and(
+              eq(
+                fundingApprovalReportLinks.fundingApprovalId,
+                row.fundingApprovalId
+              ),
+              eq(
+                fundingApprovalReportLinks.appointmentNumber,
+                fundingApprovalTypeReports.appointmentNumber
+              )
+            )
+          )
+          .where(
+            eq(
+              fundingApprovalTypeReports.fundingApprovalTypeId,
+              row.fundingApprovalTypeId
+            )
+          )
+          .orderBy(asc(fundingApprovalTypeReports.appointmentNumber))
+
+        reportingRequirements = reqs.map((req) => ({
+          appointmentNumber: req.appointmentNumber,
+          reportType: req.reportType,
+          status: deriveReportingRequirementStatus({
+            hasLinkedReport: Boolean(req.simpleReportId),
+            appointmentNumber: req.appointmentNumber,
+            appointmentsAttended,
+          }),
+        }))
+      }
+
+      const { fundingApprovalTypeId: _typeId, ...rest } = row
+
+      return {
+        ...rest,
+        appointmentsAttended,
+        reportingRequirements,
+      }
+    })
   )
 }
 

@@ -4,7 +4,6 @@ import { and, eq } from "drizzle-orm"
 
 import { ActionItemsSection } from "@/app/clients/[client_id]/action-items-section"
 import { ClientMenuSidebar } from "@/app/clients/[client_id]/client-menu-sidebar"
-import { ExportSessionNotesButton } from "@/components/session-notes/export-session-notes-button"
 import { EmergencyContactsSection } from "@/components/emergency-contacts/emergency-contacts-section"
 import { ClientStatusControl } from "@/components/clients/client-status-control"
 import { AppShell } from "@/components/app-shell"
@@ -27,6 +26,7 @@ import {
 } from "@/components/ui/table"
 import { clients } from "@/db/schema"
 import { getDefaultBatteryAssessments } from "@/lib/assessments/battery-defaults"
+import { loadLatestAssessmentResultForClient } from "@/lib/assessments/load"
 import {
   formatAppointmentDate,
   formatAppointmentTime,
@@ -40,6 +40,7 @@ import { requirePractitionerContext } from "@/lib/auth"
 import { db } from "@/lib/db"
 import { getFundingPanelByClientId } from "@/lib/actions/funding"
 import { formatApprovalProgress, formatDisplayDate } from "@/lib/funding/format"
+import { REPORTING_REQUIREMENT_STATUS_CONFIG } from "@/lib/funding/reporting-status"
 import { buildTemplateVariablesFromLinkResponse } from "@/lib/email/link-response"
 import { getQuestionnaireEmailContext } from "@/lib/email/practitioner-context"
 import { loadActiveTreatmentPlanSummary } from "@/lib/treatment-plans/load"
@@ -87,6 +88,8 @@ export default async function ClientDetailPage({
     nextAppointment,
     fundingPanelRows,
     attendanceRisk,
+    latestAsq,
+    latestPsf,
   ] = await Promise.all([
     loadActiveTreatmentPlanSummary(clientId, context.practiceId),
     loadActiveCrisisPlanSummary(clientId, context.practiceId),
@@ -97,7 +100,14 @@ export default async function ClientDetailPage({
     loadNextAppointmentForClient(clientId, context.practiceId),
     getFundingPanelByClientId(clientId),
     loadAttendanceRiskForClient(clientId, context.practiceId),
+    loadLatestAssessmentResultForClient(clientId, context.practiceId, "ASQ"),
+    loadLatestAssessmentResultForClient(clientId, context.practiceId, "PSF"),
   ])
+
+  const maxReportCount =
+    fundingPanelRows.length > 0
+      ? Math.max(...fundingPanelRows.map((r) => r.reportingRequirements.length))
+      : 0
 
   const clientEmail = client.email?.trim() || null
   const estimatedExpiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
@@ -138,27 +148,10 @@ export default async function ClientDetailPage({
         <div>
           <Card className="mb-6">
             <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>Client details</CardTitle>
-              <Button variant="outline" size="sm" asChild>
-                <Link href={`/clients/${clientId}/edit`}>Edit Client</Link>
-              </Button>
+              <CardTitle>Status</CardTitle>
             </CardHeader>
             <CardContent>
               <dl className="grid gap-3 sm:grid-cols-2">
-                <div>
-                  <dt className="text-sm text-muted-foreground">Email</dt>
-                  <dd className="font-medium">{client.email ?? "—"}</dd>
-                </div>
-                <div>
-                  <dt className="text-sm text-muted-foreground">Phone</dt>
-                  <dd className="font-medium">{client.phone ?? "—"}</dd>
-                </div>
-                <div>
-                  <dt className="text-sm text-muted-foreground">Date of birth</dt>
-                  <dd className="font-medium">
-                    {formatDate(client.dateOfBirth)}
-                  </dd>
-                </div>
                 <div>
                   <dt className="text-sm text-muted-foreground">Client status</dt>
                   <dd className="font-medium">
@@ -198,6 +191,67 @@ export default async function ClientDetailPage({
                     )}
                   </dd>
                 </div>
+                <div>
+                  <dt className="text-sm text-muted-foreground">Risk</dt>
+                  <dd className="mt-0.5">
+                    {latestAsq ? (
+                      <p className="text-sm">
+                        {formatDate(latestAsq.assessmentDate)}
+                        {latestAsq.severity ? ` · ${latestAsq.severity}` : ""}
+                      </p>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">
+                        No ASQ on file
+                      </p>
+                    )}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-sm text-muted-foreground">Feedback</dt>
+                  <dd className="mt-0.5">
+                    {latestPsf ? (
+                      <p className="text-sm">
+                        {formatDate(latestPsf.assessmentDate)}
+                        {latestPsf.severity ? ` · ${latestPsf.severity}` : ""}
+                      </p>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">
+                        No PSF on file
+                      </p>
+                    )}
+                  </dd>
+                </div>
+              </dl>
+            </CardContent>
+          </Card>
+
+          <Card className="mb-6">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle>Client details</CardTitle>
+              <Button variant="outline" size="sm" asChild>
+                <Link href={`/clients/${clientId}/edit`}>Edit Client</Link>
+              </Button>
+            </CardHeader>
+            <CardContent>
+              <dl className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <dt className="text-sm text-muted-foreground">Email</dt>
+                  <dd className="font-medium">{client.email ?? "—"}</dd>
+                </div>
+                <div>
+                  <dt className="text-sm text-muted-foreground">Phone</dt>
+                  <dd className="font-medium">{client.phone ?? "—"}</dd>
+                </div>
+                <div>
+                  <dt className="text-sm text-muted-foreground">Date of birth</dt>
+                  <dd className="font-medium">
+                    {formatDate(client.dateOfBirth)}
+                  </dd>
+                </div>
+                <div className="sm:col-span-2">
+                  <dt className="text-sm text-muted-foreground">Address</dt>
+                  <dd className="font-medium">{client.address ?? "—"}</dd>
+                </div>
               </dl>
             </CardContent>
           </Card>
@@ -221,20 +275,13 @@ export default async function ClientDetailPage({
           <Card className="mb-6">
             <CardHeader className="flex flex-row items-center justify-between gap-4">
               <CardTitle>Funding</CardTitle>
-              <div className="flex flex-wrap gap-2">
-                <Button variant="outline" size="sm" asChild>
-                  <Link href={`/clients/${clientId}/claims`}>
-                    See All
-                  </Link>
-                </Button>
-                <Button size="sm" asChild>
-                  <Link
-                    href={`/funding/approvals/new?clientId=${clientId}&returnTo=${encodeURIComponent(`/clients/${clientId}`)}`}
-                  >
-                    Add Approval
-                  </Link>
-                </Button>
-              </div>
+              <Button size="sm" asChild>
+                <Link
+                  href={`/funding/approvals/new?clientId=${clientId}&returnTo=${encodeURIComponent(`/clients/${clientId}`)}`}
+                >
+                  Add Approval
+                </Link>
+              </Button>
             </CardHeader>
             <CardContent>
               <div className="rounded-lg border">
@@ -245,13 +292,16 @@ export default async function ClientDetailPage({
                       <TableHead>Approval</TableHead>
                       <TableHead>Start</TableHead>
                       <TableHead>Progress</TableHead>
+                      {Array.from({ length: maxReportCount }, (_, i) => (
+                        <TableHead key={i}>Report {i + 1}</TableHead>
+                      ))}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {fundingPanelRows.length === 0 ? (
                       <TableRow>
                         <TableCell
-                          colSpan={4}
+                          colSpan={4 + maxReportCount}
                           className="h-16 text-center text-muted-foreground"
                         >
                           No funding approvals yet.
@@ -300,6 +350,25 @@ export default async function ClientDetailPage({
                                 )}
                               </Link>
                             </TableCell>
+                            {Array.from({ length: maxReportCount }, (_, i) => {
+                              const req = row.reportingRequirements[i]
+                              return (
+                                <TableCell key={i}>
+                                  <Link href={approvalHref} className="block">
+                                    {req ? (
+                                      <StatusBadge
+                                        status={req.status}
+                                        statusMap={
+                                          REPORTING_REQUIREMENT_STATUS_CONFIG
+                                        }
+                                      />
+                                    ) : (
+                                      "—"
+                                    )}
+                                  </Link>
+                                </TableCell>
+                              )
+                            })}
                           </TableRow>
                         )
                       })
@@ -389,24 +458,11 @@ export default async function ClientDetailPage({
               {!activeCrisisPlan ? (
                 <p className="text-sm text-muted-foreground">No crisis plan</p>
               ) : (
-                <dl className="grid gap-3">
-                  <div>
-                    <dt className="text-sm text-muted-foreground">Date of plan</dt>
-                    <dd className="font-medium">
-                      {formatDate(activeCrisisPlan.dateOfPlan)}
-                    </dd>
-                  </div>
-                </dl>
+                <p className="text-sm font-medium">
+                  v{activeCrisisPlan.versionNumber} (
+                  {formatDate(activeCrisisPlan.dateOfPlan)})
+                </p>
               )}
-            </CardContent>
-          </Card>
-
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle>Records</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ExportSessionNotesButton clientId={clientId} />
             </CardContent>
           </Card>
         </div>

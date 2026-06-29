@@ -5,6 +5,7 @@ import Link from "next/link"
 
 import { createDraftSessionNote } from "@/app/session-notes/actions"
 import { SendCommunicationModal } from "@/components/email/send-communication-modal"
+import { ExportSessionNotesButton } from "@/components/session-notes/export-session-notes-button"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -73,6 +74,7 @@ export function ActionItemsSection({
                 Create Report
               </Link>
             </Button>
+            <ExportSessionNotesButton clientId={clientId} />
           </div>
 
           {statusMessage ? (

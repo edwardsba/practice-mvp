@@ -21,11 +21,11 @@ export const APPOINTMENT_STATUS_CONFIG: Record<string, StatusConfig> = {
 }
 
 export const APPOINTMENT_STATUS_TRANSITIONS: Record<string, string[]> = {
-  scheduled: ["confirmed", "cancelled"],
-  confirmed: ["completed", "no_show", "cancelled"],
-  completed: ["no_show"],
-  no_show: [],
-  cancelled: [],
+  scheduled:  ["confirmed", "completed", "no_show", "cancelled"],
+  confirmed:  ["scheduled", "completed", "no_show", "cancelled"],
+  completed:  ["scheduled", "confirmed", "no_show", "cancelled"],
+  no_show:    ["scheduled", "confirmed", "completed", "cancelled"],
+  cancelled:  ["scheduled", "confirmed", "completed", "no_show"],
 }
 
 export const FUNDING_APPROVAL_STATUS_CONFIG: Record<string, StatusConfig> = {

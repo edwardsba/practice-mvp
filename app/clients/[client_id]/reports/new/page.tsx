@@ -150,6 +150,7 @@ export default async function NewReportPage({
         saveAction={saveReportDraft.bind(null, clientId)}
         submitLabel="Save Draft"
         therapeuticTarget={therapeuticTarget}
+        cancelHref={`/clients/${clientId}`}
       />
     </AppShell>
   )

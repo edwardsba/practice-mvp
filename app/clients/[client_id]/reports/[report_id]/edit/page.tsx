@@ -201,6 +201,7 @@ export default async function EditReportPage({
         saveAction={updateReportDraft.bind(null, clientId, reportId)}
         submitLabel="Save changes"
         therapeuticTarget={therapeuticTarget}
+        cancelHref={`/clients/${clientId}/reports/${reportId}`}
       />
 
       <EntityDeleteSection

@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import { useActionState, useCallback, useEffect, useRef, useState, useTransition } from "react"
 
 import {
@@ -66,6 +67,7 @@ export function ReportForm({
   saveAction,
   submitLabel,
   therapeuticTarget,
+  cancelHref,
 }: {
   clientId: string
   fundingApprovals: Awaited<
@@ -104,6 +106,7 @@ export function ReportForm({
   ) => Promise<SaveReportDraftState>
   submitLabel?: string
   therapeuticTarget?: string | null
+  cancelHref: string
 }) {
   const validInitialApprovalId =
     initialFundingApprovalId &&
@@ -629,6 +632,9 @@ export function ReportForm({
               >
                 Print / Save as PDF
               </Button>
+              <Button type="button" variant="outline" asChild>
+                <Link href={cancelHref}>Cancel</Link>
+              </Button>
             </div>
           </form>
         ) : (
@@ -860,6 +866,9 @@ export function ReportForm({
                   disabled={!previewSnapshot}
                 >
                   Print / Save as PDF
+                </Button>
+                <Button type="button" variant="outline" asChild>
+                  <Link href={cancelHref}>Cancel</Link>
                 </Button>
               </div>
             </form>

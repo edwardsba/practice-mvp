@@ -101,7 +101,7 @@ export async function loadAppointmentsForPractice(
       eq(sessionNotes.appointmentId, appointments.appointmentId)
     )
     .where(and(...conditions))
-    .orderBy(asc(appointments.appointmentDate), asc(appointments.appointmentTime))
+    .orderBy(desc(appointments.appointmentDate), desc(appointments.appointmentTime))
 }
 
 export async function loadAppointmentForPractice(

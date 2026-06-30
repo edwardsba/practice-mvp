@@ -28,7 +28,7 @@ export function AppointmentsFilter({
       {APPOINTMENT_FILTER_VALUES.map((filter) => {
         const isActive = currentFilter === filter
         const href =
-          filter === "upcoming" ? pathname : `${pathname}?filter=${filter}`
+          filter === "all" ? pathname : `${pathname}?filter=${filter}`
 
         return (
           <Button

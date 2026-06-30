@@ -32,7 +32,7 @@ function parseFilter(value: string | undefined): AppointmentFilter {
   if (value && APPOINTMENT_FILTER_VALUES.includes(value as AppointmentFilter)) {
     return value as AppointmentFilter
   }
-  return "upcoming"
+  return "all"
 }
 
 export default async function AppointmentsPage({
@@ -50,9 +50,13 @@ export default async function AppointmentsPage({
 
   return (
     <AppShell>
-      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="mb-6">
         <h1 className="text-2xl font-semibold tracking-tight">Appointments</h1>
-        <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-start">
+      </div>
+
+      <div className="mb-6 flex items-center justify-between gap-4">
+        <AppointmentsFilter currentFilter={filter} />
+        <div className="flex items-center gap-3">
           {process.env.NODE_ENV === "development" ? (
             <TestAutomationsButton />
           ) : null}
@@ -60,10 +64,6 @@ export default async function AppointmentsPage({
             <Link href="/appointments/new">Add Appointment</Link>
           </Button>
         </div>
-      </div>
-
-      <div className="mb-6">
-        <AppointmentsFilter currentFilter={filter} />
       </div>
 
       <div className="rounded-lg border">

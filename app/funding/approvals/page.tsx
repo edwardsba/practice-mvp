@@ -1,6 +1,7 @@
 import Link from "next/link"
 
 import { AppShell } from "@/components/app-shell"
+import { StatusBadge } from "@/components/ui/status-badge"
 import { Button } from "@/components/ui/button"
 import {
   Table,
@@ -11,7 +12,8 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { getFundingApprovals } from "@/lib/actions/funding"
-import { formatDisplayDate } from "@/lib/funding/format"
+import { formatApprovalProgress, formatDisplayDate } from "@/lib/funding/format"
+import { REPORTING_OVERALL_STATUS_CONFIG } from "@/lib/funding/reporting-status"
 import { requirePractitionerContext } from "@/lib/auth"
 
 export default async function FundingApprovalsPage() {
@@ -37,13 +39,15 @@ export default async function FundingApprovalsPage() {
               <TableHead>Approval type</TableHead>
               <TableHead>Start date</TableHead>
               <TableHead>End date</TableHead>
+              <TableHead>Reporting</TableHead>
+              <TableHead>Progress</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {approvals.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={4}
+                  colSpan={6}
                   className="h-20 text-center text-muted-foreground"
                 >
                   No funding approvals yet.
@@ -76,6 +80,26 @@ export default async function FundingApprovalsPage() {
                     <TableCell>
                       <Link href={approvalHref} className="block">
                         {formatDisplayDate(approval.endDate)}
+                      </Link>
+                    </TableCell>
+                    <TableCell>
+                      <Link href={approvalHref} className="block">
+                        {approval.reportingOverallStatus ? (
+                          <StatusBadge
+                            status={approval.reportingOverallStatus}
+                            statusMap={REPORTING_OVERALL_STATUS_CONFIG}
+                          />
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </Link>
+                    </TableCell>
+                    <TableCell>
+                      <Link href={approvalHref} className="block">
+                        {formatApprovalProgress(
+                          approval.appointmentsAttended,
+                          approval.appointmentsApproved
+                        )}
                       </Link>
                     </TableCell>
                   </TableRow>

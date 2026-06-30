@@ -29,9 +29,11 @@ import {
 } from "@/lib/funding/format"
 import {
   REPORTING_REQUIREMENT_STATUS_CONFIG,
+  REPORTING_OVERALL_STATUS_CONFIG,
   deriveReportingRequirementStatus,
+  deriveReportingOverallStatus,
 } from "@/lib/funding/reporting-status"
-import { FUNDING_APPROVAL_STATUS_CONFIG, APPOINTMENT_STATUS_CONFIG, type StatusConfig } from "@/lib/status"
+import { FUNDING_APPROVAL_STATUS_CONFIG, APPOINTMENT_STATUS_CONFIG } from "@/lib/status"
 import {
   formatAppointmentDate,
   formatAppointmentTime,
@@ -79,20 +81,7 @@ export default async function FundingApprovalDetailPage({
     })
   })
 
-  const reportingOverallStatus = (() => {
-    if (reportingStatuses.length === 0) return null
-    if (reportingStatuses.every((s) => s === "completed")) return "completed"
-    if (reportingStatuses.some((s) => s === "overdue")) return "overdue"
-    if (reportingStatuses.some((s) => s === "completed")) return "in_progress"
-    return "not_due"
-  })()
-
-  const REPORTING_OVERALL_CONFIG: Record<string, StatusConfig> = {
-    completed: { label: "All complete", variant: "success" },
-    overdue: { label: "Overdue", variant: "destructive" },
-    in_progress: { label: "In progress", variant: "warning" },
-    not_due: { label: "Not due yet", variant: "muted" },
-  }
+  const reportingOverallStatus = deriveReportingOverallStatus(reportingStatuses)
 
   const expiryPercent = (() => {
     if (!approval.startDate || !approval.endDate) return null
@@ -141,7 +130,7 @@ export default async function FundingApprovalDetailPage({
                 {reportingOverallStatus ? (
                   <StatusBadge
                     status={reportingOverallStatus}
-                    statusMap={REPORTING_OVERALL_CONFIG}
+                    statusMap={REPORTING_OVERALL_STATUS_CONFIG}
                   />
                 ) : (
                   <span className="text-sm text-muted-foreground">

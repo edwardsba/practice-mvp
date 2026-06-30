@@ -32,7 +32,9 @@ import {
 } from "@/lib/funding/format"
 import {
   deriveReportingRequirementStatus,
+  deriveReportingOverallStatus,
   type ReportingRequirementStatus,
+  type ReportingOverallStatus,
 } from "@/lib/funding/reporting-status"
 import {
   countActiveAppointmentsLinkedToClaim,
@@ -549,6 +551,7 @@ export async function getFundingApprovals(practiceId: string) {
   const rows = await db
     .select({
       fundingApprovalId: fundingApprovals.fundingApprovalId,
+      fundingApprovalTypeId: fundingApprovals.fundingApprovalTypeId,
       clientId: fundingApprovals.clientId,
       clientFirstName: clients.firstName,
       clientLastName: clients.lastName,
@@ -576,12 +579,59 @@ export async function getFundingApprovals(practiceId: string) {
     .orderBy(desc(fundingApprovals.startDate), asc(clients.lastName))
 
   return Promise.all(
-    rows.map(async (row) => ({
-      ...row,
-      appointmentsAttended: await countAppointmentsAttended(
+    rows.map(async (row) => {
+      const appointmentsAttended = await countAppointmentsAttended(
         row.fundingApprovalId
-      ),
-    }))
+      )
+
+      let reportingOverallStatus: ReportingOverallStatus | null = null
+
+      if (row.fundingApprovalTypeId) {
+        const reqs = await db
+          .select({
+            appointmentNumber: fundingApprovalTypeReports.appointmentNumber,
+            simpleReportId: fundingApprovalReportLinks.simpleReportId,
+          })
+          .from(fundingApprovalTypeReports)
+          .leftJoin(
+            fundingApprovalReportLinks,
+            and(
+              eq(
+                fundingApprovalReportLinks.fundingApprovalId,
+                row.fundingApprovalId
+              ),
+              eq(
+                fundingApprovalReportLinks.appointmentNumber,
+                fundingApprovalTypeReports.appointmentNumber
+              )
+            )
+          )
+          .where(
+            eq(
+              fundingApprovalTypeReports.fundingApprovalTypeId,
+              row.fundingApprovalTypeId
+            )
+          )
+
+        const statuses = reqs.map((req) =>
+          deriveReportingRequirementStatus({
+            hasLinkedReport: Boolean(req.simpleReportId),
+            appointmentNumber: req.appointmentNumber,
+            appointmentsAttended,
+          })
+        )
+
+        reportingOverallStatus = deriveReportingOverallStatus(statuses)
+      }
+
+      const { fundingApprovalTypeId: _typeId, ...rest } = row
+
+      return {
+        ...rest,
+        appointmentsAttended,
+        reportingOverallStatus,
+      }
+    })
   )
 }
 

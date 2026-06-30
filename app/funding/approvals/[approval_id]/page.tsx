@@ -309,7 +309,6 @@ export default async function FundingApprovalDetailPage({
                   <TableHead>No.</TableHead>
                   <TableHead>Date</TableHead>
                   <TableHead>Time</TableHead>
-                  <TableHead>Location</TableHead>
                   <TableHead>Status</TableHead>
                 </TableRow>
               </TableHeader>
@@ -317,7 +316,7 @@ export default async function FundingApprovalDetailPage({
                 {approval.linkedAppointments.length === 0 ? (
                   <TableRow>
                     <TableCell
-                      colSpan={5}
+                      colSpan={4}
                       className="h-16 text-center text-muted-foreground"
                     >
                       No linked appointments.
@@ -358,14 +357,6 @@ export default async function FundingApprovalDetailPage({
                           href={`/appointments/${appointment.appointmentId}`}
                           className="block"
                         >
-                          {appointment.location?.trim() || "—"}
-                        </Link>
-                      </TableCell>
-                      <TableCell>
-                        <Link
-                          href={`/appointments/${appointment.appointmentId}`}
-                          className="block"
-                        >
                           <StatusBadge
                             status={appointment.status}
                             statusMap={APPOINTMENT_STATUS_CONFIG}
@@ -392,8 +383,8 @@ export default async function FundingApprovalDetailPage({
                 <TableRow>
                   <TableHead>Session</TableHead>
                   <TableHead>Report Type</TableHead>
-                  <TableHead>Linked Report</TableHead>
                   <TableHead>Report Status</TableHead>
+                  <TableHead>Linked Report</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -423,6 +414,12 @@ export default async function FundingApprovalDetailPage({
                         <TableCell>{requirement.appointmentNumber}</TableCell>
                         <TableCell>{requirement.reportType}</TableCell>
                         <TableCell>
+                          <StatusBadge
+                            status={status}
+                            statusMap={REPORTING_REQUIREMENT_STATUS_CONFIG}
+                          />
+                        </TableCell>
+                        <TableCell>
                           {linked?.simpleReportId ? (
                             <Link
                               href={`/clients/${approval.clientId}/reports/${linked.simpleReportId}`}
@@ -439,12 +436,6 @@ export default async function FundingApprovalDetailPage({
                               </Link>
                             </Button>
                           )}
-                        </TableCell>
-                        <TableCell>
-                          <StatusBadge
-                            status={status}
-                            statusMap={REPORTING_REQUIREMENT_STATUS_CONFIG}
-                          />
                         </TableCell>
                       </TableRow>
                     )

@@ -1,17 +1,20 @@
-import Link from "next/link"
-import { notFound } from "next/navigation"
 import { and, eq } from "drizzle-orm"
+import { notFound } from "next/navigation"
 
 import { SavedReportView } from "@/app/clients/[client_id]/reports/[report_id]/saved-report-view"
 import { AppShell } from "@/components/app-shell"
 import { BackButton } from "@/components/ui/back-button"
-import { Button } from "@/components/ui/button"
-import { clients, simpleReports } from "@/db/schema"
+import {
+  clients,
+  fundingApprovalTypeReports,
+  fundingApprovalTypes,
+  fundingApprovals,
+  simpleReports,
+} from "@/db/schema"
 import { requirePractitionerContext } from "@/lib/auth"
 import { db } from "@/lib/db"
 import { parseReportSnapshot } from "@/lib/reports/snapshot"
 
-// Print CSS kept for browser preview; PDF is generated server-side
 import "@/components/report/report-print.css"
 
 export default async function SavedReportPage({
@@ -46,6 +49,8 @@ export default async function SavedReportPage({
       simpleReportId: simpleReports.simpleReportId,
       reportStatus: simpleReports.reportStatus,
       valuesSnapshotJson: simpleReports.valuesSnapshotJson,
+      fundingApprovalId: simpleReports.fundingApprovalId,
+      reportRequirementId: simpleReports.reportRequirementId,
     })
     .from(simpleReports)
     .where(
@@ -66,7 +71,65 @@ export default async function SavedReportPage({
     notFound()
   }
 
-  const clientName = `${client.firstName} ${client.lastName}`
+  let fundingApproval: {
+    approvalTypeName: string
+    startDate: string | null
+  } | null = null
+
+  if (report.fundingApprovalId) {
+    const [fa] = await db
+      .select({
+        approvalTypeName: fundingApprovalTypes.name,
+        startDate: fundingApprovals.startDate,
+      })
+      .from(fundingApprovals)
+      .leftJoin(
+        fundingApprovalTypes,
+        eq(
+          fundingApprovals.fundingApprovalTypeId,
+          fundingApprovalTypes.fundingApprovalTypeId
+        )
+      )
+      .where(
+        and(
+          eq(fundingApprovals.fundingApprovalId, report.fundingApprovalId),
+          eq(fundingApprovals.practiceId, context.practiceId)
+        )
+      )
+      .limit(1)
+
+    if (fa) {
+      fundingApproval = {
+        approvalTypeName: fa.approvalTypeName ?? "Funding approval",
+        startDate: fa.startDate,
+      }
+    }
+  }
+
+  let reportingRequirement: {
+    appointmentNumber: number
+    reportType: string
+  } | null = null
+
+  if (report.reportRequirementId) {
+    const [req] = await db
+      .select({
+        appointmentNumber: fundingApprovalTypeReports.appointmentNumber,
+        reportType: fundingApprovalTypeReports.reportType,
+      })
+      .from(fundingApprovalTypeReports)
+      .where(
+        eq(
+          fundingApprovalTypeReports.reportRequirementId,
+          report.reportRequirementId
+        )
+      )
+      .limit(1)
+
+    if (req) {
+      reportingRequirement = req
+    }
+  }
 
   return (
     <AppShell>
@@ -75,8 +138,13 @@ export default async function SavedReportPage({
           fallbackHref={`/clients/${clientId}`}
           label="← Back to client"
         />
-        <h1 className="text-2xl font-semibold tracking-tight">{clientName}</h1>
-        <p className="mt-1 text-muted-foreground">{snapshot.reportTitle}</p>
+        <h1 className="text-2xl font-semibold tracking-tight">
+          {snapshot.reportTitle}
+        </h1>
+        <p className="mt-1 text-muted-foreground">
+          {client.lastName}, {client.firstName}
+          {fundingApproval ? ` — ${fundingApproval.approvalTypeName}` : ""}
+        </p>
       </div>
 
       <SavedReportView
@@ -84,6 +152,8 @@ export default async function SavedReportPage({
         reportId={reportId}
         reportStatus={report.reportStatus}
         snapshot={snapshot}
+        fundingApproval={fundingApproval}
+        reportingRequirement={reportingRequirement}
       />
     </AppShell>
   )

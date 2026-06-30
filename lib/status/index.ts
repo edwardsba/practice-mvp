@@ -40,6 +40,11 @@ export const SESSION_NOTE_STATUS_CONFIG: Record<string, StatusConfig> = {
   finalised: { label: "Finalised", variant: "success" },
 }
 
+export const REPORT_STATUS_CONFIG: Record<string, StatusConfig> = {
+  draft: { label: "Draft", variant: "default" },
+  finalised: { label: "Finalised", variant: "success" },
+}
+
 export const CLIENT_STATUS_CONFIG: Record<string, StatusConfig> = {
   active: { label: "Active", variant: "default" },
   on_hold: { label: "On hold", variant: "warning" },

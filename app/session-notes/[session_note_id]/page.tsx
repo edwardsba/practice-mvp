@@ -2,12 +2,12 @@ import Link from "next/link"
 import { notFound } from "next/navigation"
 
 import { OngoingAssessmentsTable } from "@/components/session-notes/ongoing-assessments-table"
+import { PrintButton } from "@/components/session-notes/print-button"
 import { ResendBatteryButton } from "@/components/session-notes/resend-battery-button"
 import {
   RiskAssessmentTable,
   type RiskAssessmentRow,
 } from "@/components/session-notes/risk-assessment-table"
-import { SessionDateTimeEditor } from "@/components/session-notes/session-date-time-editor"
 import { SessionNoteActions } from "@/components/session-notes/session-note-actions"
 import { SessionNoteDocument } from "@/components/session-notes/session-note-document"
 import { SessionNotesEditor } from "@/components/session-notes/session-notes-editor"
@@ -29,7 +29,6 @@ import {
 } from "@/components/ui/table"
 import { formatClientNameLastFirst } from "@/lib/appointments/format"
 import { requirePractitionerContext } from "@/lib/auth"
-import { appendReturnTo } from "@/lib/navigation/back"
 import { formatSessionNoteDate } from "@/lib/session-notes/format"
 import { loadSessionNoteViewContext } from "@/lib/session-notes/load-context"
 import { loadSessionNoteForPractice } from "@/lib/session-notes/load"
@@ -75,44 +74,17 @@ export default async function SessionNoteViewPage({
           fallbackHref={`/clients/${note.clientId}`}
           label="← Back to client"
         />
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex items-start justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight">
-              <Link href={`/clients/${note.clientId}`} className="hover:underline">
-                {clientName}
-              </Link>
-            </h1>
+            <h1 className="text-2xl font-semibold tracking-tight">Session note</h1>
+            <p className="text-sm text-muted-foreground">{clientName}</p>
             <p className="text-sm text-muted-foreground">
               Date of birth: {formatDob(note.clientDateOfBirth)}
             </p>
           </div>
-          <div className="flex flex-col items-start gap-1 sm:items-end">
-            <SessionDateTimeEditor
-              sessionNoteId={sessionNoteId}
-              sessionDate={note.sessionDate}
-              sessionTime={note.sessionTime}
-              readOnly={isFinalised}
-            />
-            {note.appointmentId ? (
-              <Link
-                href={appendReturnTo(
-                  `/appointments/${note.appointmentId}`,
-                  `/session-notes/${sessionNoteId}`
-                )}
-                className="text-sm text-primary hover:underline"
-              >
-                View appointment →
-              </Link>
-            ) : null}
-          </div>
+          <PrintButton />
         </div>
       </div>
-
-      <SessionNoteActions
-        sessionNoteId={sessionNoteId}
-        status={note.status}
-        pdfStoragePath={note.pdfStoragePath ?? null}
-      />
 
       <div className="no-print grid grid-cols-1 gap-6 lg:grid-cols-[1.6fr_1fr]">
         <SessionNotesEditor
@@ -122,6 +94,16 @@ export default async function SessionNoteViewPage({
         />
 
         <div className="flex flex-col gap-6">
+          <SessionNoteActions
+            sessionNoteId={sessionNoteId}
+            status={note.status}
+            pdfStoragePath={note.pdfStoragePath ?? null}
+            appointmentId={note.appointmentId ?? null}
+            sessionDate={note.sessionDate}
+            sessionTime={note.sessionTime}
+            nextAppointment={viewContext.nextAppointment ?? null}
+          />
+
           <Card>
             <CardHeader>
               <CardTitle>Treatment plan</CardTitle>
@@ -209,32 +191,6 @@ export default async function SessionNoteViewPage({
                   <p className="text-sm text-muted-foreground">No active crisis plan.</p>
                 )}
               </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Next appointment</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {viewContext.nextAppointment ? (
-                <Link
-                  href={appendReturnTo(
-                    `/appointments/${viewContext.nextAppointment.appointmentId}`,
-                    `/session-notes/${sessionNoteId}`
-                  )}
-                  className="text-sm text-primary hover:underline"
-                >
-                  {viewContext.nextAppointment.label}
-                </Link>
-              ) : (
-                <Link
-                  href={`/calendar?view=month&clientId=${note.clientId}&returnTo=/session-notes/${sessionNoteId}`}
-                  className="text-sm text-primary hover:underline"
-                >
-                  Schedule appointment →
-                </Link>
-              )}
             </CardContent>
           </Card>
         </div>

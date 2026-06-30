@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import { useActionState, useEffect, useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 
@@ -11,8 +12,19 @@ import {
   type GenerateSessionNotePdfPreviewState,
 } from "@/app/session-notes/actions"
 import { Button } from "@/components/ui/button"
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
 import { StatusBadge } from "@/components/ui/status-badge"
+import { appendReturnTo } from "@/lib/navigation/back"
 import { SESSION_NOTE_STATUS_CONFIG } from "@/lib/status"
+import {
+  formatSessionNoteDate,
+  formatSessionNoteTime,
+} from "@/lib/session-notes/format"
 
 const initialFinaliseState: FinaliseSessionNoteState = {}
 const initialPreviewState: GenerateSessionNotePdfPreviewState = {}
@@ -21,10 +33,18 @@ export function SessionNoteActions({
   sessionNoteId,
   status,
   pdfStoragePath,
+  appointmentId,
+  sessionDate,
+  sessionTime,
+  nextAppointment,
 }: {
   sessionNoteId: string
   status: string
   pdfStoragePath: string | null
+  appointmentId: string | null
+  sessionDate: string
+  sessionTime: string | null
+  nextAppointment: { appointmentId: string; label: string } | null
 }) {
   const [finaliseState, finaliseFormAction, finalisePending] = useActionState(
     finaliseSessionNote.bind(null, sessionNoteId),
@@ -41,6 +61,7 @@ export function SessionNoteActions({
   const router = useRouter()
 
   const isFinalised = status === "finalised" || finaliseState.success
+
   const showPreviewModal =
     Boolean(previewState.pdfBase64) && !isFinalised
 
@@ -49,10 +70,6 @@ export function SessionNoteActions({
       router.refresh()
     }
   }, [finaliseState.success, router])
-
-  function handlePrint() {
-    window.print()
-  }
 
   function handleDownload() {
     setDownloadError(null)
@@ -69,47 +86,115 @@ export function SessionNoteActions({
     })
   }
 
+  const sessionDateTime = (
+    <>
+      {formatSessionNoteDate(sessionDate)}
+      {sessionTime ? `, ${formatSessionNoteTime(sessionTime)}` : ""}
+    </>
+  )
+
   return (
     <>
-      <div className="no-print mb-6 flex flex-wrap items-center gap-3">
-        <StatusBadge
-          status={isFinalised ? "finalised" : status}
-          statusMap={SESSION_NOTE_STATUS_CONFIG}
-        />
-        {isFinalised ? (
-          <>
-            {pdfStoragePath ? (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={downloadPending}
-                onClick={handleDownload}
-              >
-                {downloadPending ? "Preparing…" : "Download PDF"}
-              </Button>
-            ) : null}
-          </>
-        ) : (
-          <form action={previewFormAction}>
-            <Button type="submit" disabled={previewPending}>
-              {previewPending ? "Generating preview…" : "Finalise"}
-            </Button>
-          </form>
-        )}
-        <Button type="button" variant="outline" onClick={handlePrint}>
-          Print
-        </Button>
-        {previewState.error ? (
-          <p className="w-full text-sm text-destructive">{previewState.error}</p>
-        ) : null}
-        {finaliseState.error ? (
-          <p className="w-full text-sm text-destructive">{finaliseState.error}</p>
-        ) : null}
-        {downloadError ? (
-          <p className="w-full text-sm text-destructive">{downloadError}</p>
-        ) : null}
-      </div>
+      <Card className="no-print mb-6">
+        <CardHeader>
+          <CardTitle>Status</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <dl className="grid gap-4">
+            <div>
+              <dt className="mb-2 text-sm text-muted-foreground">
+                Session note
+              </dt>
+              <dd className="flex flex-wrap items-center gap-3">
+                <StatusBadge
+                  status={isFinalised ? "finalised" : status}
+                  statusMap={SESSION_NOTE_STATUS_CONFIG}
+                />
+                {isFinalised ? (
+                  <>
+                    {pdfStoragePath ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={downloadPending}
+                        onClick={handleDownload}
+                      >
+                        {downloadPending ? "Preparing…" : "Download PDF"}
+                      </Button>
+                    ) : null}
+                  </>
+                ) : (
+                  <form action={previewFormAction}>
+                    <Button type="submit" size="sm" disabled={previewPending}>
+                      {previewPending ? "Generating preview…" : "Finalise"}
+                    </Button>
+                  </form>
+                )}
+              </dd>
+            </div>
+
+            <div>
+              <dt className="text-sm text-muted-foreground">Appointment</dt>
+              <dd className="mt-0.5 text-sm font-medium">
+                {appointmentId ? (
+                  <Link
+                    href={appendReturnTo(
+                      `/appointments/${appointmentId}`,
+                      `/session-notes/${sessionNoteId}`
+                    )}
+                    className="text-primary hover:underline"
+                  >
+                    {sessionDateTime}
+                  </Link>
+                ) : (
+                  <span>{sessionDateTime}</span>
+                )}
+              </dd>
+            </div>
+
+            <div>
+              <dt className="text-sm text-muted-foreground">
+                Next appointment
+              </dt>
+              <dd className="mt-0.5 text-sm font-medium">
+                {nextAppointment ? (
+                  <Link
+                    href={appendReturnTo(
+                      `/appointments/${nextAppointment.appointmentId}`,
+                      `/session-notes/${sessionNoteId}`
+                    )}
+                    className="text-primary hover:underline"
+                  >
+                    {nextAppointment.label}
+                  </Link>
+                ) : (
+                  <Link
+                    href={`/calendar?view=month&returnTo=/session-notes/${sessionNoteId}`}
+                    className="text-primary hover:underline"
+                  >
+                    Schedule appointment →
+                  </Link>
+                )}
+              </dd>
+            </div>
+          </dl>
+
+          {previewState.error ? (
+            <p className="mt-3 text-sm text-destructive">
+              {previewState.error}
+            </p>
+          ) : null}
+          {finaliseState.error ? (
+            <p className="mt-3 text-sm text-destructive">
+              {finaliseState.error}
+            </p>
+          ) : null}
+          {downloadError ? (
+            <p className="mt-3 text-sm text-destructive">{downloadError}</p>
+          ) : null}
+        </CardContent>
+      </Card>
 
       {showPreviewModal ? (
         <div className="no-print fixed inset-0 z-50 flex flex-col bg-background/95 backdrop-blur-sm">

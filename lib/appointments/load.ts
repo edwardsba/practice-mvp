@@ -251,6 +251,7 @@ export async function loadAppointmentsForClient(
       appointmentTime: appointments.appointmentTime,
       mode: appointments.mode,
       status: appointments.status,
+      sessionNoteStatus: sessionNotes.status,
       approvalTypeName: fundingApprovalTypes.name,
     })
     .from(appointments)
@@ -264,6 +265,10 @@ export async function loadAppointmentsForClient(
         fundingApprovals.fundingApprovalTypeId,
         fundingApprovalTypes.fundingApprovalTypeId
       )
+    )
+    .leftJoin(
+      sessionNotes,
+      eq(sessionNotes.appointmentId, appointments.appointmentId)
     )
     .where(
       and(

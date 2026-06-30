@@ -4,6 +4,7 @@ import { and, eq } from "drizzle-orm"
 
 import { AppShell } from "@/components/app-shell"
 import { Button } from "@/components/ui/button"
+import { StatusBadge } from "@/components/ui/status-badge"
 import {
   Table,
   TableBody,
@@ -19,13 +20,13 @@ import {
 } from "@/lib/appointments/constants"
 import {
   formatAppointmentDate,
-  formatAppointmentStatus,
   formatAppointmentTime,
 } from "@/lib/appointments/format"
 import { loadAppointmentsForClient } from "@/lib/appointments/load"
 import { requirePractitionerContext } from "@/lib/auth"
 import { appendReturnTo } from "@/lib/navigation/back"
 import { db } from "@/lib/db"
+import { APPOINTMENT_STATUS_CONFIG, SESSION_NOTE_STATUS_CONFIG } from "@/lib/status"
 
 export default async function ClientAppointmentsPage({
   params,
@@ -85,16 +86,17 @@ export default async function ClientAppointmentsPage({
             <TableRow>
               <TableHead>Date</TableHead>
               <TableHead>Time</TableHead>
-              <TableHead>Mode</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead>Funding Approval</TableHead>
+              <TableHead>Session note</TableHead>
+              <TableHead>Funding approval</TableHead>
+              <TableHead>Mode</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {appointments.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={5}
+                  colSpan={6}
                   className="h-20 text-center text-muted-foreground"
                 >
                   No appointments scheduled.
@@ -120,27 +122,40 @@ export default async function ClientAppointmentsPage({
                       </Link>
                     </TableCell>
                     <TableCell>
-                      <Link href={appointmentHref} className="block hover:underline">
+                      <Link href={appointmentHref} className="block">
                         {formatAppointmentTime(appointment.appointmentTime)}
                       </Link>
                     </TableCell>
                     <TableCell>
-                      <Link href={appointmentHref} className="block hover:underline">
-                        {appointment.mode in APPOINTMENT_MODE_LABELS
-                          ? APPOINTMENT_MODE_LABELS[
-                              appointment.mode as AppointmentMode
-                            ]
-                          : appointment.mode}
+                      <Link href={appointmentHref} className="block">
+                        <StatusBadge
+                          status={appointment.status}
+                          statusMap={APPOINTMENT_STATUS_CONFIG}
+                        />
                       </Link>
                     </TableCell>
                     <TableCell>
-                      <Link href={appointmentHref} className="block hover:underline">
-                        {formatAppointmentStatus(appointment.status)}
+                      <Link href={appointmentHref} className="block">
+                        {appointment.sessionNoteStatus ? (
+                          <StatusBadge
+                            status={appointment.sessionNoteStatus}
+                            statusMap={SESSION_NOTE_STATUS_CONFIG}
+                          />
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
                       </Link>
                     </TableCell>
                     <TableCell>
-                      <Link href={appointmentHref} className="block hover:underline">
+                      <Link href={appointmentHref} className="block">
                         {appointment.approvalTypeName ?? "—"}
+                      </Link>
+                    </TableCell>
+                    <TableCell>
+                      <Link href={appointmentHref} className="block">
+                        {appointment.mode in APPOINTMENT_MODE_LABELS
+                          ? APPOINTMENT_MODE_LABELS[appointment.mode as AppointmentMode]
+                          : appointment.mode}
                       </Link>
                     </TableCell>
                   </TableRow>

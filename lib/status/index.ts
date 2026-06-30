@@ -36,7 +36,7 @@ export const FUNDING_APPROVAL_STATUS_CONFIG: Record<string, StatusConfig> = {
 }
 
 export const SESSION_NOTE_STATUS_CONFIG: Record<string, StatusConfig> = {
-  draft: { label: "Draft", variant: "default" },
+  draft: { label: "Draft", variant: "warning" },
   finalised: { label: "Finalised", variant: "success" },
 }
 

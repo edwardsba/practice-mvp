@@ -54,6 +54,7 @@ export default async function EditOrganisationPage({
           postalAddress: organisation.postalAddress,
           phone: organisation.phone,
           fax: organisation.fax,
+          faxEmail: organisation.faxEmail,
           email: organisation.email,
           claimsEmail: organisation.claimsEmail,
           secureMessaging: organisation.secureMessaging,

@@ -375,6 +375,7 @@ export async function upsertProfessionalOrganisation(
     postalAddress?: string | null
     phone?: string | null
     fax?: string | null
+    faxEmail?: string | null
     email?: string | null
     claimsEmail?: string | null
     secureMessaging?: string | null
@@ -396,6 +397,7 @@ export async function upsertProfessionalOrganisation(
     postalAddress: data.postalAddress?.trim() || null,
     phone: data.phone?.trim() || null,
     fax: data.fax?.trim() || null,
+    faxEmail: data.faxEmail?.trim() || null,
     email: data.email?.trim() || null,
     claimsEmail: data.claimsEmail?.trim() || null,
     secureMessaging: data.secureMessaging?.trim() || null,
@@ -558,6 +560,7 @@ export async function saveProfessionalOrganisationAction(
       postalAddress: trimOrNull(formData.get("postal_address")),
       phone: trimOrNull(formData.get("phone")),
       fax: trimOrNull(formData.get("fax")),
+      faxEmail: trimOrNull(formData.get("fax_email")),
       email: trimOrNull(formData.get("email")),
       claimsEmail: trimOrNull(formData.get("claims_email")),
       secureMessaging: trimOrNull(formData.get("secure_messaging")),

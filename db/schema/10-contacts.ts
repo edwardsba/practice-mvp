@@ -33,6 +33,7 @@ export const professionalOrganisations = pgTable('professional_organisations', {
   postalAddress: text('postal_address'),
   phone: text('phone'),
   fax: text('fax'),
+  faxEmail: text('fax_email'),
   email: text('email'),
   claimsEmail: text('claims_email'),
   secureMessaging: text('secure_messaging'),

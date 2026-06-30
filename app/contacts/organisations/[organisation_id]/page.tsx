@@ -77,6 +77,10 @@ export default async function OrganisationDetailPage({
               <dd className="font-medium">{organisation.fax ?? "—"}</dd>
             </div>
             <div>
+              <dt className="text-sm text-muted-foreground">Fax email</dt>
+              <dd className="font-medium">{organisation.faxEmail ?? "—"}</dd>
+            </div>
+            <div>
               <dt className="text-sm text-muted-foreground">Email</dt>
               <dd className="font-medium">{organisation.email ?? "—"}</dd>
             </div>

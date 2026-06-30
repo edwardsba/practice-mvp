@@ -21,6 +21,7 @@ type OrganisationInitialValues = {
   postalAddress: string | null
   phone: string | null
   fax: string | null
+  faxEmail: string | null
   email: string | null
   claimsEmail: string | null
   secureMessaging: string | null
@@ -102,6 +103,16 @@ export function OrganisationForm({
                 defaultValue={initialValues?.fax ?? ""}
               />
             </div>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="fax_email">Fax email</Label>
+            <Input
+              id="fax_email"
+              name="fax_email"
+              type="email"
+              defaultValue={initialValues?.faxEmail ?? ""}
+              placeholder="e.g. fax@organisation.com.au"
+            />
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">

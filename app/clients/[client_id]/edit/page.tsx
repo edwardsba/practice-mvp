@@ -33,6 +33,7 @@ export default async function EditClientPage({
       email: clients.email,
       phone: clients.phone,
       address: clients.address,
+      notes: clients.notes,
       commsOptOut: clients.commsOptOut,
       reminderOptOut: clients.reminderOptOut,
       preSessionOptOut: clients.preSessionOptOut,

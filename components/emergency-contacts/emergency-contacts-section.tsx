@@ -33,7 +33,12 @@ export function EmergencyContactsSection({
     <>
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle>Emergency contacts</CardTitle>
-        <Button type="button" size="sm" onClick={() => setDialogOpen(true)}>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => setDialogOpen(true)}
+        >
           Add emergency contact
         </Button>
       </CardHeader>

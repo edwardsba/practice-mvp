@@ -11,6 +11,7 @@ import { FormCheckboxField } from "@/components/treatment-plan/form-fields"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
 
 const initialState: UpdateClientFormState = {}
 
@@ -34,6 +35,7 @@ export function EditClientForm({
     email: string | null
     phone: string | null
     address: string | null
+    notes: string | null
     commsOptOut: boolean
     reminderOptOut: boolean
     preSessionOptOut: boolean
@@ -107,6 +109,17 @@ export function EditClientForm({
           name="address"
           defaultValue={client.address ?? ""}
           placeholder="e.g. 123 Smith St, Sydney NSW 2000"
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="notes">Notes</Label>
+        <Textarea
+          id="notes"
+          name="notes"
+          rows={4}
+          defaultValue={client.notes ?? ""}
+          placeholder="General notes about this client..."
         />
       </div>
 

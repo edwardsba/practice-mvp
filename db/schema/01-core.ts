@@ -62,6 +62,7 @@ export const clients = pgTable('clients', {
   email: citext('email'),
   phone: text('phone'),
   address: text('address'),
+  notes: text('notes'),
   isActive: boolean('is_active').notNull().default(true),
   clientStatus: text('client_status').notNull().default('active'),
   commsOptOut: boolean('comms_opt_out').notNull().default(false),

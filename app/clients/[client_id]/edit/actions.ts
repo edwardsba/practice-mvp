@@ -31,6 +31,7 @@ export async function updateClient(
   const adminCommsOptOut = formData.get("admin_comms_opt_out") === "on"
   const onlineBookingPermitted = formData.get("online_booking_permitted") === "on"
   const address = String(formData.get("address") ?? "").trim() || null
+  const notes = String(formData.get("notes") ?? "").trim() || null
 
   if (!firstName || !lastName) {
     return { error: "First name and last name are required." }
@@ -62,6 +63,7 @@ export async function updateClient(
       email,
       phone,
       address,
+      notes,
       dateOfBirth,
       commsOptOut,
       reminderOptOut,

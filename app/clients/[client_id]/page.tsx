@@ -196,7 +196,8 @@ export default async function ClientDetailPage({
                   <dd className="mt-0.5">
                     {latestAsq ? (
                       <p className="text-sm">
-                        {formatDate(latestAsq.assessmentDate)}
+                        ASQ · {formatDate(latestAsq.assessmentDate)}
+                        {latestAsq.score != null ? ` · ${latestAsq.score}` : ""}
                         {latestAsq.severity ? ` · ${latestAsq.severity}` : ""}
                       </p>
                     ) : (
@@ -211,7 +212,7 @@ export default async function ClientDetailPage({
                   <dd className="mt-0.5">
                     {latestPsf ? (
                       <p className="text-sm">
-                        {formatDate(latestPsf.assessmentDate)}
+                        PSF · {formatDate(latestPsf.assessmentDate)}
                         {latestPsf.severity ? ` · ${latestPsf.severity}` : ""}
                       </p>
                     ) : (
@@ -252,6 +253,12 @@ export default async function ClientDetailPage({
                   <dt className="text-sm text-muted-foreground">Address</dt>
                   <dd className="font-medium">{client.address ?? "—"}</dd>
                 </div>
+                <div className="sm:col-span-2">
+                  <dt className="text-sm text-muted-foreground">Notes</dt>
+                  <dd className="mt-1 max-h-24 overflow-y-auto rounded-md border bg-muted/30 p-2 text-sm whitespace-pre-wrap">
+                    {client.notes?.trim() || "—"}
+                  </dd>
+                </div>
               </dl>
             </CardContent>
           </Card>
@@ -275,7 +282,7 @@ export default async function ClientDetailPage({
           <Card className="mb-6">
             <CardHeader className="flex flex-row items-center justify-between gap-4">
               <CardTitle>Funding</CardTitle>
-              <Button size="sm" asChild>
+              <Button variant="outline" size="sm" asChild>
                 <Link
                   href={`/funding/approvals/new?clientId=${clientId}&returnTo=${encodeURIComponent(`/clients/${clientId}`)}`}
                 >

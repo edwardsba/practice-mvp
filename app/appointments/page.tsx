@@ -26,7 +26,7 @@ import {
 import { resolveAppointmentLocationText } from "@/lib/appointments/location"
 import { loadAppointmentsForPractice } from "@/lib/appointments/load"
 import { requirePractitionerContext } from "@/lib/auth"
-import { APPOINTMENT_STATUS_CONFIG } from "@/lib/status"
+import { APPOINTMENT_STATUS_CONFIG, SESSION_NOTE_STATUS_CONFIG } from "@/lib/status"
 
 function parseFilter(value: string | undefined): AppointmentFilter {
   if (value && APPOINTMENT_FILTER_VALUES.includes(value as AppointmentFilter)) {
@@ -73,16 +73,17 @@ export default async function AppointmentsPage({
               <TableHead>Date</TableHead>
               <TableHead>Time</TableHead>
               <TableHead>Client</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Session note</TableHead>
               <TableHead>Duration</TableHead>
               <TableHead>Location</TableHead>
-              <TableHead>Status</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {appointments.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={6}
+                  colSpan={7}
                   className="h-20 text-center text-muted-foreground"
                 >
                   No appointments scheduled.
@@ -118,6 +119,26 @@ export default async function AppointmentsPage({
                     </TableCell>
                     <TableCell>
                       <Link href={appointmentHref} className="block">
+                        <StatusBadge
+                          status={appointment.status}
+                          statusMap={APPOINTMENT_STATUS_CONFIG}
+                        />
+                      </Link>
+                    </TableCell>
+                    <TableCell>
+                      <Link href={appointmentHref} className="block">
+                        {appointment.sessionNoteStatus ? (
+                          <StatusBadge
+                            status={appointment.sessionNoteStatus}
+                            statusMap={SESSION_NOTE_STATUS_CONFIG}
+                          />
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </Link>
+                    </TableCell>
+                    <TableCell>
+                      <Link href={appointmentHref} className="block">
                         {formatAppointmentDuration(appointment.durationMinutes)}
                       </Link>
                     </TableCell>
@@ -131,14 +152,6 @@ export default async function AppointmentsPage({
                               appointment.practiceAddress ?? null,
                               appointment.practiceName ?? ""
                             )}
-                      </Link>
-                    </TableCell>
-                    <TableCell>
-                      <Link href={appointmentHref} className="block">
-                        <StatusBadge
-                          status={appointment.status}
-                          statusMap={APPOINTMENT_STATUS_CONFIG}
-                        />
                       </Link>
                     </TableCell>
                   </TableRow>

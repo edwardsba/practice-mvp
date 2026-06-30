@@ -12,6 +12,7 @@ import {
   practices,
   practitionerPracticeMemberships,
   professionals,
+  sessionNotes,
 } from "@/db/schema"
 import type { AppointmentFilter } from "@/lib/appointments/constants"
 import {
@@ -85,6 +86,7 @@ export async function loadAppointmentsForPractice(
       location: appointments.location,
       mode: appointments.mode,
       status: appointments.status,
+      sessionNoteStatus: sessionNotes.status,
       practiceName: practices.practiceName,
       practiceAddress: practices.address,
       practiceLocationNickname: practices.locationNickname,
@@ -94,6 +96,10 @@ export async function loadAppointmentsForPractice(
     .from(appointments)
     .innerJoin(clients, eq(appointments.clientId, clients.clientId))
     .leftJoin(practices, eq(appointments.practiceId, practices.practiceId))
+    .leftJoin(
+      sessionNotes,
+      eq(sessionNotes.appointmentId, appointments.appointmentId)
+    )
     .where(and(...conditions))
     .orderBy(asc(appointments.appointmentDate), asc(appointments.appointmentTime))
 }

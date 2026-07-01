@@ -8,6 +8,7 @@ import { PsqStatusBadge } from "@/components/session-notes/psq-status-badge"
 import { SessionNotePdfDownloadLink } from "@/components/session-notes/session-note-pdf-download-link"
 import { AppShell } from "@/components/app-shell"
 import { Button } from "@/components/ui/button"
+import { StatusBadge } from "@/components/ui/status-badge"
 import {
   Table,
   TableBody,
@@ -22,10 +23,10 @@ import { appendReturnTo } from "@/lib/navigation/back"
 import { db } from "@/lib/db"
 import {
   formatSessionNoteDate,
-  formatSessionNoteStatus,
   formatSessionNoteTime,
 } from "@/lib/session-notes/format"
 import { loadSessionNotesForPractice } from "@/lib/session-notes/load"
+import { SESSION_NOTE_STATUS_CONFIG } from "@/lib/status"
 
 export default async function ClientSessionNotesPage({
   params,
@@ -125,8 +126,11 @@ export default async function ClientSessionNotesPage({
                       </Link>
                     </TableCell>
                     <TableCell>
-                      <Link href={noteHref} className="block hover:underline">
-                        {formatSessionNoteStatus(note.status)}
+                      <Link href={noteHref} className="block">
+                        <StatusBadge
+                          status={note.status}
+                          statusMap={SESSION_NOTE_STATUS_CONFIG}
+                        />
                       </Link>
                     </TableCell>
                     <TableCell>

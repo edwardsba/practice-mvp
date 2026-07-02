@@ -102,10 +102,19 @@ export function SessionNoteActions({
       <Card className="no-print mb-6">
         <CardHeader className="flex flex-row items-center justify-between gap-3">
           <CardTitle>Status</CardTitle>
-          <StatusBadge
-            status={isFinalised ? "finalised" : status}
-            statusMap={SESSION_NOTE_STATUS_CONFIG}
-          />
+          <div className="flex items-center gap-3">
+            <StatusBadge
+              status={isFinalised ? "finalised" : status}
+              statusMap={SESSION_NOTE_STATUS_CONFIG}
+            />
+            {!isFinalised ? (
+              <form action={previewFormAction}>
+                <Button type="submit" size="sm" disabled={previewPending}>
+                  {previewPending ? "Generating preview…" : "Finalise"}
+                </Button>
+              </form>
+            ) : null}
+          </div>
         </CardHeader>
         <CardContent>
           <dl className="grid gap-4">
@@ -121,34 +130,24 @@ export function SessionNoteActions({
               </dd>
             </div>
 
-            <div>
-              <dt className="mb-2 text-sm text-muted-foreground">
-                Session note
-              </dt>
-              <dd className="flex flex-wrap items-center gap-3">
-                {isFinalised ? (
-                  <>
-                    {pdfStoragePath ? (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        disabled={downloadPending}
-                        onClick={handleDownload}
-                      >
-                        {downloadPending ? "Preparing…" : "Download PDF"}
-                      </Button>
-                    ) : null}
-                  </>
-                ) : (
-                  <form action={previewFormAction}>
-                    <Button type="submit" size="sm" disabled={previewPending}>
-                      {previewPending ? "Generating preview…" : "Finalise"}
-                    </Button>
-                  </form>
-                )}
-              </dd>
-            </div>
+            {isFinalised && pdfStoragePath ? (
+              <div>
+                <dt className="mb-2 text-sm text-muted-foreground">
+                  Session note
+                </dt>
+                <dd className="flex flex-wrap items-center gap-3">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={downloadPending}
+                    onClick={handleDownload}
+                  >
+                    {downloadPending ? "Preparing…" : "Download PDF"}
+                  </Button>
+                </dd>
+              </div>
+            ) : null}
 
             <div>
               <dt className="text-sm text-muted-foreground">Appointment</dt>

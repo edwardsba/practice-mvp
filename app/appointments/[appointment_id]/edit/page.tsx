@@ -2,6 +2,7 @@ import Link from "next/link"
 import { notFound } from "next/navigation"
 
 import { updateAppointment, deleteAppointment, getAppointmentDeleteStatus } from "@/app/appointments/actions"
+import { getPractitionerProfile } from "@/app/practitioner/actions"
 import { getActiveClients } from "@/app/clients/actions"
 import { AppointmentForm } from "@/components/appointments/appointment-form"
 import { AppShell } from "@/components/app-shell"
@@ -22,11 +23,13 @@ export default async function EditAppointmentPage({
   const { returnTo } = await searchParams
   const context = await requirePractitionerContext()
 
-  const [appointment, clients, memberships] = await Promise.all([
+  const [appointment, clients, memberships, profile] = await Promise.all([
     loadAppointmentForPractice(appointmentId, context.practiceId),
     getActiveClients(),
     getMemberships(context.practitionerProfileId),
+    getPractitionerProfile(),
   ])
+  const timeIntervalMinutes = profile?.calendarIntervalMinutes ?? 30
 
   if (!appointment) {
     notFound()
@@ -68,6 +71,7 @@ export default async function EditAppointmentPage({
         practiceId={context.practiceId}
         availabilityBlocks={availabilityBlocks}
         practiceMemberships={practiceMemberships}
+        timeIntervalMinutes={timeIntervalMinutes}
         initialValues={{
           clientId: appointment.clientId,
           appointmentDate: appointment.appointmentDate,

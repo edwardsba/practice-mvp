@@ -1,4 +1,5 @@
 import { createAppointment } from "@/app/appointments/actions"
+import { getPractitionerProfile } from "@/app/practitioner/actions"
 import { getActiveClients } from "@/app/clients/actions"
 import { AppointmentForm } from "@/components/appointments/appointment-form"
 import { AppShell } from "@/components/app-shell"
@@ -24,10 +25,12 @@ export default async function NewAppointmentPage({
     "/appointments",
     "← Back to appointments"
   )
-  const [clients, memberships] = await Promise.all([
+  const [clients, memberships, profile] = await Promise.all([
     getActiveClients(),
     getMemberships(context.practitionerProfileId),
+    getPractitionerProfile(),
   ])
+  const timeIntervalMinutes = profile?.calendarIntervalMinutes ?? 30
   const prefilledTime =
     time && /^\d{2}:\d{2}$/.test(time) ? `${time}:00` : time
 
@@ -60,6 +63,7 @@ export default async function NewAppointmentPage({
         practiceId={context.practiceId}
         availabilityBlocks={availabilityBlocks}
         practiceMemberships={practiceMemberships}
+        timeIntervalMinutes={timeIntervalMinutes}
         initialValues={
           date && /^\d{4}-\d{2}-\d{2}$/.test(date)
             ? {

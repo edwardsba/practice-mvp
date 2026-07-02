@@ -32,48 +32,49 @@ export function ClaimTypesManager({
           <TableHeader>
             <TableRow>
               <TableHead>Claim type name</TableHead>
-              <TableHead className="w-24" />
             </TableRow>
           </TableHeader>
           <TableBody>
             {claimTypes.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={2}
+                  colSpan={1}
                   className="h-20 text-center text-muted-foreground"
                 >
                   No claim types yet.
                 </TableCell>
               </TableRow>
             ) : (
-              claimTypes.map((claimType) => (
-                <TableRow key={claimType.claimTypeId}>
-                  <TableCell>
-                    {editingId === claimType.claimTypeId ? (
-                      <EditClaimTypeForm
-                        practiceId={practiceId}
-                        claimTypeId={claimType.claimTypeId}
-                        defaultName={claimType.claimTypeName}
-                        onDone={() => setEditingId(null)}
-                      />
-                    ) : (
-                      claimType.claimTypeName
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {editingId === claimType.claimTypeId ? null : (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setEditingId(claimType.claimTypeId)}
-                      >
-                        Edit
-                      </Button>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))
+              claimTypes.map((claimType) => {
+                const isEditing = editingId === claimType.claimTypeId
+
+                return (
+                  <TableRow
+                    key={claimType.claimTypeId}
+                    className={
+                      isEditing ? undefined : "cursor-pointer hover:bg-muted/50"
+                    }
+                    onClick={
+                      isEditing
+                        ? undefined
+                        : () => setEditingId(claimType.claimTypeId)
+                    }
+                  >
+                    <TableCell>
+                      {isEditing ? (
+                        <EditClaimTypeForm
+                          practiceId={practiceId}
+                          claimTypeId={claimType.claimTypeId}
+                          defaultName={claimType.claimTypeName}
+                          onDone={() => setEditingId(null)}
+                        />
+                      ) : (
+                        claimType.claimTypeName
+                      )}
+                    </TableCell>
+                  </TableRow>
+                )
+              })
             )}
           </TableBody>
         </Table>

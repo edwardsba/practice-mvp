@@ -109,7 +109,7 @@ export default async function AppointmentDetailPage({
 
       <Card className="mb-6">
         <CardHeader className="flex flex-row items-center justify-between gap-3">
-          <CardTitle>Appointment</CardTitle>
+          <CardTitle>Details</CardTitle>
           <Button asChild variant="outline" size="sm">
             <Link
               href={`/appointments/${appointmentId}/edit?returnTo=${encodeURIComponent(returnTo ?? "/appointments")}`}

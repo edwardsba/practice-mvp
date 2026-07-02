@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { useActionState, useCallback, useEffect, useMemo, useState } from "react"
+import { useActionState, useCallback, useEffect, useMemo, useRef, useState } from "react"
 
 import { FundingApprovalSelect } from "@/components/appointments/funding-approval-select"
 
@@ -10,8 +10,6 @@ import { Button } from "@/components/ui/button"
 import {
   Card,
   CardContent,
-  CardHeader,
-  CardTitle,
 } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -72,6 +70,7 @@ export function AppointmentForm({
   practiceId,
   availabilityBlocks,
   practiceMemberships,
+  timeIntervalMinutes = 15,
   initialValues,
   submitLabel,
   cancelHref,
@@ -84,6 +83,7 @@ export function AppointmentForm({
   practiceId: string
   availabilityBlocks: AvailabilityBlock[]
   practiceMemberships: PracticeMembership[]
+  timeIntervalMinutes?: number
   initialValues?: AppointmentInitialValues
   submitLabel: string
   cancelHref: string
@@ -115,8 +115,17 @@ export function AppointmentForm({
     initialValues?.membershipId ?? ""
   )
   const [fundingApprovalSelected, setFundingApprovalSelected] = useState(false)
+  const isManualTypeSelection = useRef(Boolean(initialValues?.appointmentTypeId))
+  const userPickedType = useRef(false)
 
-  const timeOptions = buildAppointmentTimeOptions()
+  const timeOptions = useMemo(() => {
+    const options = buildAppointmentTimeOptions(timeIntervalMinutes)
+    const offGridTime = initialValues?.appointmentTime
+    if (offGridTime && !options.includes(offGridTime)) {
+      return [...options, offGridTime].sort()
+    }
+    return options
+  }, [timeIntervalMinutes, initialValues?.appointmentTime])
 
   const selectedAppointmentType = useMemo(
     () =>
@@ -128,6 +137,9 @@ export function AppointmentForm({
 
   const handleFundingApprovalChange = useCallback(
     (fundingApprovalId: string, claimTypeId: string | null) => {
+      if (!userPickedType.current) {
+        isManualTypeSelection.current = false
+      }
       setFundingApprovalSelected(true)
       setSelectedFundingApprovalClaimTypeId(claimTypeId)
     },
@@ -149,17 +161,16 @@ export function AppointmentForm({
       .then((results) => {
         if (!cancelled) {
           setAppointmentTypeOptions(results)
+          const resolved = resolveMode(
+            selectedDate,
+            selectedTime,
+            null,
+            availabilityBlocks
+          )
           setSelectedAppointmentTypeId((current) => {
-            if (current) return current
-            return pickAppointmentTypeByMode(
-              results,
-              resolveMode(
-                selectedDate,
-                selectedTime,
-                null,
-                availabilityBlocks
-              )
-            )
+            if (current && isManualTypeSelection.current) return current
+            const picked = pickAppointmentTypeByMode(results, resolved)
+            return picked
           })
         }
       })
@@ -211,10 +222,7 @@ export function AppointmentForm({
   return (
     <form action={formAction} className="space-y-6">
       <Card className="max-w-xl">
-        <CardHeader>
-          <CardTitle>Appointment details</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-4 pt-6">
           <div className="space-y-2">
             <Label htmlFor="client_id">Client</Label>
             <select
@@ -245,7 +253,12 @@ export function AppointmentForm({
                 type="date"
                 required
                 value={selectedDate}
-                onChange={(event) => setSelectedDate(event.target.value)}
+                onChange={(event) => {
+                  if (!userPickedType.current) {
+                    isManualTypeSelection.current = false
+                  }
+                  setSelectedDate(event.target.value)
+                }}
                 className={dateInputClassName}
               />
             </div>
@@ -256,7 +269,12 @@ export function AppointmentForm({
                 name="appointment_time"
                 required
                 value={selectedTime}
-                onChange={(event) => setSelectedTime(event.target.value)}
+                onChange={(event) => {
+                  if (!userPickedType.current) {
+                    isManualTypeSelection.current = false
+                  }
+                  setSelectedTime(event.target.value)
+                }}
                 className={selectClassName}
               >
                 <option value="" disabled>
@@ -287,9 +305,11 @@ export function AppointmentForm({
               id="appointment_type_id"
               name="appointment_type_id"
               value={selectedAppointmentTypeId}
-              onChange={(event) =>
+              onChange={(event) => {
+                isManualTypeSelection.current = true
+                userPickedType.current = true
                 setSelectedAppointmentTypeId(event.target.value)
-              }
+              }}
               disabled={!selectedClientId || loadingAppointmentTypes}
               className={selectClassName}
             >

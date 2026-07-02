@@ -38,8 +38,11 @@ export function resolveMode(
 
     if (matchingBlock?.mode === "online") return "online"
 
-    if (matchingBlock && appointmentType?.mode) {
-      return appointmentType.mode
+    // Practice availability block says "both" (or a specific
+    // face_to_face block) — default to face_to_face unless the
+    // already-selected appointment type says otherwise.
+    if (matchingBlock?.mode === "both" || matchingBlock?.mode === "face_to_face") {
+      return appointmentType?.mode ?? "face_to_face"
     }
   }
 

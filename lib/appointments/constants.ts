@@ -33,10 +33,10 @@ export const APPOINTMENT_FILTER_VALUES = ["upcoming", "past", "all"] as const
 
 export type AppointmentFilter = (typeof APPOINTMENT_FILTER_VALUES)[number]
 
-export function buildAppointmentTimeOptions(): string[] {
+export function buildAppointmentTimeOptions(intervalMinutes: number = 15): string[] {
   const options: string[] = []
   for (let hour = 7; hour <= 20; hour++) {
-    for (let minute = 0; minute < 60; minute += 15) {
+    for (let minute = 0; minute < 60; minute += intervalMinutes) {
       if (hour === 20 && minute > 0) break
       options.push(
         `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}:00`

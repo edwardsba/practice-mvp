@@ -49,7 +49,7 @@ import {
 } from "@/lib/reports/snapshot"
 import { resolveTemplateKey } from "@/lib/reports/templates"
 import { getClientFundingApprovalsForReport } from "@/lib/actions/funding"
-import { todayDateString } from "@/lib/appointments/format"
+import { todayDateString } from "@/lib/dates/practice-time"
 
 export type ReportPreviewRow = ReportResultRow
 
@@ -759,7 +759,7 @@ export async function saveReportDraft(
       context.practiceId,
       fundingApprovalId
     )
-    const today = new Date().toISOString().slice(0, 10)
+    const today = todayDateString()
 
     const snapshot = await buildSnapshot(
       clientId,

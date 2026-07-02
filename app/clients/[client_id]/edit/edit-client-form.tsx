@@ -12,16 +12,9 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { formatDateForInput } from "@/lib/dates/practice-time"
 
 const initialState: UpdateClientFormState = {}
-
-function formatDateForInput(value: string | null): string {
-  if (!value) return ""
-  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value
-  const date = new Date(value.includes("T") ? value : `${value}T00:00:00`)
-  if (Number.isNaN(date.getTime())) return ""
-  return date.toISOString().slice(0, 10)
-}
 
 export function EditClientForm({
   clientId,

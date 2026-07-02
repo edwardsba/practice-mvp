@@ -1,6 +1,6 @@
 import { fromZonedTime } from "date-fns-tz"
 
-import { SYDNEY_TIMEZONE } from "@/lib/appointments/format"
+import { PRACTICE_TIMEZONE } from "@/lib/dates/practice-time"
 
 export const LATE_CANCELLATION_THRESHOLD_HOURS = 24
 export const ATTENDANCE_WINDOW = 10
@@ -27,7 +27,7 @@ function toAppointmentDateTime(appointment: ScorableAppointment): Date {
   const minutes = timeMatch?.[2] ?? "00"
   const localDateTime = `${appointment.appointmentDate}T${hours}:${minutes}:00`
 
-  return fromZonedTime(localDateTime, SYDNEY_TIMEZONE)
+  return fromZonedTime(localDateTime, PRACTICE_TIMEZONE)
 }
 
 function sortKey(appointment: ScorableAppointment): string {

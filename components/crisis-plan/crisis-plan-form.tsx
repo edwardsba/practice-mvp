@@ -26,7 +26,7 @@ import {
   STAY_WELL_OPTIONS,
   UNWELL_OPTIONS,
 } from "@/lib/crisis-plans/fields"
-import { formatDateForInput, todayDateInput } from "@/lib/crisis-plans/serialize"
+import { formatDateForInput, todayDateInput } from "@/lib/dates/practice-time"
 import type {
   CrisisPlanRow,
   EmergencyContactInput,
@@ -79,13 +79,14 @@ export function CrisisPlanForm({
           <CardTitle>Crisis plan details</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="max-w-xs space-y-2">
+          <div className="w-40 space-y-2">
             <Label htmlFor="date_of_plan">Date of plan</Label>
             <Input
               id="date_of_plan"
               name="date_of_plan"
               type="date"
               required
+              className="text-sm [&::-webkit-date-and-time-value]:text-left"
               defaultValue={
                 formatDateForInput(plan?.dateOfPlan ?? null) || todayDateInput()
               }

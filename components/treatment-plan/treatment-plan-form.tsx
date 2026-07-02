@@ -25,7 +25,7 @@ import {
   RISK_MANAGEMENT_OPTIONS,
   SUPPORT_SERVICES_OPTIONS,
 } from "@/lib/treatment-plans/fields"
-import { formatDateForInput } from "@/lib/treatment-plans/serialize"
+import { formatDateForInput } from "@/lib/dates/practice-time"
 import type { TreatmentPlanRow } from "@/lib/treatment-plans/types"
 
 export type TreatmentPlanFormState = {

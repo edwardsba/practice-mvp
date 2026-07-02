@@ -1,18 +1,14 @@
-import { addDays, format } from "date-fns"
-import { toZonedTime } from "date-fns-tz"
-
 import { APPOINTMENT_STATUS_LABELS, type AppointmentStatus } from "@/lib/appointments/constants"
+import { PRACTICE_TIMEZONE } from "@/lib/dates/practice-time"
 
-export const SYDNEY_TIMEZONE = "Australia/Sydney"
-
-export function todayDateString(): string {
-  return format(toZonedTime(new Date(), SYDNEY_TIMEZONE), "yyyy-MM-dd")
-}
-
-export function sydneyDatePlusDays(days: number): string {
-  const sydneyNow = toZonedTime(new Date(), SYDNEY_TIMEZONE)
-  return format(addDays(sydneyNow, days), "yyyy-MM-dd")
-}
+export {
+  PRACTICE_TIMEZONE,
+  SYDNEY_TIMEZONE,
+  todayDateString,
+  sydneyDatePlusDays,
+  formatDateForInput,
+  practiceLocalToUtc,
+} from "@/lib/dates/practice-time"
 
 export function formatAutomationTimestamp(value: Date | string | null): string {
   if (!value) return ""
@@ -25,7 +21,7 @@ export function formatAutomationTimestamp(value: Date | string | null): string {
     hour: "numeric",
     minute: "2-digit",
     hour12: true,
-    timeZone: SYDNEY_TIMEZONE,
+    timeZone: PRACTICE_TIMEZONE,
   })
 }
 
@@ -80,12 +76,4 @@ export function formatTimeForInput(value: string | null): string {
   const match = value.match(/^(\d{2}):(\d{2})/)
   if (!match) return value
   return `${match[1]}:${match[2]}:00`
-}
-
-export function formatDateForInput(value: string | null): string {
-  if (!value) return ""
-  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value
-  const date = new Date(value.includes("T") ? value : `${value}T00:00:00`)
-  if (Number.isNaN(date.getTime())) return ""
-  return date.toISOString().slice(0, 10)
 }

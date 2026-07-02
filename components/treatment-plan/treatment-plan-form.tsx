@@ -25,7 +25,7 @@ import {
   RISK_MANAGEMENT_OPTIONS,
   SUPPORT_SERVICES_OPTIONS,
 } from "@/lib/treatment-plans/fields"
-import { formatDateForInput } from "@/lib/dates/practice-time"
+import { formatDateForInput, todayDateInput } from "@/lib/dates/practice-time"
 import type { TreatmentPlanRow } from "@/lib/treatment-plans/types"
 
 export type TreatmentPlanFormState = {
@@ -35,6 +35,7 @@ export type TreatmentPlanFormState = {
 export function TreatmentPlanForm({
   action,
   initialPlan,
+  isNewVersion = false,
   submitLabel,
   cancelHref,
 }: {
@@ -43,6 +44,7 @@ export function TreatmentPlanForm({
     formData: FormData
   ) => Promise<TreatmentPlanFormState>
   initialPlan?: TreatmentPlanRow
+  isNewVersion?: boolean
   submitLabel: string
   cancelHref: string
 }) {
@@ -73,7 +75,12 @@ export function TreatmentPlanForm({
               id="start_date"
               name="start_date"
               type="date"
-              defaultValue={formatDateForInput(plan?.startDate ?? null)}
+              defaultValue={
+                isNewVersion
+                  ? todayDateInput()
+                  : formatDateForInput(plan?.startDate ?? null) ||
+                    todayDateInput()
+              }
             />
           </div>
           <div className="space-y-2">

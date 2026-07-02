@@ -15,6 +15,12 @@ import { loadTreatmentPlanForPractice, verifyClientInPractice } from "@/lib/trea
 import { logDeleteAuditEvent, performSoftDelete } from "@/lib/delete/delete-utils"
 import type { TreatmentPlanFormState } from "@/components/treatment-plan/treatment-plan-form"
 
+function dayBeforeDateString(dateString: string): string {
+  const date = new Date(`${dateString}T00:00:00`)
+  date.setDate(date.getDate() - 1)
+  return date.toISOString().slice(0, 10)
+}
+
 export async function createTreatmentPlan(
   clientId: string,
   _prevState: TreatmentPlanFormState,
@@ -108,6 +114,16 @@ export async function createTreatmentPlanVersion(
             eq(treatmentPlans.practiceId, context.practiceId)
           )
         )
+
+      if (columns.startDate) {
+        await tx
+          .update(treatmentPlans)
+          .set({
+            endDate: dayBeforeDateString(columns.startDate),
+            updatedAt: now,
+          })
+          .where(eq(treatmentPlans.treatmentPlanId, sourcePlanId))
+      }
 
       const [plan] = await tx
         .insert(treatmentPlans)

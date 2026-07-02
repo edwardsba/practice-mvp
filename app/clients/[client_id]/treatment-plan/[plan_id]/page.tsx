@@ -5,7 +5,6 @@ import { TreatmentPlanView } from "@/components/treatment-plan/treatment-plan-vi
 import { AppShell } from "@/components/app-shell"
 import { BackButton } from "@/components/ui/back-button"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
 import {
   Card,
   CardContent,
@@ -65,18 +64,12 @@ export default async function TreatmentPlanViewPage({
         />
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-2xl font-semibold tracking-tight">
-                Treatment plan
-              </h1>
-              <Badge variant={plan.isActive ? "default" : "secondary"}>
-                Version {plan.versionNumber}
-                {plan.isActive ? " · Active" : ""}
-              </Badge>
-            </div>
+            <h1 className="text-2xl font-semibold tracking-tight">
+              Treatment plan
+            </h1>
             <p className="mt-1 text-muted-foreground">{clientName}</p>
             <p className="mt-1 text-sm text-muted-foreground">
-              Created{" "}
+              v{plan.versionNumber} - Created{" "}
               {plan.createdAt.toLocaleDateString("en-AU", {
                 day: "numeric",
                 month: "long",

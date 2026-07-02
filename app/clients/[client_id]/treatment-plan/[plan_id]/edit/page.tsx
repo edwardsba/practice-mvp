@@ -64,6 +64,7 @@ export default async function EditTreatmentPlanPage({
       <TreatmentPlanForm
         action={saveAction}
         initialPlan={plan}
+        isNewVersion
         submitLabel="Save new version"
         cancelHref={`/clients/${clientId}/treatment-plan/${planId}`}
       />

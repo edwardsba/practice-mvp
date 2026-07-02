@@ -10,7 +10,7 @@ import {
   fetchReportResultsForRange,
   type ReportRangePreview,
 } from "@/app/clients/[client_id]/reports/actions"
-import { auditEvents, simpleReports } from "@/db/schema"
+import { auditEvents, fundingApprovalReportLinks, simpleReports } from "@/db/schema"
 import { requirePractitionerContext } from "@/lib/auth"
 import { db } from "@/lib/db"
 import { parseReportSnapshot, resolveReportType } from "@/lib/reports/snapshot"
@@ -287,6 +287,11 @@ export async function deleteSimpleReport(
       .update(simpleReports)
       .set({ reportStatus: "deleted", updatedAt: new Date() })
       .where(eq(simpleReports.simpleReportId, reportId))
+
+    await db
+      .update(fundingApprovalReportLinks)
+      .set({ simpleReportId: null, updatedAt: new Date() })
+      .where(eq(fundingApprovalReportLinks.simpleReportId, reportId))
 
     await db.insert(auditEvents).values({
       practiceId,

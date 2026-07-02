@@ -38,7 +38,7 @@ async function buildPdfData(
     dateOfBirth: note.clientDateOfBirth,
     sessionDate: note.sessionDate,
     sessionTime: note.sessionTime,
-    therapeuticTarget: viewContext.therapeuticTarget,
+    therapeuticTarget: viewContext.treatmentPlan?.therapeuticTarget ?? null,
     btpTargets: viewContext.btpTargets,
     assessments: viewContext.assessments,
     asqResult: viewContext.asqResult,
@@ -345,7 +345,8 @@ export async function exportSessionNotePdfs(
       and(
         eq(sessionNotes.clientId, clientId),
         eq(sessionNotes.practiceId, context.practiceId),
-        eq(sessionNotes.status, "finalised")
+        eq(sessionNotes.status, "finalised"),
+        eq(sessionNotes.isActive, true)
       )
     )
     .orderBy(asc(sessionNotes.sessionDate))
@@ -414,4 +415,70 @@ export async function resendPreSessionBattery(
   }
 
   return sendPreSessionBatteryForAppointment(row, { userId: context.userId })
+}
+
+export async function getSessionNoteDeleteStatus(sessionNoteId: string) {
+  const context = await requirePractitionerContext()
+  const note = await loadSessionNoteForPractice(sessionNoteId, context.practiceId)
+
+  if (!note) {
+    return { blockedReason: "Session note not found." }
+  }
+
+  if (note.status === "finalised") {
+    return {
+      blockedReason:
+        "Cannot delete: this session note has been finalised. Finalised notes are retained as part of the clinical record.",
+    }
+  }
+
+  return {}
+}
+
+export async function deleteSessionNote(
+  sessionNoteId: string,
+  practiceId: string
+): Promise<{ success?: boolean; error?: string; blockedReason?: string }> {
+  const context = await requirePractitionerContext()
+  if (context.practiceId !== practiceId) {
+    return { error: "Unauthorized practice access." }
+  }
+
+  const status = await getSessionNoteDeleteStatus(sessionNoteId)
+  if (status.blockedReason) {
+    return { blockedReason: status.blockedReason }
+  }
+
+  const note = await loadSessionNoteForPractice(sessionNoteId, practiceId)
+  if (!note) {
+    return { error: "Session note not found." }
+  }
+
+  try {
+    await db
+      .update(sessionNotes)
+      .set({ isActive: false, updatedAt: new Date() })
+      .where(
+        and(
+          eq(sessionNotes.sessionNoteId, sessionNoteId),
+          eq(sessionNotes.practiceId, practiceId)
+        )
+      )
+
+    await db.insert(auditEvents).values({
+      practiceId,
+      userId: context.userId,
+      clientId: note.clientId,
+      eventType: "session_note.deleted",
+      entityType: "session_note",
+      entityId: sessionNoteId,
+    })
+  } catch {
+    return { error: "Unable to delete session note. Please try again." }
+  }
+
+  revalidatePath("/session-notes")
+  revalidatePath(`/clients/${note.clientId}`)
+  revalidatePath(`/clients/${note.clientId}/session-notes`)
+  redirect(`/clients/${note.clientId}`)
 }

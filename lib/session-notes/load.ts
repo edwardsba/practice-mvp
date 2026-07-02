@@ -9,7 +9,10 @@ export async function loadSessionNotesForPractice(
   filter: SessionNoteFilter = "all",
   clientId?: string
 ) {
-  const conditions = [eq(sessionNotes.practiceId, practiceId)]
+  const conditions = [
+    eq(sessionNotes.practiceId, practiceId),
+    eq(sessionNotes.isActive, true),
+  ]
 
   if (filter === "draft") {
     conditions.push(eq(sessionNotes.status, "draft"))
@@ -84,7 +87,8 @@ export async function loadSessionNoteForPractice(
     .where(
       and(
         eq(sessionNotes.sessionNoteId, sessionNoteId),
-        eq(sessionNotes.practiceId, practiceId)
+        eq(sessionNotes.practiceId, practiceId),
+        eq(sessionNotes.isActive, true)
       )
     )
     .limit(1)
@@ -105,7 +109,8 @@ export async function loadSessionNoteForAppointment(
     .where(
       and(
         eq(sessionNotes.appointmentId, appointmentId),
-        eq(sessionNotes.practiceId, practiceId)
+        eq(sessionNotes.practiceId, practiceId),
+        eq(sessionNotes.isActive, true)
       )
     )
     .limit(1)
@@ -127,7 +132,8 @@ export async function loadLatestSessionNoteForClient(
     .where(
       and(
         eq(sessionNotes.clientId, clientId),
-        eq(sessionNotes.practiceId, practiceId)
+        eq(sessionNotes.practiceId, practiceId),
+        eq(sessionNotes.isActive, true)
       )
     )
     .orderBy(desc(sessionNotes.sessionDate), desc(sessionNotes.sessionTime))

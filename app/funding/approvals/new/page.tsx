@@ -66,7 +66,6 @@ export default async function NewFundingApprovalPage({
           startDate: claim.startDate,
         }))}
         referrers={referrers}
-        clientReports={[]}
         initialValues={
           initialClientId || initialClaimId
             ? {

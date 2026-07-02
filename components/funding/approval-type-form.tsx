@@ -32,6 +32,7 @@ type ClaimTypeOption = {
 type ReportRequirement = {
   appointmentNumber: number
   reportType: string
+  reportTypeId?: string | null
 }
 
 type ReportTypeOption = {
@@ -169,7 +170,7 @@ export function ApprovalTypeForm({
                 onClick={() =>
                   setReports((current) => [
                     ...current,
-                    { appointmentNumber: 1, reportType: "" },
+                    { appointmentNumber: 1, reportType: "", reportTypeId: null },
                   ])
                 }
               >
@@ -204,21 +205,28 @@ export function ApprovalTypeForm({
                 <div className="space-y-1">
                   <Label className="text-xs">Report type</Label>
                   <select
-                    value={report.reportType}
-                    onChange={(event) =>
+                    value={report.reportTypeId ?? ""}
+                    onChange={(event) => {
+                      const selected = reportTypes.find(
+                        (rt) => rt.reportTypeId === event.target.value
+                      )
                       setReports((current) =>
                         current.map((row, rowIndex) =>
                           rowIndex === index
-                            ? { ...row, reportType: event.target.value }
+                            ? {
+                                ...row,
+                                reportTypeId: selected?.reportTypeId ?? null,
+                                reportType: selected?.name ?? "",
+                              }
                             : row
                         )
                       )
-                    }
+                    }}
                     className={selectClassName}
                   >
                     <option value="">Select report type</option>
                     {reportTypes.map((rt) => (
-                      <option key={rt.reportTypeId} value={rt.name}>
+                      <option key={rt.reportTypeId} value={rt.reportTypeId}>
                         {rt.name}
                       </option>
                     ))}

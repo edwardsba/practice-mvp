@@ -1,6 +1,7 @@
 import { pgTable, uuid, text, boolean, timestamp, integer } from 'drizzle-orm/pg-core'
 import { clients, practices } from './01-core'
 import { professionals, professionalOrganisations } from './10-contacts'
+import { reportTypes } from './16-report-types'
 
 export const claimTypes = pgTable('claim_types', {
   claimTypeId: uuid('claim_type_id').primaryKey().defaultRandom(),
@@ -30,6 +31,7 @@ export const fundingApprovalTypeReports = pgTable('funding_approval_type_reports
     .references(() => fundingApprovalTypes.fundingApprovalTypeId),
   appointmentNumber: integer('appointment_number').notNull(),
   reportType: text('report_type').notNull(),
+  reportTypeId: uuid('report_type_id').references(() => reportTypes.reportTypeId),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 })
@@ -76,6 +78,7 @@ export const fundingApprovalReportLinks = pgTable('funding_approval_report_links
     .references(() => fundingApprovals.fundingApprovalId),
   appointmentNumber: integer('appointment_number').notNull(),
   reportType: text('report_type').notNull(),
+  reportTypeId: uuid('report_type_id').references(() => reportTypes.reportTypeId),
   simpleReportId: uuid('simple_report_id'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),

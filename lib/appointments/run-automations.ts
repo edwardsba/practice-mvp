@@ -18,9 +18,12 @@ import { getEmailTemplateByKey } from "@/lib/email/template-loader"
 import { getQuestionnaireEmailContext } from "@/lib/email/practitioner-context"
 import { sendQuestionnaireEmail } from "@/lib/email/send-questionnaire-link"
 import {
+  buildHtmlEmailBody,
   buildResolvedEmailBodies,
   buildResolvedPlainEmailBodies,
+  resolveTemplate,
 } from "@/lib/email/templates"
+import { prepareBatteryEmailDraftFromRow } from "@/lib/appointments/prepare-battery-email"
 import { loadActiveTreatmentPlanSummary } from "@/lib/treatment-plans/load"
 
 const ACTIVE_STATUSES = ["scheduled", "confirmed"] as const
@@ -276,48 +279,31 @@ export async function sendPreSessionBatteryForAppointment(
 ): Promise<SendPreSessionBatteryResult> {
   const { userId } = options
 
-  if (row.commsOptOut || row.preSessionOptOut) {
+  const draft = await prepareBatteryEmailDraftFromRow(row)
+
+  if (draft.status === "skipped") {
     await logAppointmentAuditEvent(
       row.practiceId,
       row.clientId,
       row.appointmentId,
       "appointment.pre_session_battery_skipped",
-      { reason: "opted_out" }
+      { reason: draft.reason }
     )
-    return { status: "skipped", reason: "opted_out" }
+    return draft
   }
 
-  const clientEmail = row.clientEmail?.trim()
-  if (!clientEmail) {
+  if (draft.status === "failed") {
     await logAppointmentAuditEvent(
       row.practiceId,
       row.clientId,
       row.appointmentId,
-      "appointment.pre_session_battery_skipped",
-      { reason: "no_email" }
+      "appointment.pre_session_battery_failed",
+      { reason: "template_missing", error: draft.error }
     )
-    return { status: "skipped", reason: "no_email" }
+    return { status: "failed", error: draft.error }
   }
 
   try {
-    const template = await getEmailTemplateByKey(
-      row.practiceId,
-      "pre_session_questionnaire"
-    )
-    if (!template) {
-      await logAppointmentAuditEvent(
-        row.practiceId,
-        row.clientId,
-        row.appointmentId,
-        "appointment.pre_session_battery_failed",
-        { reason: "template_missing" }
-      )
-      return {
-        status: "failed",
-        error: "pre_session_questionnaire template not found.",
-      }
-    }
-
     const treatmentPlan = await loadActiveTreatmentPlanSummary(
       row.clientId,
       row.practiceId
@@ -347,50 +333,38 @@ export async function sendPreSessionBatteryForAppointment(
       return { status: "failed", error: batteryResult.error }
     }
 
-    const emailContext = await getQuestionnaireEmailContext(
+    const template = await getEmailTemplateByKey(
       row.practiceId,
-      row.practitionerProfileId
+      "pre_session_questionnaire"
     )
-    if (!emailContext) {
+    if (!template) {
       await logAppointmentAuditEvent(
         row.practiceId,
         row.clientId,
         row.appointmentId,
         "appointment.pre_session_battery_failed",
-        { reason: "practitioner_context_missing" }
+        { reason: "template_missing" }
       )
-      return { status: "failed", error: "Practice or practitioner not found." }
+      return {
+        status: "failed",
+        error: "pre_session_questionnaire template not found.",
+      }
     }
 
-    const variables = {
-      ...batteryResult.templateVariables,
-      appointment_date: formatAppointmentDate(row.appointmentDate),
-      appointment_time: formatAppointmentTime(row.appointmentTime),
-      location: resolveAppointmentLocationText(
-        row.location,
-        emailContext.locationNickname,
-        emailContext.practiceAddress,
-        emailContext.practiceName
-      ),
-      appointment_location: resolveAppointmentLocationPhrase(
-        row.mode,
-        row.location,
-        emailContext.locationNickname,
-        emailContext.practiceAddress,
-        emailContext.practiceName
-      ),
-    }
-
-    const { subject, htmlBody, textBody } = buildResolvedEmailBodies(
-      template.message,
-      template.subject,
+    const htmlBody = buildHtmlEmailBody(
+      draft.message,
       batteryResult.link,
-      variables,
-      template.actionButtonLabel ?? "Complete Questionnaire"
+      draft.actionButtonLabel
     )
+    const textBody = resolveTemplate(draft.message, {
+      questionnaire_link: batteryResult.link,
+    }).replace(/\n{3,}/g, "\n\n")
+    const subject = resolveTemplate(draft.subject, {
+      questionnaire_link: batteryResult.link,
+    })
 
     const sendResult = await sendQuestionnaireEmail({
-      to: clientEmail,
+      to: draft.to,
       cc: template.defaultCc ?? undefined,
       bcc: template.defaultBcc ?? undefined,
       subject,

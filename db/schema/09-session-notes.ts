@@ -1,4 +1,4 @@
-import { date, pgTable, text, time, timestamp, uuid } from 'drizzle-orm/pg-core'
+import { boolean, date, pgTable, text, time, timestamp, uuid } from 'drizzle-orm/pg-core'
 
 import { clients, practices, practitionerProfiles } from './01-core'
 import { batteryInstances } from './05-battery-instances'
@@ -19,6 +19,7 @@ export const sessionNotes = pgTable('session_notes', {
   sessionTime: time('session_time'),
   practitionerNotes: text('practitioner_notes'),
   status: text('status').notNull().default('draft'),
+  isActive: boolean('is_active').notNull().default(true),
   finalisedAt: timestamp('finalised_at', { withTimezone: true }),
   pdfStoragePath: text('pdf_storage_path'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),

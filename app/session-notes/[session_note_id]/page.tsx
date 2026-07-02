@@ -5,6 +5,10 @@ import { OngoingAssessmentsTable } from "@/components/session-notes/ongoing-asse
 import { PrintButton } from "@/components/session-notes/print-button"
 import { ResendBatteryButton } from "@/components/session-notes/resend-battery-button"
 import {
+  deleteSessionNote,
+  getSessionNoteDeleteStatus,
+} from "@/app/session-notes/actions"
+import {
   RiskAssessmentTable,
   type RiskAssessmentRow,
 } from "@/components/session-notes/risk-assessment-table"
@@ -13,6 +17,7 @@ import { SessionNoteDocument } from "@/components/session-notes/session-note-doc
 import { SessionNotesEditor } from "@/components/session-notes/session-notes-editor"
 import { AppShell } from "@/components/app-shell"
 import { BackButton } from "@/components/ui/back-button"
+import { EntityDeleteSection } from "@/components/entity-delete-section"
 import {
   Card,
   CardContent,
@@ -61,6 +66,7 @@ export default async function SessionNoteViewPage({
   }
 
   const viewContext = await loadSessionNoteViewContext(note)
+  const deleteStatus = await getSessionNoteDeleteStatus(sessionNoteId)
   const clientName = formatClientNameLastFirst(
     note.clientFirstName,
     note.clientLastName
@@ -87,15 +93,19 @@ export default async function SessionNoteViewPage({
       </div>
 
       <div className="no-print grid grid-cols-1 gap-6 lg:grid-cols-[1.6fr_1fr]">
-        <SessionNotesEditor
-          sessionNoteId={sessionNoteId}
-          initialNotes={note.practitionerNotes ?? ""}
-          readOnly={isFinalised}
-        />
+        <div className="order-2 lg:order-1">
+          <SessionNotesEditor
+            sessionNoteId={sessionNoteId}
+            initialNotes={note.practitionerNotes ?? ""}
+            readOnly={isFinalised}
+          />
+        </div>
 
-        <div className="flex flex-col gap-6">
+        <div className="order-1 flex flex-col gap-6 lg:order-2">
           <SessionNoteActions
             sessionNoteId={sessionNoteId}
+            clientId={note.clientId}
+            clientName={clientName}
             status={note.status}
             pdfStoragePath={note.pdfStoragePath ?? null}
             appointmentId={note.appointmentId ?? null}
@@ -109,9 +119,25 @@ export default async function SessionNoteViewPage({
               <CardTitle>Treatment plan</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="mb-3 text-sm">
-                {viewContext.therapeuticTarget || "No treatment plan"}
-              </p>
+              {viewContext.treatmentPlan ? (
+                <Link
+                  href={`/clients/${note.clientId}/treatment-plan/${viewContext.treatmentPlan.treatmentPlanId}`}
+                  className="mb-3 block text-sm font-medium text-primary hover:underline"
+                >
+                  v.{viewContext.treatmentPlan.versionNumber} created:{" "}
+                  {formatSessionNoteDate(viewContext.treatmentPlan.startDate)}
+                </Link>
+              ) : (
+                <p className="mb-3 text-sm text-muted-foreground">
+                  No treatment plan
+                </p>
+              )}
+              {viewContext.treatmentPlan?.therapeuticTarget ? (
+                <p className="mb-3 text-sm">
+                  <span className="font-medium">Therapeutic target: </span>
+                  {viewContext.treatmentPlan.therapeuticTarget}
+                </p>
+              ) : null}
               {viewContext.btpTargets.length === 0 ? (
                 <p className="text-sm text-muted-foreground">
                   No BTP results for this session.
@@ -193,6 +219,16 @@ export default async function SessionNoteViewPage({
               </div>
             </CardContent>
           </Card>
+
+          <EntityDeleteSection
+            entityName="Session note"
+            blockedReason={deleteStatus.blockedReason}
+            deleteAction={deleteSessionNote.bind(
+              null,
+              sessionNoteId,
+              context.practiceId
+            )}
+          />
         </div>
       </div>
 
@@ -202,7 +238,7 @@ export default async function SessionNoteViewPage({
           dateOfBirth={note.clientDateOfBirth}
           sessionDate={note.sessionDate}
           sessionTime={note.sessionTime}
-          therapeuticTarget={viewContext.therapeuticTarget}
+          therapeuticTarget={viewContext.treatmentPlan?.therapeuticTarget ?? null}
           btpTargets={viewContext.btpTargets}
           assessments={viewContext.assessments}
           asqResult={viewContext.asqResult}

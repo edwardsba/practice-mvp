@@ -98,7 +98,10 @@ export async function loadAppointmentsForPractice(
     .leftJoin(practices, eq(appointments.practiceId, practices.practiceId))
     .leftJoin(
       sessionNotes,
-      eq(sessionNotes.appointmentId, appointments.appointmentId)
+      and(
+        eq(sessionNotes.appointmentId, appointments.appointmentId),
+        eq(sessionNotes.isActive, true)
+      )
     )
     .where(and(...conditions))
     .orderBy(desc(appointments.appointmentDate), desc(appointments.appointmentTime))
@@ -268,7 +271,10 @@ export async function loadAppointmentsForClient(
     )
     .leftJoin(
       sessionNotes,
-      eq(sessionNotes.appointmentId, appointments.appointmentId)
+      and(
+        eq(sessionNotes.appointmentId, appointments.appointmentId),
+        eq(sessionNotes.isActive, true)
+      )
     )
     .where(
       and(

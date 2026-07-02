@@ -155,6 +155,7 @@ export async function countNonFinalisedSessionNotes(
       eq(sessionNotes.clientId, clientId),
       eq(sessionNotes.practiceId, practiceId),
       eq(sessionNotes.status, SESSION_NOTE_STATUSES[0]),
+      eq(sessionNotes.isActive, true),
     ])
   } catch {
     return 0
@@ -367,6 +368,7 @@ export async function countNonFinalisedSessionNotesByAppointment(
       eq(sessionNotes.appointmentId, appointmentId),
       eq(sessionNotes.practiceId, practiceId),
       eq(sessionNotes.status, SESSION_NOTE_STATUSES[0]),
+      eq(sessionNotes.isActive, true),
     ])
   } catch {
     return 0

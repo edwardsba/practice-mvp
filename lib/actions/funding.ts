@@ -31,10 +31,12 @@ import {
   formatApprovalProgress,
 } from "@/lib/funding/format"
 import {
-  deriveReportingRequirementStatus,
-  deriveReportingOverallStatus,
-  type ReportingRequirementStatus,
-  type ReportingOverallStatus,
+  getReportingOverallStatusForApproval,
+  getReportingRequirementsForApproval,
+} from "@/lib/funding/reporting-requirements"
+import type {
+  ReportingOverallStatus,
+  ReportingRequirementStatus,
 } from "@/lib/funding/reporting-status"
 import {
   countActiveAppointmentsLinkedToClaim,
@@ -224,7 +226,11 @@ export async function upsertFundingApprovalType(
     return { error: "Name is required." }
   }
 
-  let reports: Array<{ appointmentNumber: number; reportType: string }> = []
+  let reports: Array<{
+    appointmentNumber: number
+    reportType: string
+    reportTypeId?: string | null
+  }> = []
   if (reportsRaw) {
     try {
       reports = JSON.parse(reportsRaw)
@@ -277,21 +283,48 @@ export async function upsertFundingApprovalType(
       return { error: "Unable to save funding approval type." }
     }
 
-    await db
-      .delete(fundingApprovalTypeReports)
-      .where(
-        eq(fundingApprovalTypeReports.fundingApprovalTypeId, savedTypeId)
-      )
+    const existing = await db
+      .select({
+        reportRequirementId: fundingApprovalTypeReports.reportRequirementId,
+        appointmentNumber: fundingApprovalTypeReports.appointmentNumber,
+      })
+      .from(fundingApprovalTypeReports)
+      .where(eq(fundingApprovalTypeReports.fundingApprovalTypeId, savedTypeId))
 
-    if (reports.length > 0) {
-      await db.insert(fundingApprovalTypeReports).values(
-        reports.map((report) => ({
+    const existingByAppointmentNumber = new Map(
+      existing.map((row) => [row.appointmentNumber, row.reportRequirementId])
+    )
+    const incomingNumbers = new Set(reports.map((r) => r.appointmentNumber))
+
+    const toRemove = existing
+      .filter((row) => !incomingNumbers.has(row.appointmentNumber))
+      .map((row) => row.reportRequirementId)
+    if (toRemove.length > 0) {
+      await db
+        .delete(fundingApprovalTypeReports)
+        .where(inArray(fundingApprovalTypeReports.reportRequirementId, toRemove))
+    }
+
+    for (const report of reports) {
+      const existingId = existingByAppointmentNumber.get(report.appointmentNumber)
+      if (existingId) {
+        await db
+          .update(fundingApprovalTypeReports)
+          .set({
+            reportType: report.reportType,
+            reportTypeId: report.reportTypeId ?? null,
+            updatedAt: now,
+          })
+          .where(eq(fundingApprovalTypeReports.reportRequirementId, existingId))
+      } else {
+        await db.insert(fundingApprovalTypeReports).values({
           fundingApprovalTypeId: savedTypeId!,
           appointmentNumber: report.appointmentNumber,
           reportType: report.reportType,
+          reportTypeId: report.reportTypeId ?? null,
           updatedAt: now,
-        }))
-      )
+        })
+      }
     }
   } catch {
     return { error: "Unable to save funding approval type." }
@@ -587,41 +620,11 @@ export async function getFundingApprovals(practiceId: string) {
       let reportingOverallStatus: ReportingOverallStatus | null = null
 
       if (row.fundingApprovalTypeId) {
-        const reqs = await db
-          .select({
-            appointmentNumber: fundingApprovalTypeReports.appointmentNumber,
-            simpleReportId: fundingApprovalReportLinks.simpleReportId,
-          })
-          .from(fundingApprovalTypeReports)
-          .leftJoin(
-            fundingApprovalReportLinks,
-            and(
-              eq(
-                fundingApprovalReportLinks.fundingApprovalId,
-                row.fundingApprovalId
-              ),
-              eq(
-                fundingApprovalReportLinks.appointmentNumber,
-                fundingApprovalTypeReports.appointmentNumber
-              )
-            )
-          )
-          .where(
-            eq(
-              fundingApprovalTypeReports.fundingApprovalTypeId,
-              row.fundingApprovalTypeId
-            )
-          )
-
-        const statuses = reqs.map((req) =>
-          deriveReportingRequirementStatus({
-            hasLinkedReport: Boolean(req.simpleReportId),
-            appointmentNumber: req.appointmentNumber,
-            appointmentsAttended,
-          })
+        reportingOverallStatus = await getReportingOverallStatusForApproval(
+          row.fundingApprovalId,
+          row.fundingApprovalTypeId,
+          appointmentsAttended
         )
-
-        reportingOverallStatus = deriveReportingOverallStatus(statuses)
       }
 
       const { fundingApprovalTypeId: _typeId, ...rest } = row
@@ -696,6 +699,7 @@ export async function getClientFundingApprovalsForReport(
       reportRequirementId: string
       appointmentNumber: number
       reportType: string
+      reportTypeId: string | null
       label: string
     }>
     appointments: Array<{
@@ -819,6 +823,7 @@ export async function getClientFundingApprovalsForReport(
         reportRequirementId: string
         appointmentNumber: number
         reportType: string
+        reportTypeId: string | null
         label: string
       }> = []
 
@@ -828,6 +833,7 @@ export async function getClientFundingApprovalsForReport(
             reportRequirementId: fundingApprovalTypeReports.reportRequirementId,
             appointmentNumber: fundingApprovalTypeReports.appointmentNumber,
             reportType: fundingApprovalTypeReports.reportType,
+            reportTypeId: fundingApprovalTypeReports.reportTypeId,
             simpleReportId: fundingApprovalReportLinks.simpleReportId,
           })
           .from(fundingApprovalTypeReports)
@@ -858,6 +864,7 @@ export async function getClientFundingApprovalsForReport(
             reportRequirementId: r.reportRequirementId,
             appointmentNumber: r.appointmentNumber,
             reportType: r.reportType,
+            reportTypeId: r.reportTypeId,
             label: `Report at appointment ${r.appointmentNumber}`,
           }))
       }
@@ -1034,43 +1041,16 @@ export async function getFundingPanelByClientId(clientId: string) {
       }> = []
 
       if (row.fundingApprovalTypeId) {
-        const reqs = await db
-          .select({
-            appointmentNumber:
-              fundingApprovalTypeReports.appointmentNumber,
-            reportType: fundingApprovalTypeReports.reportType,
-            simpleReportId: fundingApprovalReportLinks.simpleReportId,
-          })
-          .from(fundingApprovalTypeReports)
-          .leftJoin(
-            fundingApprovalReportLinks,
-            and(
-              eq(
-                fundingApprovalReportLinks.fundingApprovalId,
-                row.fundingApprovalId
-              ),
-              eq(
-                fundingApprovalReportLinks.appointmentNumber,
-                fundingApprovalTypeReports.appointmentNumber
-              )
-            )
-          )
-          .where(
-            eq(
-              fundingApprovalTypeReports.fundingApprovalTypeId,
-              row.fundingApprovalTypeId
-            )
-          )
-          .orderBy(asc(fundingApprovalTypeReports.appointmentNumber))
+        const reqs = await getReportingRequirementsForApproval(
+          row.fundingApprovalId,
+          row.fundingApprovalTypeId,
+          appointmentsAttended
+        )
 
         reportingRequirements = reqs.map((req) => ({
           appointmentNumber: req.appointmentNumber,
-          reportType: req.reportType,
-          status: deriveReportingRequirementStatus({
-            hasLinkedReport: Boolean(req.simpleReportId),
-            appointmentNumber: req.appointmentNumber,
-            appointmentsAttended,
-          }),
+          reportType: req.reportTypeName,
+          status: req.status,
         }))
       }
 
@@ -1217,23 +1197,6 @@ export async function getFundingApprovalById(fundingApprovalId: string) {
         .orderBy(asc(fundingApprovalTypeReports.appointmentNumber))
     : []
 
-  const clientReports = await db
-    .select({
-      simpleReportId: simpleReports.simpleReportId,
-      reportType: simpleReports.reportType,
-      reportStatus: simpleReports.reportStatus,
-      reportDate: simpleReports.reportDate,
-      createdAt: simpleReports.createdAt,
-    })
-    .from(simpleReports)
-    .where(
-      and(
-        eq(simpleReports.clientId, approval.clientId),
-        eq(simpleReports.practiceId, context.practiceId)
-      )
-    )
-    .orderBy(desc(simpleReports.createdAt))
-
   return {
     ...approval,
     referrerOrganisationName,
@@ -1242,7 +1205,6 @@ export async function getFundingApprovalById(fundingApprovalId: string) {
     linkedAppointments,
     reportLinks,
     typeReports,
-    clientReports,
   }
 }
 
@@ -1268,24 +1230,9 @@ export async function upsertFundingApproval(
     : null
   const approvalStatus =
     String(formData.get("approval_status") ?? "active").trim() || "active"
-  const reportLinksRaw = String(formData.get("report_links") ?? "").trim()
 
   if (!clientId) {
     return { error: "Client is required." }
-  }
-
-  let reportLinks: Array<{
-    appointmentNumber: number
-    reportType: string
-    simpleReportId: string | null
-  }> = []
-
-  if (reportLinksRaw) {
-    try {
-      reportLinks = JSON.parse(reportLinksRaw)
-    } catch {
-      return { error: "Invalid report links." }
-    }
   }
 
   const now = new Date()
@@ -1336,20 +1283,70 @@ export async function upsertFundingApproval(
       return { error: "Unable to save funding approval." }
     }
 
-    await db
-      .delete(fundingApprovalReportLinks)
-      .where(eq(fundingApprovalReportLinks.fundingApprovalId, savedApprovalId))
+    if (fundingApprovalTypeId) {
+      const requirements = await db
+        .select({
+          appointmentNumber: fundingApprovalTypeReports.appointmentNumber,
+          reportType: fundingApprovalTypeReports.reportType,
+          reportTypeId: fundingApprovalTypeReports.reportTypeId,
+        })
+        .from(fundingApprovalTypeReports)
+        .where(
+          eq(
+            fundingApprovalTypeReports.fundingApprovalTypeId,
+            fundingApprovalTypeId
+          )
+        )
 
-    if (reportLinks.length > 0) {
-      await db.insert(fundingApprovalReportLinks).values(
-        reportLinks.map((link) => ({
-          fundingApprovalId: savedApprovalId!,
-          appointmentNumber: link.appointmentNumber,
-          reportType: link.reportType,
-          simpleReportId: link.simpleReportId,
-          updatedAt: now,
-        }))
+      const existingLinks = await db
+        .select({
+          appointmentNumber: fundingApprovalReportLinks.appointmentNumber,
+          simpleReportId: fundingApprovalReportLinks.simpleReportId,
+        })
+        .from(fundingApprovalReportLinks)
+        .where(eq(fundingApprovalReportLinks.fundingApprovalId, savedApprovalId))
+
+      const existingByNumber = new Map(
+        existingLinks.map((row) => [row.appointmentNumber, row.simpleReportId])
       )
+      const requirementNumbers = new Set(
+        requirements.map((r) => r.appointmentNumber)
+      )
+
+      const staleUnlinked = existingLinks.filter(
+        (row) =>
+          !requirementNumbers.has(row.appointmentNumber) && !row.simpleReportId
+      )
+      for (const row of staleUnlinked) {
+        await db
+          .delete(fundingApprovalReportLinks)
+          .where(
+            and(
+              eq(fundingApprovalReportLinks.fundingApprovalId, savedApprovalId),
+              eq(
+                fundingApprovalReportLinks.appointmentNumber,
+                row.appointmentNumber
+              )
+            )
+          )
+      }
+
+      for (const req of requirements) {
+        if (!existingByNumber.has(req.appointmentNumber)) {
+          await db.insert(fundingApprovalReportLinks).values({
+            fundingApprovalId: savedApprovalId!,
+            appointmentNumber: req.appointmentNumber,
+            reportType: req.reportType,
+            reportTypeId: req.reportTypeId,
+            simpleReportId: null,
+            updatedAt: now,
+          })
+        }
+      }
+    } else {
+      await db
+        .delete(fundingApprovalReportLinks)
+        .where(eq(fundingApprovalReportLinks.fundingApprovalId, savedApprovalId))
     }
   } catch {
     return { error: "Unable to save funding approval." }

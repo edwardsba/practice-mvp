@@ -31,6 +31,8 @@ const initialPreviewState: GenerateSessionNotePdfPreviewState = {}
 
 export function SessionNoteActions({
   sessionNoteId,
+  clientId,
+  clientName,
   status,
   pdfStoragePath,
   appointmentId,
@@ -39,6 +41,8 @@ export function SessionNoteActions({
   nextAppointment,
 }: {
   sessionNoteId: string
+  clientId: string
+  clientName: string
   status: string
   pdfStoragePath: string | null
   appointmentId: string | null
@@ -96,20 +100,32 @@ export function SessionNoteActions({
   return (
     <>
       <Card className="no-print mb-6">
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between gap-3">
           <CardTitle>Status</CardTitle>
+          <StatusBadge
+            status={isFinalised ? "finalised" : status}
+            statusMap={SESSION_NOTE_STATUS_CONFIG}
+          />
         </CardHeader>
         <CardContent>
           <dl className="grid gap-4">
+            <div>
+              <dt className="text-sm text-muted-foreground">Client</dt>
+              <dd className="mt-0.5 text-sm font-medium">
+                <Link
+                  href={`/clients/${clientId}`}
+                  className="text-primary hover:underline"
+                >
+                  {clientName}
+                </Link>
+              </dd>
+            </div>
+
             <div>
               <dt className="mb-2 text-sm text-muted-foreground">
                 Session note
               </dt>
               <dd className="flex flex-wrap items-center gap-3">
-                <StatusBadge
-                  status={isFinalised ? "finalised" : status}
-                  statusMap={SESSION_NOTE_STATUS_CONFIG}
-                />
                 {isFinalised ? (
                   <>
                     {pdfStoragePath ? (
@@ -170,7 +186,7 @@ export function SessionNoteActions({
                   </Link>
                 ) : (
                   <Link
-                    href={`/calendar?view=month&returnTo=/session-notes/${sessionNoteId}`}
+                    href={`/calendar?view=month&clientId=${clientId}&returnTo=/session-notes/${sessionNoteId}`}
                     className="text-primary hover:underline"
                   >
                     Schedule appointment →

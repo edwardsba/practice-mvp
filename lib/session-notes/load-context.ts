@@ -67,7 +67,12 @@ export type SessionNoteNextAppointment = {
 } | null
 
 export type SessionNoteViewContext = {
-  therapeuticTarget: string | null
+  treatmentPlan: {
+    treatmentPlanId: string
+    versionNumber: number
+    startDate: string
+    therapeuticTarget: string | null
+  } | null
   btpTargets: SessionNoteBtpTarget[]
   assessments: SessionNoteAssessmentResult[]
   asqResult: SessionNoteAsqResult
@@ -356,7 +361,14 @@ export async function loadSessionNoteViewContext(
     ])
 
   return {
-    therapeuticTarget: treatmentPlan?.therapeuticTarget?.trim() || null,
+    treatmentPlan: treatmentPlan
+      ? {
+          treatmentPlanId: treatmentPlan.treatmentPlanId,
+          versionNumber: treatmentPlan.versionNumber,
+          startDate: treatmentPlan.startDate ?? "",
+          therapeuticTarget: treatmentPlan.therapeuticTarget?.trim() || null,
+        }
+      : null,
     btpTargets,
     assessments: [phq9, gad7, assist],
     asqResult,

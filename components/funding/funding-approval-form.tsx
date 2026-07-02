@@ -23,24 +23,11 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
-import {
   addMonthsToDateString,
   APPROVAL_STATUS_LABELS,
   APPROVAL_STATUSES,
-  formatDisplayDate,
   isMedicareClaimType,
 } from "@/lib/funding/format"
-import {
-  formatAppointmentDate,
-  formatAppointmentTime,
-} from "@/lib/appointments/format"
 import { cn } from "@/lib/utils"
 
 const selectClassName = cn(
@@ -77,23 +64,10 @@ type ReferrerOption = {
   organisationName: string | null
 }
 
-type ReportOption = {
-  simpleReportId: string
-  reportType: string
-  reportDate: string | null
-  createdAt: Date
-}
-
 type LinkedAppointment = {
   appointmentDate: string
   appointmentTime: string
   location: string | null
-}
-
-type ReportLinkRow = {
-  appointmentNumber: number
-  reportType: string
-  simpleReportId: string | null
 }
 
 type InitialValues = {
@@ -108,7 +82,6 @@ type InitialValues = {
   appointmentsAttended?: number
   approvalStatus?: string
   linkedAppointments?: LinkedAppointment[]
-  reportLinks?: ReportLinkRow[]
 }
 
 export function FundingApprovalForm({
@@ -116,7 +89,6 @@ export function FundingApprovalForm({
   approvalTypes,
   claims,
   referrers,
-  clientReports,
   initialValues,
   cancelHref,
   returnTo,
@@ -125,7 +97,6 @@ export function FundingApprovalForm({
   approvalTypes: ApprovalTypeOption[]
   claims: ClaimOption[]
   referrers: ReferrerOption[]
-  clientReports: ReportOption[]
   initialValues?: InitialValues
   cancelHref: string
   returnTo?: string
@@ -186,16 +157,6 @@ export function FundingApprovalForm({
     [claims, clientId]
   )
 
-  const [reportLinks, setReportLinks] = useState<ReportLinkRow[]>(
-    initialValues?.reportLinks ??
-      selectedType?.reports.map((report) => ({
-        appointmentNumber: report.appointmentNumber,
-        reportType: report.reportType,
-        simpleReportId: null,
-      })) ??
-      []
-  )
-
   useEffect(() => {
     const draft = loadFundingApprovalDraft(draftId)
     if (draft) {
@@ -209,7 +170,6 @@ export function FundingApprovalForm({
       setAppointmentsApproved(
         draft.appointmentsApproved || appointmentsApproved
       )
-      if (draft.reportLinks?.length) setReportLinks(draft.reportLinks)
       clearFundingApprovalDraft(draftId)
     }
 
@@ -248,13 +208,6 @@ export function FundingApprovalForm({
           addMonthsToDateString(startDate, selectedType.durationMonths) ?? ""
         )
       }
-      setReportLinks(
-        selectedType.reports.map((report) => ({
-          appointmentNumber: report.appointmentNumber,
-          reportType: report.reportType,
-          simpleReportId: null,
-        }))
-      )
     }
   }, [approvalTypeId, selectedType, startDate, initialValues?.fundingApprovalId])
 
@@ -278,7 +231,6 @@ export function FundingApprovalForm({
       startDate,
       endDate,
       appointmentsApproved,
-      reportLinks,
     })
   }
 
@@ -293,8 +245,6 @@ export function FundingApprovalForm({
       </CardHeader>
       <CardContent>
         <form action={formAction} className="space-y-6">
-          <input type="hidden" name="report_links" value={JSON.stringify(reportLinks)} />
-
           <div className="space-y-2">
             <Label htmlFor="client_id">Client</Label>
             <select
@@ -521,64 +471,6 @@ export function FundingApprovalForm({
               ))}
             </select>
           </div>
-
-          {reportLinks.length > 0 ? (
-            <div className="space-y-2">
-              <Label>Reporting</Label>
-              <div className="rounded-lg border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Report type</TableHead>
-                      <TableHead>Linked report</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {reportLinks.map((link, index) => (
-                      <TableRow key={index}>
-                        <TableCell className="text-muted-foreground">
-                          {link.reportType}
-                        </TableCell>
-                        <TableCell>
-                          <select
-                            value={link.simpleReportId ?? ""}
-                            onChange={(event) =>
-                              setReportLinks((current) =>
-                                current.map((row, rowIndex) =>
-                                  rowIndex === index
-                                    ? {
-                                        ...row,
-                                        simpleReportId:
-                                          event.target.value || null,
-                                      }
-                                    : row
-                                )
-                              )
-                            }
-                            className={selectClassName}
-                          >
-                            <option value="">Select report</option>
-                            {clientReports.map((report) => (
-                              <option
-                                key={report.simpleReportId}
-                                value={report.simpleReportId}
-                              >
-                                {report.reportType} —{" "}
-                                {formatDisplayDate(
-                                  report.reportDate ??
-                                    report.createdAt.toISOString().slice(0, 10)
-                                )}
-                              </option>
-                            ))}
-                          </select>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </div>
-          ) : null}
 
           {state.error ? (
             <p className="text-sm text-destructive" role="alert">

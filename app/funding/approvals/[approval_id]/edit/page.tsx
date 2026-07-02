@@ -57,7 +57,6 @@ export default async function EditFundingApprovalPage({
           startDate: claim.startDate,
         }))}
         referrers={referrers}
-        clientReports={approval.clientReports}
         initialValues={{
           fundingApprovalId: approval.fundingApprovalId,
           clientId: approval.clientId,
@@ -70,11 +69,6 @@ export default async function EditFundingApprovalPage({
           appointmentsAttended: approval.appointmentsAttended,
           approvalStatus: approval.approvalStatus,
           linkedAppointments: approval.linkedAppointments,
-          reportLinks: approval.reportLinks.map((link) => ({
-            appointmentNumber: link.appointmentNumber,
-            reportType: link.reportType,
-            simpleReportId: link.simpleReportId,
-          })),
         }}
         cancelHref={`/funding/approvals/${approvalId}`}
       />

@@ -333,7 +333,9 @@ export function ReportForm({
       (r) => r.reportRequirementId === requirementId
     )
     if (!req) return
-    const matched = findReportTypeByName(req.reportType)
+    const matched = req.reportTypeId
+      ? reportTypes.find((rt) => rt.reportTypeId === req.reportTypeId)
+      : findReportTypeByName(req.reportType)
     if (matched) {
       setReportTypeId(matched.reportTypeId)
     }

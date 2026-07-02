@@ -659,14 +659,17 @@ export type SaveReportDraftState = {
   error?: string
 }
 
+type DbTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0]
+
 async function linkReportToRequirement(
+  tx: DbTransaction,
   reportRequirementId: string | null,
   fundingApprovalId: string | null,
   simpleReportId: string
 ) {
   if (!reportRequirementId || !fundingApprovalId) return
 
-  const [req] = await db
+  const [req] = await tx
     .select({
       appointmentNumber: fundingApprovalTypeReports.appointmentNumber,
     })
@@ -678,7 +681,7 @@ async function linkReportToRequirement(
 
   if (!req) return
 
-  await db
+  await tx
     .update(fundingApprovalReportLinks)
     .set({ simpleReportId, updatedAt: new Date() })
     .where(
@@ -783,41 +786,46 @@ export async function saveReportDraft(
       return { error: "Unable to save report. Client or practice not found." }
     }
 
-    const [report] = await db
-      .insert(simpleReports)
-      .values({
-        clientId,
+    const report = await db.transaction(async (tx) => {
+      const [inserted] = await tx
+        .insert(simpleReports)
+        .values({
+          clientId,
+          practiceId: context.practiceId,
+          practitionerProfileId: context.practitionerProfileId,
+          reportType: "referral_acknowledgement",
+          reportTypeId,
+          reportDate,
+          dateRangeStart: today,
+          dateRangeEnd: today,
+          valuesSnapshotJson: snapshot,
+          clinicalSummaryText,
+          recommendationsText: null,
+          reportStatus: "draft",
+          recipientType: "referrer",
+          fundingApprovalId,
+          reportRequirementId,
+        })
+        .returning({ simpleReportId: simpleReports.simpleReportId })
+
+      await tx.insert(auditEvents).values({
         practiceId: context.practiceId,
-        practitionerProfileId: context.practitionerProfileId,
-        reportType: "referral_acknowledgement",
-        reportTypeId,
-        reportDate,
-        dateRangeStart: today,
-        dateRangeEnd: today,
-        valuesSnapshotJson: snapshot,
-        clinicalSummaryText,
-        recommendationsText: null,
-        reportStatus: "draft",
-        recipientType: "referrer",
-        fundingApprovalId,
-        reportRequirementId,
+        userId: context.userId,
+        clientId,
+        eventType: "report.created",
+        entityType: "simple_report",
+        entityId: inserted.simpleReportId,
       })
-      .returning({ simpleReportId: simpleReports.simpleReportId })
 
-    await db.insert(auditEvents).values({
-      practiceId: context.practiceId,
-      userId: context.userId,
-      clientId,
-      eventType: "report.created",
-      entityType: "simple_report",
-      entityId: report.simpleReportId,
+      await linkReportToRequirement(
+        tx,
+        reportRequirementId,
+        fundingApprovalId,
+        inserted.simpleReportId
+      )
+
+      return inserted
     })
-
-    await linkReportToRequirement(
-      reportRequirementId,
-      fundingApprovalId,
-      report.simpleReportId
-    )
 
     redirect(`/clients/${clientId}/reports/${report.simpleReportId}`)
   }
@@ -913,40 +921,45 @@ export async function saveReportDraft(
     preview.gad7Results.length
   )
 
-  const [report] = await db
-    .insert(simpleReports)
-    .values({
-      clientId,
-      practiceId: context.practiceId,
-      practitionerProfileId: context.practitionerProfileId,
-      reportType,
-      reportTypeId,
-      reportDate,
-      dateRangeStart,
-      dateRangeEnd,
-      valuesSnapshotJson: snapshot,
-      clinicalSummaryText,
-      recommendationsText,
-      reportStatus: "draft",
-      recipientType: recipientType === "none" ? null : recipientType,
-      fundingApprovalId,
+  const report = await db.transaction(async (tx) => {
+    const [inserted] = await tx
+      .insert(simpleReports)
+      .values({
+        clientId,
+        practiceId: context.practiceId,
+        practitionerProfileId: context.practitionerProfileId,
+        reportType,
+        reportTypeId,
+        reportDate,
+        dateRangeStart,
+        dateRangeEnd,
+        valuesSnapshotJson: snapshot,
+        clinicalSummaryText,
+        recommendationsText,
+        reportStatus: "draft",
+        recipientType: recipientType === "none" ? null : recipientType,
+        fundingApprovalId,
+        reportRequirementId,
+      })
+      .returning({ simpleReportId: simpleReports.simpleReportId })
+
+    await linkReportToRequirement(
+      tx,
       reportRequirementId,
+      fundingApprovalId,
+      inserted.simpleReportId
+    )
+
+    await tx.insert(auditEvents).values({
+      practiceId: context.practiceId,
+      userId: context.userId,
+      clientId,
+      eventType: "report.created",
+      entityType: "simple_report",
+      entityId: inserted.simpleReportId,
     })
-    .returning({ simpleReportId: simpleReports.simpleReportId })
 
-  await linkReportToRequirement(
-    reportRequirementId,
-    fundingApprovalId,
-    report.simpleReportId
-  )
-
-  await db.insert(auditEvents).values({
-    practiceId: context.practiceId,
-    userId: context.userId,
-    clientId,
-    eventType: "report.created",
-    entityType: "simple_report",
-    entityId: report.simpleReportId,
+    return inserted
   })
 
   redirect(`/clients/${clientId}/reports/${report.simpleReportId}`)

@@ -8,11 +8,6 @@ export type FundingApprovalDraft = {
   startDate: string
   endDate: string
   appointmentsApproved: string
-  reportLinks: Array<{
-    appointmentNumber: number
-    reportType: string
-    simpleReportId: string | null
-  }>
 }
 
 function draftKey(id: string | "new") {

@@ -21,6 +21,10 @@ import { BackButton } from "@/components/ui/back-button"
 import { StatusBadge } from "@/components/ui/status-badge"
 import { getFundingApprovalById } from "@/lib/actions/funding"
 import {
+  getReportingOverallStatusForApproval,
+  getReportingRequirementsForApproval,
+} from "@/lib/funding/reporting-requirements"
+import {
   formatApprovalProgress,
   formatDisplayDate,
   formatMedicareIdentifier,
@@ -30,10 +34,8 @@ import {
 import {
   REPORTING_REQUIREMENT_STATUS_CONFIG,
   REPORTING_OVERALL_STATUS_CONFIG,
-  deriveReportingRequirementStatus,
-  deriveReportingOverallStatus,
 } from "@/lib/funding/reporting-status"
-import { FUNDING_APPROVAL_STATUS_CONFIG, APPOINTMENT_STATUS_CONFIG } from "@/lib/status"
+import { FUNDING_APPROVAL_STATUS_CONFIG, APPOINTMENT_STATUS_CONFIG, REPORT_STATUS_CONFIG } from "@/lib/status"
 import {
   formatAppointmentDate,
   formatAppointmentTime,
@@ -69,19 +71,16 @@ export default async function FundingApprovalDetailPage({
   const showMedicare = isMedicareClaimType(approval.claimTypeName)
   const showInsurance = isInsuranceClaimType(approval.claimTypeName)
 
-  const reportingStatuses = approval.typeReports.map((req) => {
-    const linked = approval.reportLinks.find(
-      (link) =>
-        link.appointmentNumber === req.appointmentNumber && link.simpleReportId
-    )
-    return deriveReportingRequirementStatus({
-      hasLinkedReport: Boolean(linked),
-      appointmentNumber: req.appointmentNumber,
-      appointmentsAttended: approval.appointmentsAttended,
-    })
-  })
-
-  const reportingOverallStatus = deriveReportingOverallStatus(reportingStatuses)
+  const reportingRequirements = await getReportingRequirementsForApproval(
+    approval.fundingApprovalId,
+    approval.fundingApprovalTypeId,
+    approval.appointmentsAttended
+  )
+  const reportingOverallStatus = await getReportingOverallStatusForApproval(
+    approval.fundingApprovalId,
+    approval.fundingApprovalTypeId,
+    approval.appointmentsAttended
+  )
 
   const expiryPercent = (() => {
     if (!approval.startDate || !approval.endDate) return null
@@ -383,6 +382,7 @@ export default async function FundingApprovalDetailPage({
                 <TableRow>
                   <TableHead>Session</TableHead>
                   <TableHead>Report Type</TableHead>
+                  <TableHead>Requirement Status</TableHead>
                   <TableHead>Report Status</TableHead>
                   <TableHead>Linked Report</TableHead>
                 </TableRow>
@@ -391,7 +391,7 @@ export default async function FundingApprovalDetailPage({
                 {approval.typeReports.length === 0 ? (
                   <TableRow>
                     <TableCell
-                      colSpan={4}
+                      colSpan={5}
                       className="h-16 text-center text-muted-foreground"
                     >
                       No reporting requirements configured for this approval type.
@@ -399,25 +399,38 @@ export default async function FundingApprovalDetailPage({
                   </TableRow>
                 ) : (
                   approval.typeReports.map((requirement) => {
+                    const requirementStatus = reportingRequirements.find(
+                      (row) =>
+                        row.appointmentNumber === requirement.appointmentNumber
+                    )
                     const linked = approval.reportLinks.find(
                       (link) =>
                         link.appointmentNumber === requirement.appointmentNumber &&
                         link.simpleReportId
                     )
-                    const status = deriveReportingRequirementStatus({
-                      hasLinkedReport: Boolean(linked),
-                      appointmentNumber: requirement.appointmentNumber,
-                      appointmentsAttended: approval.appointmentsAttended,
-                    })
                     return (
                       <TableRow key={requirement.reportRequirementId}>
                         <TableCell>{requirement.appointmentNumber}</TableCell>
                         <TableCell>{requirement.reportType}</TableCell>
                         <TableCell>
-                          <StatusBadge
-                            status={status}
-                            statusMap={REPORTING_REQUIREMENT_STATUS_CONFIG}
-                          />
+                          {requirementStatus ? (
+                            <StatusBadge
+                              status={requirementStatus.status}
+                              statusMap={REPORTING_REQUIREMENT_STATUS_CONFIG}
+                            />
+                          ) : (
+                            "—"
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {linked?.reportStatus ? (
+                            <StatusBadge
+                              status={linked.reportStatus}
+                              statusMap={REPORT_STATUS_CONFIG}
+                            />
+                          ) : (
+                            <span className="text-sm text-muted-foreground">—</span>
+                          )}
                         </TableCell>
                         <TableCell>
                           {linked?.simpleReportId ? (

@@ -1,6 +1,6 @@
 "use server"
 
-import { and, asc, count, desc, eq, inArray } from "drizzle-orm"
+import { and, asc, count, desc, eq, inArray, sql } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
 
@@ -1162,8 +1162,24 @@ export async function getFundingApprovalById(fundingApprovalId: string) {
       appointmentTime: appointments.appointmentTime,
       location: appointments.location,
       status: appointments.status,
+      preSessionBatterySentAt: appointments.preSessionBatterySentAt,
+      psqBatteryStatus: sql<string | null>`(
+        SELECT bi.status
+        FROM battery_instances bi
+        JOIN assessment_instances ai ON bi.phq9_instance_id = ai.assessment_instance_id
+        WHERE ai.appointment_id = ${appointments.appointmentId}
+        LIMIT 1
+      )`.as("psq_battery_status"),
+      sessionNoteStatus: sessionNotes.status,
     })
     .from(appointments)
+    .leftJoin(
+      sessionNotes,
+      and(
+        eq(sessionNotes.appointmentId, appointments.appointmentId),
+        eq(sessionNotes.isActive, true)
+      )
+    )
     .where(eq(appointments.fundingApprovalId, fundingApprovalId))
     .orderBy(asc(appointments.appointmentDate), asc(appointments.appointmentTime))
 

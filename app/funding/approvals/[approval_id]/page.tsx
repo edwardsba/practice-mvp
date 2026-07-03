@@ -17,6 +17,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { PsqStatusBadge } from "@/components/session-notes/psq-status-badge"
 import { BackButton } from "@/components/ui/back-button"
 import { StatusBadge } from "@/components/ui/status-badge"
 import { getFundingApprovalById } from "@/lib/actions/funding"
@@ -35,7 +36,12 @@ import {
   REPORTING_REQUIREMENT_STATUS_CONFIG,
   REPORTING_OVERALL_STATUS_CONFIG,
 } from "@/lib/funding/reporting-status"
-import { FUNDING_APPROVAL_STATUS_CONFIG, APPOINTMENT_STATUS_CONFIG, REPORT_STATUS_CONFIG } from "@/lib/status"
+import {
+  FUNDING_APPROVAL_STATUS_CONFIG,
+  APPOINTMENT_STATUS_CONFIG,
+  REPORT_STATUS_CONFIG,
+  SESSION_NOTE_STATUS_CONFIG,
+} from "@/lib/status"
 import {
   formatAppointmentDate,
   formatAppointmentTime,
@@ -309,13 +315,15 @@ export default async function FundingApprovalDetailPage({
                   <TableHead>Date</TableHead>
                   <TableHead>Time</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead>PSQ</TableHead>
+                  <TableHead>Session Note</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {approval.linkedAppointments.length === 0 ? (
                   <TableRow>
                     <TableCell
-                      colSpan={4}
+                      colSpan={6}
                       className="h-16 text-center text-muted-foreground"
                     >
                       No linked appointments.
@@ -360,6 +368,34 @@ export default async function FundingApprovalDetailPage({
                             status={appointment.status}
                             statusMap={APPOINTMENT_STATUS_CONFIG}
                           />
+                        </Link>
+                      </TableCell>
+                      <TableCell>
+                        <Link
+                          href={`/appointments/${appointment.appointmentId}`}
+                          className="block"
+                        >
+                          <PsqStatusBadge
+                            sentAt={appointment.preSessionBatterySentAt}
+                            psqBatteryStatus={appointment.psqBatteryStatus}
+                          />
+                        </Link>
+                      </TableCell>
+                      <TableCell>
+                        <Link
+                          href={`/appointments/${appointment.appointmentId}`}
+                          className="block"
+                        >
+                          {appointment.sessionNoteStatus ? (
+                            <StatusBadge
+                              status={appointment.sessionNoteStatus}
+                              statusMap={SESSION_NOTE_STATUS_CONFIG}
+                            />
+                          ) : (
+                            <span className="text-sm text-muted-foreground">
+                              —
+                            </span>
+                          )}
                         </Link>
                       </TableCell>
                     </TableRow>

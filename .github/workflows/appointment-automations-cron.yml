@@ -13,4 +13,4 @@ jobs:
         run: |
           curl -sf -X POST \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
-            https://edwardspsychology.com.au/api/cron/appointment-automations
+            https://practice-mvp.vercel.app/api/cron/appointment-automations

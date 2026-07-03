@@ -11,6 +11,6 @@ jobs:
     steps:
       - name: Call appointment automations endpoint
         run: |
-          curl -sf -X POST \
+          curl -sv -X POST \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
             https://practice-mvp.vercel.app/api/cron/appointment-automations

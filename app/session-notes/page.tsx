@@ -12,16 +12,17 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { StatusBadge } from "@/components/ui/status-badge"
 import { formatClientNameLastFirst } from "@/lib/appointments/format"
 import { requirePractitionerContext } from "@/lib/auth"
 import { appendReturnTo } from "@/lib/navigation/back"
+import { SESSION_NOTE_STATUS_CONFIG } from "@/lib/status"
 import {
   SESSION_NOTE_FILTER_VALUES,
   type SessionNoteFilter,
 } from "@/lib/session-notes/constants"
 import {
   formatSessionNoteDate,
-  formatSessionNoteStatus,
   formatSessionNoteTime,
 } from "@/lib/session-notes/format"
 import { loadSessionNotesForPractice } from "@/lib/session-notes/load"
@@ -132,7 +133,10 @@ export default async function SessionNotesPage({
                     </TableCell>
                     <TableCell>
                       <Link href={noteHref} className="block">
-                        {formatSessionNoteStatus(note.status)}
+                        <StatusBadge
+                          status={note.status}
+                          statusMap={SESSION_NOTE_STATUS_CONFIG}
+                        />
                       </Link>
                     </TableCell>
                     <TableCell>

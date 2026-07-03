@@ -33,8 +33,8 @@ export default async function AllReportsPage() {
               <TableHead>Client</TableHead>
               <TableHead>Report date</TableHead>
               <TableHead>Type</TableHead>
-              <TableHead>Period</TableHead>
               <TableHead>Status</TableHead>
+              <TableHead>Funding Approval</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -54,7 +54,13 @@ export default async function AllReportsPage() {
                   report.clientLastName
                 )
                 const href = `/clients/${report.clientId}/reports/${report.simpleReportId}`
-                const periodLabel = `${formatDisplayDate(report.dateRangeStart)} – ${formatDisplayDate(report.dateRangeEnd)}`
+                const fundingApprovalLabel = report.fundingApprovalTypeName
+                  ? `${report.fundingApprovalTypeName} - ${
+                      report.fundingApprovalStartDate
+                        ? formatDisplayDate(report.fundingApprovalStartDate)
+                        : "—"
+                    }`
+                  : "—"
 
                 return (
                   <TableRow
@@ -79,11 +85,6 @@ export default async function AllReportsPage() {
                       </Link>
                     </TableCell>
                     <TableCell>
-                      <Link href={href} className="block text-sm">
-                        {periodLabel}
-                      </Link>
-                    </TableCell>
-                    <TableCell>
                       <Link href={href} className="block">
                         <Badge
                           variant={
@@ -96,6 +97,11 @@ export default async function AllReportsPage() {
                             ? "Finalised"
                             : "Draft"}
                         </Badge>
+                      </Link>
+                    </TableCell>
+                    <TableCell>
+                      <Link href={href} className="block text-sm">
+                        {fundingApprovalLabel}
                       </Link>
                     </TableCell>
                   </TableRow>

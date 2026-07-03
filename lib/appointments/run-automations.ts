@@ -125,6 +125,10 @@ async function processReminders(
     )
 
   const templateCache = new Map<string, EmailTemplateRow | null>()
+  const emailContextCache = new Map<
+    string,
+    Awaited<ReturnType<typeof getQuestionnaireEmailContext>>
+  >()
 
   for (const row of rows) {
     if (row.commsOptOut || row.reminderOptOut) {
@@ -174,10 +178,15 @@ async function processReminders(
         continue
       }
 
-      const emailContext = await getQuestionnaireEmailContext(
-        row.practiceId,
-        row.practitionerProfileId
-      )
+      const contextCacheKey = `${row.practiceId}:${row.practitionerProfileId}`
+      let emailContext = emailContextCache.get(contextCacheKey)
+      if (emailContext === undefined) {
+        emailContext = await getQuestionnaireEmailContext(
+          row.practiceId,
+          row.practitionerProfileId
+        )
+        emailContextCache.set(contextCacheKey, emailContext)
+      }
       if (!emailContext) {
         summary.errors.push(
           `Reminder failed for appointment ${row.appointmentId}: practice or practitioner not found.`

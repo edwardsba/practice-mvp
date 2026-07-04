@@ -7,7 +7,6 @@ import { redirect } from "next/navigation"
 import { appointments, auditEvents, clients, sessionNotes } from "@/db/schema"
 import { loadAppointmentForPractice } from "@/lib/appointments/load"
 import {
-  formatClientNameLastFirst,
   todayDateString,
 } from "@/lib/appointments/format"
 import {
@@ -16,6 +15,7 @@ import {
 } from "@/lib/appointments/run-automations"
 import { requirePractitionerContext } from "@/lib/auth"
 import { db } from "@/lib/db"
+import { buildSessionNotePdfData } from "@/lib/session-notes/build-pdf-data"
 import {
   loadSessionNoteForPractice,
 } from "@/lib/session-notes/load"
@@ -24,32 +24,6 @@ import { loadSessionNoteViewContext } from "@/lib/session-notes/load-context"
 import { uploadSessionNotePdf } from "@/lib/session-notes/upload-pdf"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { verifyClientInPractice } from "@/lib/treatment-plans/load"
-
-async function buildPdfData(
-  note: NonNullable<Awaited<ReturnType<typeof loadSessionNoteForPractice>>>,
-  viewContext: Awaited<ReturnType<typeof loadSessionNoteViewContext>>
-) {
-  return {
-    clientId: note.clientId,
-    clientName: formatClientNameLastFirst(
-      note.clientFirstName,
-      note.clientLastName
-    ),
-    dateOfBirth: note.clientDateOfBirth,
-    sessionDate: note.sessionDate,
-    sessionTime: note.sessionTime,
-    therapeuticTarget: viewContext.treatmentPlan?.therapeuticTarget ?? null,
-    btpTargets: viewContext.btpTargets,
-    assessments: viewContext.assessments,
-    asqResult: viewContext.asqResult,
-    crisisPlan: viewContext.crisisPlan,
-    practitionerNotes: note.practitionerNotes,
-    nextAppointment: viewContext.nextAppointment,
-    practitionerName: viewContext.practitionerName,
-    practitionerTitle: viewContext.practitionerTitle,
-    practitionerDisplayName: viewContext.practitionerDisplayName,
-  }
-}
 
 export type FinaliseSessionNoteState = {
   error?: string
@@ -226,7 +200,7 @@ export async function generateSessionNotePdfPreview(
   }
 
   const viewContext = await loadSessionNoteViewContext(note)
-  const pdfData = await buildPdfData(note, viewContext)
+  const pdfData = await buildSessionNotePdfData(note, viewContext)
   const buffer = await generateSessionNotePdf(pdfData)
 
   return { pdfBase64: buffer.toString("base64") }
@@ -279,7 +253,7 @@ export async function finaliseSessionNote(
   }
 
   const viewContext = await loadSessionNoteViewContext(note)
-  const pdfData = await buildPdfData(note, viewContext)
+  const pdfData = await buildSessionNotePdfData(note, viewContext)
   const uploadResult = await uploadSessionNotePdf(
     sessionNoteId,
     context.practiceId,
@@ -294,33 +268,6 @@ export async function finaliseSessionNote(
   revalidatePath(`/session-notes/${sessionNoteId}`)
   revalidatePath(`/clients/${note.clientId}`)
   return { success: true }
-}
-
-export type GetSessionNotePdfDownloadUrlState = {
-  error?: string
-  url?: string
-}
-
-export async function getSessionNotePdfDownloadUrl(
-  sessionNoteId: string
-): Promise<GetSessionNotePdfDownloadUrlState> {
-  const context = await requirePractitionerContext()
-
-  const note = await loadSessionNoteForPractice(sessionNoteId, context.practiceId)
-  if (!note || !note.pdfStoragePath) {
-    return { error: "No PDF available for this session note." }
-  }
-
-  const supabase = createAdminClient()
-  const { data, error } = await supabase.storage
-    .from("session-note-pdfs")
-    .createSignedUrl(note.pdfStoragePath, 60)
-
-  if (error || !data?.signedUrl) {
-    return { error: "Unable to generate download link." }
-  }
-
-  return { url: data.signedUrl }
 }
 
 export type ExportSessionNotesState = {

@@ -1,13 +1,12 @@
 "use client"
 
 import Link from "next/link"
-import { useActionState, useEffect, useState, useTransition } from "react"
+import { useActionState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 
 import {
   finaliseSessionNote,
   generateSessionNotePdfPreview,
-  getSessionNotePdfDownloadUrl,
   type FinaliseSessionNoteState,
   type GenerateSessionNotePdfPreviewState,
 } from "@/app/session-notes/actions"
@@ -60,8 +59,6 @@ export function SessionNoteActions({
     initialPreviewState
   )
 
-  const [downloadPending, startDownloadTransition] = useTransition()
-  const [downloadError, setDownloadError] = useState<string | null>(null)
   const router = useRouter()
 
   const isFinalised = status === "finalised" || finaliseState.success
@@ -74,21 +71,6 @@ export function SessionNoteActions({
       router.refresh()
     }
   }, [finaliseState.success, router])
-
-  function handleDownload() {
-    setDownloadError(null)
-    startDownloadTransition(async () => {
-      const result = await getSessionNotePdfDownloadUrl(sessionNoteId)
-      if (result.error || !result.url) {
-        setDownloadError(result.error ?? "Download failed.")
-        return
-      }
-      const a = document.createElement("a")
-      a.href = result.url
-      a.download = ""
-      a.click()
-    })
-  }
 
   const sessionDateTime = (
     <>
@@ -136,14 +118,10 @@ export function SessionNoteActions({
                   Session note
                 </dt>
                 <dd className="flex flex-wrap items-center gap-3">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    disabled={downloadPending}
-                    onClick={handleDownload}
-                  >
-                    {downloadPending ? "Preparing…" : "Download PDF"}
+                  <Button variant="outline" size="sm" asChild>
+                    <a href={`/api/session-notes/${sessionNoteId}/pdf`} download>
+                      Download PDF
+                    </a>
                   </Button>
                 </dd>
               </div>
@@ -204,9 +182,6 @@ export function SessionNoteActions({
             <p className="mt-3 text-sm text-destructive">
               {finaliseState.error}
             </p>
-          ) : null}
-          {downloadError ? (
-            <p className="mt-3 text-sm text-destructive">{downloadError}</p>
           ) : null}
         </CardContent>
       </Card>

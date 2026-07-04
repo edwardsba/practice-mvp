@@ -1,9 +1,8 @@
-import { renderToBuffer } from "@react-pdf/renderer"
 import { eq } from "drizzle-orm"
 
 import { crisisPlans } from "@/db/schema"
 import { buildCrisisPlanPdfData } from "@/lib/crisis-plan/build-pdf-data"
-import { CrisisPlanPdfDocument } from "@/lib/crisis-plan/crisis-plan-pdf-document"
+import { generateCrisisPlanPdf } from "@/lib/crisis-plan/pdf-document"
 import type { CrisisPlanRow, EmergencyContactRow } from "@/lib/crisis-plans/types"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { db } from "@/lib/db"
@@ -21,9 +20,7 @@ export async function generateAndStoreCrisisPlanPdf({
   clientName: string
 }) {
   const pdfData = buildCrisisPlanPdfData(plan, contacts, clientName)
-  const buffer = await renderToBuffer(
-    <CrisisPlanPdfDocument data={pdfData} />
-  )
+  const buffer = await generateCrisisPlanPdf(pdfData)
 
   const storagePath = `${plan.practiceId}/${plan.clientId}/${plan.crisisPlanId}.pdf`
   const supabase = createAdminClient()

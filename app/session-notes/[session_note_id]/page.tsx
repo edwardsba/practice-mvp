@@ -53,10 +53,13 @@ function formatDob(value: string | null) {
 
 export default async function SessionNoteViewPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ session_note_id: string }>
+  searchParams: Promise<{ returnTo?: string }>
 }) {
   const { session_note_id: sessionNoteId } = await params
+  const { returnTo } = await searchParams
   const context = await requirePractitionerContext()
 
   const note = await loadSessionNoteForPractice(sessionNoteId, context.practiceId)
@@ -72,6 +75,9 @@ export default async function SessionNoteViewPage({
     note.clientLastName
   )
   const isFinalised = note.status === "finalised"
+  const sessionNoteUrl = returnTo
+    ? `/session-notes/${sessionNoteId}?returnTo=${encodeURIComponent(returnTo)}`
+    : `/session-notes/${sessionNoteId}`
 
   return (
     <AppShell>
@@ -121,7 +127,7 @@ export default async function SessionNoteViewPage({
             <CardContent>
               {viewContext.treatmentPlan ? (
                 <Link
-                  href={`/clients/${note.clientId}/treatment-plan/${viewContext.treatmentPlan.treatmentPlanId}`}
+                  href={`/clients/${note.clientId}/treatment-plan/${viewContext.treatmentPlan.treatmentPlanId}?returnTo=${encodeURIComponent(sessionNoteUrl)}`}
                   className="mb-3 block text-sm font-medium text-primary hover:underline"
                 >
                   v.{viewContext.treatmentPlan.versionNumber} created:{" "}
@@ -198,7 +204,7 @@ export default async function SessionNoteViewPage({
                     score: viewContext.asqResult?.score ?? null,
                     maxScore: viewContext.asqResult?.maxScore ?? null,
                     acuteRiskRating: viewContext.asqResult?.acuteRiskRating ?? null,
-                    administerHref: `/clients/${note.clientId}/asq/new?session_note_id=${sessionNoteId}`,
+                    administerHref: `/clients/${note.clientId}/asq/new?session_note_id=${sessionNoteId}&returnTo=${encodeURIComponent(sessionNoteUrl)}`,
                   } satisfies RiskAssessmentRow,
                 ]}
                 clientId={note.clientId}
@@ -207,7 +213,7 @@ export default async function SessionNoteViewPage({
                 <p className="mb-1 text-sm font-medium">Crisis plan</p>
                 {viewContext.crisisPlan ? (
                   <Link
-                    href={`/clients/${note.clientId}/crisis-plan/${viewContext.crisisPlan.crisisPlanId}`}
+                    href={`/clients/${note.clientId}/crisis-plan/${viewContext.crisisPlan.crisisPlanId}?returnTo=${encodeURIComponent(sessionNoteUrl)}`}
                     className="text-sm text-primary hover:underline"
                   >
                     v{viewContext.crisisPlan.versionNumber} (

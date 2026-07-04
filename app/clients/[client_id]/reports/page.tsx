@@ -87,6 +87,7 @@ export default async function ClientReportsPage({
     .orderBy(desc(simpleReports.reportDate), desc(simpleReports.createdAt))
 
   const clientName = `${client.firstName} ${client.lastName}`
+  const reportsListUrl = `/clients/${clientId}/reports`
 
   return (
     <AppShell>
@@ -99,7 +100,11 @@ export default async function ClientReportsPage({
             Reports — {clientName}
           </h1>
           <Button asChild>
-            <Link href={`/clients/${clientId}/reports/new`}>Create Report</Link>
+            <Link
+              href={`/clients/${clientId}/reports/new?returnTo=${encodeURIComponent(reportsListUrl)}`}
+            >
+              Create Report
+            </Link>
           </Button>
         </div>
       </div>
@@ -126,7 +131,7 @@ export default async function ClientReportsPage({
               </TableRow>
             ) : (
               reports.map((report) => {
-                const reportHref = `/clients/${clientId}/reports/${report.simpleReportId}`
+                const reportHref = `/clients/${clientId}/reports/${report.simpleReportId}?returnTo=${encodeURIComponent(reportsListUrl)}`
                 const fundingApprovalLabel = report.fundingApprovalTypeName
                   ? `${report.fundingApprovalTypeName} - ${
                       report.fundingApprovalStartDate

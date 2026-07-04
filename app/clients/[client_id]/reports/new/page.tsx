@@ -27,12 +27,14 @@ export default async function NewReportPage({
   searchParams: Promise<{
     fundingApprovalId?: string
     reportRequirementId?: string
+    returnTo?: string
   }>
 }) {
   const { client_id: clientId } = await params
   const {
     fundingApprovalId: initialFundingApprovalId,
     reportRequirementId: initialRequirementId,
+    returnTo,
   } = await searchParams
   const context = await requirePractitionerContext()
 
@@ -150,7 +152,7 @@ export default async function NewReportPage({
         saveAction={saveReportDraft.bind(null, clientId)}
         submitLabel="Save Draft"
         therapeuticTarget={therapeuticTarget}
-        cancelHref={`/clients/${clientId}`}
+        cancelHref={returnTo ?? `/clients/${clientId}`}
       />
     </AppShell>
   )

@@ -74,6 +74,9 @@ export default async function AppointmentDetailPage({
     "← Back to appointments"
   )
   const notes = appointment.notes?.trim() ?? ""
+  const appointmentUrl = returnTo
+    ? `/appointments/${appointmentId}?returnTo=${encodeURIComponent(returnTo)}`
+    : `/appointments/${appointmentId}`
 
   return (
     <AppShell>
@@ -86,7 +89,9 @@ export default async function AppointmentDetailPage({
           <div className="flex flex-wrap justify-end gap-2">
             {linkedSessionNote ? (
               <Button asChild variant="default">
-                <Link href={`/session-notes/${linkedSessionNote.sessionNoteId}`}>
+                <Link
+                  href={`/session-notes/${linkedSessionNote.sessionNoteId}?returnTo=${encodeURIComponent(appointmentUrl)}`}
+                >
                   View Session Note
                 </Link>
               </Button>
@@ -95,7 +100,8 @@ export default async function AppointmentDetailPage({
                 action={createDraftSessionNote.bind(
                   null,
                   appointment.clientId,
-                  appointmentId
+                  appointmentId,
+                  appointmentUrl
                 )}
               >
                 <Button type="submit" variant="default">

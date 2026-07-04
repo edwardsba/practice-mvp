@@ -21,6 +21,9 @@ function labelForReturnTo(returnTo: string, defaultLabel: string): string {
     if (/^\/clients\/[^/]+\/appointments$/.test(returnTo)) {
       return "← Back to appointments"
     }
+    if (/^\/clients\/[^/]+\/reports$/.test(returnTo)) {
+      return "← Back to reports"
+    }
     return "← Back to client"
   }
   if (returnTo === "/appointments" || returnTo.startsWith("/appointments/")) {

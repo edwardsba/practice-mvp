@@ -40,6 +40,7 @@ import { requirePractitionerContext } from "@/lib/auth"
 import { db } from "@/lib/db"
 import { getFundingPanelByClientId } from "@/lib/actions/funding"
 import { formatApprovalProgress, formatDisplayDate } from "@/lib/funding/format"
+import { appendReturnTo } from "@/lib/navigation/back"
 import { REPORTING_REQUIREMENT_STATUS_CONFIG } from "@/lib/funding/reporting-status"
 import { buildTemplateVariablesFromLinkResponse } from "@/lib/email/link-response"
 import { getQuestionnaireEmailContext } from "@/lib/email/practitioner-context"
@@ -177,7 +178,10 @@ export default async function ClientDetailPage({
                   <dd className="font-medium">
                     {nextAppointment ? (
                       <Link
-                        href={`/appointments/${nextAppointment.appointmentId}`}
+                        href={appendReturnTo(
+                          `/appointments/${nextAppointment.appointmentId}`,
+                          `/clients/${clientId}`
+                        )}
                         className="text-primary hover:underline"
                       >
                         {formatAppointmentDate(nextAppointment.appointmentDate)}{" "}
@@ -316,7 +320,10 @@ export default async function ClientDetailPage({
                       </TableRow>
                     ) : (
                       fundingPanelRows.map((row) => {
-                        const approvalHref = `/funding/approvals/${row.fundingApprovalId}`
+                        const approvalHref = appendReturnTo(
+                          `/funding/approvals/${row.fundingApprovalId}`,
+                          `/clients/${clientId}`
+                        )
                         return (
                           <TableRow
                             key={row.fundingApprovalId}

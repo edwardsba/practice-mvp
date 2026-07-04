@@ -49,14 +49,23 @@ export function ActionItemsSection({
         <CardContent className="space-y-3">
           <div className="flex flex-wrap gap-2">
             <Button asChild>
-              <Link href={`/appointments/new?clientId=${clientId}`}>
+              <Link
+                href={`/appointments/new?clientId=${clientId}&returnTo=${encodeURIComponent(`/clients/${clientId}`)}`}
+              >
                 New Appointment
               </Link>
             </Button>
             <Button variant="outline" disabled>
               Edit Appointment
             </Button>
-            <form action={createDraftSessionNote.bind(null, clientId, null)}>
+            <form
+              action={createDraftSessionNote.bind(
+                null,
+                clientId,
+                null,
+                `/clients/${clientId}`
+              )}
+            >
               <Button type="submit" variant="outline">
                 Add Session Note
               </Button>

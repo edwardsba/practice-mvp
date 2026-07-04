@@ -73,7 +73,9 @@ export default async function ClientSessionNotesPage({
           <h1 className="text-2xl font-semibold tracking-tight">
             Session Notes — {clientName}
           </h1>
-          <form action={createDraftSessionNote.bind(null, clientId, null)}>
+          <form
+            action={createDraftSessionNote.bind(null, clientId, null, returnTo)}
+          >
             <Button type="submit">New Session Note</Button>
           </form>
         </div>

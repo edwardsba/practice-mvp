@@ -24,6 +24,7 @@ import { loadSessionNoteViewContext } from "@/lib/session-notes/load-context"
 import { uploadSessionNotePdf } from "@/lib/session-notes/upload-pdf"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { verifyClientInPractice } from "@/lib/treatment-plans/load"
+import { appendReturnTo } from "@/lib/navigation/back"
 
 export type FinaliseSessionNoteState = {
   error?: string
@@ -32,7 +33,8 @@ export type FinaliseSessionNoteState = {
 
 export async function createDraftSessionNote(
   clientId: string,
-  appointmentId: string | null
+  appointmentId: string | null,
+  returnTo?: string
 ) {
   const context = await requirePractitionerContext()
 
@@ -87,7 +89,11 @@ export async function createDraftSessionNote(
 
   revalidatePath("/session-notes")
   revalidatePath(`/clients/${clientId}`)
-  redirect(`/session-notes/${sessionNoteId!}`)
+  redirect(
+    returnTo
+      ? appendReturnTo(`/session-notes/${sessionNoteId!}`, returnTo)
+      : `/session-notes/${sessionNoteId!}`
+  )
 }
 
 export type UpdateSessionNoteNotesState = {

@@ -73,7 +73,7 @@ export default async function ClientAppointmentsPage({
             Appointments — {clientName}
           </h1>
           <Button asChild>
-            <Link href={`/appointments/new?clientId=${clientId}`}>
+            <Link href={appendReturnTo(`/appointments/new?clientId=${clientId}`, returnTo)}>
               Add Appointment
             </Link>
           </Button>

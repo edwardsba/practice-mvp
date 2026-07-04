@@ -162,6 +162,11 @@ export function formatDayShortLabel(dateStr: string): string {
   return WEEKDAY_SHORT_LABELS[index]
 }
 
+export function formatDayFullLabel(dateStr: string): string {
+  const date = parseDateString(dateStr)
+  return date.toLocaleDateString("en-AU", { weekday: "long" })
+}
+
 export function buildCalendarUrl(
   view: CalendarView,
   date: string,

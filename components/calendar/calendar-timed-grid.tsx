@@ -1,6 +1,12 @@
 import Link from "next/link"
 
-import { formatDayShortLabel, newAppointmentUrl, parseDateString } from "@/lib/calendar/dates"
+import { PsqStatusBadge } from "@/components/session-notes/psq-status-badge"
+import {
+  formatDayFullLabel,
+  formatDayShortLabel,
+  newAppointmentUrl,
+  parseDateString,
+} from "@/lib/calendar/dates"
 import {
   isSlotAvailable,
   type AvailabilityBlock,
@@ -14,6 +20,7 @@ import {
   parseTimeStringToMinutes,
 } from "@/lib/calendar/time-slots"
 import type { CalendarAppointment } from "@/lib/appointments/load"
+import { resolveAppointmentLocationText } from "@/lib/appointments/location"
 import { todayDateString } from "@/lib/appointments/format"
 import { cn } from "@/lib/utils"
 
@@ -28,17 +35,51 @@ type CalendarSettings = {
 function AppointmentBlock({
   appointment,
   rowSpan,
+  detailed,
 }: {
   appointment: CalendarAppointment
   rowSpan: number
+  detailed: boolean
 }) {
+  const blockHeight = rowSpan * CALENDAR_SLOT_HEIGHT_PX - 8
+  const showExtraDetail = detailed && blockHeight >= 72
+
+  if (!showExtraDetail) {
+    return (
+      <Link
+        href={`/appointments/${appointment.appointmentId}?returnTo=/calendar`}
+        className="flex h-full min-h-0 flex-col justify-center truncate rounded-md border border-primary/20 bg-primary/10 px-1 text-[10px] font-medium leading-tight text-primary hover:bg-primary/15 sm:px-2 sm:text-xs"
+        style={{ minHeight: blockHeight }}
+      >
+        {formatAppointmentClientName(appointment)}
+      </Link>
+    )
+  }
+
+  const locationText =
+    appointment.mode === "online"
+      ? "Online"
+      : resolveAppointmentLocationText(
+          appointment.location,
+          appointment.practiceLocationNickname,
+          appointment.practiceAddress,
+          appointment.practiceName
+        )
+
   return (
     <Link
       href={`/appointments/${appointment.appointmentId}?returnTo=/calendar`}
-      className="flex h-full min-h-0 flex-col justify-center truncate rounded-md border border-primary/20 bg-primary/10 px-1 text-[10px] font-medium leading-tight text-primary hover:bg-primary/15 sm:px-2 sm:text-xs"
-      style={{ minHeight: rowSpan * CALENDAR_SLOT_HEIGHT_PX - 8 }}
+      className="flex h-full min-h-0 flex-col justify-center gap-1 truncate rounded-md border border-primary/20 bg-primary/10 px-2 py-1.5 text-xs font-medium leading-tight text-primary hover:bg-primary/15"
+      style={{ minHeight: blockHeight }}
     >
-      {formatAppointmentClientName(appointment)}
+      <span className="truncate">{formatAppointmentClientName(appointment)}</span>
+      <span className="truncate text-[11px] font-normal text-primary/80">
+        {locationText}
+      </span>
+      <PsqStatusBadge
+        sentAt={appointment.preSessionBatterySentAt}
+        psqBatteryStatus={appointment.psqBatteryStatus}
+      />
     </Link>
   )
 }
@@ -63,6 +104,7 @@ function TimedGridTable({
   returnTo?: string
 }) {
   const today = todayDateString()
+  const isDayView = days.length === 1
   const cellsByDay = new Map(
     days.map((day) => [
       day,
@@ -92,8 +134,13 @@ function TimedGridTable({
                   className="border-b border-l bg-muted/40 px-1 py-2 text-center text-xs font-medium text-muted-foreground sm:px-2"
                 >
                   <div className="flex flex-col items-center gap-0.5">
-                    <span className="text-[10px] uppercase sm:text-xs">
-                      {formatDayShortLabel(day)}
+                    <span
+                      className={cn(
+                        "uppercase",
+                        isDayView ? "text-sm sm:text-base" : "text-[10px] sm:text-xs"
+                      )}
+                    >
+                      {isDayView ? formatDayFullLabel(day) : formatDayShortLabel(day)}
                     </span>
                     <span
                       className={cn(
@@ -134,6 +181,7 @@ function TimedGridTable({
                       <AppointmentBlock
                         appointment={cell.appointment}
                         rowSpan={cell.rowSpan}
+                        detailed={isDayView}
                       />
                     </td>
                   )

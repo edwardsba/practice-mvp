@@ -16,7 +16,19 @@ export async function loadTodaysAppointments(practiceId: string) {
       location: appointments.location,
       mode: appointments.mode,
       status: appointments.status,
+      practiceName: sql<string>`coalesce(${practices.practiceName}, '')`.as(
+        "practice_name"
+      ),
+      practiceAddress: practices.address,
       practiceLocationNickname: practices.locationNickname,
+      preSessionBatterySentAt: appointments.preSessionBatterySentAt,
+      psqBatteryStatus: sql<string | null>`(
+        SELECT bi.status
+        FROM battery_instances bi
+        JOIN assessment_instances ai ON bi.phq9_instance_id = ai.assessment_instance_id
+        WHERE ai.appointment_id = ${appointments.appointmentId}
+        LIMIT 1
+      )`.as("psq_battery_status"),
       clientFirstName: clients.firstName,
       clientLastName: clients.lastName,
     })

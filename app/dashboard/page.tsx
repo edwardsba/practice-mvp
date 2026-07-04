@@ -1,18 +1,22 @@
 import Link from "next/link"
 
 import { AppShell } from "@/components/app-shell"
+import { PsqStatusBadge } from "@/components/session-notes/psq-status-badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { StatusBadge } from "@/components/ui/status-badge"
 import {
   formatAppointmentTime,
   formatClientNameLastFirst,
 } from "@/lib/appointments/format"
+import { resolveAppointmentLocationText } from "@/lib/appointments/location"
 import { requirePractitionerContext } from "@/lib/auth"
+import { formatCalendarPeriodLabel } from "@/lib/calendar/dates"
 import {
   countAppointmentsMissingFinalisedNote,
   countOutstandingReports,
   loadTodaysAppointments,
 } from "@/lib/dashboard/load"
+import { todayDateString } from "@/lib/dates/practice-time"
 import { APPOINTMENT_STATUS_CONFIG } from "@/lib/status"
 
 export default async function DashboardPage() {
@@ -31,6 +35,9 @@ export default async function DashboardPage() {
         <Card>
           <CardHeader>
             <CardTitle>Today&apos;s appointments</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              {formatCalendarPeriodLabel("day", todayDateString())}
+            </p>
           </CardHeader>
           <CardContent>
             {todaysAppointments.length === 0 ? (
@@ -39,26 +46,47 @@ export default async function DashboardPage() {
               </p>
             ) : (
               <ul className="divide-y">
-                {todaysAppointments.map((appt) => (
-                  <li key={appt.appointmentId} className="py-3">
-                    <Link
-                      href={`/appointments/${appt.appointmentId}`}
-                      className="flex flex-wrap items-center justify-between gap-2 hover:underline"
-                    >
-                      <span className="font-medium">
-                        {formatAppointmentTime(appt.appointmentTime)} —{" "}
-                        {formatClientNameLastFirst(
-                          appt.clientFirstName,
-                          appt.clientLastName
-                        )}
-                      </span>
-                      <StatusBadge
-                        status={appt.status}
-                        statusMap={APPOINTMENT_STATUS_CONFIG}
-                      />
-                    </Link>
-                  </li>
-                ))}
+                {todaysAppointments.map((appt) => {
+                  const locationText =
+                    appt.mode === "online"
+                      ? "Online"
+                      : resolveAppointmentLocationText(
+                          appt.location,
+                          appt.practiceLocationNickname,
+                          appt.practiceAddress,
+                          appt.practiceName
+                        )
+
+                  return (
+                    <li key={appt.appointmentId} className="py-3">
+                      <Link
+                        href={`/appointments/${appt.appointmentId}`}
+                        className="flex flex-col gap-1 hover:underline"
+                      >
+                        <span className="flex flex-wrap items-center justify-between gap-2">
+                          <span className="font-medium">
+                            {formatAppointmentTime(appt.appointmentTime)} —{" "}
+                            {formatClientNameLastFirst(
+                              appt.clientFirstName,
+                              appt.clientLastName
+                            )}
+                          </span>
+                          <StatusBadge
+                            status={appt.status}
+                            statusMap={APPOINTMENT_STATUS_CONFIG}
+                          />
+                        </span>
+                        <span className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                          <span>{locationText}</span>
+                          <PsqStatusBadge
+                            sentAt={appt.preSessionBatterySentAt}
+                            psqBatteryStatus={appt.psqBatteryStatus}
+                          />
+                        </span>
+                      </Link>
+                    </li>
+                  )
+                })}
               </ul>
             )}
           </CardContent>

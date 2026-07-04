@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, gte, lte, lt } from "drizzle-orm"
+import { and, asc, count, desc, eq, gte, lte, lt, sql } from "drizzle-orm"
 
 import {
   appointments,
@@ -31,6 +31,13 @@ export type CalendarAppointment = {
   durationMinutes: number
   clientFirstName: string
   clientLastName: string
+  location: string | null
+  mode: string
+  practiceName: string
+  practiceAddress: string | null
+  practiceLocationNickname: string | null
+  preSessionBatterySentAt: Date | null
+  psqBatteryStatus: string | null
 }
 
 export async function loadAppointmentsForPractitionerInRange(
@@ -48,9 +55,25 @@ export async function loadAppointmentsForPractitionerInRange(
       durationMinutes: appointments.durationMinutes,
       clientFirstName: clients.firstName,
       clientLastName: clients.lastName,
+      location: appointments.location,
+      mode: appointments.mode,
+      practiceName: sql<string>`coalesce(${practices.practiceName}, '')`.as(
+        "practice_name"
+      ),
+      practiceAddress: practices.address,
+      practiceLocationNickname: practices.locationNickname,
+      preSessionBatterySentAt: appointments.preSessionBatterySentAt,
+      psqBatteryStatus: sql<string | null>`(
+        SELECT bi.status
+        FROM battery_instances bi
+        JOIN assessment_instances ai ON bi.phq9_instance_id = ai.assessment_instance_id
+        WHERE ai.appointment_id = ${appointments.appointmentId}
+        LIMIT 1
+      )`.as("psq_battery_status"),
     })
     .from(appointments)
     .innerJoin(clients, eq(appointments.clientId, clients.clientId))
+    .leftJoin(practices, eq(appointments.practiceId, practices.practiceId))
     .where(
       and(
         eq(appointments.practiceId, practiceId),

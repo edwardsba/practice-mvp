@@ -13,25 +13,17 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { clients, reportTypes, simpleReports } from "@/db/schema"
+import {
+  clients,
+  fundingApprovals,
+  fundingApprovalTypes,
+  reportTypes,
+  simpleReports,
+} from "@/db/schema"
 import { requirePractitionerContext } from "@/lib/auth"
 import { db } from "@/lib/db"
 import { formatDisplayDate } from "@/lib/funding/format"
 import { formatReportType } from "@/lib/reports/snapshot"
-
-function formatReportDateRange(start: string, end: string) {
-  const formatPart = (value: string) => {
-    const date = new Date(`${value}T00:00:00`)
-    if (Number.isNaN(date.getTime())) return value
-    return date.toLocaleDateString("en-AU", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-    })
-  }
-
-  return `${formatPart(start)} – ${formatPart(end)}`
-}
 
 export default async function ClientReportsPage({
   params,
@@ -64,16 +56,26 @@ export default async function ClientReportsPage({
     .select({
       simpleReportId: simpleReports.simpleReportId,
       reportTypeName: reportTypes.name,
-      templateKey: reportTypes.templateKey,
       reportStatus: simpleReports.reportStatus,
       reportDate: simpleReports.reportDate,
-      dateRangeStart: simpleReports.dateRangeStart,
-      dateRangeEnd: simpleReports.dateRangeEnd,
+      fundingApprovalTypeName: fundingApprovalTypes.name,
+      fundingApprovalStartDate: fundingApprovals.startDate,
     })
     .from(simpleReports)
     .leftJoin(
       reportTypes,
       eq(simpleReports.reportTypeId, reportTypes.reportTypeId)
+    )
+    .leftJoin(
+      fundingApprovals,
+      eq(simpleReports.fundingApprovalId, fundingApprovals.fundingApprovalId)
+    )
+    .leftJoin(
+      fundingApprovalTypes,
+      eq(
+        fundingApprovals.fundingApprovalTypeId,
+        fundingApprovalTypes.fundingApprovalTypeId
+      )
     )
     .where(
       and(
@@ -107,9 +109,9 @@ export default async function ClientReportsPage({
           <TableHeader>
             <TableRow>
               <TableHead>Report date</TableHead>
-              <TableHead>Report type</TableHead>
-              <TableHead>Date range</TableHead>
+              <TableHead>Type</TableHead>
               <TableHead>Status</TableHead>
+              <TableHead>Funding Approval</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -125,6 +127,14 @@ export default async function ClientReportsPage({
             ) : (
               reports.map((report) => {
                 const reportHref = `/clients/${clientId}/reports/${report.simpleReportId}`
+                const fundingApprovalLabel = report.fundingApprovalTypeName
+                  ? `${report.fundingApprovalTypeName} - ${
+                      report.fundingApprovalStartDate
+                        ? formatDisplayDate(report.fundingApprovalStartDate)
+                        : "—"
+                    }`
+                  : "—"
+
                 return (
                   <TableRow
                     key={report.simpleReportId}
@@ -146,18 +156,6 @@ export default async function ClientReportsPage({
                       </Link>
                     </TableCell>
                     <TableCell>
-                      <Link href={reportHref} className="block hover:underline">
-                        {report.templateKey === "referral_acknowledgement"
-                          ? "—"
-                          : report.dateRangeStart && report.dateRangeEnd
-                            ? formatReportDateRange(
-                                String(report.dateRangeStart),
-                                String(report.dateRangeEnd)
-                              )
-                            : "—"}
-                      </Link>
-                    </TableCell>
-                    <TableCell>
                       <Link href={reportHref} className="block">
                         <Badge
                           variant={
@@ -170,6 +168,11 @@ export default async function ClientReportsPage({
                             ? "Finalised"
                             : "Draft"}
                         </Badge>
+                      </Link>
+                    </TableCell>
+                    <TableCell>
+                      <Link href={reportHref} className="block text-sm">
+                        {fundingApprovalLabel}
                       </Link>
                     </TableCell>
                   </TableRow>

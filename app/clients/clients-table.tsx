@@ -14,6 +14,10 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { CLIENT_STATUS_CONFIG } from "@/lib/status"
+import {
+  formatAppointmentDate,
+  formatAppointmentTime,
+} from "@/lib/appointments/format"
 
 export type ClientRow = {
   clientId: string
@@ -23,6 +27,8 @@ export type ClientRow = {
   phone: string | null
   dateOfBirth: string | null
   clientStatus: string
+  nextAppointmentDate: string | null
+  nextAppointmentTime: string | null
 }
 
 function formatDate(value: string | null) {
@@ -65,6 +71,7 @@ export function ClientsTable({ clients }: { clients: ClientRow[] }) {
               <TableHead>First name</TableHead>
               <TableHead>Last name</TableHead>
               <TableHead>Status</TableHead>
+              <TableHead>Next appointment</TableHead>
               <TableHead>Email</TableHead>
               <TableHead>Phone</TableHead>
               <TableHead>Date of birth</TableHead>
@@ -73,7 +80,7 @@ export function ClientsTable({ clients }: { clients: ClientRow[] }) {
           <TableBody>
             {filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
+                <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
                   {clients.length === 0
                     ? "No clients yet. Add your first client to get started."
                     : "No clients match your search."}
@@ -104,6 +111,13 @@ export function ClientsTable({ clients }: { clients: ClientRow[] }) {
                           status={client.clientStatus}
                           statusMap={CLIENT_STATUS_CONFIG}
                         />
+                      </Link>
+                    </TableCell>
+                    <TableCell>
+                      <Link href={clientHref} className="block">
+                        {client.nextAppointmentDate
+                          ? `${formatAppointmentDate(client.nextAppointmentDate)} at ${formatAppointmentTime(client.nextAppointmentTime)}`
+                          : "—"}
                       </Link>
                     </TableCell>
                     <TableCell>

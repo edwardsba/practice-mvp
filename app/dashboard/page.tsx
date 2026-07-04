@@ -12,6 +12,7 @@ import { resolveAppointmentLocationText } from "@/lib/appointments/location"
 import { requirePractitionerContext } from "@/lib/auth"
 import { formatCalendarPeriodLabel } from "@/lib/calendar/dates"
 import {
+  countActiveClientsWithoutUpcomingAppointment,
   countAppointmentsMissingFinalisedNote,
   countOutstandingReports,
   loadTodaysAppointments,
@@ -22,12 +23,17 @@ import { APPOINTMENT_STATUS_CONFIG } from "@/lib/status"
 export default async function DashboardPage() {
   const context = await requirePractitionerContext()
 
-  const [todaysAppointments, outstandingReportsCount, missingNotesCount] =
-    await Promise.all([
-      loadTodaysAppointments(context.practiceId),
-      countOutstandingReports(context.practiceId),
-      countAppointmentsMissingFinalisedNote(context.practiceId),
-    ])
+  const [
+    todaysAppointments,
+    outstandingReportsCount,
+    missingNotesCount,
+    clientsWithoutAppointmentCount,
+  ] = await Promise.all([
+    loadTodaysAppointments(context.practiceId),
+    countOutstandingReports(context.practiceId),
+    countAppointmentsMissingFinalisedNote(context.practiceId),
+    countActiveClientsWithoutUpcomingAppointment(context.practiceId),
+  ])
 
   return (
     <AppShell title="Welcome">
@@ -92,7 +98,7 @@ export default async function DashboardPage() {
           </CardContent>
         </Card>
 
-        <div className="grid gap-6 lg:grid-cols-2">
+        <div className="grid gap-6 lg:grid-cols-3">
           <Card>
             <CardHeader>
               <CardTitle>Outstanding reports</CardTitle>
@@ -131,6 +137,28 @@ export default async function DashboardPage() {
                   {missingNotesCount} completed{" "}
                   {missingNotesCount === 1 ? "appointment" : "appointments"}{" "}
                   without a finalised session note →
+                </Link>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Clients without an appointment</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {clientsWithoutAppointmentCount === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  Every active client has an upcoming appointment.
+                </p>
+              ) : (
+                <Link
+                  href="/clients"
+                  className="text-sm text-primary hover:underline"
+                >
+                  {clientsWithoutAppointmentCount} active{" "}
+                  {clientsWithoutAppointmentCount === 1 ? "client" : "clients"}{" "}
+                  with no upcoming appointment →
                 </Link>
               )}
             </CardContent>

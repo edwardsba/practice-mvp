@@ -1,12 +1,13 @@
 "use server"
 
-import { and, eq } from "drizzle-orm"
+import { and, eq, sql } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
 
 import { clients } from "@/db/schema"
 import { requirePractitionerContext } from "@/lib/auth"
 import { db } from "@/lib/db"
+import { todayDateString } from "@/lib/dates/practice-time"
 import {
   countActiveAppointments,
   countActiveClaims,
@@ -27,6 +28,7 @@ export type ClientFormState = {
 
 export async function getActiveClients() {
   const context = await requirePractitionerContext()
+  const today = todayDateString()
 
   return db
     .select({
@@ -37,6 +39,24 @@ export async function getActiveClients() {
       phone: clients.phone,
       dateOfBirth: clients.dateOfBirth,
       clientStatus: clients.clientStatus,
+      nextAppointmentDate: sql<string | null>`(
+        SELECT a.appointment_date
+        FROM appointments a
+        WHERE a.client_id = ${clients.clientId}
+          AND a.appointment_date >= ${today}
+          AND a.status != 'cancelled'
+        ORDER BY a.appointment_date ASC, a.appointment_time ASC
+        LIMIT 1
+      )`.as("next_appointment_date"),
+      nextAppointmentTime: sql<string | null>`(
+        SELECT a.appointment_time
+        FROM appointments a
+        WHERE a.client_id = ${clients.clientId}
+          AND a.appointment_date >= ${today}
+          AND a.status != 'cancelled'
+        ORDER BY a.appointment_date ASC, a.appointment_time ASC
+        LIMIT 1
+      )`.as("next_appointment_time"),
     })
     .from(clients)
     .where(

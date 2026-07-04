@@ -102,3 +102,31 @@ export async function countAppointmentsMissingFinalisedNote(
 
   return Number(result.rows[0]?.count ?? 0)
 }
+
+/**
+ * Count of active clients (clientStatus = 'active', not soft-deleted) with
+ * no upcoming, non-cancelled appointment scheduled on or after today.
+ * Surfaces clients who may have fallen out of the booking cadence.
+ * On-hold, discharged, and inactive clients are excluded by design.
+ */
+export async function countActiveClientsWithoutUpcomingAppointment(
+  practiceId: string
+): Promise<number> {
+  const today = todayDateString()
+
+  const result = await db.execute<{ count: string }>(sql`
+    SELECT count(*) AS count
+    FROM clients c
+    WHERE c.practice_id = ${practiceId}
+      AND c.is_active = true
+      AND c.client_status = 'active'
+      AND NOT EXISTS (
+        SELECT 1 FROM appointments a
+        WHERE a.client_id = c.client_id
+          AND a.appointment_date >= ${today}
+          AND a.status != 'cancelled'
+      )
+  `)
+
+  return Number(result.rows[0]?.count ?? 0)
+}

@@ -77,8 +77,8 @@ export default async function TreatmentPlanViewPage({
               })}
             </p>
           </div>
-          {plan.isActive ? (
-            <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2">
+            {plan.isActive ? (
               <Button asChild variant="outline">
                 <Link
                   href={`/clients/${clientId}/treatment-plan/${planId}/edit`}
@@ -86,8 +86,13 @@ export default async function TreatmentPlanViewPage({
                   Edit / Create new version
                 </Link>
               </Button>
-            </div>
-          ) : null}
+            ) : null}
+            <Button variant="outline" asChild>
+              <a href={`/api/treatment-plans/${planId}/pdf`} download>
+                Download PDF
+              </a>
+            </Button>
+          </div>
         </div>
       </div>
 

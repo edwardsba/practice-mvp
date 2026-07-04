@@ -22,6 +22,7 @@ export const treatmentPlans = pgTable('treatment_plans', {
   caseFormulationJson: jsonb('case_formulation_json'),
   alternateResponsesJson: jsonb('alternate_responses_json'),
   qualityOfLifeJson: jsonb('quality_of_life_json'),
+  pdfStoragePath: text('pdf_storage_path'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 })

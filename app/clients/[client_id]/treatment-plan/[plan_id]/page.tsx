@@ -2,9 +2,9 @@ import Link from "next/link"
 import { notFound } from "next/navigation"
 
 import { TreatmentPlanView } from "@/components/treatment-plan/treatment-plan-view"
+import { TreatmentPlanToolbar } from "@/components/treatment-plan/treatment-plan-toolbar"
 import { AppShell } from "@/components/app-shell"
 import { BackButton } from "@/components/ui/back-button"
-import { Button } from "@/components/ui/button"
 import {
   Card,
   CardContent,
@@ -17,6 +17,7 @@ import {
   verifyClientInPractice,
 } from "@/lib/treatment-plans/load"
 import { requirePractitionerContext } from "@/lib/auth"
+import { getQuestionnaireEmailContext } from "@/lib/email/practitioner-context"
 
 function formatVersionDate(value: Date) {
   return value.toLocaleDateString("en-AU", {
@@ -48,10 +49,13 @@ export default async function TreatmentPlanViewPage({
     notFound()
   }
 
-  const versions = await loadTreatmentPlanVersions(
-    clientId,
-    context.practiceId
-  )
+  const [versions, emailContext] = await Promise.all([
+    loadTreatmentPlanVersions(clientId, context.practiceId),
+    getQuestionnaireEmailContext(
+      context.practiceId,
+      context.practitionerProfileId
+    ),
+  ])
 
   const clientName = `${client.firstName} ${client.lastName}`
 
@@ -77,22 +81,18 @@ export default async function TreatmentPlanViewPage({
               })}
             </p>
           </div>
-          <div className="flex flex-wrap gap-2">
-            {plan.isActive ? (
-              <Button asChild variant="outline">
-                <Link
-                  href={`/clients/${clientId}/treatment-plan/${planId}/edit`}
-                >
-                  Edit / Create new version
-                </Link>
-              </Button>
-            ) : null}
-            <Button variant="outline" asChild>
-              <a href={`/api/treatment-plans/${planId}/pdf`} download>
-                Download PDF
-              </a>
-            </Button>
-          </div>
+          <TreatmentPlanToolbar
+            clientId={clientId}
+            treatmentPlanId={planId}
+            isActive={plan.isActive}
+            clientEmail={client.email?.trim() || null}
+            templateVariables={{
+              client_first_name: client.firstName.trim() || "there",
+              practice_name: emailContext?.practiceName ?? "your practice",
+              practitioner_name:
+                emailContext?.practitionerName ?? "your practitioner",
+            }}
+          />
         </div>
       </div>
 

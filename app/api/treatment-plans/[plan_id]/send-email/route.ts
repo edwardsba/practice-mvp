@@ -1,39 +1,39 @@
 import { and, eq } from "drizzle-orm"
 import { NextResponse } from "next/server"
 
-import { auditEvents, crisisPlans } from "@/db/schema"
+import { auditEvents, treatmentPlans } from "@/db/schema"
 import { getPractitionerContext } from "@/lib/auth"
 import { db } from "@/lib/db"
 import { getQuestionnaireEmailContext } from "@/lib/email/practitioner-context"
+import { sendTreatmentPlanEmail } from "@/lib/email/send-treatment-plan-email"
 import {
-  resolveCrisisPlanEmail,
-  type CrisisPlanEmailVariables,
-} from "@/lib/email/crisis-plan-templates"
-import { sendCrisisPlanEmail } from "@/lib/email/send-crisis-plan-email"
-import { buildCrisisPlanFilename } from "@/lib/crisis-plan/filename"
-import { getOrGenerateCrisisPlanPdfBuffer } from "@/lib/crisis-plan/get-pdf-buffer"
-import {
-  loadEmergencyContacts,
-  verifyClientInPractice,
-} from "@/lib/crisis-plans/load"
-import { rowToCrisisPlan } from "@/lib/crisis-plans/serialize"
+  resolveTreatmentPlanEmail,
+  type TreatmentPlanEmailVariables,
+} from "@/lib/email/treatment-plan-templates"
+import { buildTreatmentPlanFilename } from "@/lib/treatment-plans/filename"
+import { getOrGenerateTreatmentPlanPdfBuffer } from "@/lib/treatment-plans/get-pdf-buffer"
+import { verifyClientInPractice } from "@/lib/treatment-plans/load"
+import { rowToTreatmentPlan } from "@/lib/treatment-plans/serialize"
 
-type SendCrisisPlanEmailBody = {
+type SendTreatmentPlanEmailBody = {
   to?: string
   subject?: string
   message?: string
-  crisisPlanId?: string
 }
 
-export async function POST(request: Request) {
+export async function POST(
+  request: Request,
+  { params }: { params: Promise<{ plan_id: string }> }
+) {
+  const { plan_id: planId } = await params
   const context = await getPractitionerContext()
   if (!context) {
     return NextResponse.json({ error: "Unauthorized." }, { status: 401 })
   }
 
-  let body: SendCrisisPlanEmailBody
+  let body: SendTreatmentPlanEmailBody
   try {
-    body = (await request.json()) as SendCrisisPlanEmailBody
+    body = (await request.json()) as SendTreatmentPlanEmailBody
   } catch {
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 })
   }
@@ -41,31 +41,30 @@ export async function POST(request: Request) {
   const to = body.to?.trim()
   const subject = body.subject?.trim()
   const message = body.message?.trim()
-  const crisisPlanId = body.crisisPlanId?.trim()
 
-  if (!to || !subject || !message || !crisisPlanId) {
+  if (!to || !subject || !message) {
     return NextResponse.json(
-      { error: "to, subject, message, and crisisPlanId are required." },
+      { error: "to, subject, and message are required." },
       { status: 400 }
     )
   }
 
   const [row] = await db
     .select()
-    .from(crisisPlans)
+    .from(treatmentPlans)
     .where(
       and(
-        eq(crisisPlans.crisisPlanId, crisisPlanId),
-        eq(crisisPlans.practiceId, context.practiceId)
+        eq(treatmentPlans.treatmentPlanId, planId),
+        eq(treatmentPlans.practiceId, context.practiceId)
       )
     )
     .limit(1)
 
   if (!row) {
-    return NextResponse.json({ error: "Crisis plan not found." }, { status: 404 })
+    return NextResponse.json({ error: "Treatment plan not found." }, { status: 404 })
   }
 
-  const plan = rowToCrisisPlan(row)
+  const plan = rowToTreatmentPlan(row)
   const client = await verifyClientInPractice(plan.clientId, context.practiceId)
   if (!client) {
     return NextResponse.json({ error: "Client not found." }, { status: 404 })
@@ -82,37 +81,36 @@ export async function POST(request: Request) {
     )
   }
 
-  const variables: CrisisPlanEmailVariables = {
+  const variables: TreatmentPlanEmailVariables = {
     client_first_name: client.firstName.trim() || "there",
     practice_name: emailContext.practiceName,
     practitioner_name: emailContext.practitionerName,
   }
 
-  const contacts = await loadEmergencyContacts(plan.clientId, context.practiceId)
-  const clientName = `${client.firstName} ${client.lastName}`
-
   try {
-    const pdfBuffer = await getOrGenerateCrisisPlanPdfBuffer(
+    const pdfBuffer = await getOrGenerateTreatmentPlanPdfBuffer(
       row.pdfStoragePath,
       plan,
-      contacts,
-      clientName
+      client,
+      context.practiceId
     )
 
     const { subject: resolvedSubject, htmlBody, textBody } =
-      resolveCrisisPlanEmail(subject, message, variables)
+      resolveTreatmentPlanEmail(subject, message, variables)
 
-    const result = await sendCrisisPlanEmail({
+    const filename = buildTreatmentPlanFilename(
+      plan.versionNumber,
+      client.lastName,
+      client.firstName
+    )
+
+    const result = await sendTreatmentPlanEmail({
       to,
       subject: resolvedSubject,
       htmlBody,
       textBody,
       pdfBuffer,
-      filename: buildCrisisPlanFilename(
-        plan.versionNumber,
-        client.lastName,
-        client.firstName
-      ),
+      filename,
     })
 
     if (!result.sent) {
@@ -123,19 +121,18 @@ export async function POST(request: Request) {
       practiceId: context.practiceId,
       userId: context.userId,
       clientId: plan.clientId,
-      eventType: "crisis_plan.emailed",
-      entityType: "crisis_plan",
-      entityId: crisisPlanId,
+      eventType: "treatment_plan.emailed",
+      entityType: "treatment_plan",
+      entityId: planId,
     })
 
     return NextResponse.json({ sent: true })
   } catch (error) {
-    console.error("Failed to send crisis plan email:", error)
+    console.error("Failed to send treatment plan email:", error)
     return NextResponse.json(
       {
         sent: false,
-        error:
-          error instanceof Error ? error.message : "Unable to send email.",
+        error: error instanceof Error ? error.message : "Unable to send email.",
       },
       { status: 500 }
     )

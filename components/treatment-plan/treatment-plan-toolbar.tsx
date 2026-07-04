@@ -3,22 +3,22 @@
 import Link from "next/link"
 import { useState } from "react"
 
-import { SendCrisisPlanEmailModal } from "@/components/crisis-plan/send-crisis-plan-email-modal"
+import { SendTreatmentPlanEmailModal } from "@/components/treatment-plan/send-treatment-plan-email-modal"
 import { Button } from "@/components/ui/button"
-import type { CrisisPlanEmailVariables } from "@/lib/email/crisis-plan-templates"
+import type { TreatmentPlanEmailVariables } from "@/lib/email/treatment-plan-templates"
 
-export function CrisisPlanToolbar({
+export function TreatmentPlanToolbar({
   clientId,
-  crisisPlanId,
+  treatmentPlanId,
   isActive,
   clientEmail,
   templateVariables,
 }: {
   clientId: string
-  crisisPlanId: string
+  treatmentPlanId: string
   isActive: boolean
   clientEmail: string | null
-  templateVariables: CrisisPlanEmailVariables
+  templateVariables: TreatmentPlanEmailVariables
 }) {
   const [emailModalOpen, setEmailModalOpen] = useState(false)
   const [emailStatus, setEmailStatus] = useState<string | null>(null)
@@ -28,13 +28,15 @@ export function CrisisPlanToolbar({
       <div className="flex flex-wrap gap-2">
         {isActive ? (
           <Button asChild variant="outline">
-            <Link href={`/clients/${clientId}/crisis-plan/${crisisPlanId}/edit`}>
+            <Link
+              href={`/clients/${clientId}/treatment-plan/${treatmentPlanId}/edit`}
+            >
               Edit / Create new version
             </Link>
           </Button>
         ) : null}
         <Button variant="outline" asChild>
-          <a href={`/api/crisis-plan/${crisisPlanId}/pdf`} download>
+          <a href={`/api/treatment-plans/${treatmentPlanId}/pdf`} download>
             Download PDF
           </a>
         </Button>
@@ -54,11 +56,11 @@ export function CrisisPlanToolbar({
       ) : null}
 
       {clientEmail ? (
-        <SendCrisisPlanEmailModal
+        <SendTreatmentPlanEmailModal
           open={emailModalOpen}
           onOpenChange={setEmailModalOpen}
           to={clientEmail}
-          crisisPlanId={crisisPlanId}
+          treatmentPlanId={treatmentPlanId}
           templateVariables={templateVariables}
           onSendComplete={({ sent }) => {
             setEmailStatus(

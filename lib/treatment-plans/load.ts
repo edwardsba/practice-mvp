@@ -116,6 +116,8 @@ export async function verifyClientInPractice(
       clientId: clients.clientId,
       firstName: clients.firstName,
       lastName: clients.lastName,
+      dateOfBirth: clients.dateOfBirth,
+      email: clients.email,
     })
     .from(clients)
     .where(

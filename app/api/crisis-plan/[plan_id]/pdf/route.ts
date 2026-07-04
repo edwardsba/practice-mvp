@@ -1,13 +1,16 @@
 import { and, eq } from "drizzle-orm"
 import { NextResponse } from "next/server"
 
-import { treatmentPlans } from "@/db/schema"
+import { crisisPlans } from "@/db/schema"
 import { getPractitionerContext } from "@/lib/auth"
 import { db } from "@/lib/db"
-import { buildTreatmentPlanFilename } from "@/lib/treatment-plans/filename"
-import { getOrGenerateTreatmentPlanPdfBuffer } from "@/lib/treatment-plans/get-pdf-buffer"
-import { rowToTreatmentPlan } from "@/lib/treatment-plans/serialize"
-import { verifyClientInPractice } from "@/lib/treatment-plans/load"
+import { buildCrisisPlanFilename } from "@/lib/crisis-plan/filename"
+import { getOrGenerateCrisisPlanPdfBuffer } from "@/lib/crisis-plan/get-pdf-buffer"
+import {
+  loadEmergencyContacts,
+  verifyClientInPractice,
+} from "@/lib/crisis-plans/load"
+import { rowToCrisisPlan } from "@/lib/crisis-plans/serialize"
 
 export async function GET(
   _request: Request,
@@ -21,11 +24,11 @@ export async function GET(
 
   const [row] = await db
     .select()
-    .from(treatmentPlans)
+    .from(crisisPlans)
     .where(
       and(
-        eq(treatmentPlans.treatmentPlanId, planId),
-        eq(treatmentPlans.practiceId, context.practiceId)
+        eq(crisisPlans.crisisPlanId, planId),
+        eq(crisisPlans.practiceId, context.practiceId)
       )
     )
     .limit(1)
@@ -34,13 +37,13 @@ export async function GET(
     return NextResponse.json({ error: "Not found" }, { status: 404 })
   }
 
-  const plan = rowToTreatmentPlan(row)
+  const plan = rowToCrisisPlan(row)
   const client = await verifyClientInPractice(plan.clientId, context.practiceId)
   if (!client) {
     return NextResponse.json({ error: "Client not found" }, { status: 404 })
   }
 
-  const filename = buildTreatmentPlanFilename(
+  const filename = buildCrisisPlanFilename(
     plan.versionNumber,
     client.lastName,
     client.firstName
@@ -48,11 +51,13 @@ export async function GET(
 
   let pdfBuffer: Buffer
   try {
-    pdfBuffer = await getOrGenerateTreatmentPlanPdfBuffer(
+    const contacts = await loadEmergencyContacts(plan.clientId, context.practiceId)
+    const clientName = `${client.firstName} ${client.lastName}`
+    pdfBuffer = await getOrGenerateCrisisPlanPdfBuffer(
       row.pdfStoragePath,
       plan,
-      client,
-      context.practiceId
+      contacts,
+      clientName
     )
   } catch (error) {
     return NextResponse.json(

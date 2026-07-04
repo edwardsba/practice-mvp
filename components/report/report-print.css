@@ -26,6 +26,19 @@
   .report-print-area {
     display: block !important;
     overflow: visible !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    border-radius: 0 !important;
+  }
+
+  .report-document textarea {
+    border: none !important;
+    outline: none !important;
+    resize: none !important;
+    background: transparent !important;
+    padding: 0 !important;
+    overflow: hidden !important;
   }
 
   .report-document {

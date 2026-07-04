@@ -1,4 +1,5 @@
 import { ReportBtpResultsTable } from "@/components/report/btp-results-table"
+import { EditableParagraph } from "@/components/report/editable-paragraph"
 import type { ReportSnapshot } from "@/lib/reports/snapshot"
 import {
   getAsqResultsFromSnapshot,
@@ -140,10 +141,16 @@ function ProgressReportBody({
   snapshot,
   readOnly = false,
   omitEmptySections = false,
+  editable = false,
+  onClinicalSummaryChange,
+  onRecommendationsChange,
 }: {
   snapshot: ReportSnapshot
   readOnly?: boolean
   omitEmptySections?: boolean
+  editable?: boolean
+  onClinicalSummaryChange?: (value: string) => void
+  onRecommendationsChange?: (value: string) => void
 }) {
   const phq9Results = getPhq9ResultsFromSnapshot(snapshot)
   const gad7Results = getGad7ResultsFromSnapshot(snapshot)
@@ -280,16 +287,32 @@ function ProgressReportBody({
 
       <section className="report-clinical-summary space-y-2">
         <h3 className="text-lg font-semibold">Clinical summary</h3>
-        <p className="whitespace-pre-wrap text-sm leading-relaxed">
-          {readOnly ? clinicalSummary : clinicalSummary === "—" ? "" : clinicalSummary}
-        </p>
+        {editable ? (
+          <EditableParagraph
+            value={snapshot.clinicalSummaryText ?? ""}
+            onChange={(v) => onClinicalSummaryChange?.(v)}
+            placeholder="Enter clinical summary…"
+          />
+        ) : (
+          <p className="whitespace-pre-wrap text-sm leading-relaxed">
+            {readOnly ? clinicalSummary : clinicalSummary === "—" ? "" : clinicalSummary}
+          </p>
+        )}
       </section>
 
       <section className="report-recommendations space-y-2">
         <h3 className="text-lg font-semibold">Recommendations</h3>
-        <p className="whitespace-pre-wrap text-sm leading-relaxed">
-          {readOnly ? recommendations : recommendations === "—" ? "" : recommendations}
-        </p>
+        {editable ? (
+          <EditableParagraph
+            value={snapshot.recommendationsText ?? ""}
+            onChange={(v) => onRecommendationsChange?.(v)}
+            placeholder="Enter recommendations…"
+          />
+        ) : (
+          <p className="whitespace-pre-wrap text-sm leading-relaxed">
+            {readOnly ? recommendations : recommendations === "—" ? "" : recommendations}
+          </p>
+        )}
       </section>
     </div>
   )
@@ -297,9 +320,13 @@ function ProgressReportBody({
 
 function ReferralAcknowledgementBody({
   snapshot,
+  editable = false,
+  onClinicalSummaryChange,
 }: {
   snapshot: ReportSnapshot
   readOnly?: boolean
+  editable?: boolean
+  onClinicalSummaryChange?: (value: string) => void
 }) {
   const fa = snapshot.fundingApproval
   const notes = snapshot.clinicalSummaryText?.trim() || ""
@@ -342,7 +369,15 @@ function ReferralAcknowledgementBody({
         to contact me should you require any further information.
       </p>
 
-      {notes ? <p className="whitespace-pre-wrap">{notes}</p> : null}
+      {editable ? (
+        <EditableParagraph
+          value={snapshot.clinicalSummaryText ?? ""}
+          onChange={(v) => onClinicalSummaryChange?.(v)}
+          placeholder="Add any additional notes for this letter…"
+        />
+      ) : notes ? (
+        <p className="whitespace-pre-wrap">{notes}</p>
+      ) : null}
 
       <p>Yours sincerely,</p>
     </div>
@@ -353,10 +388,16 @@ export function ReportDocument({
   snapshot,
   readOnly = false,
   omitEmptySections = false,
+  editable = false,
+  onClinicalSummaryChange,
+  onRecommendationsChange,
 }: {
   snapshot: ReportSnapshot
   readOnly?: boolean
   omitEmptySections?: boolean
+  editable?: boolean
+  onClinicalSummaryChange?: (value: string) => void
+  onRecommendationsChange?: (value: string) => void
 }) {
   const templateKey = resolveTemplateKey(snapshot.templateKey)
 
@@ -367,12 +408,20 @@ export function ReportDocument({
         <h2 className="text-lg font-semibold">{snapshot.reportTitle}</h2>
       </header>
       {templateKey === "referral_acknowledgement" ? (
-        <ReferralAcknowledgementBody snapshot={snapshot} readOnly={readOnly} />
+        <ReferralAcknowledgementBody
+          snapshot={snapshot}
+          readOnly={readOnly}
+          editable={editable}
+          onClinicalSummaryChange={onClinicalSummaryChange}
+        />
       ) : (
         <ProgressReportBody
           snapshot={snapshot}
           readOnly={readOnly}
           omitEmptySections={omitEmptySections}
+          editable={editable}
+          onClinicalSummaryChange={onClinicalSummaryChange}
+          onRecommendationsChange={onRecommendationsChange}
         />
       )}
       <SignatureBlock snapshot={snapshot} />

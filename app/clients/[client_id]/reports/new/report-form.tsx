@@ -12,11 +12,6 @@ import {
 import { ReportDocument } from "@/components/report/report-document"
 import { AsqStatusBadge } from "@/components/session-notes/asq-status-badge"
 import { PsqStatusBadge } from "@/components/session-notes/psq-status-badge"
-import { ReportBtpResultsTable } from "@/components/report/btp-results-table"
-import {
-  ReportAsqResultsTable,
-  ReportResultsTable,
-} from "@/components/report/results-table"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -26,7 +21,6 @@ import {
 } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
 import type { getReportTypes } from "@/lib/actions/report-types"
 import type { getClientFundingApprovalsForReport } from "@/lib/actions/funding"
 import {
@@ -486,6 +480,8 @@ export function ReportForm({
       <input type="hidden" name="template_key" value={templateKey} />
       <input type="hidden" name="report_title" value={reportTitle} />
       <input type="hidden" name="report_date" value={reportDate} />
+      <input type="hidden" name="clinical_summary_text" value={clinicalSummary} />
+      <input type="hidden" name="recommendations_text" value={recommendations} />
     </>
   )
 
@@ -594,52 +590,7 @@ export function ReportForm({
           </CardContent>
         </Card>
 
-        {isReferralAck ? (
-          <form action={boundSaveAction} className="space-y-6">
-            {hiddenFormInputs}
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Notes (optional)</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Textarea
-                  name="clinical_summary_text"
-                  value={clinicalSummary}
-                  onChange={(e) => setClinicalSummary(e.target.value)}
-                  placeholder="Additional notes for the letter…"
-                  rows={6}
-                />
-              </CardContent>
-            </Card>
-
-            {saveState.error ? (
-              <p className="text-sm text-destructive">{saveState.error}</p>
-            ) : null}
-
-            <div className="flex flex-wrap gap-3">
-              <Button
-                type="submit"
-                disabled={
-                  savePending || !reportTypeId || !fundingApprovalId
-                }
-              >
-                {savePending ? "Saving…" : (submitLabel ?? "Save Draft")}
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handlePrint}
-                disabled={!previewSnapshot}
-              >
-                Print / Save as PDF
-              </Button>
-              <Button type="button" variant="outline" asChild>
-                <Link href={cancelHref}>Cancel</Link>
-              </Button>
-            </div>
-          </form>
-        ) : (
+        {isReferralAck ? null : (
           <>
             {selectedApproval ? (
               <Card>
@@ -751,138 +702,118 @@ export function ReportForm({
                 </CardContent>
               </Card>
             )}
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Results preview</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {!hasPreviewSource ? (
-                  <p className="text-sm text-muted-foreground">
-                    {selectedApproval
-                      ? "Select at least one appointment to preview results."
-                      : "Select a date range to preview results."}
-                  </p>
-                ) : previewLoading ? (
-                  <p className="text-sm text-muted-foreground">Loading results…</p>
-                ) : (
-                  <>
-                    <div className="space-y-3">
-                      <h3 className="text-sm font-semibold">Ongoing objective assessments</h3>
-                      <ReportResultsTable
-                        title="Patient Health Questionnaire 9 (PHQ-9) results"
-                        results={phq9Results}
-                        emptyMessage="No PHQ-9 results in this period."
-                        showImpairment
-                      />
-                      <ReportResultsTable
-                        title="Generalised Anxiety Disorder 7 (GAD-7) results"
-                        results={gad7Results}
-                        emptyMessage="No GAD-7 results in this period."
-                        showImpairment
-                      />
-                      <ReportResultsTable
-                        title="Alcohol, Smoking and Substance Involvement Screening Test (ASSIST) results"
-                        results={assistResults}
-                        emptyMessage="No ASSIST results in this period."
-                        severityColumnLabel="Risk Level"
-                        capitalizeSeverity={false}
-                      />
-                    </div>
-
-                    <div className="space-y-3">
-                      <h3 className="text-sm font-semibold">Risk assessments</h3>
-                      <ReportAsqResultsTable
-                        results={asqResults}
-                        emptyMessage="No ASQ results in this period."
-                      />
-                    </div>
-
-                    <ReportBtpResultsTable
-                      results={btpResults}
-                      emptyMessage="No Behavioural Targets Progress results in this period."
-                      therapeuticTarget={therapeuticTarget ?? null}
-                      clientFirstName={initialSnapshot.client.firstName}
-                    />
-                  </>
-                )}
-              </CardContent>
-            </Card>
-
-            <form action={boundSaveAction} className="space-y-6">
-              {hiddenFormInputs}
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Clinical summary</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <Textarea
-                    name="clinical_summary_text"
-                    value={clinicalSummary}
-                    onChange={(e) => setClinicalSummary(e.target.value)}
-                    placeholder="Enter clinical summary…"
-                    rows={6}
-                  />
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Recommendations</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <Textarea
-                    name="recommendations_text"
-                    value={recommendations}
-                    onChange={(e) => setRecommendations(e.target.value)}
-                    placeholder="Enter recommendations…"
-                    rows={6}
-                  />
-                </CardContent>
-              </Card>
-
-              {saveState.error ? (
-                <p className="text-sm text-destructive">{saveState.error}</p>
-              ) : null}
-
-              <div className="flex flex-wrap gap-3">
-                <Button
-                  type="submit"
-                  disabled={
-                    savePending ||
-                    !reportTypeId ||
-                    (selectedApproval
-                      ? !derivedDateRangeStart ||
-                        !derivedDateRangeEnd ||
-                        selectedAppointmentIds.length === 0
-                      : !dateRangeStart || !dateRangeEnd)
-                  }
-                >
-                  {savePending ? "Saving…" : (submitLabel ?? "Save Draft")}
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={handlePrint}
-                  disabled={!previewSnapshot}
-                >
-                  Print / Save as PDF
-                </Button>
-                <Button type="button" variant="outline" asChild>
-                  <Link href={cancelHref}>Cancel</Link>
-                </Button>
-              </div>
-            </form>
           </>
         )}
       </div>
 
-      {previewSnapshot ? (
-        <div className="report-print-area hidden print:block">
-          <ReportDocument snapshot={previewSnapshot} readOnly />
-        </div>
-      ) : null}
+      {isReferralAck ? (
+        <form action={boundSaveAction} className="mt-6 space-y-6">
+          {hiddenFormInputs}
+
+          {previewSnapshot ? (
+            <div className="report-print-area rounded-xl border bg-white p-8 shadow-sm">
+              <ReportDocument
+                snapshot={previewSnapshot}
+                editable
+                onClinicalSummaryChange={setClinicalSummary}
+              />
+            </div>
+          ) : (
+            <Card>
+              <CardContent className="py-8 text-center text-sm text-muted-foreground">
+                Select a funding approval above to preview the letter.
+              </CardContent>
+            </Card>
+          )}
+
+          {saveState.error ? (
+            <p className="no-print text-sm text-destructive">{saveState.error}</p>
+          ) : null}
+
+          <div className="no-print flex flex-wrap gap-3">
+            <Button
+              type="submit"
+              disabled={
+                savePending || !reportTypeId || !fundingApprovalId
+              }
+            >
+              {savePending ? "Saving…" : (submitLabel ?? "Save Draft")}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handlePrint}
+              disabled={!previewSnapshot}
+            >
+              Print / Save as PDF
+            </Button>
+            <Button type="button" variant="outline" asChild>
+              <Link href={cancelHref}>Cancel</Link>
+            </Button>
+          </div>
+        </form>
+      ) : (
+        <form action={boundSaveAction} className="mt-6 space-y-6">
+          {hiddenFormInputs}
+
+          {previewLoading ? (
+            <Card>
+              <CardContent className="py-8 text-center text-sm text-muted-foreground">
+                Loading results…
+              </CardContent>
+            </Card>
+          ) : previewSnapshot ? (
+            <div className="report-print-area rounded-xl border bg-white p-8 shadow-sm">
+              <ReportDocument
+                snapshot={previewSnapshot}
+                editable
+                onClinicalSummaryChange={setClinicalSummary}
+                onRecommendationsChange={setRecommendations}
+              />
+            </div>
+          ) : (
+            <Card>
+              <CardContent className="py-8 text-center text-sm text-muted-foreground">
+                {selectedApproval
+                  ? "Select at least one appointment above to preview the letter."
+                  : "Select a date range above to preview the letter."}
+              </CardContent>
+            </Card>
+          )}
+
+          {saveState.error ? (
+            <p className="no-print text-sm text-destructive">{saveState.error}</p>
+          ) : null}
+
+          <div className="no-print flex flex-wrap gap-3">
+            <Button
+              type="submit"
+              disabled={
+                savePending ||
+                !reportTypeId ||
+                (selectedApproval
+                  ? !derivedDateRangeStart ||
+                    !derivedDateRangeEnd ||
+                    selectedAppointmentIds.length === 0
+                  : !dateRangeStart || !dateRangeEnd)
+              }
+            >
+              {savePending ? "Saving…" : (submitLabel ?? "Save Draft")}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handlePrint}
+              disabled={!previewSnapshot}
+            >
+              Print / Save as PDF
+            </Button>
+            <Button type="button" variant="outline" asChild>
+              <Link href={cancelHref}>Cancel</Link>
+            </Button>
+          </div>
+        </form>
+      )}
     </>
   )
 }

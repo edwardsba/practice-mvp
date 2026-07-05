@@ -165,10 +165,10 @@ export function generateSessionNotePdf(data: SessionNotePdfData): Promise<Buffer
       drawTable(
         doc,
         [
-          { header: "Assessment", width: 110 },
-          { header: "Score", width: 70 },
-          { header: "Rating", width: 160 },
-          { header: "Functional Impairment", width: 155 },
+          { header: "Assessment", width: 90 },
+          { header: "Score", width: 55 },
+          { header: "Rating", width: 175 },
+          { header: "Functional Impairment", width: 175 },
         ],
         completedAssessments.map((a) => [
           a.name,

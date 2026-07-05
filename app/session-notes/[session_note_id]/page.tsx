@@ -119,6 +119,9 @@ export default async function SessionNoteViewPage({
             sessionDate={note.sessionDate}
             sessionTime={note.sessionTime}
             nextAppointment={viewContext.nextAppointment ?? null}
+            preSessionBatterySentAt={note.preSessionBatterySentAt}
+            psqBatteryStatus={note.psqBatteryStatus}
+            asqCompleted={Boolean(viewContext.asqResult)}
           />
 
           <Card>

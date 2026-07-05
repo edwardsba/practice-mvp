@@ -81,9 +81,21 @@ export async function loadSessionNoteForPractice(
       clientFirstName: clients.firstName,
       clientLastName: clients.lastName,
       clientDateOfBirth: clients.dateOfBirth,
+      preSessionBatterySentAt: appointments.preSessionBatterySentAt,
+      psqBatteryStatus: sql<string | null>`(
+        SELECT bi.status
+        FROM battery_instances bi
+        JOIN assessment_instances ai ON bi.phq9_instance_id = ai.assessment_instance_id
+        WHERE ai.appointment_id = ${sessionNotes.appointmentId}
+        LIMIT 1
+      )`.as("psq_battery_status"),
     })
     .from(sessionNotes)
     .innerJoin(clients, eq(sessionNotes.clientId, clients.clientId))
+    .leftJoin(
+      appointments,
+      eq(sessionNotes.appointmentId, appointments.appointmentId)
+    )
     .where(
       and(
         eq(sessionNotes.sessionNoteId, sessionNoteId),

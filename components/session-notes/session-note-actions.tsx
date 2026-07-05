@@ -10,6 +10,8 @@ import {
   type FinaliseSessionNoteState,
   type GenerateSessionNotePdfPreviewState,
 } from "@/app/session-notes/actions"
+import { AsqStatusBadge } from "@/components/session-notes/asq-status-badge"
+import { PsqStatusBadge } from "@/components/session-notes/psq-status-badge"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -39,6 +41,9 @@ export function SessionNoteActions({
   sessionDate,
   sessionTime,
   nextAppointment,
+  preSessionBatterySentAt,
+  psqBatteryStatus,
+  asqCompleted,
 }: {
   sessionNoteId: string
   sessionNoteUrl: string
@@ -50,6 +55,9 @@ export function SessionNoteActions({
   sessionDate: string
   sessionTime: string | null
   nextAppointment: { appointmentId: string; label: string } | null
+  preSessionBatterySentAt: Date | null
+  psqBatteryStatus: string | null
+  asqCompleted: boolean
 }) {
   const [finaliseState, finaliseFormAction, finalisePending] = useActionState(
     finaliseSessionNote.bind(null, sessionNoteId),
@@ -171,6 +179,17 @@ export function SessionNoteActions({
                     Schedule appointment →
                   </Link>
                 )}
+              </dd>
+            </div>
+
+            <div>
+              <dt className="text-sm text-muted-foreground">Questionnaires</dt>
+              <dd className="mt-0.5 flex flex-row flex-nowrap items-center gap-2">
+                <PsqStatusBadge
+                  sentAt={preSessionBatterySentAt}
+                  psqBatteryStatus={psqBatteryStatus}
+                />
+                <AsqStatusBadge asqCompleted={asqCompleted} />
               </dd>
             </div>
           </dl>

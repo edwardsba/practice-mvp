@@ -3,7 +3,6 @@ import Link from "next/link"
 import { AppShell } from "@/components/app-shell"
 import { PsqStatusBadge } from "@/components/session-notes/psq-status-badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { StatusBadge } from "@/components/ui/status-badge"
 import {
   formatAppointmentTime,
   formatClientNameLastFirst,
@@ -18,7 +17,6 @@ import {
   loadTodaysAppointments,
 } from "@/lib/dashboard/load"
 import { todayDateString } from "@/lib/dates/practice-time"
-import { APPOINTMENT_STATUS_CONFIG } from "@/lib/status"
 
 export default async function DashboardPage() {
   const context = await requirePractitionerContext()
@@ -77,17 +75,13 @@ export default async function DashboardPage() {
                               appt.clientLastName
                             )}
                           </span>
-                          <StatusBadge
-                            status={appt.status}
-                            statusMap={APPOINTMENT_STATUS_CONFIG}
-                          />
-                        </span>
-                        <span className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-                          <span>{locationText}</span>
                           <PsqStatusBadge
                             sentAt={appt.preSessionBatterySentAt}
                             psqBatteryStatus={appt.psqBatteryStatus}
                           />
+                        </span>
+                        <span className="text-sm text-muted-foreground">
+                          {locationText}
                         </span>
                       </Link>
                     </li>

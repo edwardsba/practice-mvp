@@ -234,7 +234,7 @@ export default async function SessionNoteViewPage({
 
         </div>
 
-        <div className="order-3 border-t pt-6 lg:order-2 lg:col-start-2">
+        <div className="order-3 lg:order-2 lg:col-start-2">
           <EntityDeleteSection
             entityName="Session note"
             blockedReason={deleteStatus.blockedReason}

@@ -184,12 +184,18 @@ export function SessionNoteActions({
 
             <div>
               <dt className="text-sm text-muted-foreground">Questionnaires</dt>
-              <dd className="mt-0.5 flex flex-row flex-nowrap items-center gap-2">
-                <PsqStatusBadge
-                  sentAt={preSessionBatterySentAt}
-                  psqBatteryStatus={psqBatteryStatus}
-                />
-                <AsqStatusBadge asqCompleted={asqCompleted} />
+              <dd className="mt-0.5 flex flex-row flex-nowrap items-center gap-3">
+                <span className="flex flex-row flex-nowrap items-center gap-1.5">
+                  <span className="text-xs text-muted-foreground">PSQ</span>
+                  <PsqStatusBadge
+                    sentAt={preSessionBatterySentAt}
+                    psqBatteryStatus={psqBatteryStatus}
+                  />
+                </span>
+                <span className="flex flex-row flex-nowrap items-center gap-1.5">
+                  <span className="text-xs text-muted-foreground">ASQ</span>
+                  <AsqStatusBadge asqCompleted={asqCompleted} />
+                </span>
               </dd>
             </div>
           </dl>

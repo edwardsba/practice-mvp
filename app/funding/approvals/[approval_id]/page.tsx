@@ -52,15 +52,22 @@ function displayValue(value: string | null | undefined) {
 
 export default async function FundingApprovalDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ approval_id: string }>
+  searchParams: Promise<{ returnTo?: string }>
 }) {
   const { approval_id: approvalId } = await params
+  const { returnTo } = await searchParams
   const approval = await getFundingApprovalById(approvalId)
 
   if (!approval) {
     notFound()
   }
+
+  const approvalUrl = returnTo
+    ? `/funding/approvals/${approvalId}?returnTo=${encodeURIComponent(returnTo)}`
+    : `/funding/approvals/${approvalId}`
 
   const progress = formatApprovalProgress(
     approval.appointmentsAttended,
@@ -337,7 +344,7 @@ export default async function FundingApprovalDetailPage({
                     >
                       <TableCell>
                         <Link
-                          href={`/appointments/${appointment.appointmentId}`}
+                          href={`/appointments/${appointment.appointmentId}?returnTo=${encodeURIComponent(approvalUrl)}`}
                           className="block"
                         >
                           {index + 1}
@@ -345,7 +352,7 @@ export default async function FundingApprovalDetailPage({
                       </TableCell>
                       <TableCell>
                         <Link
-                          href={`/appointments/${appointment.appointmentId}`}
+                          href={`/appointments/${appointment.appointmentId}?returnTo=${encodeURIComponent(approvalUrl)}`}
                           className="block"
                         >
                           {formatAppointmentDate(appointment.appointmentDate)}
@@ -353,7 +360,7 @@ export default async function FundingApprovalDetailPage({
                       </TableCell>
                       <TableCell>
                         <Link
-                          href={`/appointments/${appointment.appointmentId}`}
+                          href={`/appointments/${appointment.appointmentId}?returnTo=${encodeURIComponent(approvalUrl)}`}
                           className="block"
                         >
                           {formatAppointmentTime(appointment.appointmentTime)}
@@ -361,7 +368,7 @@ export default async function FundingApprovalDetailPage({
                       </TableCell>
                       <TableCell>
                         <Link
-                          href={`/appointments/${appointment.appointmentId}`}
+                          href={`/appointments/${appointment.appointmentId}?returnTo=${encodeURIComponent(approvalUrl)}`}
                           className="block"
                         >
                           <StatusBadge
@@ -372,7 +379,7 @@ export default async function FundingApprovalDetailPage({
                       </TableCell>
                       <TableCell>
                         <Link
-                          href={`/appointments/${appointment.appointmentId}`}
+                          href={`/appointments/${appointment.appointmentId}?returnTo=${encodeURIComponent(approvalUrl)}`}
                           className="block"
                         >
                           <PsqStatusBadge
@@ -383,7 +390,7 @@ export default async function FundingApprovalDetailPage({
                       </TableCell>
                       <TableCell>
                         <Link
-                          href={`/appointments/${appointment.appointmentId}`}
+                          href={`/appointments/${appointment.appointmentId}?returnTo=${encodeURIComponent(approvalUrl)}`}
                           className="block"
                         >
                           {appointment.sessionNoteStatus ? (

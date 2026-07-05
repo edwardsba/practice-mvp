@@ -110,6 +110,7 @@ export default async function SessionNoteViewPage({
         <div className="order-1 flex flex-col gap-6 lg:order-2">
           <SessionNoteActions
             sessionNoteId={sessionNoteId}
+            sessionNoteUrl={sessionNoteUrl}
             clientId={note.clientId}
             clientName={clientName}
             status={note.status}
@@ -186,6 +187,7 @@ export default async function SessionNoteViewPage({
               <OngoingAssessmentsTable
                 assessments={viewContext.assessments}
                 clientId={note.clientId}
+                returnTo={sessionNoteUrl}
               />
             </CardContent>
           </Card>
@@ -208,6 +210,7 @@ export default async function SessionNoteViewPage({
                   } satisfies RiskAssessmentRow,
                 ]}
                 clientId={note.clientId}
+                returnTo={sessionNoteUrl}
               />
               <div>
                 <p className="mb-1 text-sm font-medium">Crisis plan</p>

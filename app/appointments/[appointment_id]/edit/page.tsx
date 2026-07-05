@@ -57,7 +57,15 @@ export default async function EditAppointmentPage({
     <AppShell>
       <div className="mb-6">
         <Button variant="ghost" size="sm" asChild className="mb-2 -ml-2">
-          <Link href={`/appointments/${appointmentId}`}>← Back</Link>
+          <Link
+            href={
+              returnTo
+                ? `/appointments/${appointmentId}?returnTo=${encodeURIComponent(returnTo)}`
+                : `/appointments/${appointmentId}`
+            }
+          >
+            ← Back
+          </Link>
         </Button>
         <h1 className="text-2xl font-semibold tracking-tight">
           Edit appointment

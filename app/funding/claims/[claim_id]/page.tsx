@@ -40,15 +40,22 @@ function displayValue(value: string | null | undefined) {
 
 export default async function ClaimDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ claim_id: string }>
+  searchParams: Promise<{ returnTo?: string }>
 }) {
   const { claim_id: claimId } = await params
+  const { returnTo } = await searchParams
   const claim = await getClaimById(claimId)
 
   if (!claim) {
     notFound()
   }
+
+  const claimUrl = returnTo
+    ? `/funding/claims/${claimId}?returnTo=${encodeURIComponent(returnTo)}`
+    : `/funding/claims/${claimId}`
 
   const showMedicare = isMedicareClaimType(claim.claimTypeName)
   const showInsurance = isInsuranceClaimType(claim.claimTypeName)
@@ -234,7 +241,7 @@ export default async function ClaimDetailPage({
                     <TableRow key={appointment.appointmentId}>
                       <TableCell>
                         <Link
-                          href={`/appointments/${appointment.appointmentId}`}
+                          href={`/appointments/${appointment.appointmentId}?returnTo=${encodeURIComponent(claimUrl)}`}
                           className="text-primary hover:underline"
                         >
                           {formatAppointmentDate(appointment.appointmentDate)}

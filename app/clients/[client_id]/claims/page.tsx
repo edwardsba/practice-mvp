@@ -93,7 +93,7 @@ export default async function ClientClaimsPage({
                 <TableRow key={claim.claimId} className="hover:bg-muted/50">
                   <TableCell>
                     <Link
-                      href={`/funding/claims/${claim.claimId}`}
+                      href={`/funding/claims/${claim.claimId}?returnTo=${encodeURIComponent(returnTo)}`}
                       className="block font-medium text-primary hover:underline"
                     >
                       {claim.claimTypeName}
@@ -101,7 +101,7 @@ export default async function ClientClaimsPage({
                   </TableCell>
                   <TableCell>
                     <Link
-                      href={`/funding/claims/${claim.claimId}`}
+                      href={`/funding/claims/${claim.claimId}?returnTo=${encodeURIComponent(returnTo)}`}
                       className="block hover:underline"
                     >
                       {formatDisplayDate(claim.startDate)}
@@ -109,7 +109,7 @@ export default async function ClientClaimsPage({
                   </TableCell>
                   <TableCell>
                     <Link
-                      href={`/funding/claims/${claim.claimId}`}
+                      href={`/funding/claims/${claim.claimId}?returnTo=${encodeURIComponent(returnTo)}`}
                       className="block hover:underline"
                     >
                       {formatDisplayDate(claim.endDate)}

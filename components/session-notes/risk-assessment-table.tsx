@@ -24,9 +24,11 @@ export type RiskAssessmentRow = {
 export function RiskAssessmentTable({
   rows,
   clientId,
+  returnTo,
 }: {
   rows: RiskAssessmentRow[]
   clientId: string
+  returnTo?: string
 }) {
   const router = useRouter()
 
@@ -50,7 +52,7 @@ export function RiskAssessmentTable({
                 onClick={() =>
                   router.push(
                     hasResult
-                      ? `/clients/${clientId}/results/${row.assessmentResultId}`
+                      ? `/clients/${clientId}/results/${row.assessmentResultId}${returnTo ? `?returnTo=${encodeURIComponent(returnTo)}` : ""}`
                       : row.administerHref
                   )
                 }

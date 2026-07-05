@@ -30,6 +30,7 @@ const initialPreviewState: GenerateSessionNotePdfPreviewState = {}
 
 export function SessionNoteActions({
   sessionNoteId,
+  sessionNoteUrl,
   clientId,
   clientName,
   status,
@@ -40,6 +41,7 @@ export function SessionNoteActions({
   nextAppointment,
 }: {
   sessionNoteId: string
+  sessionNoteUrl: string
   clientId: string
   clientName: string
   status: string
@@ -134,7 +136,7 @@ export function SessionNoteActions({
                   <Link
                     href={appendReturnTo(
                       `/appointments/${appointmentId}`,
-                      `/session-notes/${sessionNoteId}`
+                      sessionNoteUrl
                     )}
                     className="text-primary hover:underline"
                   >
@@ -155,7 +157,7 @@ export function SessionNoteActions({
                   <Link
                     href={appendReturnTo(
                       `/appointments/${nextAppointment.appointmentId}`,
-                      `/session-notes/${sessionNoteId}`
+                      sessionNoteUrl
                     )}
                     className="text-primary hover:underline"
                   >
@@ -163,7 +165,7 @@ export function SessionNoteActions({
                   </Link>
                 ) : (
                   <Link
-                    href={`/calendar?view=month&clientId=${clientId}&returnTo=/session-notes/${sessionNoteId}`}
+                    href={`/calendar?view=month&clientId=${clientId}&returnTo=${encodeURIComponent(sessionNoteUrl)}`}
                     className="text-primary hover:underline"
                   >
                     Schedule appointment →

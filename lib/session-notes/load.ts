@@ -36,11 +36,32 @@ export async function loadSessionNotesForPractice(
       clientLastName: clients.lastName,
       preSessionBatterySentAt: appointments.preSessionBatterySentAt,
       psqBatteryStatus: sql<string | null>`(
-        SELECT bi.status
-        FROM battery_instances bi
-        JOIN assessment_instances ai ON bi.phq9_instance_id = ai.assessment_instance_id
-        WHERE ai.appointment_id = ${sessionNotes.appointmentId}
-        LIMIT 1
+        SELECT
+          CASE
+            WHEN EXISTS (
+              SELECT 1
+              FROM battery_instances bi
+              JOIN assessment_instances ai ON bi.phq9_instance_id = ai.assessment_instance_id
+              WHERE ai.appointment_id = ${sessionNotes.appointmentId}
+              AND (
+                bi.status = 'submitted'
+                OR (
+                  EXISTS (SELECT 1 FROM assessment_results r WHERE r.assessment_instance_id = bi.phq9_instance_id)
+                  AND EXISTS (SELECT 1 FROM assessment_results r WHERE r.assessment_instance_id = bi.gad7_instance_id)
+                  AND (bi.btp_instance_id IS NULL OR EXISTS (SELECT 1 FROM assessment_results r WHERE r.assessment_instance_id = bi.btp_instance_id))
+                  AND (bi.assist_instance_id IS NULL OR EXISTS (SELECT 1 FROM assessment_results r WHERE r.assessment_instance_id = bi.assist_instance_id))
+                )
+              )
+            ) THEN 'submitted'
+            ELSE (
+              SELECT bi2.status
+              FROM battery_instances bi2
+              JOIN assessment_instances ai2 ON bi2.phq9_instance_id = ai2.assessment_instance_id
+              WHERE ai2.appointment_id = ${sessionNotes.appointmentId}
+              ORDER BY bi2.created_at DESC
+              LIMIT 1
+            )
+          END
       )`.as("psq_battery_status"),
       asqCompleted: sql<boolean>`EXISTS (
         SELECT 1
@@ -83,11 +104,32 @@ export async function loadSessionNoteForPractice(
       clientDateOfBirth: clients.dateOfBirth,
       preSessionBatterySentAt: appointments.preSessionBatterySentAt,
       psqBatteryStatus: sql<string | null>`(
-        SELECT bi.status
-        FROM battery_instances bi
-        JOIN assessment_instances ai ON bi.phq9_instance_id = ai.assessment_instance_id
-        WHERE ai.appointment_id = ${sessionNotes.appointmentId}
-        LIMIT 1
+        SELECT
+          CASE
+            WHEN EXISTS (
+              SELECT 1
+              FROM battery_instances bi
+              JOIN assessment_instances ai ON bi.phq9_instance_id = ai.assessment_instance_id
+              WHERE ai.appointment_id = ${sessionNotes.appointmentId}
+              AND (
+                bi.status = 'submitted'
+                OR (
+                  EXISTS (SELECT 1 FROM assessment_results r WHERE r.assessment_instance_id = bi.phq9_instance_id)
+                  AND EXISTS (SELECT 1 FROM assessment_results r WHERE r.assessment_instance_id = bi.gad7_instance_id)
+                  AND (bi.btp_instance_id IS NULL OR EXISTS (SELECT 1 FROM assessment_results r WHERE r.assessment_instance_id = bi.btp_instance_id))
+                  AND (bi.assist_instance_id IS NULL OR EXISTS (SELECT 1 FROM assessment_results r WHERE r.assessment_instance_id = bi.assist_instance_id))
+                )
+              )
+            ) THEN 'submitted'
+            ELSE (
+              SELECT bi2.status
+              FROM battery_instances bi2
+              JOIN assessment_instances ai2 ON bi2.phq9_instance_id = ai2.assessment_instance_id
+              WHERE ai2.appointment_id = ${sessionNotes.appointmentId}
+              ORDER BY bi2.created_at DESC
+              LIMIT 1
+            )
+          END
       )`.as("psq_battery_status"),
     })
     .from(sessionNotes)

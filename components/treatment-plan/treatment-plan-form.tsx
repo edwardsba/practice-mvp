@@ -1,6 +1,6 @@
 "use client"
 
-import { useActionState, useEffect } from "react"
+import { useActionState, useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 
 import {
@@ -92,7 +92,9 @@ export function TreatmentPlanForm({
       {} as SaveTreatmentPlanAndSendState
     )
 
-  const showPreviewModal = Boolean(previewState.pdfBase64)
+  const [previewDismissed, setPreviewDismissed] = useState(false)
+
+  const showPreviewModal = Boolean(previewState.pdfBase64) && !previewDismissed
 
   useEffect(() => {
     if (
@@ -129,7 +131,11 @@ export function TreatmentPlanForm({
 
   return (
     <>
-      <form action={previewFormAction} className="space-y-6">
+      <form
+        action={previewFormAction}
+        onSubmit={() => setPreviewDismissed(false)}
+        className="space-y-6"
+      >
         <Card>
           <CardHeader>
             <CardTitle>Meta details</CardTitle>
@@ -290,7 +296,7 @@ export function TreatmentPlanForm({
           title="Review treatment plan"
           description="Review the PDF below before saving."
           pdfBase64={previewState.pdfBase64!}
-          onCancel={() => router.push(cancelHref)}
+          onCancel={() => setPreviewDismissed(true)}
           hiddenFields={{ values_json: previewState.valuesJson ?? "" }}
           saveLabel="Save"
           savePending={savePending}

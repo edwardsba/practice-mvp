@@ -130,7 +130,11 @@ export default async function EditReportPage({
     : null
 
   const [activePlan] = await db
-    .select({ therapeuticTarget: treatmentPlans.therapeuticTarget })
+    .select({
+      therapeuticTarget: treatmentPlans.therapeuticTarget,
+      behaviouralTargetsJson: treatmentPlans.behaviouralTargetsJson,
+      ongoingAssessmentsJson: treatmentPlans.ongoingAssessmentsJson,
+    })
     .from(treatmentPlans)
     .where(
       and(
@@ -143,6 +147,10 @@ export default async function EditReportPage({
     .limit(1)
 
   const therapeuticTarget = activePlan?.therapeuticTarget ?? null
+  const behaviouralTargets =
+    (activePlan?.behaviouralTargetsJson as { items?: string[] } | null)?.items ?? []
+  const assistEnabled =
+    (activePlan?.ongoingAssessmentsJson as { assist?: boolean } | null)?.assist ?? false
 
   const clientName = `${client.firstName} ${client.lastName}`
   const isFinalised = report.reportStatus === "finalised"
@@ -202,10 +210,14 @@ export default async function EditReportPage({
           recipient: snapshot.recipient,
           fundingApproval: snapshot.fundingApproval,
           therapeuticTarget: snapshot.therapeuticTarget ?? null,
+          behaviouralTargets: snapshot.behaviouralTargets ?? [],
+          assistEnabled: snapshot.assistEnabled ?? false,
         }}
         existingDraftReportId={existingDraftReportId}
         previousVersionId={previousVersionId}
         therapeuticTarget={therapeuticTarget}
+        behaviouralTargets={behaviouralTargets}
+        assistEnabled={assistEnabled}
         cancelHref={`/clients/${clientId}/reports/${reportId}`}
       />
 

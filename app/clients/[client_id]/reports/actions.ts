@@ -605,7 +605,11 @@ export async function buildSnapshot(
   }
 
   const [activeTreatmentPlan] = await db
-    .select({ therapeuticTarget: treatmentPlans.therapeuticTarget })
+    .select({
+      therapeuticTarget: treatmentPlans.therapeuticTarget,
+      behaviouralTargetsJson: treatmentPlans.behaviouralTargetsJson,
+      ongoingAssessmentsJson: treatmentPlans.ongoingAssessmentsJson,
+    })
     .from(treatmentPlans)
     .where(
       and(
@@ -618,6 +622,12 @@ export async function buildSnapshot(
     .limit(1)
 
   const therapeuticTarget = activeTreatmentPlan?.therapeuticTarget ?? null
+  const behaviouralTargets =
+    (activeTreatmentPlan?.behaviouralTargetsJson as { items?: string[] } | null)
+      ?.items ?? []
+  const assistEnabled =
+    (activeTreatmentPlan?.ongoingAssessmentsJson as { assist?: boolean } | null)
+      ?.assist ?? false
 
   return {
     reportTitle: reportTitle?.trim() || "Progress Report",
@@ -651,6 +661,8 @@ export async function buildSnapshot(
     clinicalSummaryText,
     recommendationsText,
     therapeuticTarget,
+    behaviouralTargets,
+    assistEnabled,
     selectedAppointmentIds,
   }
 }

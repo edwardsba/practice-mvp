@@ -10,6 +10,13 @@ import {
 } from "@/lib/reports/snapshot"
 import { resolveTemplateKey } from "@/lib/reports/templates"
 import {
+  buildAssessmentSummaryParagraph,
+  toAssessmentPoints,
+} from "@/lib/assessment-summary/templates"
+import { buildAsqSummarySentence } from "@/lib/assessment-summary/asq-template"
+import { buildBtpSummaryParagraphs } from "@/lib/assessment-summary/btp-template"
+import { buildTreatmentPlanSummary } from "@/lib/reports/treatment-plan-summary"
+import {
   ReportAsqResultsTable,
   ReportResultsTable,
 } from "@/components/report/results-table"
@@ -161,6 +168,39 @@ function ProgressReportBody({
   const clinicalSummary = snapshot.clinicalSummaryText?.trim() || "—"
   const recommendations = snapshot.recommendationsText?.trim() || "—"
 
+  const clientFirstName = snapshot.client.firstName
+
+  const phq9Paragraph = buildAssessmentSummaryParagraph(
+    "PHQ9",
+    toAssessmentPoints(phq9Results),
+    clientFirstName
+  )
+  const gad7Paragraph = buildAssessmentSummaryParagraph(
+    "GAD7",
+    toAssessmentPoints(gad7Results),
+    clientFirstName
+  )
+  const assistParagraph = snapshot.assistEnabled
+    ? buildAssessmentSummaryParagraph(
+        "ASSIST",
+        toAssessmentPoints(assistResults),
+        clientFirstName
+      )
+    : null
+  const asqSentence = buildAsqSummarySentence(
+    asqResults.map((r) => ({
+      date: r.date,
+      acuteRiskRating: r.acuteRiskRating ?? null,
+    }))
+  )
+  const btpParagraphs = buildBtpSummaryParagraphs(btpResults)
+
+  const treatmentPlanSummary = buildTreatmentPlanSummary(
+    clientFirstName,
+    snapshot.therapeuticTarget,
+    snapshot.behaviouralTargets
+  )
+
   return (
     <div className="space-y-4">
       <section className="report-client-details space-y-0.5 text-sm">
@@ -221,68 +261,64 @@ function ProgressReportBody({
         </section>
       ) : null}
 
-      {(!omitEmptySections ||
-        phq9Results.length > 0 ||
-        gad7Results.length > 0 ||
-        assistResults.length > 0) ? (
-        <section className="report-group-ongoing space-y-3">
-          <h3 className="text-sm font-semibold">Ongoing objective assessments</h3>
+      <section className="report-treatment-plan-summary space-y-2">
+        <h3 className="text-lg font-semibold">Treatment plan summary</h3>
+        <p className="text-sm leading-relaxed">{treatmentPlanSummary}</p>
+      </section>
 
-          {!omitEmptySections || phq9Results.length > 0 ? (
-            <ReportResultsTable
-              title="Patient Health Questionnaire 9 (PHQ-9) results"
-              results={phq9Results}
-              emptyMessage="No PHQ-9 results in this period."
-              className="report-results-phq9"
-              showImpairment
-            />
+      {(!omitEmptySections || phq9Paragraph || gad7Paragraph) ? (
+        <section className="report-group-emotional-state space-y-2">
+          <h3 className="text-sm font-semibold">
+            Ongoing emotional state supervision
+          </h3>
+          <p className="text-sm leading-relaxed">
+            As part of the treatment plan, ongoing emotional state was
+            monitored for {clientFirstName} using the Patient Health
+            Questionnaire (PHQ-9) and the Generalised Anxiety Disorder scale
+            (GAD-7).
+          </p>
+          {phq9Paragraph ? (
+            <p className="text-sm leading-relaxed">{phq9Paragraph}</p>
           ) : null}
-
-          {!omitEmptySections || gad7Results.length > 0 ? (
-            <ReportResultsTable
-              title="Generalised Anxiety Disorder 7 (GAD-7) results"
-              results={gad7Results}
-              emptyMessage="No GAD-7 results in this period."
-              className="report-results-gad7"
-              showImpairment
-            />
-          ) : null}
-
-          {!omitEmptySections || assistResults.length > 0 ? (
-            <ReportResultsTable
-              title="Alcohol, Smoking and Substance Involvement Screening Test (ASSIST) results"
-              results={assistResults}
-              emptyMessage="No ASSIST results in this period."
-              className="report-results-assist"
-              severityColumnLabel="Risk Level"
-              capitalizeSeverity={false}
-            />
+          {gad7Paragraph ? (
+            <p className="text-sm leading-relaxed">{gad7Paragraph}</p>
           ) : null}
         </section>
       ) : null}
 
-      {!omitEmptySections || asqResults.length > 0 ? (
-        <section className="report-group-risk space-y-3">
-          <h3 className="text-sm font-semibold">Risk assessments</h3>
-
-          {!omitEmptySections || asqResults.length > 0 ? (
-            <ReportAsqResultsTable
-              results={asqResults}
-              emptyMessage="No ASQ results in this period."
-              className="report-results-asq"
-            />
+      {(!omitEmptySections || asqSentence) ? (
+        <section className="report-group-risk space-y-2">
+          <h3 className="text-sm font-semibold">Risk supervision</h3>
+          <p className="text-sm leading-relaxed">
+            Suicide risk was monitored throughout treatment using the Ask
+            Suicide-Screening Questions (ASQ).
+          </p>
+          {asqSentence ? (
+            <p className="text-sm leading-relaxed">{asqSentence}</p>
           ) : null}
         </section>
       ) : null}
 
-      {!omitEmptySections || btpResults.length > 0 ? (
-        <ReportBtpResultsTable
-          results={btpResults}
-          emptyMessage="No Behavioural Targets Progress results in this period."
-          className="report-results-btp"
-          therapeuticTarget={snapshot.therapeuticTarget ?? null}
-          clientFirstName={snapshot.client.firstName}
-        />
+      {(!omitEmptySections || btpParagraphs.length > 0 || assistParagraph) ? (
+        <section className="report-group-behavioural-targets space-y-2">
+          <h3 className="text-sm font-semibold">Behavioural targets</h3>
+          <p className="text-sm leading-relaxed">
+            Progress toward behavioural change was monitored using self-rated
+            behavioural targets identified in the treatment plan
+            {snapshot.assistEnabled
+              ? " and the ASSIST substance-use screen"
+              : ""}
+            .
+          </p>
+          {btpParagraphs.map(({ target, paragraph }) => (
+            <p key={target} className="text-sm leading-relaxed">
+              {paragraph}
+            </p>
+          ))}
+          {assistParagraph ? (
+            <p className="text-sm leading-relaxed">{assistParagraph}</p>
+          ) : null}
+        </section>
       ) : null}
 
       <section className="report-clinical-summary space-y-2">
@@ -314,6 +350,65 @@ function ProgressReportBody({
           </p>
         )}
       </section>
+
+      {(!omitEmptySections ||
+        phq9Results.length > 0 ||
+        gad7Results.length > 0 ||
+        assistResults.length > 0 ||
+        asqResults.length > 0 ||
+        btpResults.length > 0) ? (
+        <section className="report-assessment-data space-y-4">
+          <h3 className="text-lg font-semibold">Assessment Data</h3>
+
+          {!omitEmptySections || phq9Results.length > 0 ? (
+            <ReportResultsTable
+              title="Patient Health Questionnaire 9 (PHQ-9) results"
+              results={phq9Results}
+              emptyMessage="No PHQ-9 results in this period."
+              className="report-results-phq9"
+              showImpairment
+            />
+          ) : null}
+
+          {!omitEmptySections || gad7Results.length > 0 ? (
+            <ReportResultsTable
+              title="Generalised Anxiety Disorder 7 (GAD-7) results"
+              results={gad7Results}
+              emptyMessage="No GAD-7 results in this period."
+              className="report-results-gad7"
+              showImpairment
+            />
+          ) : null}
+
+          {snapshot.assistEnabled &&
+          (!omitEmptySections || assistResults.length > 0) ? (
+            <ReportResultsTable
+              title="Alcohol, Smoking and Substance Involvement Screening Test (ASSIST) results"
+              results={assistResults}
+              emptyMessage="No ASSIST results in this period."
+              className="report-results-assist"
+              severityColumnLabel="Risk Level"
+              capitalizeSeverity={false}
+            />
+          ) : null}
+
+          {!omitEmptySections || asqResults.length > 0 ? (
+            <ReportAsqResultsTable
+              results={asqResults}
+              emptyMessage="No ASQ results in this period."
+              className="report-results-asq"
+            />
+          ) : null}
+
+          {!omitEmptySections || btpResults.length > 0 ? (
+            <ReportBtpResultsTable
+              results={btpResults}
+              emptyMessage="No Behavioural Targets Progress results in this period."
+              className="report-results-btp"
+            />
+          ) : null}
+        </section>
+      ) : null}
     </div>
   )
 }

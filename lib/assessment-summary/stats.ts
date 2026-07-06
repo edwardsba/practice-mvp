@@ -20,16 +20,16 @@ export type AssessmentOverviewStats = {
   variabilityLabel: VariabilityLabel
 }
 
-function round(value: number, decimals = 1): number {
+export function round(value: number, decimals = 1): number {
   const factor = 10 ** decimals
   return Math.round(value * factor) / factor
 }
 
-function mean(values: number[]): number {
+export function mean(values: number[]): number {
   return values.reduce((sum, v) => sum + v, 0) / values.length
 }
 
-function median(values: number[]): number {
+export function median(values: number[]): number {
   const sorted = [...values].sort((a, b) => a - b)
   const mid = Math.floor(sorted.length / 2)
   return sorted.length % 2 !== 0
@@ -43,6 +43,34 @@ export function sampleStandardDeviation(values: number[]): number {
   const variance =
     values.reduce((sum, v) => sum + (v - m) ** 2, 0) / (values.length - 1)
   return Math.sqrt(variance)
+}
+
+export function computeGenericOverviewStats(
+  points: AssessmentPoint[],
+  variabilityBands: { label: VariabilityLabel; maxSd: number }[]
+): Omit<AssessmentOverviewStats, "minBand" | "maxBand" | "meanBand" | "medianBand"> | null {
+  if (points.length === 0) return null
+
+  const scores = points.map((p) => p.score)
+  const minScore = Math.min(...scores)
+  const maxScore = Math.max(...scores)
+  const meanScore = round(mean(scores))
+  const medianScore = round(median(scores))
+  const sd = round(sampleStandardDeviation(scores), 2)
+
+  const variabilityLabel =
+    variabilityBands.find((band) => sd <= band.maxSd)?.label ??
+    "Considerable fluctuation"
+
+  return {
+    n: points.length,
+    min: minScore,
+    max: maxScore,
+    mean: meanScore,
+    median: medianScore,
+    sd,
+    variabilityLabel,
+  }
 }
 
 export function computeOverviewStats(

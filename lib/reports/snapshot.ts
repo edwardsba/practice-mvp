@@ -74,6 +74,8 @@ export type ReportSnapshot = {
   clinicalSummaryText: string | null
   recommendationsText: string | null
   therapeuticTarget: string | null
+  behaviouralTargets: string[]
+  assistEnabled: boolean
   selectedAppointmentIds?: string[]
 }
 
@@ -164,6 +166,8 @@ export function parseReportSnapshot(value: unknown): ReportSnapshot | null {
     assistResults,
     btpResults,
     therapeuticTarget: raw.therapeuticTarget ?? null,
+    behaviouralTargets: raw.behaviouralTargets ?? [],
+    assistEnabled: raw.assistEnabled ?? false,
     selectedAppointmentIds: raw.selectedAppointmentIds ?? [],
   }
 }

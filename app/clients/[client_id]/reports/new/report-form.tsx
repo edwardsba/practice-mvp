@@ -74,6 +74,8 @@ export function ReportForm({
   existingDraftReportId,
   previousVersionId,
   therapeuticTarget,
+  behaviouralTargets = [],
+  assistEnabled = false,
   cancelHref,
 }: {
   clientId: string
@@ -110,6 +112,8 @@ export function ReportForm({
   existingDraftReportId: string | null
   previousVersionId: string | null
   therapeuticTarget?: string | null
+  behaviouralTargets?: string[]
+  assistEnabled?: boolean
   cancelHref: string
 }) {
   const validInitialApprovalId =
@@ -492,6 +496,9 @@ export function ReportForm({
           recipient,
           fundingApproval: null,
           selectedAppointmentIds: [],
+          therapeuticTarget: therapeuticTarget ?? initialSnapshot.therapeuticTarget ?? null,
+          behaviouralTargets,
+          assistEnabled,
         }
       : null
     : effectiveDateRangeStart && effectiveDateRangeEnd
@@ -513,6 +520,9 @@ export function ReportForm({
           recipient,
           fundingApproval: null,
           selectedAppointmentIds: selectedApproval ? selectedAppointmentIds : [],
+          therapeuticTarget: therapeuticTarget ?? initialSnapshot.therapeuticTarget ?? null,
+          behaviouralTargets,
+          assistEnabled,
         }
       : null
 

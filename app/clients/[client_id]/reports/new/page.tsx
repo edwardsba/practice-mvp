@@ -95,7 +95,11 @@ export default async function NewReportPage({
     : null
 
   const [activePlan] = await db
-    .select({ therapeuticTarget: treatmentPlans.therapeuticTarget })
+    .select({
+      therapeuticTarget: treatmentPlans.therapeuticTarget,
+      behaviouralTargetsJson: treatmentPlans.behaviouralTargetsJson,
+      ongoingAssessmentsJson: treatmentPlans.ongoingAssessmentsJson,
+    })
     .from(treatmentPlans)
     .where(
       and(
@@ -108,6 +112,10 @@ export default async function NewReportPage({
     .limit(1)
 
   const therapeuticTarget = activePlan?.therapeuticTarget ?? null
+  const behaviouralTargets =
+    (activePlan?.behaviouralTargetsJson as { items?: string[] } | null)?.items ?? []
+  const assistEnabled =
+    (activePlan?.ongoingAssessmentsJson as { assist?: boolean } | null)?.assist ?? false
 
   const clientName = `${client.firstName} ${client.lastName}`
 
@@ -147,10 +155,14 @@ export default async function NewReportPage({
           recipient: null,
           fundingApproval: null,
           therapeuticTarget: null,
+          behaviouralTargets: [],
+          assistEnabled: false,
         }}
         existingDraftReportId={null}
         previousVersionId={null}
         therapeuticTarget={therapeuticTarget}
+        behaviouralTargets={behaviouralTargets}
+        assistEnabled={assistEnabled}
         cancelHref={returnTo ?? `/clients/${clientId}`}
       />
     </AppShell>

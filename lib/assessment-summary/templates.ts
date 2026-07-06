@@ -1,6 +1,18 @@
 import { NUMERIC_TOOL_CONFIG, NumericToolCode } from "./config"
+import type { ReportResultRow } from "@/lib/reports/snapshot"
 import { AssessmentPoint, computeOverviewStats } from "./stats"
 import { classifyTrend, TrendShape } from "./trend"
+
+export function toAssessmentPoints(results: ReportResultRow[]): AssessmentPoint[] {
+  const sorted = [...results].sort(
+    (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+  )
+  return sorted.map((r, i) => ({
+    date: r.date,
+    score: r.score,
+    sessionIndex: i + 1,
+  }))
+}
 
 const TREND_SENTENCES: Record<
   TrendShape,
@@ -15,7 +27,7 @@ const TREND_SENTENCES: Record<
   peak: (toolName, symptomDomain) =>
     `${toolName} scores were higher mid-way through the referral period compared to the beginning and end, suggesting a temporary increase in ${symptomDomain} before returning toward baseline.`,
   flat: (toolName) =>
-    `${toolName} scores remained relatively stable across the referral period, with no clear upward or downward trend.`,
+    `${toolName} scores did not show a consistent upward or downward trend across the referral period.`,
 }
 
 const VARIABILITY_SENTENCES: Record<string, (symptomDomain: string) => string> = {

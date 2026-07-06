@@ -81,6 +81,7 @@ export default async function ClientReportsPage({
       and(
         eq(simpleReports.clientId, clientId),
         eq(simpleReports.practiceId, context.practiceId),
+        eq(simpleReports.isCurrentVersion, true),
         ne(simpleReports.reportStatus, "deleted")
       )
     )

@@ -47,6 +47,7 @@ export async function loadReportsForPractice(practiceId: string) {
     .where(
       and(
         eq(simpleReports.practiceId, practiceId),
+        eq(simpleReports.isCurrentVersion, true),
         ne(simpleReports.reportStatus, "deleted")
       )
     )

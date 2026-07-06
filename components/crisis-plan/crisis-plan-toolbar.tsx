@@ -13,14 +13,16 @@ export function CrisisPlanToolbar({
   isActive,
   clientEmail,
   templateVariables,
+  autoOpenSend = false,
 }: {
   clientId: string
   crisisPlanId: string
   isActive: boolean
   clientEmail: string | null
   templateVariables: CrisisPlanEmailVariables
+  autoOpenSend?: boolean
 }) {
-  const [emailModalOpen, setEmailModalOpen] = useState(false)
+  const [emailModalOpen, setEmailModalOpen] = useState(autoOpenSend)
   const [emailStatus, setEmailStatus] = useState<string | null>(null)
 
   return (

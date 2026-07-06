@@ -1,7 +1,7 @@
 import Link from "next/link"
 import { notFound } from "next/navigation"
 
-import { createCrisisPlanVersion, deleteCrisisPlan } from "@/app/clients/[client_id]/crisis-plan/actions"
+import { deleteCrisisPlan } from "@/app/clients/[client_id]/crisis-plan/actions"
 import { CrisisPlanForm } from "@/components/crisis-plan/crisis-plan-form"
 import { AppShell } from "@/components/app-shell"
 import { BackButton } from "@/components/ui/back-button"
@@ -59,10 +59,10 @@ export default async function EditCrisisPlanPage({
       </div>
 
       <CrisisPlanForm
-        action={createCrisisPlanVersion.bind(null, clientId, planId)}
+        clientId={clientId}
+        sourcePlanId={planId}
         initialPlan={plan}
         initialContacts={contacts}
-        submitLabel="Save new version"
         cancelHref={`/clients/${clientId}/crisis-plan/${planId}`}
       />
 

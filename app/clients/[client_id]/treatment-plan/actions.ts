@@ -198,12 +198,6 @@ export async function saveTreatmentPlanAndDownload(
     client.firstName
   )
 
-  revalidatePath(`/clients/${clientId}`)
-  if (sourcePlanId) {
-    revalidatePath(`/clients/${clientId}/treatment-plan/${sourcePlanId}`)
-  }
-  revalidatePath(`/clients/${clientId}/treatment-plan/${treatmentPlanId}`)
-
   return {
     success: true,
     newPlanId: treatmentPlanId,
@@ -256,9 +250,7 @@ export async function saveTreatmentPlanAndSend(
   if (sourcePlanId) {
     revalidatePath(`/clients/${clientId}/treatment-plan/${sourcePlanId}`)
   }
-  revalidatePath(`/clients/${clientId}/treatment-plan/${treatmentPlanId}`)
-
-  return { success: true, newPlanId: treatmentPlanId }
+  redirect(`/clients/${clientId}/treatment-plan/${treatmentPlanId}?openSend=1`)
 }
 
 export async function deleteTreatmentPlan(

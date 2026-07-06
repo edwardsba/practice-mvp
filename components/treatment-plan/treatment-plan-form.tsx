@@ -106,19 +106,9 @@ export function TreatmentPlanForm({
         saveAndDownloadState.pdfBase64,
         saveAndDownloadState.filename ?? "treatment-plan.pdf"
       )
-      router.push(
-        `/clients/${clientId}/treatment-plan/${saveAndDownloadState.newPlanId}`
-      )
+      window.location.href = `/clients/${clientId}/treatment-plan/${saveAndDownloadState.newPlanId}`
     }
-  }, [saveAndDownloadState, clientId, router])
-
-  useEffect(() => {
-    if (saveAndSendState.success && saveAndSendState.newPlanId) {
-      router.push(
-        `/clients/${clientId}/treatment-plan/${saveAndSendState.newPlanId}?openSend=1`
-      )
-    }
-  }, [saveAndSendState, clientId, router])
+  }, [saveAndDownloadState, clientId])
 
   const plan = initialPlan
   const behaviouralItems = plan?.behaviouralTargetsJson?.items ?? []

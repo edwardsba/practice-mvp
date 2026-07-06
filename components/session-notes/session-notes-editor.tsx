@@ -1,13 +1,11 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useState } from "react"
 
 import { updateSessionNoteNotes } from "@/app/session-notes/actions"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
-
-const AUTOSAVE_DELAY_MS = 1500
 
 function formatSavedTime(date: Date): string {
   return date.toLocaleTimeString("en-AU", {
@@ -31,34 +29,20 @@ export function SessionNotesEditor({
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [expanded, setExpanded] = useState(false)
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const lastSavedRef = useRef(initialNotes)
 
-  useEffect(() => {
-    if (readOnly) return
-    if (notes === lastSavedRef.current) return
-
-    if (timeoutRef.current) clearTimeout(timeoutRef.current)
-
-    timeoutRef.current = setTimeout(() => {
-      setSaving(true)
-      setError(null)
-      updateSessionNoteNotes(sessionNoteId, notes)
-        .then((result) => {
-          if (result.error) {
-            setError(result.error)
-            return
-          }
-          lastSavedRef.current = notes
-          setSavedAt(new Date())
-        })
-        .finally(() => setSaving(false))
-    }, AUTOSAVE_DELAY_MS)
-
-    return () => {
-      if (timeoutRef.current) clearTimeout(timeoutRef.current)
-    }
-  }, [notes, sessionNoteId, readOnly])
+  function handleSaveDraft() {
+    setSaving(true)
+    setError(null)
+    updateSessionNoteNotes(sessionNoteId, notes)
+      .then((result) => {
+        if (result.error) {
+          setError(result.error)
+          return
+        }
+        setSavedAt(new Date())
+      })
+      .finally(() => setSaving(false))
+  }
 
   let statusLabel = ""
   if (saving) {
@@ -85,9 +69,19 @@ export function SessionNotesEditor({
             ) : null}
             {error ? <span className="text-sm text-destructive">{error}</span> : null}
             {!readOnly ? (
-              <Button type="button" variant="outline" size="sm" onClick={() => setExpanded(true)}>
-                Expand
-              </Button>
+              <>
+                <Button
+                  type="button"
+                  size="sm"
+                  disabled={saving}
+                  onClick={handleSaveDraft}
+                >
+                  {saving ? "Saving…" : "Save Draft"}
+                </Button>
+                <Button type="button" variant="outline" size="sm" onClick={() => setExpanded(true)}>
+                  Expand
+                </Button>
+              </>
             ) : null}
           </div>
         </CardHeader>
@@ -105,16 +99,31 @@ export function SessionNotesEditor({
 
       {expanded ? (
         <div className="no-print fixed inset-0 z-50 flex flex-col gap-3 bg-background p-4 sm:p-8">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-3">
             <p className="text-sm font-medium">
               Practitioner notes
               {statusLabel ? (
                 <span className="ml-3 font-normal text-muted-foreground">{statusLabel}</span>
               ) : null}
+              {error ? (
+                <span className="ml-3 font-normal text-destructive">{error}</span>
+              ) : null}
             </p>
-            <Button type="button" onClick={() => setExpanded(false)}>
-              Done
-            </Button>
+            <div className="flex items-center gap-3">
+              {!readOnly ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  disabled={saving}
+                  onClick={handleSaveDraft}
+                >
+                  {saving ? "Saving…" : "Save Draft"}
+                </Button>
+              ) : null}
+              <Button type="button" onClick={() => setExpanded(false)}>
+                Done
+              </Button>
+            </div>
           </div>
           <Textarea
             {...sharedTextareaProps}

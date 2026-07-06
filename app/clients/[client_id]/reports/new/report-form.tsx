@@ -7,8 +7,18 @@ import {
   fetchReportResultsForAppointments,
   fetchReportResultsForRange,
   type ReportPreviewRow,
-  type SaveReportDraftState,
 } from "@/app/clients/[client_id]/reports/actions"
+import {
+  finaliseReportAction,
+  finaliseReportAndDownloadAction,
+  previewReport,
+  saveReportDraftAction,
+  type FinaliseReportAndDownloadState,
+  type FinaliseReportState,
+  type PreviewReportState,
+  type SaveReportDraftState,
+} from "@/app/clients/[client_id]/reports/report-form-actions"
+import { DocumentPreviewModal } from "@/components/documents/document-preview-modal"
 import { ReportDocument } from "@/components/report/report-document"
 import { AsqStatusBadge } from "@/components/session-notes/asq-status-badge"
 import { PsqStatusBadge } from "@/components/session-notes/psq-status-badge"
@@ -58,8 +68,8 @@ export function ReportForm({
   initialClinicalSummary,
   initialRecommendations,
   initialSnapshot,
-  saveAction,
-  submitLabel,
+  existingDraftReportId,
+  previousVersionId,
   therapeuticTarget,
   cancelHref,
 }: {
@@ -94,11 +104,8 @@ export function ReportForm({
     | "templateKey"
     | "reportDate"
   >
-  saveAction: (
-    prevState: SaveReportDraftState,
-    formData: FormData
-  ) => Promise<SaveReportDraftState>
-  submitLabel?: string
+  existingDraftReportId: string | null
+  previousVersionId: string | null
   therapeuticTarget?: string | null
   cancelHref: string
 }) {
@@ -156,9 +163,32 @@ export function ReportForm({
   )
   const [isPendingPreview, startPreviewTransition] = useTransition()
   const [saveState, boundSaveAction, savePending] = useActionState(
-    saveAction,
+    saveReportDraftAction.bind(null, clientId, existingDraftReportId, previousVersionId),
     initialSaveState
   )
+  const [previewState, previewFormAction, previewPending] = useActionState(
+    previewReport.bind(null, clientId, existingDraftReportId, previousVersionId),
+    {} as PreviewReportState
+  )
+  const [finaliseState, finaliseFormAction, finalisePending] = useActionState(
+    finaliseReportAction.bind(null, clientId, existingDraftReportId, previousVersionId),
+    {} as FinaliseReportState
+  )
+  const [
+    finaliseAndDownloadState,
+    finaliseAndDownloadFormAction,
+    finaliseAndDownloadPending,
+  ] = useActionState(
+    finaliseReportAndDownloadAction.bind(
+      null,
+      clientId,
+      existingDraftReportId,
+      previousVersionId
+    ),
+    {} as FinaliseReportAndDownloadState
+  )
+  const [previewDismissed, setPreviewDismissed] = useState(false)
+  const showPreviewModal = Boolean(previewState.pdfBase64) && !previewDismissed
 
   const selectedApproval =
     fundingApprovals.find((fa) => fa.fundingApprovalId === fundingApprovalId) ??
@@ -358,6 +388,32 @@ export function ReportForm({
       loadPreview([], dateRangeStart, dateRangeEnd)
     }
   }, [selectedApproval, dateRangeStart, dateRangeEnd, loadPreview])
+
+  useEffect(() => {
+    if (
+      finaliseAndDownloadState.success &&
+      finaliseAndDownloadState.pdfBase64 &&
+      finaliseAndDownloadState.newReportId
+    ) {
+      const byteCharacters = atob(finaliseAndDownloadState.pdfBase64)
+      const byteNumbers = new Array(byteCharacters.length)
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i)
+      }
+      const blob = new Blob([new Uint8Array(byteNumbers)], {
+        type: "application/pdf",
+      })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = finaliseAndDownloadState.filename ?? "report.pdf"
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+      window.location.href = `/clients/${clientId}/reports/${finaliseAndDownloadState.newReportId}`
+    }
+  }, [finaliseAndDownloadState, clientId])
 
   const recipient: ReportRecipient =
     recipientType === "referrer" && selectedApproval
@@ -729,15 +785,25 @@ export function ReportForm({
           {saveState.error ? (
             <p className="no-print text-sm text-destructive">{saveState.error}</p>
           ) : null}
+          {previewState.error ? (
+            <p className="no-print text-sm text-destructive">{previewState.error}</p>
+          ) : null}
 
           <div className="no-print flex flex-wrap gap-3">
             <Button
               type="submit"
-              disabled={
-                savePending || !reportTypeId || !fundingApprovalId
-              }
+              variant="outline"
+              disabled={savePending || !reportTypeId || !fundingApprovalId}
             >
-              {savePending ? "Saving…" : (submitLabel ?? "Save Draft")}
+              {savePending ? "Saving…" : "Save Draft"}
+            </Button>
+            <Button
+              type="submit"
+              formAction={previewFormAction}
+              onClick={() => setPreviewDismissed(false)}
+              disabled={previewPending || !reportTypeId || !fundingApprovalId}
+            >
+              {previewPending ? "Generating preview…" : "Finalise"}
             </Button>
             <Button
               type="button"
@@ -784,10 +850,14 @@ export function ReportForm({
           {saveState.error ? (
             <p className="no-print text-sm text-destructive">{saveState.error}</p>
           ) : null}
+          {previewState.error ? (
+            <p className="no-print text-sm text-destructive">{previewState.error}</p>
+          ) : null}
 
           <div className="no-print flex flex-wrap gap-3">
             <Button
               type="submit"
+              variant="outline"
               disabled={
                 savePending ||
                 !reportTypeId ||
@@ -798,7 +868,23 @@ export function ReportForm({
                   : !dateRangeStart || !dateRangeEnd)
               }
             >
-              {savePending ? "Saving…" : (submitLabel ?? "Save Draft")}
+              {savePending ? "Saving…" : "Save Draft"}
+            </Button>
+            <Button
+              type="submit"
+              formAction={previewFormAction}
+              onClick={() => setPreviewDismissed(false)}
+              disabled={
+                previewPending ||
+                !reportTypeId ||
+                (selectedApproval
+                  ? !derivedDateRangeStart ||
+                    !derivedDateRangeEnd ||
+                    selectedAppointmentIds.length === 0
+                  : !dateRangeStart || !dateRangeEnd)
+              }
+            >
+              {previewPending ? "Generating preview…" : "Finalise"}
             </Button>
             <Button
               type="button"
@@ -814,6 +900,45 @@ export function ReportForm({
           </div>
         </form>
       )}
+
+      {showPreviewModal ? (
+        <DocumentPreviewModal
+          title="Review report"
+          description="Review the PDF below before finalising."
+          pdfBase64={previewState.pdfBase64!}
+          onCancel={() => setPreviewDismissed(true)}
+          hiddenFields={{
+            date_range_start: selectedApproval ? derivedDateRangeStart : dateRangeStart,
+            date_range_end: selectedApproval ? derivedDateRangeEnd : dateRangeEnd,
+            appointment_ids: isReferralAck ? "" : selectedAppointmentIds.join(","),
+            recipient_type: recipientType === "referrer" ? "referrer" : recipientType,
+            funding_approval_id: fundingApprovalId,
+            report_requirement_id: requirementId,
+            report_type_id: reportTypeId,
+            template_key: templateKey,
+            report_title: reportTitle,
+            report_date: reportDate,
+            clinical_summary_text: clinicalSummary,
+            recommendations_text: recommendations,
+          }}
+          saveLabel="Save"
+          savePending={finalisePending}
+          saveFormAction={finaliseFormAction}
+          saveAndDownloadLabel="Save and download"
+          saveAndDownloadPending={finaliseAndDownloadPending}
+          saveAndDownloadFormAction={finaliseAndDownloadFormAction}
+        />
+      ) : null}
+      {finaliseState.error ? (
+        <p className="mt-3 text-sm text-destructive" role="alert">
+          {finaliseState.error}
+        </p>
+      ) : null}
+      {finaliseAndDownloadState.error ? (
+        <p className="mt-3 text-sm text-destructive" role="alert">
+          {finaliseAndDownloadState.error}
+        </p>
+      ) : null}
     </>
   )
 }

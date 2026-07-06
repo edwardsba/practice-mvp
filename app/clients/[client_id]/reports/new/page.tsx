@@ -3,7 +3,6 @@ import { notFound } from "next/navigation"
 import { and, desc, eq } from "drizzle-orm"
 
 import { ReportForm } from "@/app/clients/[client_id]/reports/new/report-form"
-import { saveReportDraft } from "@/app/clients/[client_id]/reports/actions"
 import { AppShell } from "@/components/app-shell"
 import { BackButton } from "@/components/ui/back-button"
 import { clients, practitionerProfiles, practices, treatmentPlans } from "@/db/schema"
@@ -149,8 +148,8 @@ export default async function NewReportPage({
           fundingApproval: null,
           therapeuticTarget: null,
         }}
-        saveAction={saveReportDraft.bind(null, clientId)}
-        submitLabel="Save Draft"
+        existingDraftReportId={null}
+        previousVersionId={null}
         therapeuticTarget={therapeuticTarget}
         cancelHref={returnTo ?? `/clients/${clientId}`}
       />

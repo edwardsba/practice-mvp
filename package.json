@@ -44,6 +44,7 @@
     "db:assessment-instance-links": "tsx db/apply-assessment-instance-links-migration.ts",
     "db:session-note-pdf-storage-path": "tsx db/apply-session-note-pdf-storage-path-migration.ts",
     "db:treatment-plan-pdf-storage-path": "tsx db/apply-treatment-plan-pdf-storage-path-migration.ts",
+    "db:report-versioning": "tsx db/apply-report-versioning-migration.ts",
     "db:seed-email-templates": "tsx db/seed-email-templates.ts",
     "db:seed-psf": "npx tsx db/seed-psf.ts"
   },

@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, timestamp, jsonb, date } from 'drizzle-orm/pg-core'
+import { pgTable, uuid, text, timestamp, jsonb, date, integer, boolean } from 'drizzle-orm/pg-core'
 import { clients, practices, practitionerProfiles } from './01-core'
 
 export const simpleReports = pgTable('simple_reports', {
@@ -15,6 +15,9 @@ export const simpleReports = pgTable('simple_reports', {
   clinicalSummaryText: text('clinical_summary_text'),
   recommendationsText: text('recommendations_text'),
   reportStatus: text('report_status').notNull().default('draft'),
+  versionNumber: integer('version_number').notNull().default(1),
+  isCurrentVersion: boolean('is_current_version').notNull().default(true),
+  previousVersionId: uuid('previous_version_id'),
   pdfStoragePath: text('pdf_storage_path'),
   recipientType: text('recipient_type'),
   fundingApprovalId: uuid('funding_approval_id'),

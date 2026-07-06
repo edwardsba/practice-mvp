@@ -1,9 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { useActionState } from "react"
 
-import { finaliseReport, type FinaliseReportState } from "@/app/clients/[client_id]/reports/[report_id]/actions"
 import { ReportDocument } from "@/components/report/report-document"
 import { Button } from "@/components/ui/button"
 import {
@@ -15,31 +13,40 @@ import {
 import { StatusBadge } from "@/components/ui/status-badge"
 import { formatDisplayDate } from "@/lib/funding/format"
 import type { ReportSnapshot } from "@/lib/reports/snapshot"
+import type { ReportVersionSummary } from "@/lib/reports/version-history"
 import { REPORT_STATUS_CONFIG } from "@/lib/status"
 
-const initialState: FinaliseReportState = {}
+function formatVersionDate(value: Date) {
+  return value.toLocaleDateString("en-AU", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  })
+}
 
 export function SavedReportView({
   clientId,
   reportId,
   reportStatus,
+  versionNumber,
+  isCurrentVersion,
   snapshot,
   fundingApproval,
   reportingRequirement,
+  versions,
 }: {
   clientId: string
   reportId: string
   reportStatus: string
+  versionNumber: number
+  isCurrentVersion: boolean
   snapshot: ReportSnapshot
   fundingApproval: { approvalTypeName: string; startDate: string | null } | null
   reportingRequirement: { appointmentNumber: number; reportType: string } | null
+  versions: ReportVersionSummary[]
 }) {
-  const [state, formAction, pending] = useActionState(
-    finaliseReport.bind(null, clientId, reportId),
-    initialState
-  )
-
-  const isFinalised = reportStatus === "finalised" || state.success
+  const isFinalised = reportStatus === "finalised"
+  const currentVersion = versions.find((v) => v.isCurrentVersion)
 
   return (
     <div className="space-y-6">
@@ -85,17 +92,21 @@ export function SavedReportView({
                   status={isFinalised ? "finalised" : "draft"}
                   statusMap={REPORT_STATUS_CONFIG}
                 />
-                {!isFinalised ? (
-                  <form action={formAction}>
-                    <Button type="submit" size="sm" disabled={pending}>
-                      {pending ? "Finalising…" : "Finalise"}
-                    </Button>
-                  </form>
-                ) : null}
+                <span className="text-sm text-muted-foreground">
+                  Version {versionNumber}
+                  {isCurrentVersion ? " · Current" : " · Superseded"}
+                </span>
                 {!isFinalised ? (
                   <Button variant="outline" size="sm" asChild>
                     <Link href={`/clients/${clientId}/reports/${reportId}/edit`}>
-                      Edit Report
+                      Continue editing
+                    </Link>
+                  </Button>
+                ) : null}
+                {isFinalised && isCurrentVersion ? (
+                  <Button variant="outline" size="sm" asChild>
+                    <Link href={`/clients/${clientId}/reports/${reportId}/edit`}>
+                      Edit / Create new version
                     </Link>
                   </Button>
                 ) : null}
@@ -107,8 +118,17 @@ export function SavedReportView({
               </dd>
             </div>
           </dl>
-          {state.error ? (
-            <p className="mt-3 text-sm text-destructive">{state.error}</p>
+
+          {!isCurrentVersion && currentVersion ? (
+            <p className="mt-4 text-sm text-muted-foreground">
+              This version has been superseded.{" "}
+              <Link
+                href={`/clients/${clientId}/reports/${currentVersion.simpleReportId}`}
+                className="text-primary hover:underline"
+              >
+                View the current version →
+              </Link>
+            </p>
           ) : null}
         </CardContent>
       </Card>
@@ -116,6 +136,39 @@ export function SavedReportView({
       <div id="report-print-area" className="report-print-area">
         <ReportDocument snapshot={snapshot} readOnly omitEmptySections />
       </div>
+
+      {versions.length > 1 ? (
+        <Card className="no-print">
+          <CardHeader>
+            <CardTitle>Version history</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ul className="space-y-2">
+              {versions.map((version) => (
+                <li key={version.simpleReportId}>
+                  <Link
+                    href={`/clients/${clientId}/reports/${version.simpleReportId}`}
+                    className={`text-sm hover:underline ${
+                      version.isCurrentVersion
+                        ? "font-semibold text-primary"
+                        : "text-primary"
+                    }`}
+                  >
+                    Version {version.versionNumber} —{" "}
+                    {formatVersionDate(version.createdAt)}
+                    {version.reportStatus !== "finalised" ? " (draft)" : ""}
+                    {version.isCurrentVersion ? (
+                      <span className="ml-2 font-medium text-foreground">
+                        (Current)
+                      </span>
+                    ) : null}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      ) : null}
     </div>
   )
 }

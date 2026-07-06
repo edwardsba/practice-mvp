@@ -14,6 +14,7 @@ import {
 import { requirePractitionerContext } from "@/lib/auth"
 import { db } from "@/lib/db"
 import { parseReportSnapshot } from "@/lib/reports/snapshot"
+import { loadReportVersionHistory } from "@/lib/reports/version-history"
 
 import "@/components/report/report-print.css"
 
@@ -48,6 +49,8 @@ export default async function SavedReportPage({
     .select({
       simpleReportId: simpleReports.simpleReportId,
       reportStatus: simpleReports.reportStatus,
+      versionNumber: simpleReports.versionNumber,
+      isCurrentVersion: simpleReports.isCurrentVersion,
       valuesSnapshotJson: simpleReports.valuesSnapshotJson,
       fundingApprovalId: simpleReports.fundingApprovalId,
       reportRequirementId: simpleReports.reportRequirementId,
@@ -131,6 +134,8 @@ export default async function SavedReportPage({
     }
   }
 
+  const versions = await loadReportVersionHistory(reportId, context.practiceId)
+
   return (
     <AppShell>
       <div className="mb-6 no-print">
@@ -151,9 +156,12 @@ export default async function SavedReportPage({
         clientId={clientId}
         reportId={reportId}
         reportStatus={report.reportStatus}
+        versionNumber={report.versionNumber}
+        isCurrentVersion={report.isCurrentVersion}
         snapshot={snapshot}
         fundingApproval={fundingApproval}
         reportingRequirement={reportingRequirement}
+        versions={versions}
       />
     </AppShell>
   )

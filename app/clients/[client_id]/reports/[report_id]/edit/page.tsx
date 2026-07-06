@@ -1,11 +1,8 @@
-import { notFound, redirect } from "next/navigation"
+import { notFound } from "next/navigation"
 import { and, desc, eq } from "drizzle-orm"
 
 import { ReportForm } from "@/app/clients/[client_id]/reports/new/report-form"
-import {
-  deleteSimpleReport,
-  updateReportDraft,
-} from "@/app/clients/[client_id]/reports/[report_id]/edit/actions"
+import { deleteSimpleReport } from "@/app/clients/[client_id]/reports/[report_id]/edit/actions"
 import { AppShell } from "@/components/app-shell"
 import { BackButton } from "@/components/ui/back-button"
 import { EntityDeleteSection } from "@/components/entity-delete-section"
@@ -59,6 +56,8 @@ export default async function EditReportPage({
   const [report] = await db
     .select({
       reportStatus: simpleReports.reportStatus,
+      versionNumber: simpleReports.versionNumber,
+      previousVersionId: simpleReports.previousVersionId,
       valuesSnapshotJson: simpleReports.valuesSnapshotJson,
       reportTypeId: simpleReports.reportTypeId,
       fundingApprovalId: simpleReports.fundingApprovalId,
@@ -82,10 +81,6 @@ export default async function EditReportPage({
 
   if (!report) {
     notFound()
-  }
-
-  if (report.reportStatus === "finalised") {
-    redirect(`/clients/${clientId}/reports/${reportId}`)
   }
 
   const snapshot = parseReportSnapshot(report.valuesSnapshotJson)
@@ -150,6 +145,9 @@ export default async function EditReportPage({
   const therapeuticTarget = activePlan?.therapeuticTarget ?? null
 
   const clientName = `${client.firstName} ${client.lastName}`
+  const isFinalised = report.reportStatus === "finalised"
+  const existingDraftReportId = isFinalised ? null : reportId
+  const previousVersionId = isFinalised ? reportId : report.previousVersionId
 
   return (
     <AppShell>
@@ -158,8 +156,15 @@ export default async function EditReportPage({
           fallbackHref={`/clients/${clientId}/reports/${reportId}`}
           label="← Back to report"
         />
-        <h1 className="text-2xl font-semibold tracking-tight">Edit report</h1>
-        <p className="mt-1 text-muted-foreground">{clientName}</p>
+        <h1 className="text-2xl font-semibold tracking-tight">
+          {isFinalised ? "Correct report" : "Edit report"}
+        </h1>
+        <p className="mt-1 text-muted-foreground">
+          {clientName}
+          {isFinalised
+            ? " — saving creates a new version; the original stays on file."
+            : ""}
+        </p>
       </div>
 
       <ReportForm
@@ -198,20 +203,22 @@ export default async function EditReportPage({
           fundingApproval: snapshot.fundingApproval,
           therapeuticTarget: snapshot.therapeuticTarget ?? null,
         }}
-        saveAction={updateReportDraft.bind(null, clientId, reportId)}
-        submitLabel="Save changes"
+        existingDraftReportId={existingDraftReportId}
+        previousVersionId={previousVersionId}
         therapeuticTarget={therapeuticTarget}
         cancelHref={`/clients/${clientId}/reports/${reportId}`}
       />
 
-      <EntityDeleteSection
-        entityName="Report"
-        deleteAction={deleteSimpleReport.bind(
-          null,
-          reportId,
-          context.practiceId
-        )}
-      />
+      {!isFinalised ? (
+        <EntityDeleteSection
+          entityName="Report"
+          deleteAction={deleteSimpleReport.bind(
+            null,
+            reportId,
+            context.practiceId
+          )}
+        />
+      ) : null}
     </AppShell>
   )
 }

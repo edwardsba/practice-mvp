@@ -14,6 +14,7 @@ import {
 import { requirePractitionerContext } from "@/lib/auth"
 import { db } from "@/lib/db"
 import { commitReportDraft, commitReportFinalise } from "@/lib/reports/commit"
+import { buildReportFilename } from "@/lib/reports/filename"
 import { generateReportPdf } from "@/lib/reports/generate-pdf"
 import { resolveReportType, type ReportSnapshot } from "@/lib/reports/snapshot"
 import { resolveTemplateKey } from "@/lib/reports/templates"
@@ -387,7 +388,12 @@ export async function finaliseReportAndDownloadAction(
   }
 
   const buffer = await generateReportPdf(result.values.snapshot)
-  const filename = `${result.values.reportDate}_Confidential_${result.values.snapshot.reportTitle.replace(/\s+/g, "_")}.pdf`
+  const filename = buildReportFilename(
+    result.values.snapshot,
+    result.values.reportDate,
+    result.values.snapshot.client.lastName,
+    result.values.snapshot.client.firstName
+  )
 
   return {
     success: true,
@@ -395,4 +401,52 @@ export async function finaliseReportAndDownloadAction(
     pdfBase64: buffer.toString("base64"),
     filename,
   }
+}
+
+export type FinaliseReportAndSendState = {
+  error?: string
+}
+
+export async function finaliseReportAndSendAction(
+  clientId: string,
+  existingDraftReportId: string | null,
+  previousVersionId: string | null,
+  _prevState: FinaliseReportAndSendState,
+  formData: FormData
+): Promise<FinaliseReportAndSendState> {
+  const context = await requirePractitionerContext()
+
+  const result = await parseReportForm(
+    clientId,
+    context.practiceId,
+    context.practitionerProfileId,
+    formData
+  )
+  if (result.error || !result.values) {
+    return { error: result.error ?? "Unable to finalise report." }
+  }
+
+  const { simpleReportId } = await commitReportFinalise({
+    clientId,
+    practiceId: context.practiceId,
+    practitionerProfileId: context.practitionerProfileId,
+    userId: context.userId,
+    existingDraftReportId,
+    previousVersionId,
+    values: result.values,
+  })
+
+  if (result.values.reportRequirementId && result.values.fundingApprovalId) {
+    await db.transaction(async (tx) => {
+      await linkReportToRequirement(
+        tx,
+        result.values!.reportRequirementId,
+        result.values!.fundingApprovalId,
+        simpleReportId
+      )
+    })
+  }
+
+  revalidatePath(`/clients/${clientId}`)
+  redirect(`/clients/${clientId}/reports/${simpleReportId}?openSend=1`)
 }

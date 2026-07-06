@@ -15,6 +15,10 @@ import {
   DEFAULT_TREATMENT_PLAN_MESSAGE,
   DEFAULT_TREATMENT_PLAN_SUBJECT,
 } from "../lib/email/treatment-plan-templates"
+import {
+  DEFAULT_REPORT_MESSAGE,
+  DEFAULT_REPORT_SUBJECT,
+} from "../lib/email/report-templates"
 import { emailTemplates, practices } from "./schema"
 
 config({ path: ".env.local" })
@@ -97,6 +101,16 @@ Thank you for coming in. We'd really appreciate a couple of minutes of your feed
     name: "Treatment Plan",
     subject: DEFAULT_TREATMENT_PLAN_SUBJECT,
     message: DEFAULT_TREATMENT_PLAN_MESSAGE,
+    defaultCc: null as string | null,
+    defaultBcc: null as string | null,
+    hasActionButton: false,
+    actionButtonLabel: null as string | null,
+  },
+  {
+    templateKey: "report",
+    name: "Report",
+    subject: DEFAULT_REPORT_SUBJECT,
+    message: DEFAULT_REPORT_MESSAGE,
     defaultCc: null as string | null,
     defaultBcc: null as string | null,
     hasActionButton: false,

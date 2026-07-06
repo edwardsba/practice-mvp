@@ -13,23 +13,29 @@ import {
 } from "@/db/schema"
 import { requirePractitionerContext } from "@/lib/auth"
 import { db } from "@/lib/db"
+import { getQuestionnaireEmailContext } from "@/lib/email/practitioner-context"
 import { parseReportSnapshot } from "@/lib/reports/snapshot"
+import { getReferrerEmailOptions } from "@/lib/reports/referrer-contact"
 import { loadReportVersionHistory } from "@/lib/reports/version-history"
 
 import "@/components/report/report-print.css"
 
 export default async function SavedReportPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ client_id: string; report_id: string }>
+  searchParams: Promise<{ openSend?: string }>
 }) {
   const { client_id: clientId, report_id: reportId } = await params
+  const { openSend } = await searchParams
   const context = await requirePractitionerContext()
 
   const [client] = await db
     .select({
       firstName: clients.firstName,
       lastName: clients.lastName,
+      email: clients.email,
     })
     .from(clients)
     .where(
@@ -54,6 +60,7 @@ export default async function SavedReportPage({
       valuesSnapshotJson: simpleReports.valuesSnapshotJson,
       fundingApprovalId: simpleReports.fundingApprovalId,
       reportRequirementId: simpleReports.reportRequirementId,
+      recipientType: simpleReports.recipientType,
     })
     .from(simpleReports)
     .where(
@@ -136,6 +143,38 @@ export default async function SavedReportPage({
 
   const versions = await loadReportVersionHistory(reportId, context.practiceId)
 
+  const referrerOptions =
+    report.recipientType === "referrer" && report.fundingApprovalId
+      ? await getReferrerEmailOptions(report.fundingApprovalId, context.practiceId)
+      : null
+
+  const emailContext = await getQuestionnaireEmailContext(
+    context.practiceId,
+    context.practitionerProfileId
+  )
+
+  const addressOptions: { label: string; value: string }[] = []
+  if (referrerOptions?.faxEmail) {
+    addressOptions.push({ label: "Fax email", value: referrerOptions.faxEmail })
+  }
+  if (referrerOptions?.claimsEmail) {
+    addressOptions.push({ label: "Claims email", value: referrerOptions.claimsEmail })
+  }
+  if (referrerOptions?.secureMessaging) {
+    addressOptions.push({
+      label: "Secure messaging",
+      value: referrerOptions.secureMessaging,
+    })
+  }
+  if (referrerOptions?.email) {
+    addressOptions.push({ label: "General email", value: referrerOptions.email })
+  }
+
+  const defaultSendTo =
+    report.recipientType === "client"
+      ? client.email?.trim() || ""
+      : addressOptions[0]?.value ?? ""
+
   return (
     <AppShell>
       <div className="mb-6 no-print">
@@ -162,6 +201,20 @@ export default async function SavedReportPage({
         fundingApproval={fundingApproval}
         reportingRequirement={reportingRequirement}
         versions={versions}
+        defaultSendTo={defaultSendTo}
+        addressOptions={addressOptions}
+        autoOpenSend={openSend === "1"}
+        templateVariables={{
+          recipient_name:
+            report.recipientType === "referrer"
+              ? snapshot.recipient?.name || "Colleague"
+              : client.firstName.trim() || "there",
+          client_name: `${client.firstName} ${client.lastName}`,
+          report_title: snapshot.reportTitle,
+          report_title_lower: snapshot.reportTitle.toLowerCase(),
+          practice_name: emailContext?.practiceName ?? "your practice",
+          practitioner_name: emailContext?.practitionerName ?? "your practitioner",
+        }}
       />
     </AppShell>
   )

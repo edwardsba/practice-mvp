@@ -5,6 +5,7 @@ import { clients, simpleReports } from "@/db/schema"
 import { getPractitionerContext } from "@/lib/auth"
 import { db } from "@/lib/db"
 import { parseReportSnapshot } from "@/lib/reports/snapshot"
+import { buildReportFilename } from "@/lib/reports/filename"
 import { uploadReportPdf } from "@/lib/reports/upload-pdf"
 import { createAdminClient } from "@/lib/supabase/admin"
 
@@ -51,17 +52,12 @@ export async function GET(
     .where(eq(clients.clientId, report.clientId))
     .limit(1)
 
-  const clientLastName = client?.lastName ?? "Unknown"
-  const clientFirstInitial = client?.firstName?.[0] ?? ""
-  const datePrefix =
-    snapshot.reportDate?.slice(0, 10) ||
-    (report.reportDate ? String(report.reportDate).slice(0, 10) : "") ||
-    (snapshot.dateRangeEnd ? snapshot.dateRangeEnd.slice(0, 10) : "") ||
-    new Date().toISOString().slice(0, 10)
-  const titleSlug = (snapshot.reportTitle || "Report")
-    .replace(/[^a-zA-Z0-9]+/g, "_")
-    .replace(/^_+|_+$/g, "")
-  const filename = `${datePrefix}_Confidential_${titleSlug}_${clientLastName}_${clientFirstInitial}.pdf`
+  const filename = buildReportFilename(
+    snapshot,
+    report.reportDate ? String(report.reportDate) : null,
+    client?.lastName ?? "Unknown",
+    client?.firstName ?? ""
+  )
 
   let pdfBuffer: Buffer
 

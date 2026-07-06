@@ -11,9 +11,11 @@ import {
 import {
   finaliseReportAction,
   finaliseReportAndDownloadAction,
+  finaliseReportAndSendAction,
   previewReport,
   saveReportDraftAction,
   type FinaliseReportAndDownloadState,
+  type FinaliseReportAndSendState,
   type FinaliseReportState,
   type PreviewReportState,
   type SaveReportDraftState,
@@ -186,6 +188,19 @@ export function ReportForm({
       previousVersionId
     ),
     {} as FinaliseReportAndDownloadState
+  )
+  const [
+    finaliseAndSendState,
+    finaliseAndSendFormAction,
+    finaliseAndSendPending,
+  ] = useActionState(
+    finaliseReportAndSendAction.bind(
+      null,
+      clientId,
+      existingDraftReportId,
+      previousVersionId
+    ),
+    {} as FinaliseReportAndSendState
   )
   const [previewDismissed, setPreviewDismissed] = useState(false)
   const showPreviewModal = Boolean(previewState.pdfBase64) && !previewDismissed
@@ -927,6 +942,9 @@ export function ReportForm({
           saveAndDownloadLabel="Save and download"
           saveAndDownloadPending={finaliseAndDownloadPending}
           saveAndDownloadFormAction={finaliseAndDownloadFormAction}
+          saveAndSendLabel="Save and send"
+          saveAndSendPending={finaliseAndSendPending}
+          saveAndSendFormAction={finaliseAndSendFormAction}
         />
       ) : null}
       {finaliseState.error ? (
@@ -937,6 +955,11 @@ export function ReportForm({
       {finaliseAndDownloadState.error ? (
         <p className="mt-3 text-sm text-destructive" role="alert">
           {finaliseAndDownloadState.error}
+        </p>
+      ) : null}
+      {finaliseAndSendState.error ? (
+        <p className="mt-3 text-sm text-destructive" role="alert">
+          {finaliseAndSendState.error}
         </p>
       ) : null}
     </>

@@ -1,7 +1,7 @@
 import Link from "next/link"
 import { notFound } from "next/navigation"
 
-import { createTreatmentPlanVersion, deleteTreatmentPlan } from "@/app/clients/[client_id]/treatment-plan/actions"
+import { deleteTreatmentPlan } from "@/app/clients/[client_id]/treatment-plan/actions"
 import { TreatmentPlanForm } from "@/components/treatment-plan/treatment-plan-form"
 import { AppShell } from "@/components/app-shell"
 import { BackButton } from "@/components/ui/back-button"
@@ -40,7 +40,6 @@ export default async function EditTreatmentPlanPage({
   }
 
   const clientName = `${client.firstName} ${client.lastName}`
-  const saveAction = createTreatmentPlanVersion.bind(null, clientId, planId)
 
   return (
     <AppShell>
@@ -62,10 +61,10 @@ export default async function EditTreatmentPlanPage({
       </div>
 
       <TreatmentPlanForm
-        action={saveAction}
+        clientId={clientId}
+        sourcePlanId={planId}
         initialPlan={plan}
         isNewVersion
-        submitLabel="Save new version"
         cancelHref={`/clients/${clientId}/treatment-plan/${planId}`}
       />
 

@@ -167,8 +167,8 @@ export function generateSessionNotePdf(data: SessionNotePdfData): Promise<Buffer
         [
           { header: "Assessment", width: 90 },
           { header: "Score", width: 55 },
-          { header: "Rating", width: 175 },
-          { header: "Functional Impairment", width: 175 },
+          { header: "Rating", width: 210 },
+          { header: "Functional Impairment", width: 140 },
         ],
         completedAssessments.map((a) => [
           a.name,

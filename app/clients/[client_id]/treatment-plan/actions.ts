@@ -4,28 +4,40 @@ import { and, eq } from "drizzle-orm"
 import { redirect } from "next/navigation"
 import { revalidatePath } from "next/cache"
 
-import { auditEvents, treatmentPlans } from "@/db/schema"
+import { treatmentPlans } from "@/db/schema"
 import { requirePractitionerContext } from "@/lib/auth"
 import { db } from "@/lib/db"
+import { commitTreatmentPlan } from "@/lib/treatment-plans/commit"
+import { buildTreatmentPlanFilename } from "@/lib/treatment-plans/filename"
+import { generateTreatmentPlanPdf } from "@/lib/treatment-plans/generate-pdf"
+import {
+  loadTreatmentPlanForPractice,
+  verifyClientInPractice,
+} from "@/lib/treatment-plans/load"
 import {
   formValuesToDbColumns,
   parseTreatmentPlanFormData,
 } from "@/lib/treatment-plans/parse-form"
-import { loadTreatmentPlanForPractice, verifyClientInPractice } from "@/lib/treatment-plans/load"
+import type { TreatmentPlanFormValues, TreatmentPlanRow } from "@/lib/treatment-plans/types"
+import { uploadTreatmentPlanPdf } from "@/lib/treatment-plans/upload-pdf"
 import { logDeleteAuditEvent, performSoftDelete } from "@/lib/delete/delete-utils"
-import type { TreatmentPlanFormState } from "@/components/treatment-plan/treatment-plan-form"
 
-function dayBeforeDateString(dateString: string): string {
-  const date = new Date(`${dateString}T00:00:00`)
-  date.setDate(date.getDate() - 1)
-  return date.toISOString().slice(0, 10)
+export type TreatmentPlanFormState = {
+  error?: string
 }
 
-export async function createTreatmentPlan(
+export type PreviewTreatmentPlanState = {
+  error?: string
+  pdfBase64?: string
+  valuesJson?: string
+}
+
+export async function previewTreatmentPlan(
   clientId: string,
-  _prevState: TreatmentPlanFormState,
+  sourcePlanId: string | null,
+  _prevState: PreviewTreatmentPlanState,
   formData: FormData
-): Promise<TreatmentPlanFormState> {
+): Promise<PreviewTreatmentPlanState> {
   const context = await requirePractitionerContext()
   const client = await verifyClientInPractice(clientId, context.practiceId)
 
@@ -35,127 +47,218 @@ export async function createTreatmentPlan(
 
   const values = parseTreatmentPlanFormData(formData)
   const columns = formValuesToDbColumns(values)
-  const now = new Date()
 
-  let newPlanId: string
+  let nextVersion = 1
+  if (sourcePlanId) {
+    const sourcePlan = await loadTreatmentPlanForPractice(
+      sourcePlanId,
+      clientId,
+      context.practiceId
+    )
+    if (!sourcePlan) {
+      return { error: "Treatment plan not found." }
+    }
+    nextVersion = sourcePlan.versionNumber + 1
+  }
 
+  const previewRow: TreatmentPlanRow = {
+    treatmentPlanId: sourcePlanId ?? "preview",
+    clientId,
+    practiceId: context.practiceId,
+    practitionerProfileId: context.practitionerProfileId,
+    versionNumber: nextVersion,
+    isActive: true,
+    ...columns,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  }
+
+  const buffer = await generateTreatmentPlanPdf(previewRow, client)
+
+  return {
+    pdfBase64: buffer.toString("base64"),
+    valuesJson: JSON.stringify(values),
+  }
+}
+
+function parseValuesJson(formData: FormData): TreatmentPlanFormValues {
+  return JSON.parse(String(formData.get("values_json") ?? "{}")) as TreatmentPlanFormValues
+}
+
+export type SaveTreatmentPlanState = {
+  error?: string
+}
+
+export async function saveTreatmentPlan(
+  clientId: string,
+  sourcePlanId: string | null,
+  _prevState: SaveTreatmentPlanState,
+  formData: FormData
+): Promise<SaveTreatmentPlanState> {
+  const context = await requirePractitionerContext()
+  const client = await verifyClientInPractice(clientId, context.practiceId)
+  if (!client) {
+    return { error: "Client not found." }
+  }
+
+  let values: TreatmentPlanFormValues
   try {
-    await db.transaction(async (tx) => {
-      const [plan] = await tx
-        .insert(treatmentPlans)
-        .values({
-          clientId,
-          practiceId: context.practiceId,
-          practitionerProfileId: context.practitionerProfileId,
-          versionNumber: 1,
-          isActive: true,
-          ...columns,
-          updatedAt: now,
-        })
-        .returning({ treatmentPlanId: treatmentPlans.treatmentPlanId })
+    values = parseValuesJson(formData)
+  } catch {
+    return { error: "Unable to save treatment plan. Please try again." }
+  }
 
-      newPlanId = plan.treatmentPlanId
-
-      await tx.insert(auditEvents).values({
-        practiceId: context.practiceId,
-        userId: context.userId,
-        clientId,
-        eventType: "treatment_plan.created",
-        entityType: "treatment_plan",
-        entityId: plan.treatmentPlanId,
-      })
+  let treatmentPlanId: string
+  try {
+    const result = await commitTreatmentPlan({
+      clientId,
+      practiceId: context.practiceId,
+      practitionerProfileId: context.practitionerProfileId,
+      userId: context.userId,
+      sourcePlanId,
+      values,
     })
+    treatmentPlanId = result.treatmentPlanId
   } catch {
     return { error: "Unable to save treatment plan. Please try again." }
   }
 
   revalidatePath(`/clients/${clientId}`)
-  redirect(`/clients/${clientId}/treatment-plan/${newPlanId!}`)
+  if (sourcePlanId) {
+    revalidatePath(`/clients/${clientId}/treatment-plan/${sourcePlanId}`)
+  }
+  redirect(`/clients/${clientId}/treatment-plan/${treatmentPlanId}`)
 }
 
-export async function createTreatmentPlanVersion(
+export type SaveTreatmentPlanAndDownloadState = {
+  error?: string
+  success?: boolean
+  newPlanId?: string
+  pdfBase64?: string
+  filename?: string
+}
+
+export async function saveTreatmentPlanAndDownload(
   clientId: string,
-  sourcePlanId: string,
-  _prevState: TreatmentPlanFormState,
+  sourcePlanId: string | null,
+  _prevState: SaveTreatmentPlanAndDownloadState,
   formData: FormData
-): Promise<TreatmentPlanFormState> {
+): Promise<SaveTreatmentPlanAndDownloadState> {
   const context = await requirePractitionerContext()
   const client = await verifyClientInPractice(clientId, context.practiceId)
-
   if (!client) {
     return { error: "Client not found." }
   }
 
-  const sourcePlan = await loadTreatmentPlanForPractice(
-    sourcePlanId,
+  let values: TreatmentPlanFormValues
+  try {
+    values = parseValuesJson(formData)
+  } catch {
+    return { error: "Unable to save treatment plan. Please try again." }
+  }
+
+  let treatmentPlanId: string
+  try {
+    const result = await commitTreatmentPlan({
+      clientId,
+      practiceId: context.practiceId,
+      practitionerProfileId: context.practitionerProfileId,
+      userId: context.userId,
+      sourcePlanId,
+      values,
+    })
+    treatmentPlanId = result.treatmentPlanId
+  } catch {
+    return { error: "Unable to save treatment plan. Please try again." }
+  }
+
+  const plan = await loadTreatmentPlanForPractice(
+    treatmentPlanId,
     clientId,
     context.practiceId
   )
-
-  if (!sourcePlan) {
-    return { error: "Treatment plan not found." }
+  if (!plan) {
+    return {
+      error: "Treatment plan was saved, but could not be loaded for download.",
+    }
   }
 
-  const values = parseTreatmentPlanFormData(formData)
-  const columns = formValuesToDbColumns(values)
-  const now = new Date()
-  const nextVersion = sourcePlan.versionNumber + 1
+  const uploadResult = await uploadTreatmentPlanPdf(plan, client, context.practiceId)
+  if (!uploadResult.ok) {
+    return {
+      error:
+        "Treatment plan was saved, but the PDF could not be generated. Use Download PDF on the plan to try again.",
+    }
+  }
 
-  let newPlanId: string
+  const buffer = await generateTreatmentPlanPdf(plan, client)
+  const filename = buildTreatmentPlanFilename(
+    plan.versionNumber,
+    client.lastName,
+    client.firstName
+  )
 
+  revalidatePath(`/clients/${clientId}`)
+  if (sourcePlanId) {
+    revalidatePath(`/clients/${clientId}/treatment-plan/${sourcePlanId}`)
+  }
+  revalidatePath(`/clients/${clientId}/treatment-plan/${treatmentPlanId}`)
+
+  return {
+    success: true,
+    newPlanId: treatmentPlanId,
+    pdfBase64: buffer.toString("base64"),
+    filename,
+  }
+}
+
+export type SaveTreatmentPlanAndSendState = {
+  error?: string
+  success?: boolean
+  newPlanId?: string
+}
+
+export async function saveTreatmentPlanAndSend(
+  clientId: string,
+  sourcePlanId: string | null,
+  _prevState: SaveTreatmentPlanAndSendState,
+  formData: FormData
+): Promise<SaveTreatmentPlanAndSendState> {
+  const context = await requirePractitionerContext()
+  const client = await verifyClientInPractice(clientId, context.practiceId)
+  if (!client) {
+    return { error: "Client not found." }
+  }
+
+  let values: TreatmentPlanFormValues
   try {
-    await db.transaction(async (tx) => {
-      await tx
-        .update(treatmentPlans)
-        .set({ isActive: false, updatedAt: now })
-        .where(
-          and(
-            eq(treatmentPlans.clientId, clientId),
-            eq(treatmentPlans.practiceId, context.practiceId)
-          )
-        )
+    values = parseValuesJson(formData)
+  } catch {
+    return { error: "Unable to save treatment plan. Please try again." }
+  }
 
-      if (columns.startDate) {
-        await tx
-          .update(treatmentPlans)
-          .set({
-            endDate: dayBeforeDateString(columns.startDate),
-            updatedAt: now,
-          })
-          .where(eq(treatmentPlans.treatmentPlanId, sourcePlanId))
-      }
-
-      const [plan] = await tx
-        .insert(treatmentPlans)
-        .values({
-          clientId,
-          practiceId: context.practiceId,
-          practitionerProfileId: context.practitionerProfileId,
-          versionNumber: nextVersion,
-          isActive: true,
-          ...columns,
-          updatedAt: now,
-        })
-        .returning({ treatmentPlanId: treatmentPlans.treatmentPlanId })
-
-      newPlanId = plan.treatmentPlanId
-
-      await tx.insert(auditEvents).values({
-        practiceId: context.practiceId,
-        userId: context.userId,
-        clientId,
-        eventType: "treatment_plan.updated",
-        entityType: "treatment_plan",
-        entityId: plan.treatmentPlanId,
-      })
+  let treatmentPlanId: string
+  try {
+    const result = await commitTreatmentPlan({
+      clientId,
+      practiceId: context.practiceId,
+      practitionerProfileId: context.practitionerProfileId,
+      userId: context.userId,
+      sourcePlanId,
+      values,
     })
+    treatmentPlanId = result.treatmentPlanId
   } catch {
     return { error: "Unable to save treatment plan. Please try again." }
   }
 
   revalidatePath(`/clients/${clientId}`)
-  revalidatePath(`/clients/${clientId}/treatment-plan/${sourcePlanId}`)
-  redirect(`/clients/${clientId}/treatment-plan/${newPlanId!}`)
+  if (sourcePlanId) {
+    revalidatePath(`/clients/${clientId}/treatment-plan/${sourcePlanId}`)
+  }
+  revalidatePath(`/clients/${clientId}/treatment-plan/${treatmentPlanId}`)
+
+  return { success: true, newPlanId: treatmentPlanId }
 }
 
 export async function deleteTreatmentPlan(

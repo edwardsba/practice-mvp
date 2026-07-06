@@ -13,14 +13,16 @@ export function TreatmentPlanToolbar({
   isActive,
   clientEmail,
   templateVariables,
+  autoOpenSend = false,
 }: {
   clientId: string
   treatmentPlanId: string
   isActive: boolean
   clientEmail: string | null
   templateVariables: TreatmentPlanEmailVariables
+  autoOpenSend?: boolean
 }) {
-  const [emailModalOpen, setEmailModalOpen] = useState(false)
+  const [emailModalOpen, setEmailModalOpen] = useState(autoOpenSend)
   const [emailStatus, setEmailStatus] = useState<string | null>(null)
 
   return (

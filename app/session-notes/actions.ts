@@ -258,8 +258,65 @@ export async function finaliseSessionNote(
     return { error: "Unable to finalise session note. Please try again." }
   }
 
+  revalidatePath("/session-notes")
+  revalidatePath(`/session-notes/${sessionNoteId}`)
+  revalidatePath(`/clients/${note.clientId}`)
+  return { success: true }
+}
+
+export type FinaliseSessionNoteAndDownloadState = {
+  error?: string
+  success?: boolean
+  pdfBase64?: string
+  filename?: string
+}
+
+export async function finaliseSessionNoteAndDownload(
+  sessionNoteId: string,
+  _prevState: FinaliseSessionNoteAndDownloadState
+): Promise<FinaliseSessionNoteAndDownloadState> {
+  const context = await requirePractitionerContext()
+
+  const note = await loadSessionNoteForPractice(sessionNoteId, context.practiceId)
+  if (!note) {
+    return { error: "Session note not found." }
+  }
+
+  if (note.status !== "finalised") {
+    const now = new Date()
+    try {
+      await db.transaction(async (tx) => {
+        await tx
+          .update(sessionNotes)
+          .set({
+            status: "finalised",
+            finalisedAt: now,
+            updatedAt: now,
+          })
+          .where(
+            and(
+              eq(sessionNotes.sessionNoteId, sessionNoteId),
+              eq(sessionNotes.practiceId, context.practiceId)
+            )
+          )
+
+        await tx.insert(auditEvents).values({
+          practiceId: context.practiceId,
+          userId: context.userId,
+          clientId: note.clientId,
+          eventType: "session_note.finalised",
+          entityType: "session_note",
+          entityId: sessionNoteId,
+        })
+      })
+    } catch {
+      return { error: "Unable to finalise session note. Please try again." }
+    }
+  }
+
   const viewContext = await loadSessionNoteViewContext(note)
   const pdfData = await buildSessionNotePdfData(note, viewContext)
+
   const uploadResult = await uploadSessionNotePdf(
     sessionNoteId,
     context.practiceId,
@@ -267,13 +324,20 @@ export async function finaliseSessionNote(
   )
 
   if (!uploadResult.ok) {
-    console.error("PDF upload failed after finalise:", uploadResult.error)
+    return {
+      error:
+        "Session note was saved, but the PDF could not be generated. Use Download PDF on the note to try again.",
+    }
   }
+
+  const buffer = await generateSessionNotePdf(pdfData)
+  const filename = `${note.sessionDate}_Confidential_Session_Note_${note.clientLastName}_${note.clientFirstName?.[0] ?? ""}.pdf`
 
   revalidatePath("/session-notes")
   revalidatePath(`/session-notes/${sessionNoteId}`)
   revalidatePath(`/clients/${note.clientId}`)
-  return { success: true }
+
+  return { success: true, pdfBase64: buffer.toString("base64"), filename }
 }
 
 export type ExportSessionNotesState = {

@@ -6,10 +6,13 @@ import { useRouter } from "next/navigation"
 
 import {
   finaliseSessionNote,
+  finaliseSessionNoteAndDownload,
   generateSessionNotePdfPreview,
+  type FinaliseSessionNoteAndDownloadState,
   type FinaliseSessionNoteState,
   type GenerateSessionNotePdfPreviewState,
 } from "@/app/session-notes/actions"
+import { DocumentPreviewModal } from "@/components/documents/document-preview-modal"
 import { AsqStatusBadge } from "@/components/session-notes/asq-status-badge"
 import { PsqStatusBadge } from "@/components/session-notes/psq-status-badge"
 import { Button } from "@/components/ui/button"
@@ -28,6 +31,7 @@ import {
 } from "@/lib/session-notes/format"
 
 const initialFinaliseState: FinaliseSessionNoteState = {}
+const initialFinaliseAndDownloadState: FinaliseSessionNoteAndDownloadState = {}
 const initialPreviewState: GenerateSessionNotePdfPreviewState = {}
 
 export function SessionNoteActions({
@@ -64,6 +68,15 @@ export function SessionNoteActions({
     initialFinaliseState
   )
 
+  const [
+    finaliseAndDownloadState,
+    finaliseAndDownloadFormAction,
+    finaliseAndDownloadPending,
+  ] = useActionState(
+    finaliseSessionNoteAndDownload.bind(null, sessionNoteId),
+    initialFinaliseAndDownloadState
+  )
+
   const [previewState, previewFormAction, previewPending] = useActionState(
     generateSessionNotePdfPreview.bind(null, sessionNoteId),
     initialPreviewState
@@ -71,7 +84,10 @@ export function SessionNoteActions({
 
   const router = useRouter()
 
-  const isFinalised = status === "finalised" || finaliseState.success
+  const isFinalised =
+    status === "finalised" ||
+    finaliseState.success ||
+    finaliseAndDownloadState.success
 
   const showPreviewModal =
     Boolean(previewState.pdfBase64) && !isFinalised
@@ -81,6 +97,33 @@ export function SessionNoteActions({
       router.refresh()
     }
   }, [finaliseState.success, router])
+
+  useEffect(() => {
+    if (finaliseAndDownloadState.success && finaliseAndDownloadState.pdfBase64) {
+      const byteCharacters = atob(finaliseAndDownloadState.pdfBase64)
+      const byteNumbers = new Array(byteCharacters.length)
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i)
+      }
+      const blob = new Blob([new Uint8Array(byteNumbers)], {
+        type: "application/pdf",
+      })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = finaliseAndDownloadState.filename ?? "session-note.pdf"
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+      router.refresh()
+    }
+  }, [
+    finaliseAndDownloadState.success,
+    finaliseAndDownloadState.pdfBase64,
+    finaliseAndDownloadState.filename,
+    router,
+  ])
 
   const sessionDateTime = (
     <>
@@ -122,7 +165,7 @@ export function SessionNoteActions({
               </dd>
             </div>
 
-            {isFinalised && pdfStoragePath ? (
+            {isFinalised ? (
               <div>
                 <dt className="mb-2 text-sm text-muted-foreground">
                   Session note
@@ -210,43 +253,27 @@ export function SessionNoteActions({
               {finaliseState.error}
             </p>
           ) : null}
+          {finaliseAndDownloadState.error ? (
+            <p className="mt-3 text-sm text-destructive">
+              {finaliseAndDownloadState.error}
+            </p>
+          ) : null}
         </CardContent>
       </Card>
 
       {showPreviewModal ? (
-        <div className="no-print fixed inset-0 z-50 flex flex-col bg-background/95 backdrop-blur-sm">
-          <div className="flex items-center justify-between border-b px-6 py-4">
-            <div>
-              <h2 className="text-lg font-semibold">Review session note</h2>
-              <p className="text-sm text-muted-foreground">
-                Review the PDF below before confirming finalisation.
-              </p>
-            </div>
-            <div className="flex items-center gap-3">
-              <form action={finaliseFormAction}>
-                <Button type="submit" disabled={finalisePending}>
-                  {finalisePending ? "Saving…" : "Confirm & Save"}
-                </Button>
-              </form>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  window.location.reload()
-                }}
-              >
-                Cancel
-              </Button>
-            </div>
-          </div>
-          <div className="flex-1 overflow-hidden p-4">
-            <iframe
-              src={`data:application/pdf;base64,${previewState.pdfBase64}`}
-              className="h-full w-full rounded-lg border"
-              title="Session note PDF preview"
-            />
-          </div>
-        </div>
+        <DocumentPreviewModal
+          title="Review session note"
+          description="Review the PDF below before confirming finalisation."
+          pdfBase64={previewState.pdfBase64!}
+          onCancel={() => window.location.reload()}
+          saveLabel="Save"
+          savePending={finalisePending}
+          saveFormAction={finaliseFormAction}
+          saveAndDownloadLabel="Save and download"
+          saveAndDownloadPending={finaliseAndDownloadPending}
+          saveAndDownloadFormAction={finaliseAndDownloadFormAction}
+        />
       ) : null}
     </>
   )

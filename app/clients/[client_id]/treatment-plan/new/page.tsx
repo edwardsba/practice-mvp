@@ -1,7 +1,6 @@
 import Link from "next/link"
 import { notFound } from "next/navigation"
 
-import { createTreatmentPlan } from "@/app/clients/[client_id]/treatment-plan/actions"
 import { TreatmentPlanForm } from "@/components/treatment-plan/treatment-plan-form"
 import { AppShell } from "@/components/app-shell"
 import { BackButton } from "@/components/ui/back-button"
@@ -37,8 +36,8 @@ export default async function NewTreatmentPlanPage({
       </div>
 
       <TreatmentPlanForm
-        action={createTreatmentPlan.bind(null, clientId)}
-        submitLabel="Save treatment plan"
+        clientId={clientId}
+        sourcePlanId={null}
         cancelHref={`/clients/${clientId}`}
       />
     </AppShell>

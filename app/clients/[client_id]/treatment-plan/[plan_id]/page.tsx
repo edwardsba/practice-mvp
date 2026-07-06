@@ -29,10 +29,13 @@ function formatVersionDate(value: Date) {
 
 export default async function TreatmentPlanViewPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ client_id: string; plan_id: string }>
+  searchParams: Promise<{ openSend?: string }>
 }) {
   const { client_id: clientId, plan_id: planId } = await params
+  const { openSend } = await searchParams
   const context = await requirePractitionerContext()
 
   const client = await verifyClientInPractice(clientId, context.practiceId)
@@ -92,6 +95,7 @@ export default async function TreatmentPlanViewPage({
               practitioner_name:
                 emailContext?.practitionerName ?? "your practitioner",
             }}
+            autoOpenSend={openSend === "1"}
           />
         </div>
       </div>

@@ -21,6 +21,7 @@ import {
   type SaveReportDraftState,
 } from "@/app/clients/[client_id]/reports/report-form-actions"
 import { DocumentPreviewModal } from "@/components/documents/document-preview-modal"
+import { AssessmentSummaryMethodologyNote } from "@/components/report/assessment-summary-methodology-note"
 import { ReportDocument } from "@/components/report/report-document"
 import { AsqStatusBadge } from "@/components/session-notes/asq-status-badge"
 import { PsqStatusBadge } from "@/components/session-notes/psq-status-badge"
@@ -660,6 +661,8 @@ export function ReportForm({
             </div>
           </CardContent>
         </Card>
+
+        <AssessmentSummaryMethodologyNote />
 
         {isReferralAck ? null : (
           <>

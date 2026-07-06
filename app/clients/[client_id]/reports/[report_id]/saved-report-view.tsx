@@ -4,6 +4,7 @@ import Link from "next/link"
 import { useState } from "react"
 
 import { ReportDocument } from "@/components/report/report-document"
+import { AssessmentSummaryMethodologyNote } from "@/components/report/assessment-summary-methodology-note"
 import { SendReportEmailModal } from "@/components/report/send-report-email-modal"
 import { Button } from "@/components/ui/button"
 import {
@@ -159,6 +160,8 @@ export function SavedReportView({
           ) : null}
         </CardContent>
       </Card>
+
+      <AssessmentSummaryMethodologyNote />
 
       {emailStatus ? (
         <p className="no-print text-sm font-medium text-foreground">{emailStatus}</p>

@@ -1,29 +1,15 @@
-function formatShortDate(value: string): string {
-  const date = new Date(value.includes("T") ? value : `${value}T00:00:00`)
-  if (Number.isNaN(date.getTime())) return value
-  return date.toLocaleDateString("en-AU", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  })
-}
+import { formatShortDate } from "@/lib/reports/format-date"
 
 export type AsqResultForSummary = {
   date: string
-  acuteRiskRating: string | null
+  recentPositive: boolean
+  currentPositive: boolean
 }
 
 /**
- * Builds the ASQ summary sentence. ASQ is categorical (Negative screen /
- * Non-acute positive screen / Acute positive screen) and does NOT go through
- * the numeric mean/SD/trend pipeline - see lib/assessments/asq.ts for how
- * acuteRiskRating is derived.
- *
- * Important: a lifetime-history item (Q4, "have you ever tried to kill
- * yourself") can produce a "Non-acute positive screen" indefinitely, even
- * decades after the fact, without indicating current risk. The sentence
- * always uses the full qualified label (e.g. "non-acute positive screen"),
- * never a bare "positive", to avoid misreading this as an acute concern.
+ * Builds the ASQ results summary for the progress report Risk section.
+ * Uses Recent (Q1–3) and Current (Q5) flags per submission in the
+ * reporting period — Historical (Q4) is handled separately in self-harm history.
  */
 export function buildAsqSummarySentence(
   results: AsqResultForSummary[]
@@ -34,24 +20,34 @@ export function buildAsqSummarySentence(
     (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
   )
 
-  const positives = sorted.filter(
-    (r) => r.acuteRiskRating && r.acuteRiskRating !== "Negative screen"
-  )
+  const total = sorted.length
+  const recentOnly = sorted.filter((r) => r.recentPositive && !r.currentPositive)
+  const currentPositive = sorted.filter((r) => r.currentPositive)
+  const negative = sorted.filter((r) => !r.recentPositive && !r.currentPositive)
 
-  const intro = `The client completed the ASQ on ${sorted.length} occasion${
-    sorted.length === 1 ? "" : "s"
-  } during the referral period.`
-
-  if (positives.length === 0) {
-    return `${intro} All screens were negative for suicide risk indicators.`
+  if (negative.length === total) {
+    return `The client denied any thoughts of self-harm across all ${total} ASQ submissions during this period.`
   }
 
-  const mostRecent = sorted[sorted.length - 1]
-  const positiveDates = positives.map((r) => formatShortDate(r.date)).join(", ")
-  const mostRecentLabel = (mostRecent.acuteRiskRating ?? "").toLowerCase()
+  const sentence1 =
+    `Of the ${total} ASQ submissions during this period, the client denied any thoughts of self-harm on ` +
+    `${negative.length} occasion${negative.length === 1 ? "" : "s"}, reported recent thoughts of suicide ` +
+    `without current thoughts on ${recentOnly.length} occasion${recentOnly.length === 1 ? "" : "s"}, and ` +
+    `reported current thoughts of suicide on ${currentPositive.length} occasion${currentPositive.length === 1 ? "" : "s"}.`
 
-  return (
-    `${intro} The client screened positive on ${positiveDates}; the most recent ` +
-    `screen (${formatShortDate(mostRecent.date)}) was a ${mostRecentLabel}.`
-  )
+  const sentences = [sentence1]
+
+  if (recentOnly.length > 0) {
+    const dates = recentOnly.map((r) => formatShortDate(r.date)).join(", ")
+    sentences.push(
+      `Recent thoughts of suicide, without current thoughts, were recorded on ${dates}.`
+    )
+  }
+
+  if (currentPositive.length > 0) {
+    const dates = currentPositive.map((r) => formatShortDate(r.date)).join(", ")
+    sentences.push(`Current thoughts of suicide were recorded on ${dates}.`)
+  }
+
+  return sentences.join(" ")
 }

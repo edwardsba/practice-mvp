@@ -17,6 +17,7 @@ import {
   BehaviouralTargetsFields,
   MultiSelectSectionFields,
   OngoingAssessmentsFields,
+  SuicideAttemptsFields,
 } from "@/components/treatment-plan/form-fields"
 import { DocumentPreviewModal } from "@/components/documents/document-preview-modal"
 import { Button } from "@/components/ui/button"
@@ -112,6 +113,7 @@ export function TreatmentPlanForm({
 
   const plan = initialPlan
   const behaviouralItems = plan?.behaviouralTargetsJson?.items ?? []
+  const suicideAttemptItems = plan?.suicideAttemptsJson?.items ?? []
   const ongoing = plan?.ongoingAssessmentsJson ?? {
     phq9: false,
     gad7: false,
@@ -191,7 +193,16 @@ export function TreatmentPlanForm({
           <CardHeader>
             <CardTitle>Risk management</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-6">
+            <div className="space-y-2">
+              <Label>Suicide attempt history (lifetime)</Label>
+              <p className="text-xs text-muted-foreground">
+                This is an ongoing, cumulative record. Add a new entry any time a
+                new attempt occurs during treatment — do not remove prior entries
+                unless correcting a data-entry error.
+              </p>
+              <SuicideAttemptsFields initialItems={suicideAttemptItems} />
+            </div>
             <MultiSelectSectionFields
               prefix="risk"
               options={RISK_MANAGEMENT_OPTIONS}

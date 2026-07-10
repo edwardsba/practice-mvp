@@ -10,6 +10,7 @@ import type { CheckboxOption } from "@/lib/treatment-plans/fields"
 import type {
   MultiSelectSectionJson,
   OngoingAssessmentsJson,
+  SuicideAttemptRecord,
 } from "@/lib/treatment-plans/types"
 
 export function FormCheckboxField({
@@ -179,6 +180,112 @@ export function BehaviouralTargetsFields({
       ))}
       <Button type="button" variant="outline" size="sm" onClick={addRow}>
         Add behavioural target
+      </Button>
+    </div>
+  )
+}
+
+export function SuicideAttemptsFields({
+  initialItems,
+}: {
+  initialItems: SuicideAttemptRecord[]
+}) {
+  const [items, setItems] = useState<SuicideAttemptRecord[]>(initialItems)
+
+  function addRow() {
+    setItems((rows) => [
+      ...rows,
+      {
+        id: crypto.randomUUID(),
+        year: new Date().getFullYear(),
+        month: null,
+        day: null,
+        notes: null,
+      },
+    ])
+  }
+
+  function updateRow(index: number, patch: Partial<SuicideAttemptRecord>) {
+    setItems((rows) => rows.map((row, i) => (i === index ? { ...row, ...patch } : row)))
+  }
+
+  function removeRow(index: number) {
+    setItems((rows) => rows.filter((_, i) => i !== index))
+  }
+
+  return (
+    <div className="space-y-3">
+      {items.map((item, index) => (
+        <div
+          key={item.id}
+          className="flex flex-wrap items-end gap-2 rounded-md border p-3"
+        >
+          <input type="hidden" name="suicide_attempt_id" value={item.id} />
+          <div>
+            <Label className="text-xs">Year</Label>
+            <Input
+              name="suicide_attempt_year"
+              type="number"
+              value={item.year}
+              onChange={(e) =>
+                updateRow(index, { year: parseInt(e.target.value, 10) })
+              }
+              className="w-24"
+            />
+          </div>
+          <div>
+            <Label className="text-xs">Month</Label>
+            <Input
+              name="suicide_attempt_month"
+              type="number"
+              min={1}
+              max={12}
+              value={item.month ?? ""}
+              onChange={(e) =>
+                updateRow(index, {
+                  month: e.target.value ? parseInt(e.target.value, 10) : null,
+                })
+              }
+              className="w-20"
+            />
+          </div>
+          <div>
+            <Label className="text-xs">Day</Label>
+            <Input
+              name="suicide_attempt_day"
+              type="number"
+              min={1}
+              max={31}
+              value={item.day ?? ""}
+              onChange={(e) =>
+                updateRow(index, {
+                  day: e.target.value ? parseInt(e.target.value, 10) : null,
+                })
+              }
+              className="w-20"
+            />
+          </div>
+          <div className="min-w-[200px] flex-1">
+            <Label className="text-xs">Notes</Label>
+            <Input
+              name="suicide_attempt_notes"
+              value={item.notes ?? ""}
+              onChange={(e) => updateRow(index, { notes: e.target.value })}
+              placeholder="Method, circumstances, etc. (clinician record only — not shown in reports)"
+            />
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => removeRow(index)}
+          >
+            Remove
+          </Button>
+        </div>
+      ))}
+      <Button type="button" variant="outline" size="sm" onClick={addRow}>
+        Add suicide attempt
       </Button>
     </div>
   )

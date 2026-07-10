@@ -15,6 +15,10 @@ import {
   optionLabel,
 } from "@/lib/treatment-plans/fields"
 import type { TreatmentPlanRow } from "@/lib/treatment-plans/types"
+import {
+  formatAttemptDate,
+  sortAttemptsChronologically,
+} from "@/lib/treatment-plans/format-attempt-date"
 
 function formatDisplayDate(value: string | null) {
   if (!value) return "—"
@@ -65,6 +69,9 @@ export function TreatmentPlanView({ plan }: { plan: TreatmentPlanRow }) {
   ).map((option) => option.label)
 
   const behaviouralItems = plan.behaviouralTargetsJson?.items ?? []
+  const suicideAttempts = sortAttemptsChronologically(
+    plan.suicideAttemptsJson?.items ?? []
+  )
   const emptyMulti = { selected: [], other: [] }
 
   return (
@@ -120,7 +127,33 @@ export function TreatmentPlanView({ plan }: { plan: TreatmentPlanRow }) {
         <CardHeader>
           <CardTitle>Risk management</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
+          <div>
+            <p className="text-sm text-muted-foreground">
+              Suicide attempt history (lifetime)
+            </p>
+            {suicideAttempts.length === 0 ? (
+              <p className="mt-2 text-sm text-muted-foreground">
+                No suicide attempts recorded
+              </p>
+            ) : (
+              <ul className="mt-2 list-inside list-disc space-y-2 text-sm">
+                {suicideAttempts.map((attempt) => (
+                  <li key={attempt.id}>
+                    <span className="font-medium">
+                      {formatAttemptDate(attempt)}
+                    </span>
+                    {attempt.notes ? (
+                      <span className="text-muted-foreground">
+                        {" "}
+                        — {attempt.notes}
+                      </span>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
           <ViewMultiSection
             options={RISK_MANAGEMENT_OPTIONS}
             section={plan.riskManagementJson ?? emptyMulti}

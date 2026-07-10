@@ -17,6 +17,7 @@ export const treatmentPlans = pgTable('treatment_plans', {
   behaviouralTargetsJson: jsonb('behavioural_targets_json'),
   ongoingAssessmentsJson: jsonb('ongoing_assessments_json'),
   riskManagementJson: jsonb('risk_management_json'),
+  suicideAttemptsJson: jsonb('suicide_attempts_json'),
   supportServicesJson: jsonb('support_services_json'),
   psychoeducationJson: jsonb('psychoeducation_json'),
   caseFormulationJson: jsonb('case_formulation_json'),

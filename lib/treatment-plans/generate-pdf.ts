@@ -11,6 +11,10 @@ import {
   optionLabel,
 } from "@/lib/treatment-plans/fields"
 import type { TreatmentPlanRow } from "@/lib/treatment-plans/types"
+import {
+  formatAttemptDate,
+  sortAttemptsChronologically,
+} from "@/lib/treatment-plans/format-attempt-date"
 
 const PAGE_MARGIN = 50
 const PAGE_WIDTH = 595.28
@@ -146,6 +150,33 @@ export function generateTreatmentPlanPdf(
     )
 
     heading(doc, "Risk management")
+
+    const suicideAttempts = sortAttemptsChronologically(
+      plan.suicideAttemptsJson?.items ?? []
+    )
+    doc
+      .font("Helvetica-Bold")
+      .fontSize(BASE_FONT_SIZE)
+      .fillColor(TEXT_COLOR)
+      .text("Suicide attempt history (lifetime)", { lineGap: LINE_GAP })
+    doc.moveDown(0.15)
+    if (suicideAttempts.length === 0) {
+      doc
+        .font("Helvetica")
+        .fontSize(BASE_FONT_SIZE)
+        .fillColor(MUTED_COLOR)
+        .text("No suicide attempts recorded", { lineGap: LINE_GAP })
+    } else {
+      doc.font("Helvetica").fontSize(BASE_FONT_SIZE).fillColor(TEXT_COLOR)
+      for (const attempt of suicideAttempts) {
+        const line = attempt.notes
+          ? `${formatAttemptDate(attempt)} — ${attempt.notes}`
+          : formatAttemptDate(attempt)
+        doc.text(`•  ${line}`, { lineGap: LINE_GAP, width: CONTENT_WIDTH, indent: 4 })
+      }
+    }
+    doc.moveDown(0.35)
+
     bulletList(
       doc,
       multiSectionLabels(RISK_MANAGEMENT_OPTIONS, plan.riskManagementJson)

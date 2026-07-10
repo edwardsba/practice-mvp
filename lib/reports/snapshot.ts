@@ -1,3 +1,5 @@
+import type { SuicideAttemptRecord } from "@/lib/treatment-plans/types"
+
 export type ReportResultRow = {
   assessmentResultId: string
   date: string
@@ -6,6 +8,8 @@ export type ReportResultRow = {
   severity: string | null
   functionalImpairmentLabel?: string | null
   acuteRiskRating?: string | null
+  recentPositive?: boolean
+  currentPositive?: boolean
 }
 
 export type BtpReportTargetRow = {
@@ -76,6 +80,8 @@ export type ReportSnapshot = {
   therapeuticTarget: string | null
   behaviouralTargets: string[]
   assistEnabled: boolean
+  suicideAttempts: SuicideAttemptRecord[]
+  crisisPlanDate: string | null
   selectedAppointmentIds?: string[]
 }
 
@@ -168,6 +174,8 @@ export function parseReportSnapshot(value: unknown): ReportSnapshot | null {
     therapeuticTarget: raw.therapeuticTarget ?? null,
     behaviouralTargets: raw.behaviouralTargets ?? [],
     assistEnabled: raw.assistEnabled ?? false,
+    suicideAttempts: raw.suicideAttempts ?? [],
+    crisisPlanDate: raw.crisisPlanDate ?? null,
     selectedAppointmentIds: raw.selectedAppointmentIds ?? [],
   }
 }

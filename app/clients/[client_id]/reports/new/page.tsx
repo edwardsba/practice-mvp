@@ -7,6 +7,7 @@ import { AppShell } from "@/components/app-shell"
 import { BackButton } from "@/components/ui/back-button"
 import { clients, practitionerProfiles, practices, treatmentPlans } from "@/db/schema"
 import { getClientFundingApprovalsForReport } from "@/lib/actions/funding"
+import { loadActiveCrisisPlanSummary } from "@/lib/crisis-plans/load"
 import { getReportTypes } from "@/lib/actions/report-types"
 import {
   formatPractitionerFormalName,
@@ -15,6 +16,7 @@ import {
 import { getSignatureAsDataUrl } from "@/lib/practitioner/signature"
 import { requirePractitionerContext } from "@/lib/auth"
 import { db } from "@/lib/db"
+import { suicideAttemptItemsFromJson } from "@/lib/treatment-plans/serialize"
 
 import "@/components/report/report-print.css"
 
@@ -94,28 +96,35 @@ export default async function NewReportPage({
     ? await getSignatureAsDataUrl(practitioner.signatureImagePath)
     : null
 
-  const [activePlan] = await db
-    .select({
-      therapeuticTarget: treatmentPlans.therapeuticTarget,
-      behaviouralTargetsJson: treatmentPlans.behaviouralTargetsJson,
-      ongoingAssessmentsJson: treatmentPlans.ongoingAssessmentsJson,
-    })
-    .from(treatmentPlans)
-    .where(
-      and(
-        eq(treatmentPlans.clientId, clientId),
-        eq(treatmentPlans.practiceId, context.practiceId),
-        eq(treatmentPlans.isActive, true)
+  const [activePlan, activeCrisisPlan] = await Promise.all([
+    db
+      .select({
+        therapeuticTarget: treatmentPlans.therapeuticTarget,
+        behaviouralTargetsJson: treatmentPlans.behaviouralTargetsJson,
+        ongoingAssessmentsJson: treatmentPlans.ongoingAssessmentsJson,
+        suicideAttemptsJson: treatmentPlans.suicideAttemptsJson,
+      })
+      .from(treatmentPlans)
+      .where(
+        and(
+          eq(treatmentPlans.clientId, clientId),
+          eq(treatmentPlans.practiceId, context.practiceId),
+          eq(treatmentPlans.isActive, true)
+        )
       )
-    )
-    .orderBy(desc(treatmentPlans.versionNumber))
-    .limit(1)
+      .orderBy(desc(treatmentPlans.versionNumber))
+      .limit(1)
+      .then((rows) => rows[0] ?? null),
+    loadActiveCrisisPlanSummary(clientId, context.practiceId),
+  ])
 
   const therapeuticTarget = activePlan?.therapeuticTarget ?? null
   const behaviouralTargets =
     (activePlan?.behaviouralTargetsJson as { items?: string[] } | null)?.items ?? []
   const assistEnabled =
     (activePlan?.ongoingAssessmentsJson as { assist?: boolean } | null)?.assist ?? false
+  const suicideAttempts = suicideAttemptItemsFromJson(activePlan?.suicideAttemptsJson)
+  const crisisPlanDate = activeCrisisPlan?.dateOfPlan ?? null
 
   const clientName = `${client.firstName} ${client.lastName}`
 
@@ -157,12 +166,16 @@ export default async function NewReportPage({
           therapeuticTarget: null,
           behaviouralTargets: [],
           assistEnabled: false,
+          suicideAttempts: [],
+          crisisPlanDate: null,
         }}
         existingDraftReportId={null}
         previousVersionId={null}
         therapeuticTarget={therapeuticTarget}
         behaviouralTargets={behaviouralTargets}
         assistEnabled={assistEnabled}
+        suicideAttempts={suicideAttempts}
+        crisisPlanDate={crisisPlanDate}
         cancelHref={returnTo ?? `/clients/${clientId}`}
       />
     </AppShell>

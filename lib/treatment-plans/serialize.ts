@@ -3,6 +3,8 @@ import type {
   BehaviouralTargetsJson,
   MultiSelectSectionJson,
   OngoingAssessmentsJson,
+  SuicideAttemptRecord,
+  SuicideAttemptsJson,
 } from "@/lib/treatment-plans/types"
 
 function parseBehaviouralTargets(
@@ -27,6 +29,39 @@ function parseOngoingAssessments(value: unknown): OngoingAssessmentsJson {
     gad7: Boolean(data.gad7),
     assist: Boolean(data.assist),
   }
+}
+
+function parseSuicideAttempts(value: unknown): SuicideAttemptsJson {
+  if (!value || typeof value !== "object") return { items: [] }
+  const items = (value as SuicideAttemptsJson).items
+  if (!Array.isArray(items)) return { items: [] }
+
+  const parsed: SuicideAttemptRecord[] = []
+  for (const item of items) {
+    if (!item || typeof item !== "object") continue
+    const record = item as SuicideAttemptRecord
+    const year = Number(record.year)
+    if (!Number.isFinite(year)) continue
+    parsed.push({
+      id: String(record.id || crypto.randomUUID()),
+      year,
+      month:
+        record.month != null && Number.isFinite(Number(record.month))
+          ? Number(record.month)
+          : null,
+      day:
+        record.day != null && Number.isFinite(Number(record.day))
+          ? Number(record.day)
+          : null,
+      notes: record.notes?.trim() || null,
+    })
+  }
+
+  return { items: parsed }
+}
+
+export function suicideAttemptItemsFromJson(value: unknown): SuicideAttemptRecord[] {
+  return parseSuicideAttempts(value).items
 }
 
 function parseMultiSection(value: unknown): MultiSelectSectionJson {
@@ -55,6 +90,7 @@ export function rowToTreatmentPlan(row: {
   endDate: string | null
   therapeuticTarget: string | null
   behaviouralTargetsJson: unknown
+  suicideAttemptsJson: unknown
   ongoingAssessmentsJson: unknown
   riskManagementJson: unknown
   supportServicesJson: unknown
@@ -76,6 +112,7 @@ export function rowToTreatmentPlan(row: {
     endDate: row.endDate,
     therapeuticTarget: row.therapeuticTarget,
     behaviouralTargetsJson: parseBehaviouralTargets(row.behaviouralTargetsJson),
+    suicideAttemptsJson: parseSuicideAttempts(row.suicideAttemptsJson),
     ongoingAssessmentsJson: parseOngoingAssessments(row.ongoingAssessmentsJson),
     riskManagementJson: parseMultiSection(row.riskManagementJson),
     supportServicesJson: parseMultiSection(row.supportServicesJson),

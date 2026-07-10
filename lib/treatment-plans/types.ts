@@ -2,6 +2,18 @@ export type BehaviouralTargetsJson = {
   items: string[]
 }
 
+export type SuicideAttemptRecord = {
+  id: string
+  year: number
+  month?: number | null
+  day?: number | null
+  notes?: string | null
+}
+
+export type SuicideAttemptsJson = {
+  items: SuicideAttemptRecord[]
+}
+
 export type OngoingAssessmentsJson = {
   phq9: boolean
   gad7: boolean
@@ -18,6 +30,7 @@ export type TreatmentPlanFormValues = {
   endDate: string | null
   therapeuticTarget: string | null
   behaviouralTargets: BehaviouralTargetsJson
+  suicideAttempts: SuicideAttemptsJson
   ongoingAssessments: OngoingAssessmentsJson
   riskManagement: MultiSelectSectionJson
   supportServices: MultiSelectSectionJson
@@ -38,6 +51,7 @@ export type TreatmentPlanRow = {
   endDate: string | null
   therapeuticTarget: string | null
   behaviouralTargetsJson: BehaviouralTargetsJson | null
+  suicideAttemptsJson: SuicideAttemptsJson | null
   ongoingAssessmentsJson: OngoingAssessmentsJson | null
   riskManagementJson: MultiSelectSectionJson | null
   supportServicesJson: MultiSelectSectionJson | null

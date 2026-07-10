@@ -27,6 +27,7 @@ import {
   formatPractitionerFormalName,
   formatPractitionerName,
 } from "@/lib/practitioner/format"
+import { getAsqRecentAndCurrentFlags } from "@/lib/assessments/asq"
 import {
   GAD7_IMPAIRMENT_ELEMENT_KEY,
   getFunctionalImpairmentLabelsByResultId,
@@ -48,6 +49,8 @@ import {
   resolveReportType,
 } from "@/lib/reports/snapshot"
 import { resolveTemplateKey } from "@/lib/reports/templates"
+import { loadActiveCrisisPlanSummary } from "@/lib/crisis-plans/load"
+import { suicideAttemptItemsFromJson } from "@/lib/treatment-plans/serialize"
 import { getClientFundingApprovalsForReport } from "@/lib/actions/funding"
 import { todayDateString } from "@/lib/dates/practice-time"
 
@@ -133,6 +136,7 @@ async function fetchResultsForAssessment(
       severity: assessmentResults.severity,
       acuteRiskRating: assessmentResults.acuteRiskRating,
       assessmentDefinitionId: assessmentDefinitions.assessmentDefinitionId,
+      assessmentInstanceId: assessmentResults.assessmentInstanceId,
     })
     .from(assessmentResults)
     .innerJoin(
@@ -172,6 +176,13 @@ async function fetchResultsForAssessment(
     ? await getMaxScoreForAssessmentDefinition(assessmentDefinitionId)
     : null
 
+  const asqFlags =
+    assessmentCode === "ASQ"
+      ? await getAsqRecentAndCurrentFlags(
+          rows.map((row) => row.assessmentInstanceId)
+        )
+      : null
+
   return rows.map((row) => ({
     assessmentResultId: row.assessmentResultId,
     date: row.assessmentDate.toISOString(),
@@ -184,6 +195,14 @@ async function fetchResultsForAssessment(
         ? row.severity
         : row.acuteRiskRating
       : undefined,
+    recentPositive:
+      assessmentCode === "ASQ"
+        ? (asqFlags?.get(row.assessmentInstanceId)?.recentPositive ?? false)
+        : undefined,
+    currentPositive:
+      assessmentCode === "ASQ"
+        ? (asqFlags?.get(row.assessmentInstanceId)?.currentPositive ?? false)
+        : undefined,
   }))
 }
 
@@ -207,6 +226,7 @@ async function fetchResultsForAppointments(
     severity: assessmentResults.severity,
     acuteRiskRating: assessmentResults.acuteRiskRating,
     assessmentDefinitionId: assessmentDefinitions.assessmentDefinitionId,
+    assessmentInstanceId: assessmentResults.assessmentInstanceId,
   }
 
   const rows = options?.linkViaSessionNote
@@ -279,6 +299,13 @@ async function fetchResultsForAppointments(
     ? await getMaxScoreForAssessmentDefinition(assessmentDefinitionId)
     : null
 
+  const asqFlags =
+    assessmentCode === "ASQ"
+      ? await getAsqRecentAndCurrentFlags(
+          rows.map((row) => row.assessmentInstanceId)
+        )
+      : null
+
   return rows.map((row) => ({
     assessmentResultId: row.assessmentResultId,
     date: row.assessmentDate.toISOString(),
@@ -292,6 +319,14 @@ async function fetchResultsForAppointments(
         ? row.severity
         : row.acuteRiskRating
       : undefined,
+    recentPositive:
+      assessmentCode === "ASQ"
+        ? (asqFlags?.get(row.assessmentInstanceId)?.recentPositive ?? false)
+        : undefined,
+    currentPositive:
+      assessmentCode === "ASQ"
+        ? (asqFlags?.get(row.assessmentInstanceId)?.currentPositive ?? false)
+        : undefined,
   }))
 }
 
@@ -604,22 +639,27 @@ export async function buildSnapshot(
     }
   }
 
-  const [activeTreatmentPlan] = await db
-    .select({
-      therapeuticTarget: treatmentPlans.therapeuticTarget,
-      behaviouralTargetsJson: treatmentPlans.behaviouralTargetsJson,
-      ongoingAssessmentsJson: treatmentPlans.ongoingAssessmentsJson,
-    })
-    .from(treatmentPlans)
-    .where(
-      and(
-        eq(treatmentPlans.clientId, clientId),
-        eq(treatmentPlans.practiceId, context.practiceId),
-        eq(treatmentPlans.isActive, true)
+  const [activeTreatmentPlan, activeCrisisPlan] = await Promise.all([
+    db
+      .select({
+        therapeuticTarget: treatmentPlans.therapeuticTarget,
+        behaviouralTargetsJson: treatmentPlans.behaviouralTargetsJson,
+        ongoingAssessmentsJson: treatmentPlans.ongoingAssessmentsJson,
+        suicideAttemptsJson: treatmentPlans.suicideAttemptsJson,
+      })
+      .from(treatmentPlans)
+      .where(
+        and(
+          eq(treatmentPlans.clientId, clientId),
+          eq(treatmentPlans.practiceId, context.practiceId),
+          eq(treatmentPlans.isActive, true)
+        )
       )
-    )
-    .orderBy(desc(treatmentPlans.versionNumber))
-    .limit(1)
+      .orderBy(desc(treatmentPlans.versionNumber))
+      .limit(1)
+      .then((rows) => rows[0] ?? null),
+    loadActiveCrisisPlanSummary(clientId, context.practiceId),
+  ])
 
   const therapeuticTarget = activeTreatmentPlan?.therapeuticTarget ?? null
   const behaviouralTargets =
@@ -628,6 +668,10 @@ export async function buildSnapshot(
   const assistEnabled =
     (activeTreatmentPlan?.ongoingAssessmentsJson as { assist?: boolean } | null)
       ?.assist ?? false
+  const suicideAttempts = suicideAttemptItemsFromJson(
+    activeTreatmentPlan?.suicideAttemptsJson
+  )
+  const crisisPlanDate = activeCrisisPlan?.dateOfPlan ?? null
 
   return {
     reportTitle: reportTitle?.trim() || "Progress Report",
@@ -663,6 +707,8 @@ export async function buildSnapshot(
     therapeuticTarget,
     behaviouralTargets,
     assistEnabled,
+    suicideAttempts,
+    crisisPlanDate,
     selectedAppointmentIds,
   }
 }

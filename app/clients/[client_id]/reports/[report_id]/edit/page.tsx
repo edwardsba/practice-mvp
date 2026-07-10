@@ -18,6 +18,8 @@ import { getReportTypes } from "@/lib/actions/report-types"
 import { requirePractitionerContext } from "@/lib/auth"
 import { db } from "@/lib/db"
 import { parseReportSnapshot } from "@/lib/reports/snapshot"
+import { loadActiveCrisisPlanSummary } from "@/lib/crisis-plans/load"
+import { suicideAttemptItemsFromJson } from "@/lib/treatment-plans/serialize"
 import {
   formatPractitionerFormalName,
   formatPractitionerName,
@@ -129,28 +131,35 @@ export default async function EditReportPage({
     ? await getSignatureAsDataUrl(practitioner.signatureImagePath)
     : null
 
-  const [activePlan] = await db
-    .select({
-      therapeuticTarget: treatmentPlans.therapeuticTarget,
-      behaviouralTargetsJson: treatmentPlans.behaviouralTargetsJson,
-      ongoingAssessmentsJson: treatmentPlans.ongoingAssessmentsJson,
-    })
-    .from(treatmentPlans)
-    .where(
-      and(
-        eq(treatmentPlans.clientId, clientId),
-        eq(treatmentPlans.practiceId, context.practiceId),
-        eq(treatmentPlans.isActive, true)
+  const [activePlan, activeCrisisPlan] = await Promise.all([
+    db
+      .select({
+        therapeuticTarget: treatmentPlans.therapeuticTarget,
+        behaviouralTargetsJson: treatmentPlans.behaviouralTargetsJson,
+        ongoingAssessmentsJson: treatmentPlans.ongoingAssessmentsJson,
+        suicideAttemptsJson: treatmentPlans.suicideAttemptsJson,
+      })
+      .from(treatmentPlans)
+      .where(
+        and(
+          eq(treatmentPlans.clientId, clientId),
+          eq(treatmentPlans.practiceId, context.practiceId),
+          eq(treatmentPlans.isActive, true)
+        )
       )
-    )
-    .orderBy(desc(treatmentPlans.versionNumber))
-    .limit(1)
+      .orderBy(desc(treatmentPlans.versionNumber))
+      .limit(1)
+      .then((rows) => rows[0] ?? null),
+    loadActiveCrisisPlanSummary(clientId, context.practiceId),
+  ])
 
   const therapeuticTarget = activePlan?.therapeuticTarget ?? null
   const behaviouralTargets =
     (activePlan?.behaviouralTargetsJson as { items?: string[] } | null)?.items ?? []
   const assistEnabled =
     (activePlan?.ongoingAssessmentsJson as { assist?: boolean } | null)?.assist ?? false
+  const suicideAttempts = suicideAttemptItemsFromJson(activePlan?.suicideAttemptsJson)
+  const crisisPlanDate = activeCrisisPlan?.dateOfPlan ?? null
 
   const clientName = `${client.firstName} ${client.lastName}`
   const isFinalised = report.reportStatus === "finalised"
@@ -212,12 +221,16 @@ export default async function EditReportPage({
           therapeuticTarget: snapshot.therapeuticTarget ?? null,
           behaviouralTargets: snapshot.behaviouralTargets ?? [],
           assistEnabled: snapshot.assistEnabled ?? false,
+          suicideAttempts: snapshot.suicideAttempts ?? [],
+          crisisPlanDate: snapshot.crisisPlanDate ?? null,
         }}
         existingDraftReportId={existingDraftReportId}
         previousVersionId={previousVersionId}
         therapeuticTarget={therapeuticTarget}
         behaviouralTargets={behaviouralTargets}
         assistEnabled={assistEnabled}
+        suicideAttempts={suicideAttempts}
+        crisisPlanDate={crisisPlanDate}
         cancelHref={`/clients/${clientId}/reports/${reportId}`}
       />
 

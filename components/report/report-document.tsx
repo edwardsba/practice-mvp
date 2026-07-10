@@ -14,6 +14,8 @@ import {
   toAssessmentPoints,
 } from "@/lib/assessment-summary/templates"
 import { buildAsqSummarySentence } from "@/lib/assessment-summary/asq-template"
+import { buildCrisisPlanSummarySentence } from "@/lib/assessment-summary/crisis-plan-summary"
+import { buildSelfHarmHistorySentence } from "@/lib/assessment-summary/self-harm-history"
 import { buildBtpSummaryParagraphs } from "@/lib/assessment-summary/btp-template"
 import { buildTreatmentPlanSummary } from "@/lib/reports/treatment-plan-summary"
 import {
@@ -190,8 +192,16 @@ function ProgressReportBody({
   const asqSentence = buildAsqSummarySentence(
     asqResults.map((r) => ({
       date: r.date,
-      acuteRiskRating: r.acuteRiskRating ?? null,
+      recentPositive: r.recentPositive ?? false,
+      currentPositive: r.currentPositive ?? false,
     }))
+  )
+  const selfHarmHistorySentence = buildSelfHarmHistorySentence(
+    snapshot.suicideAttempts
+  )
+  const crisisPlanSentence = buildCrisisPlanSummarySentence(
+    clientFirstName,
+    snapshot.crisisPlanDate
   )
   const btpParagraphs = buildBtpSummaryParagraphs(btpResults)
 
@@ -286,16 +296,31 @@ function ProgressReportBody({
         </section>
       ) : null}
 
-      {(!omitEmptySections || asqSentence) ? (
-        <section className="report-group-risk space-y-2">
-          <h3 className="text-sm font-semibold">Risk supervision</h3>
-          <p className="text-sm leading-relaxed">
-            Suicide risk was monitored throughout treatment using the Ask
-            Suicide-Screening Questions (ASQ).
-          </p>
-          {asqSentence ? (
-            <p className="text-sm leading-relaxed">{asqSentence}</p>
-          ) : null}
+      {(!omitEmptySections ||
+        selfHarmHistorySentence ||
+        asqSentence ||
+        crisisPlanSentence) ? (
+        <section className="report-group-risk space-y-4">
+          <div className="space-y-2">
+            <h3 className="text-sm font-semibold">Self-harm history</h3>
+            <p className="text-sm leading-relaxed">{selfHarmHistorySentence}</p>
+          </div>
+
+          <div className="space-y-2">
+            <h3 className="text-sm font-semibold">ASQ results summary</h3>
+            <p className="text-sm leading-relaxed">
+              Suicide risk was monitored throughout treatment using the Ask
+              Suicide-Screening Questions (ASQ).
+            </p>
+            {asqSentence ? (
+              <p className="text-sm leading-relaxed">{asqSentence}</p>
+            ) : null}
+          </div>
+
+          <div className="space-y-2">
+            <h3 className="text-sm font-semibold">Crisis plan</h3>
+            <p className="text-sm leading-relaxed">{crisisPlanSentence}</p>
+          </div>
         </section>
       ) : null}
 

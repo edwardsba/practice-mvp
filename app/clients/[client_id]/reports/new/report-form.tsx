@@ -76,6 +76,8 @@ export function ReportForm({
   therapeuticTarget,
   behaviouralTargets = [],
   assistEnabled = false,
+  suicideAttempts = [],
+  crisisPlanDate = null,
   cancelHref,
 }: {
   clientId: string
@@ -114,6 +116,8 @@ export function ReportForm({
   therapeuticTarget?: string | null
   behaviouralTargets?: string[]
   assistEnabled?: boolean
+  suicideAttempts?: ReportSnapshot["suicideAttempts"]
+  crisisPlanDate?: string | null
   cancelHref: string
 }) {
   const validInitialApprovalId =
@@ -499,6 +503,8 @@ export function ReportForm({
           therapeuticTarget: therapeuticTarget ?? initialSnapshot.therapeuticTarget ?? null,
           behaviouralTargets,
           assistEnabled,
+          suicideAttempts,
+          crisisPlanDate,
         }
       : null
     : effectiveDateRangeStart && effectiveDateRangeEnd
@@ -523,6 +529,8 @@ export function ReportForm({
           therapeuticTarget: therapeuticTarget ?? initialSnapshot.therapeuticTarget ?? null,
           behaviouralTargets,
           assistEnabled,
+          suicideAttempts,
+          crisisPlanDate,
         }
       : null
 

@@ -12,6 +12,8 @@ import type {
   BehaviouralTargetsJson,
   MultiSelectSectionJson,
   OngoingAssessmentsJson,
+  SuicideAttemptRecord,
+  SuicideAttemptsJson,
   TreatmentPlanFormValues,
 } from "@/lib/treatment-plans/types"
 
@@ -62,6 +64,34 @@ function parseBehaviouralTargets(formData: FormData): BehaviouralTargetsJson {
   return { items }
 }
 
+function parseSuicideAttempts(formData: FormData): SuicideAttemptsJson {
+  const ids = formData.getAll("suicide_attempt_id").map(String)
+  const years = formData.getAll("suicide_attempt_year").map(String)
+  const months = formData.getAll("suicide_attempt_month").map(String)
+  const days = formData.getAll("suicide_attempt_day").map(String)
+  const notes = formData.getAll("suicide_attempt_notes").map(String)
+
+  const items: SuicideAttemptRecord[] = []
+
+  for (let i = 0; i < years.length; i++) {
+    const year = parseInt(years[i], 10)
+    if (!Number.isFinite(year)) continue
+
+    const month = parseInt(months[i], 10)
+    const day = parseInt(days[i], 10)
+
+    items.push({
+      id: ids[i] || crypto.randomUUID(),
+      year,
+      month: Number.isFinite(month) ? month : null,
+      day: Number.isFinite(day) ? day : null,
+      notes: notes[i]?.trim() || null,
+    })
+  }
+
+  return { items }
+}
+
 export function parseTreatmentPlanFormData(
   formData: FormData
 ): TreatmentPlanFormValues {
@@ -71,6 +101,7 @@ export function parseTreatmentPlanFormData(
     therapeuticTarget:
       String(formData.get("therapeutic_target") ?? "").trim() || null,
     behaviouralTargets: parseBehaviouralTargets(formData),
+    suicideAttempts: parseSuicideAttempts(formData),
     ongoingAssessments: parseOngoingAssessments(formData),
     riskManagement: parseMultiSection(
       formData,
@@ -111,6 +142,7 @@ export function formValuesToDbColumns(values: TreatmentPlanFormValues) {
     endDate: values.endDate,
     therapeuticTarget: values.therapeuticTarget,
     behaviouralTargetsJson: values.behaviouralTargets,
+    suicideAttemptsJson: values.suicideAttempts,
     ongoingAssessmentsJson: values.ongoingAssessments,
     riskManagementJson: values.riskManagement,
     supportServicesJson: values.supportServices,

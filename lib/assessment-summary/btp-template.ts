@@ -1,30 +1,13 @@
 import { BTP_TOOL_CONFIG } from "./config"
 import { computeGenericOverviewStats } from "./stats"
-import { classifyTrend, TrendShape } from "./trend"
+import { classifyTrend } from "./trend"
+import { buildVariabilityPatternSentence } from "./templates"
+import {
+  classifySeverityPattern,
+  buildSeveritySentence,
+} from "./severity-pattern"
 import type { AssessmentPoint } from "./stats"
 import type { BtpReportResultRow } from "@/lib/reports/snapshot"
-
-const TREND_SENTENCES_BTP: Record<TrendShape, (domain: string) => string> = {
-  linear_increasing: (domain) =>
-    `Ratings for this target showed a consistent upward trend across the referral period, suggesting the client's ${domain} improved over time.`,
-  linear_decreasing: (domain) =>
-    `Ratings for this target showed a consistent downward trend across the referral period, suggesting the client's ${domain} declined over time.`,
-  dip: (domain) =>
-    `Ratings for this target were lower mid-way through the referral period compared to the beginning and end, suggesting a temporary decline in ${domain} that was not sustained.`,
-  peak: (domain) =>
-    `Ratings for this target were higher mid-way through the referral period compared to the beginning and end, suggesting a temporary improvement in ${domain} before returning toward baseline.`,
-  flat: (domain) =>
-    `Ratings for this target did not show a consistent upward or downward trend in ${domain} across the referral period.`,
-}
-
-const VARIABILITY_SENTENCES: Record<string, (domain: string) => string> = {
-  Consistent: (domain) =>
-    `These ratings indicate a relatively consistent level of ${domain} across the referral period.`,
-  "Some fluctuation": (domain) =>
-    `These ratings indicate some fluctuation in ${domain} across the referral period.`,
-  "Considerable fluctuation": (domain) =>
-    `These ratings demonstrate considerable fluctuation in ${domain} across the referral period.`,
-}
 
 function pivotByTarget(
   results: BtpReportResultRow[]
@@ -73,16 +56,25 @@ export function buildBtpSummaryParagraphs(
       `with a mean rating of ${stats.mean}/${config.maxScore} (${config.ratingFromScore(Math.round(stats.mean))}) ` +
       `and a median rating of ${stats.median}/${config.maxScore} (n = ${stats.n}).`
 
-    const variabilitySentence = VARIABILITY_SENTENCES[stats.variabilityLabel](
-      config.symptomDomain
+    const trendShape = classifyTrend(points)
+    const variabilityPatternSentence = buildVariabilityPatternSentence(
+      stats.variabilityLabel,
+      trendShape,
+      "ratings"
     )
 
-    const trendShape = classifyTrend(points)
-    const trendSentence = TREND_SENTENCES_BTP[trendShape](config.symptomDomain)
+    const bands = points.map((p) => config.ratingFromScore(p.score))
+    const severityCase = classifySeverityPattern(
+      bands,
+      config.bandOrder,
+      config.bottomTwoBands,
+      config.topTwoBands
+    )
+    const severitySentence = buildSeveritySentence(severityCase, "rating")
 
     output.push({
       target,
-      paragraph: [overviewSentence, variabilitySentence, trendSentence].join(" "),
+      paragraph: [overviewSentence, variabilityPatternSentence, severitySentence].join(" "),
     })
   }
 

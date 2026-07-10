@@ -2,7 +2,7 @@ import { notFound } from "next/navigation"
 import { and, desc, eq } from "drizzle-orm"
 
 import { ReportForm } from "@/app/clients/[client_id]/reports/new/report-form"
-import { deleteSimpleReport } from "@/app/clients/[client_id]/reports/[report_id]/edit/actions"
+import { deleteReportDraft } from "@/app/clients/[client_id]/reports/[report_id]/edit/actions"
 import { AppShell } from "@/components/app-shell"
 import { BackButton } from "@/components/ui/back-button"
 import { EntityDeleteSection } from "@/components/entity-delete-section"
@@ -18,6 +18,7 @@ import { getReportTypes } from "@/lib/actions/report-types"
 import { requirePractitionerContext } from "@/lib/auth"
 import { db } from "@/lib/db"
 import { parseReportSnapshot } from "@/lib/reports/snapshot"
+import { parseLetterBodyJson } from "@/lib/reports/letter-body-types"
 import { loadActiveCrisisPlanSummary } from "@/lib/crisis-plans/load"
 import { suicideAttemptItemsFromJson } from "@/lib/treatment-plans/serialize"
 import {
@@ -70,6 +71,7 @@ export default async function EditReportPage({
       dateRangeEnd: simpleReports.dateRangeEnd,
       clinicalSummaryText: simpleReports.clinicalSummaryText,
       recommendationsText: simpleReports.recommendationsText,
+      letterBodyJson: simpleReports.letterBodyJson,
     })
     .from(simpleReports)
     .where(
@@ -89,6 +91,11 @@ export default async function EditReportPage({
   if (!snapshot) {
     notFound()
   }
+
+  const initialLetterBodyJson = parseLetterBodyJson(report.letterBodyJson)
+  const snapshotForForm = initialLetterBodyJson
+    ? { ...snapshot, letterBodyJson: initialLetterBodyJson }
+    : snapshot
 
   const [fundingApprovals, reportTypes, practitioner, practice] =
     await Promise.all([
@@ -204,8 +211,9 @@ export default async function EditReportPage({
         }
         initialClinicalSummary={report.clinicalSummaryText ?? ""}
         initialRecommendations={report.recommendationsText ?? ""}
+        initialLetterBodyJson={initialLetterBodyJson}
         initialSnapshot={{
-          client: snapshot.client,
+          client: snapshotForForm.client,
           practitioner: {
             title: practitioner.title,
             fullName: formatPractitionerName(practitioner),
@@ -216,13 +224,13 @@ export default async function EditReportPage({
             practiceName: practice.practiceName,
             practiceAddress: practice.practiceAddress ?? null,
           },
-          recipient: snapshot.recipient,
-          fundingApproval: snapshot.fundingApproval,
-          therapeuticTarget: snapshot.therapeuticTarget ?? null,
-          behaviouralTargets: snapshot.behaviouralTargets ?? [],
-          assistEnabled: snapshot.assistEnabled ?? false,
-          suicideAttempts: snapshot.suicideAttempts ?? [],
-          crisisPlanDate: snapshot.crisisPlanDate ?? null,
+          recipient: snapshotForForm.recipient,
+          fundingApproval: snapshotForForm.fundingApproval,
+          therapeuticTarget: snapshotForForm.therapeuticTarget ?? null,
+          behaviouralTargets: snapshotForForm.behaviouralTargets ?? [],
+          assistEnabled: snapshotForForm.assistEnabled ?? false,
+          suicideAttempts: snapshotForForm.suicideAttempts ?? [],
+          crisisPlanDate: snapshotForForm.crisisPlanDate ?? null,
         }}
         existingDraftReportId={existingDraftReportId}
         previousVersionId={previousVersionId}
@@ -236,8 +244,8 @@ export default async function EditReportPage({
 
       {!isFinalised ? (
         <EntityDeleteSection
-          entityName="Report"
-          deleteAction={deleteSimpleReport.bind(
+          entityName="Report draft"
+          deleteAction={deleteReportDraft.bind(
             null,
             reportId,
             context.practiceId

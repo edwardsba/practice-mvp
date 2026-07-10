@@ -35,6 +35,7 @@ export function SavedReportView({
   versionNumber,
   isCurrentVersion,
   snapshot,
+  useLegacyProgressBody = false,
   fundingApproval,
   reportingRequirement,
   versions,
@@ -49,6 +50,7 @@ export function SavedReportView({
   versionNumber: number
   isCurrentVersion: boolean
   snapshot: ReportSnapshot
+  useLegacyProgressBody?: boolean
   fundingApproval: { approvalTypeName: string; startDate: string | null } | null
   reportingRequirement: { appointmentNumber: number; reportType: string } | null
   versions: ReportVersionSummary[]
@@ -186,7 +188,12 @@ export function SavedReportView({
       ) : null}
 
       <div id="report-print-area" className="report-print-area">
-        <ReportDocument snapshot={snapshot} readOnly omitEmptySections />
+        <ReportDocument
+          snapshot={snapshot}
+          readOnly
+          omitEmptySections
+          useLegacyProgressBody={useLegacyProgressBody}
+        />
       </div>
 
       {versions.length > 1 ? (

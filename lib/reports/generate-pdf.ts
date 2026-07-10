@@ -9,6 +9,8 @@ import {
   getPhq9ResultsFromSnapshot,
 } from "@/lib/reports/snapshot"
 import { resolveTemplateKey } from "@/lib/reports/templates"
+import { renderLetterBodyPdf } from "@/lib/reports/render-letter-body-pdf"
+import { isLetterBodyDoc } from "@/lib/reports/letter-body-types"
 
 const PAGE_MARGIN = 50
 const PAGE_WIDTH = 595.28
@@ -269,7 +271,10 @@ function drawLetterHeader(doc: PDFKit.PDFDocument, snapshot: ReportSnapshot) {
   doc.y = doc.y + SECTION_GAP
 }
 
-function drawProgressReportBody(doc: PDFKit.PDFDocument, snapshot: ReportSnapshot) {
+function drawProgressReportFixedHeader(
+  doc: PDFKit.PDFDocument,
+  snapshot: ReportSnapshot
+) {
   doc.font("Helvetica").fontSize(BASE_FONT_SIZE).fillColor(TEXT_COLOR)
   doc.text(
     `Client name: ${snapshot.client.firstName} ${snapshot.client.lastName}`,
@@ -316,6 +321,165 @@ function drawProgressReportBody(doc: PDFKit.PDFDocument, snapshot: ReportSnapsho
       )
     doc.y = doc.y + SECTION_GAP
   }
+}
+
+function scoreCell(score: number, maxScore?: number | null): string {
+  return maxScore != null ? `${score} / ${maxScore}` : String(score)
+}
+
+function drawAssessmentDataTables(
+  doc: PDFKit.PDFDocument,
+  snapshot: ReportSnapshot
+) {
+  const phq9Results = getPhq9ResultsFromSnapshot(snapshot)
+  const gad7Results = getGad7ResultsFromSnapshot(snapshot)
+  const asqResults = getAsqResultsFromSnapshot(snapshot)
+  const assistResults = getAssistResultsFromSnapshot(snapshot)
+  const btpResults = getBtpResultsFromSnapshot(snapshot)
+
+  if (
+    phq9Results.length === 0 &&
+    gad7Results.length === 0 &&
+    assistResults.length === 0 &&
+    asqResults.length === 0 &&
+    btpResults.length === 0
+  ) {
+    return
+  }
+
+  sectionHeading(doc, "Assessment Data")
+
+  if (phq9Results.length > 0) {
+    instrumentHeading(doc, "Patient Health Questionnaire 9 (PHQ-9) results")
+    drawTable(
+      doc,
+      [
+        { header: "Date", width: 95 },
+        { header: "Score", width: 65 },
+        { header: "Severity", width: 200 },
+        { header: "Functional Impairment", width: 135 },
+      ],
+      phq9Results.map((r) => [
+        formatShortDate(r.date),
+        scoreCell(r.score, r.maxScore),
+        r.severity ?? "—",
+        r.functionalImpairmentLabel ?? "—",
+      ])
+    )
+  }
+
+  if (gad7Results.length > 0) {
+    instrumentHeading(doc, "Generalised Anxiety Disorder 7 (GAD-7) results")
+    drawTable(
+      doc,
+      [
+        { header: "Date", width: 95 },
+        { header: "Score", width: 65 },
+        { header: "Severity", width: 200 },
+        { header: "Functional Impairment", width: 135 },
+      ],
+      gad7Results.map((r) => [
+        formatShortDate(r.date),
+        scoreCell(r.score, r.maxScore),
+        r.severity ?? "—",
+        r.functionalImpairmentLabel ?? "—",
+      ])
+    )
+  }
+
+  if (snapshot.assistEnabled && assistResults.length > 0) {
+    instrumentHeading(
+      doc,
+      "Alcohol, Smoking and Substance Involvement Screening Test (ASSIST) results"
+    )
+    drawTable(
+      doc,
+      [
+        { header: "Date", width: 95 },
+        { header: "Score", width: 65 },
+        { header: "Risk Level", width: 335 },
+      ],
+      assistResults.map((r) => [
+        formatShortDate(r.date),
+        scoreCell(r.score, r.maxScore),
+        r.severity ?? "—",
+      ])
+    )
+  }
+
+  if (asqResults.length > 0) {
+    instrumentHeading(doc, "Ask Suicide-Screening Questions (ASQ) results")
+    drawTable(
+      doc,
+      [
+        { header: "Date", width: 95 },
+        { header: "Score", width: 65 },
+        { header: "Screen outcome", width: 335 },
+      ],
+      asqResults.map((r) => [
+        formatShortDate(r.date),
+        scoreCell(r.score, r.maxScore),
+        r.acuteRiskRating ?? "—",
+      ])
+    )
+  }
+
+  if (btpResults.length > 0) {
+    const targetMap = new Map<
+      string,
+      Array<{
+        date: string
+        score: number
+        maxScore?: number | null
+        ratingLabel: string
+      }>
+    >()
+    for (const result of btpResults) {
+      for (const target of result.targets) {
+        const rows = targetMap.get(target.target) ?? []
+        rows.push({
+          date: result.date,
+          score: target.score,
+          maxScore: target.maxScore,
+          ratingLabel: target.ratingLabel,
+        })
+        targetMap.set(target.target, rows)
+      }
+    }
+
+    for (const [target, rows] of targetMap.entries()) {
+      doc.moveDown(0.3)
+      instrumentHeading(doc, target)
+      drawTable(
+        doc,
+        [
+          { header: "Date", width: 95 },
+          { header: "Score", width: 65 },
+          { header: "Rating", width: 335 },
+        ],
+        rows.map((r) => [
+          formatShortDate(r.date),
+          scoreCell(r.score, r.maxScore),
+          r.ratingLabel,
+        ])
+      )
+    }
+  }
+}
+
+function drawProgressReportBody(doc: PDFKit.PDFDocument, snapshot: ReportSnapshot) {
+  if (isLetterBodyDoc(snapshot.letterBodyJson)) {
+    drawProgressReportFixedHeader(doc, snapshot)
+    renderLetterBodyPdf(doc, snapshot.letterBodyJson, {
+      groupHeading,
+      bodyText: (pdfDoc, text) =>
+        bodyText(pdfDoc, text, { width: CONTENT_WIDTH }),
+    })
+    drawAssessmentDataTables(doc, snapshot)
+    return
+  }
+
+  drawProgressReportFixedHeader(doc, snapshot)
 
   const phq9Results = getPhq9ResultsFromSnapshot(snapshot)
   const gad7Results = getGad7ResultsFromSnapshot(snapshot)
@@ -342,10 +506,6 @@ function drawProgressReportBody(doc: PDFKit.PDFDocument, snapshot: ReportSnapsho
       { lineGap: LINE_GAP, width: PAGE_WIDTH - PAGE_MARGIN * 2 }
     )
     doc.y = doc.y + SECTION_GAP
-  }
-
-  function scoreCell(score: number, maxScore?: number | null): string {
-    return maxScore != null ? `${score} / ${maxScore}` : String(score)
   }
 
   if (

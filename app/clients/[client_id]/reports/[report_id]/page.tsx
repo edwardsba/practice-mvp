@@ -15,6 +15,7 @@ import { requirePractitionerContext } from "@/lib/auth"
 import { db } from "@/lib/db"
 import { getQuestionnaireEmailContext } from "@/lib/email/practitioner-context"
 import { parseReportSnapshot } from "@/lib/reports/snapshot"
+import { parseLetterBodyJson } from "@/lib/reports/letter-body-types"
 import { getReferrerEmailOptions } from "@/lib/reports/referrer-contact"
 import { loadReportVersionHistory } from "@/lib/reports/version-history"
 
@@ -58,6 +59,7 @@ export default async function SavedReportPage({
       versionNumber: simpleReports.versionNumber,
       isCurrentVersion: simpleReports.isCurrentVersion,
       valuesSnapshotJson: simpleReports.valuesSnapshotJson,
+      letterBodyJson: simpleReports.letterBodyJson,
       fundingApprovalId: simpleReports.fundingApprovalId,
       reportRequirementId: simpleReports.reportRequirementId,
       recipientType: simpleReports.recipientType,
@@ -80,6 +82,12 @@ export default async function SavedReportPage({
   if (!snapshot) {
     notFound()
   }
+
+  const letterBodyJson = parseLetterBodyJson(report.letterBodyJson)
+  const displaySnapshot = letterBodyJson
+    ? { ...snapshot, letterBodyJson }
+    : snapshot
+  const useLegacyProgressBody = !letterBodyJson
 
   let fundingApproval: {
     approvalTypeName: string
@@ -197,7 +205,8 @@ export default async function SavedReportPage({
         reportStatus={report.reportStatus}
         versionNumber={report.versionNumber}
         isCurrentVersion={report.isCurrentVersion}
-        snapshot={snapshot}
+        snapshot={displaySnapshot}
+        useLegacyProgressBody={useLegacyProgressBody}
         fundingApproval={fundingApproval}
         reportingRequirement={reportingRequirement}
         versions={versions}

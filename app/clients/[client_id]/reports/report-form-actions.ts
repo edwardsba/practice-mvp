@@ -16,6 +16,11 @@ import { db } from "@/lib/db"
 import { commitReportDraft, commitReportFinalise } from "@/lib/reports/commit"
 import { buildReportFilename } from "@/lib/reports/filename"
 import { generateReportPdf } from "@/lib/reports/generate-pdf"
+import {
+  attachLetterBodyToSnapshot,
+  resolveLetterBodyJson,
+} from "@/lib/reports/resolve-letter-body"
+import type { LetterBodyDoc } from "@/lib/reports/letter-body-types"
 import { resolveReportType, type ReportSnapshot } from "@/lib/reports/snapshot"
 import { resolveTemplateKey } from "@/lib/reports/templates"
 import { todayDateString } from "@/lib/appointments/format"
@@ -30,9 +35,45 @@ type ParsedReportValues = {
   snapshot: ReportSnapshot
   clinicalSummaryText: string | null
   recommendationsText: string | null
+  letterBodyJson: LetterBodyDoc | null
   recipientType: string | null
   fundingApprovalId: string | null
   reportRequirementId: string | null
+}
+
+async function buildReportValues(
+  clientId: string,
+  practiceId: string,
+  practitionerProfileId: string,
+  formData: FormData,
+  existingDraftReportId: string | null,
+  previousVersionId: string | null
+): Promise<{ error?: string; values?: ParsedReportValues }> {
+  const parsed = await parseReportForm(
+    clientId,
+    practiceId,
+    practitionerProfileId,
+    formData
+  )
+  if (parsed.error || !parsed.values) {
+    return parsed
+  }
+
+  const letterBodyJson = await resolveLetterBodyJson({
+    templateKey: parsed.values.snapshot.templateKey,
+    snapshot: parsed.values.snapshot,
+    existingDraftReportId,
+    previousVersionId,
+    formLetterBodyJson: formData.get("letter_body_json"),
+  })
+
+  return {
+    values: {
+      ...parsed.values,
+      letterBodyJson,
+      snapshot: attachLetterBodyToSnapshot(parsed.values.snapshot, letterBodyJson),
+    },
+  }
 }
 
 async function parseReportForm(
@@ -123,6 +164,7 @@ async function parseReportForm(
         snapshot,
         clinicalSummaryText,
         recommendationsText: null,
+        letterBodyJson: null,
         recipientType: "referrer",
         fundingApprovalId,
         reportRequirementId,
@@ -214,6 +256,7 @@ async function parseReportForm(
       snapshot,
       clinicalSummaryText,
       recommendationsText,
+      letterBodyJson: null,
       recipientType: recipientType === "none" ? null : recipientType,
       fundingApprovalId,
       reportRequirementId,
@@ -235,11 +278,13 @@ export async function previewReport(
 ): Promise<PreviewReportState> {
   const context = await requirePractitionerContext()
 
-  const result = await parseReportForm(
+  const result = await buildReportValues(
     clientId,
     context.practiceId,
     context.practitionerProfileId,
-    formData
+    formData,
+    _existingDraftReportId,
+    _previousVersionId
   )
   if (result.error || !result.values) {
     return { error: result.error ?? "Unable to build preview." }
@@ -262,11 +307,13 @@ export async function saveReportDraftAction(
 ): Promise<SaveReportDraftState> {
   const context = await requirePractitionerContext()
 
-  const result = await parseReportForm(
+  const result = await buildReportValues(
     clientId,
     context.practiceId,
     context.practitionerProfileId,
-    formData
+    formData,
+    existingDraftReportId,
+    previousVersionId
   )
   if (result.error || !result.values) {
     return { error: result.error ?? "Unable to save report." }
@@ -304,11 +351,13 @@ export async function finaliseReportAction(
 ): Promise<FinaliseReportState> {
   const context = await requirePractitionerContext()
 
-  const result = await parseReportForm(
+  const result = await buildReportValues(
     clientId,
     context.practiceId,
     context.practitionerProfileId,
-    formData
+    formData,
+    existingDraftReportId,
+    previousVersionId
   )
   if (result.error || !result.values) {
     return { error: result.error ?? "Unable to finalise report." }
@@ -356,11 +405,13 @@ export async function finaliseReportAndDownloadAction(
 ): Promise<FinaliseReportAndDownloadState> {
   const context = await requirePractitionerContext()
 
-  const result = await parseReportForm(
+  const result = await buildReportValues(
     clientId,
     context.practiceId,
     context.practitionerProfileId,
-    formData
+    formData,
+    existingDraftReportId,
+    previousVersionId
   )
   if (result.error || !result.values) {
     return { error: result.error ?? "Unable to finalise report." }
@@ -416,11 +467,13 @@ export async function finaliseReportAndSendAction(
 ): Promise<FinaliseReportAndSendState> {
   const context = await requirePractitionerContext()
 
-  const result = await parseReportForm(
+  const result = await buildReportValues(
     clientId,
     context.practiceId,
     context.practitionerProfileId,
-    formData
+    formData,
+    existingDraftReportId,
+    previousVersionId
   )
   if (result.error || !result.values) {
     return { error: result.error ?? "Unable to finalise report." }

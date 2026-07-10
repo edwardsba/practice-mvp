@@ -704,6 +704,7 @@ export async function buildSnapshot(
     btpResults,
     clinicalSummaryText,
     recommendationsText,
+    letterBodyJson: null,
     therapeuticTarget,
     behaviouralTargets,
     assistEnabled,

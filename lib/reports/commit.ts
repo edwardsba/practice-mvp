@@ -7,6 +7,7 @@ import {
 } from "@/db/schema"
 import { db } from "@/lib/db"
 import type { ReportSnapshot } from "@/lib/reports/snapshot"
+import type { LetterBodyDoc } from "@/lib/reports/letter-body-types"
 
 type ReportRowValues = {
   reportType: string
@@ -17,6 +18,7 @@ type ReportRowValues = {
   snapshot: ReportSnapshot
   clinicalSummaryText: string | null
   recommendationsText: string | null
+  letterBodyJson: LetterBodyDoc | null
   recipientType: string | null
   fundingApprovalId: string | null
   reportRequirementId: string | null
@@ -53,6 +55,7 @@ export async function commitReportDraft({
         valuesSnapshotJson: values.snapshot,
         clinicalSummaryText: values.clinicalSummaryText,
         recommendationsText: values.recommendationsText,
+        letterBodyJson: values.letterBodyJson,
         recipientType: values.recipientType,
         fundingApprovalId: values.fundingApprovalId,
         reportRequirementId: values.reportRequirementId,
@@ -90,6 +93,7 @@ export async function commitReportDraft({
         valuesSnapshotJson: values.snapshot,
         clinicalSummaryText: values.clinicalSummaryText,
         recommendationsText: values.recommendationsText,
+        letterBodyJson: values.letterBodyJson,
         reportStatus: "draft",
         recipientType: values.recipientType,
         fundingApprovalId: values.fundingApprovalId,
@@ -159,6 +163,7 @@ export async function commitReportFinalise({
           valuesSnapshotJson: values.snapshot,
           clinicalSummaryText: values.clinicalSummaryText,
           recommendationsText: values.recommendationsText,
+          letterBodyJson: values.letterBodyJson,
           recipientType: values.recipientType,
           fundingApprovalId: values.fundingApprovalId,
           reportRequirementId: values.reportRequirementId,
@@ -194,6 +199,7 @@ export async function commitReportFinalise({
           valuesSnapshotJson: values.snapshot,
           clinicalSummaryText: values.clinicalSummaryText,
           recommendationsText: values.recommendationsText,
+          letterBodyJson: values.letterBodyJson,
           reportStatus: "finalised",
           finalisedAt: now,
           recipientType: values.recipientType,

@@ -14,6 +14,7 @@ export const simpleReports = pgTable('simple_reports', {
   valuesSnapshotJson: jsonb('values_snapshot_json'),
   clinicalSummaryText: text('clinical_summary_text'),
   recommendationsText: text('recommendations_text'),
+  letterBodyJson: jsonb('letter_body_json'),
   reportStatus: text('report_status').notNull().default('draft'),
   versionNumber: integer('version_number').notNull().default(1),
   isCurrentVersion: boolean('is_current_version').notNull().default(true),

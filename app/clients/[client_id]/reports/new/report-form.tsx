@@ -42,6 +42,8 @@ import {
   todayDateString,
 } from "@/lib/appointments/format"
 import type { ReportRecipient, ReportSnapshot } from "@/lib/reports/snapshot"
+import type { LetterBodyDoc } from "@/lib/reports/letter-body-types"
+import { parseLetterBodyJson } from "@/lib/reports/letter-body-types"
 import { resolveTemplateKey } from "@/lib/reports/templates"
 import { cn } from "@/lib/utils"
 
@@ -70,6 +72,7 @@ export function ReportForm({
   initialDateRangeEnd,
   initialClinicalSummary,
   initialRecommendations,
+  initialLetterBodyJson = null,
   initialSnapshot,
   existingDraftReportId,
   previousVersionId,
@@ -95,6 +98,7 @@ export function ReportForm({
   initialDateRangeEnd?: string
   initialClinicalSummary?: string
   initialRecommendations?: string
+  initialLetterBodyJson?: LetterBodyDoc | null
   initialSnapshot: Omit<
     ReportSnapshot,
     | "phq9Results"
@@ -104,6 +108,7 @@ export function ReportForm({
     | "btpResults"
     | "clinicalSummaryText"
     | "recommendationsText"
+    | "letterBodyJson"
     | "dateRangeStart"
     | "dateRangeEnd"
     | "generatedAt"
@@ -171,6 +176,9 @@ export function ReportForm({
   )
   const [recommendations, setRecommendations] = useState(
     initialRecommendations ?? ""
+  )
+  const [letterBodyJson, setLetterBodyJson] = useState<LetterBodyDoc | null>(
+    initialLetterBodyJson
   )
   const [isPendingPreview, startPreviewTransition] = useTransition()
   const [saveState, boundSaveAction, savePending] = useActionState(
@@ -480,6 +488,8 @@ export function ReportForm({
             postalAddress: null,
           }
 
+  const letterBodyPending = !isReferralAck && !letterBodyJson
+
   const previewSnapshot: ReportSnapshot | null = isReferralAck
     ? fundingApprovalId
       ? {
@@ -497,6 +507,7 @@ export function ReportForm({
           btpResults: [],
           clinicalSummaryText: clinicalSummary,
           recommendationsText: null,
+          letterBodyJson: null,
           recipient,
           fundingApproval: null,
           selectedAppointmentIds: [],
@@ -521,8 +532,9 @@ export function ReportForm({
           asqResults,
           assistResults,
           btpResults,
-          clinicalSummaryText: clinicalSummary,
-          recommendationsText: recommendations,
+          clinicalSummaryText: null,
+          recommendationsText: null,
+          letterBodyJson,
           recipient,
           fundingApproval: null,
           selectedAppointmentIds: selectedApproval ? selectedAppointmentIds : [],
@@ -572,6 +584,11 @@ export function ReportForm({
       <input type="hidden" name="report_date" value={reportDate} />
       <input type="hidden" name="clinical_summary_text" value={clinicalSummary} />
       <input type="hidden" name="recommendations_text" value={recommendations} />
+      <input
+        type="hidden"
+        name="letter_body_json"
+        value={letterBodyJson ? JSON.stringify(letterBodyJson) : ""}
+      />
     </>
   )
 
@@ -869,8 +886,10 @@ export function ReportForm({
               <ReportDocument
                 snapshot={previewSnapshot}
                 editable
+                letterBodyPending={letterBodyPending}
                 onClinicalSummaryChange={setClinicalSummary}
                 onRecommendationsChange={setRecommendations}
+                onLetterBodyChange={setLetterBodyJson}
               />
             </div>
           ) : (
@@ -954,6 +973,7 @@ export function ReportForm({
             template_key: templateKey,
             report_title: reportTitle,
             report_date: reportDate,
+            letter_body_json: letterBodyJson ? JSON.stringify(letterBodyJson) : "",
             clinical_summary_text: clinicalSummary,
             recommendations_text: recommendations,
           }}

@@ -8,6 +8,56 @@ import { auditEvents, fundingApprovalReportLinks, simpleReports } from "@/db/sch
 import { requirePractitionerContext } from "@/lib/auth"
 import { db } from "@/lib/db"
 
+export async function deleteReportDraft(
+  reportId: string,
+  practiceId: string
+): Promise<{ success?: boolean; error?: string }> {
+  const context = await requirePractitionerContext()
+  if (context.practiceId !== practiceId) {
+    return { error: "Unauthorized practice access." }
+  }
+
+  const [report] = await db
+    .select({
+      simpleReportId: simpleReports.simpleReportId,
+      clientId: simpleReports.clientId,
+      reportStatus: simpleReports.reportStatus,
+    })
+    .from(simpleReports)
+    .where(
+      and(
+        eq(simpleReports.simpleReportId, reportId),
+        eq(simpleReports.practiceId, practiceId)
+      )
+    )
+    .limit(1)
+
+  if (!report) {
+    return { error: "Report not found." }
+  }
+
+  if (report.reportStatus !== "draft") {
+    return { error: "Only draft reports can be deleted." }
+  }
+
+  await db
+    .delete(simpleReports)
+    .where(eq(simpleReports.simpleReportId, reportId))
+
+  await db.insert(auditEvents).values({
+    practiceId,
+    userId: context.userId,
+    clientId: report.clientId,
+    eventType: "report.deleted",
+    entityType: "simple_report",
+    entityId: reportId,
+  })
+
+  revalidatePath(`/clients/${report.clientId}/reports`)
+  revalidatePath(`/clients/${report.clientId}`)
+  redirect(`/clients/${report.clientId}/reports`)
+}
+
 export async function deleteSimpleReport(
   reportId: string,
   practiceId: string

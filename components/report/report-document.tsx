@@ -1,5 +1,6 @@
 import { ReportBtpResultsTable } from "@/components/report/btp-results-table"
 import { EditableParagraph } from "@/components/report/editable-paragraph"
+import { LetterBodyEditor } from "@/components/report/letter-body-editor"
 import type { ReportSnapshot } from "@/lib/reports/snapshot"
 import {
   getAsqResultsFromSnapshot,
@@ -18,6 +19,7 @@ import { buildCrisisPlanSummarySentence } from "@/lib/assessment-summary/crisis-
 import { buildSelfHarmHistorySentence } from "@/lib/assessment-summary/self-harm-history"
 import { buildBtpSummaryParagraphs } from "@/lib/assessment-summary/btp-template"
 import { buildTreatmentPlanSummary } from "@/lib/reports/treatment-plan-summary"
+import type { LetterBodyDoc } from "@/lib/reports/letter-body-types"
 import {
   ReportAsqResultsTable,
   ReportResultsTable,
@@ -146,7 +148,132 @@ function SignatureBlock({ snapshot }: { snapshot: ReportSnapshot }) {
   )
 }
 
-function ProgressReportBody({
+function ProgressReportFixedHeader({ snapshot }: { snapshot: ReportSnapshot }) {
+  return (
+    <>
+      <section className="report-client-details space-y-0.5 text-sm">
+        <p>
+          <span>Client name: </span>
+          {snapshot.client.firstName} {snapshot.client.lastName}
+        </p>
+        <p>
+          <span>Date of birth: </span>
+          {formatDisplayDate(snapshot.client.dateOfBirth)}
+        </p>
+      </section>
+
+      {snapshot.fundingApproval ? (
+        <section className="report-funding-approval space-y-0.5 text-sm">
+          <p>Approval type: {snapshot.fundingApproval.approvalTypeName}</p>
+          {snapshot.fundingApproval.startDate ? (
+            <p>
+              Approval date:{" "}
+              {formatDisplayDate(snapshot.fundingApproval.startDate)}
+            </p>
+          ) : null}
+          <p>
+            Progress: {snapshot.fundingApproval.appointmentsAttended} of{" "}
+            {snapshot.fundingApproval.appointmentsApproved ?? "?"} appointments
+            attended
+          </p>
+        </section>
+      ) : null}
+
+      {!snapshot.fundingApproval &&
+      snapshot.dateRangeStart &&
+      snapshot.dateRangeEnd ? (
+        <section className="report-period text-sm">
+          <p>
+            <span className="font-medium">Reporting period: </span>
+            {formatShortDate(snapshot.dateRangeStart)} –{" "}
+            {formatShortDate(snapshot.dateRangeEnd)}
+          </p>
+        </section>
+      ) : null}
+    </>
+  )
+}
+
+function AssessmentDataSection({
+  snapshot,
+  omitEmptySections = false,
+}: {
+  snapshot: ReportSnapshot
+  omitEmptySections?: boolean
+}) {
+  const phq9Results = getPhq9ResultsFromSnapshot(snapshot)
+  const gad7Results = getGad7ResultsFromSnapshot(snapshot)
+  const assistResults = getAssistResultsFromSnapshot(snapshot)
+  const asqResults = getAsqResultsFromSnapshot(snapshot)
+  const btpResults = getBtpResultsFromSnapshot(snapshot)
+
+  if (
+    omitEmptySections &&
+    phq9Results.length === 0 &&
+    gad7Results.length === 0 &&
+    assistResults.length === 0 &&
+    asqResults.length === 0 &&
+    btpResults.length === 0
+  ) {
+    return null
+  }
+
+  return (
+    <section className="report-assessment-data space-y-4">
+      <h3 className="text-lg font-semibold">Assessment Data</h3>
+
+      {!omitEmptySections || phq9Results.length > 0 ? (
+        <ReportResultsTable
+          title="Patient Health Questionnaire 9 (PHQ-9) results"
+          results={phq9Results}
+          emptyMessage="No PHQ-9 results in this period."
+          className="report-results-phq9"
+          showImpairment
+        />
+      ) : null}
+
+      {!omitEmptySections || gad7Results.length > 0 ? (
+        <ReportResultsTable
+          title="Generalised Anxiety Disorder 7 (GAD-7) results"
+          results={gad7Results}
+          emptyMessage="No GAD-7 results in this period."
+          className="report-results-gad7"
+          showImpairment
+        />
+      ) : null}
+
+      {snapshot.assistEnabled &&
+      (!omitEmptySections || assistResults.length > 0) ? (
+        <ReportResultsTable
+          title="Alcohol, Smoking and Substance Involvement Screening Test (ASSIST) results"
+          results={assistResults}
+          emptyMessage="No ASSIST results in this period."
+          className="report-results-assist"
+          severityColumnLabel="Risk Level"
+          capitalizeSeverity={false}
+        />
+      ) : null}
+
+      {!omitEmptySections || asqResults.length > 0 ? (
+        <ReportAsqResultsTable
+          results={asqResults}
+          emptyMessage="No ASQ results in this period."
+          className="report-results-asq"
+        />
+      ) : null}
+
+      {!omitEmptySections || btpResults.length > 0 ? (
+        <ReportBtpResultsTable
+          results={btpResults}
+          emptyMessage="No Behavioural Targets Progress results in this period."
+          className="report-results-btp"
+        />
+      ) : null}
+    </section>
+  )
+}
+
+function LegacyProgressReportBody({
   snapshot,
   readOnly = false,
   omitEmptySections = false,
@@ -213,45 +340,7 @@ function ProgressReportBody({
 
   return (
     <div className="space-y-4">
-      <section className="report-client-details space-y-0.5 text-sm">
-        <p>
-          <span>Client name: </span>
-          {snapshot.client.firstName} {snapshot.client.lastName}
-        </p>
-        <p>
-          <span>Date of birth: </span>
-          {formatDisplayDate(snapshot.client.dateOfBirth)}
-        </p>
-      </section>
-
-      {snapshot.fundingApproval ? (
-        <section className="report-funding-approval space-y-0.5 text-sm">
-          <p>Approval type: {snapshot.fundingApproval.approvalTypeName}</p>
-          {snapshot.fundingApproval.startDate ? (
-            <p>
-              Approval date:{" "}
-              {formatDisplayDate(snapshot.fundingApproval.startDate)}
-            </p>
-          ) : null}
-          <p>
-            Progress: {snapshot.fundingApproval.appointmentsAttended} of{" "}
-            {snapshot.fundingApproval.appointmentsApproved ?? "?"} appointments
-            attended
-          </p>
-        </section>
-      ) : null}
-
-      {!snapshot.fundingApproval &&
-      snapshot.dateRangeStart &&
-      snapshot.dateRangeEnd ? (
-        <section className="report-period text-sm">
-          <p>
-            <span className="font-medium">Reporting period: </span>
-            {formatShortDate(snapshot.dateRangeStart)} –{" "}
-            {formatShortDate(snapshot.dateRangeEnd)}
-          </p>
-        </section>
-      ) : null}
+      <ProgressReportFixedHeader snapshot={snapshot} />
 
       {snapshot.recipient?.type === "referrer" &&
       (snapshot.recipient.firstName || snapshot.recipient.name) ? (
@@ -376,64 +465,49 @@ function ProgressReportBody({
         )}
       </section>
 
-      {(!omitEmptySections ||
-        phq9Results.length > 0 ||
-        gad7Results.length > 0 ||
-        assistResults.length > 0 ||
-        asqResults.length > 0 ||
-        btpResults.length > 0) ? (
-        <section className="report-assessment-data space-y-4">
-          <h3 className="text-lg font-semibold">Assessment Data</h3>
+      <AssessmentDataSection
+        snapshot={snapshot}
+        omitEmptySections={omitEmptySections}
+      />
+    </div>
+  )
+}
 
-          {!omitEmptySections || phq9Results.length > 0 ? (
-            <ReportResultsTable
-              title="Patient Health Questionnaire 9 (PHQ-9) results"
-              results={phq9Results}
-              emptyMessage="No PHQ-9 results in this period."
-              className="report-results-phq9"
-              showImpairment
-            />
-          ) : null}
+function RichTextProgressReportBody({
+  snapshot,
+  editable = false,
+  letterBodyPending = false,
+  onLetterBodyChange,
+  omitEmptySections = false,
+}: {
+  snapshot: ReportSnapshot
+  editable?: boolean
+  letterBodyPending?: boolean
+  onLetterBodyChange?: (value: LetterBodyDoc) => void
+  omitEmptySections?: boolean
+}) {
+  return (
+    <div className="space-y-4">
+      <ProgressReportFixedHeader snapshot={snapshot} />
 
-          {!omitEmptySections || gad7Results.length > 0 ? (
-            <ReportResultsTable
-              title="Generalised Anxiety Disorder 7 (GAD-7) results"
-              results={gad7Results}
-              emptyMessage="No GAD-7 results in this period."
-              className="report-results-gad7"
-              showImpairment
-            />
-          ) : null}
-
-          {snapshot.assistEnabled &&
-          (!omitEmptySections || assistResults.length > 0) ? (
-            <ReportResultsTable
-              title="Alcohol, Smoking and Substance Involvement Screening Test (ASSIST) results"
-              results={assistResults}
-              emptyMessage="No ASSIST results in this period."
-              className="report-results-assist"
-              severityColumnLabel="Risk Level"
-              capitalizeSeverity={false}
-            />
-          ) : null}
-
-          {!omitEmptySections || asqResults.length > 0 ? (
-            <ReportAsqResultsTable
-              results={asqResults}
-              emptyMessage="No ASQ results in this period."
-              className="report-results-asq"
-            />
-          ) : null}
-
-          {!omitEmptySections || btpResults.length > 0 ? (
-            <ReportBtpResultsTable
-              results={btpResults}
-              emptyMessage="No Behavioural Targets Progress results in this period."
-              className="report-results-btp"
-            />
-          ) : null}
+      {letterBodyPending ? (
+        <p className="text-sm text-muted-foreground">
+          This letter will be generated once you save this draft.
+        </p>
+      ) : snapshot.letterBodyJson ? (
+        <section className="report-letter-body">
+          <LetterBodyEditor
+            value={snapshot.letterBodyJson}
+            onChange={onLetterBodyChange}
+            editable={editable}
+          />
         </section>
       ) : null}
+
+      <AssessmentDataSection
+        snapshot={snapshot}
+        omitEmptySections={omitEmptySections}
+      />
     </div>
   )
 }
@@ -509,17 +583,27 @@ export function ReportDocument({
   readOnly = false,
   omitEmptySections = false,
   editable = false,
+  letterBodyPending = false,
+  useLegacyProgressBody = false,
   onClinicalSummaryChange,
   onRecommendationsChange,
+  onLetterBodyChange,
 }: {
   snapshot: ReportSnapshot
   readOnly?: boolean
   omitEmptySections?: boolean
   editable?: boolean
+  letterBodyPending?: boolean
+  useLegacyProgressBody?: boolean
   onClinicalSummaryChange?: (value: string) => void
   onRecommendationsChange?: (value: string) => void
+  onLetterBodyChange?: (value: LetterBodyDoc) => void
 }) {
   const templateKey = resolveTemplateKey(snapshot.templateKey)
+  const useRichTextBody =
+    templateKey !== "referral_acknowledgement" &&
+    !useLegacyProgressBody &&
+    (snapshot.letterBodyJson !== null || letterBodyPending)
 
   return (
     <article className="report-document mx-auto max-w-3xl bg-white text-foreground">
@@ -534,8 +618,16 @@ export function ReportDocument({
           editable={editable}
           onClinicalSummaryChange={onClinicalSummaryChange}
         />
+      ) : useRichTextBody ? (
+        <RichTextProgressReportBody
+          snapshot={snapshot}
+          editable={editable}
+          letterBodyPending={letterBodyPending}
+          onLetterBodyChange={onLetterBodyChange}
+          omitEmptySections={omitEmptySections}
+        />
       ) : (
-        <ProgressReportBody
+        <LegacyProgressReportBody
           snapshot={snapshot}
           readOnly={readOnly}
           omitEmptySections={omitEmptySections}

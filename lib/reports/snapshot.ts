@@ -1,3 +1,5 @@
+import type { LetterBodyDoc } from "@/lib/reports/letter-body-types"
+import { isLetterBodyDoc } from "@/lib/reports/letter-body-types"
 import type { SuicideAttemptRecord } from "@/lib/treatment-plans/types"
 
 export type ReportResultRow = {
@@ -77,6 +79,7 @@ export type ReportSnapshot = {
   results?: ReportResultRow[]
   clinicalSummaryText: string | null
   recommendationsText: string | null
+  letterBodyJson: LetterBodyDoc | null
   therapeuticTarget: string | null
   behaviouralTargets: string[]
   assistEnabled: boolean
@@ -176,6 +179,7 @@ export function parseReportSnapshot(value: unknown): ReportSnapshot | null {
     assistEnabled: raw.assistEnabled ?? false,
     suicideAttempts: raw.suicideAttempts ?? [],
     crisisPlanDate: raw.crisisPlanDate ?? null,
+    letterBodyJson: isLetterBodyDoc(raw.letterBodyJson) ? raw.letterBodyJson : null,
     selectedAppointmentIds: raw.selectedAppointmentIds ?? [],
   }
 }

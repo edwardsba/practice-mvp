@@ -39,7 +39,8 @@ function pivotByTarget(
  * than one target running at once, each rated separately).
  */
 export function buildBtpSummaryParagraphs(
-  results: BtpReportResultRow[]
+  results: BtpReportResultRow[],
+  clientFirstName: string
 ): { target: string; paragraph: string }[] {
   const byTarget = pivotByTarget(results)
   const config = BTP_TOOL_CONFIG
@@ -49,12 +50,16 @@ export function buildBtpSummaryParagraphs(
     const stats = computeGenericOverviewStats(points, config.variabilityBands)
     if (!stats) continue
 
-    const overviewSentence =
-      `For the behavioural target "${target}", the client rated their effectiveness between ` +
+    const targetSentence = `For the behavioural target: ${target}.`
+
+    const resultsSentence =
+      `Across the referral period, ${clientFirstName} rated their effectiveness between ` +
       `${stats.min}/${config.maxScore} (${config.ratingFromScore(stats.min)}) and ` +
-      `${stats.max}/${config.maxScore} (${config.ratingFromScore(stats.max)}) across the referral period, ` +
+      `${stats.max}/${config.maxScore} (${config.ratingFromScore(stats.max)}), ` +
       `with a mean rating of ${stats.mean}/${config.maxScore} (${config.ratingFromScore(Math.round(stats.mean))}) ` +
       `and a median rating of ${stats.median}/${config.maxScore} (n = ${stats.n}).`
+
+    const overviewSentence = `${targetSentence} ${resultsSentence}`
 
     const trendShape = classifyTrend(points)
     const variabilityPatternSentence = buildVariabilityPatternSentence(

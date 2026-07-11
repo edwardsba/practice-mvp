@@ -330,7 +330,7 @@ function LegacyProgressReportBody({
     clientFirstName,
     snapshot.crisisPlanDate
   )
-  const btpParagraphs = buildBtpSummaryParagraphs(btpResults)
+  const btpParagraphs = buildBtpSummaryParagraphs(btpResults, clientFirstName)
 
   const treatmentPlanSummary = buildTreatmentPlanSummary(
     clientFirstName,

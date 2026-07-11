@@ -121,17 +121,16 @@ export function generateLetterBody(snapshot: ReportSnapshot): LetterBodyDoc {
         clientFirstName
       )
     : null
-  const btpParagraphs = buildBtpSummaryParagraphs(btpResults)
+  const btpParagraphs = buildBtpSummaryParagraphs(btpResults, clientFirstName)
 
   if (btpParagraphs.length > 0 || assistParagraph) {
     content.push(heading("Behavioural targets"))
-    content.push(
-      paragraph(
-        `Progress toward behavioural change was monitored using self-rated behavioural targets identified in the treatment plan${
-          snapshot.assistEnabled ? " and the ASSIST substance-use screen" : ""
-        }.`
-      )
-    )
+    const behaviouralTargetsIntro =
+      "Progress towards the client's behavioural targets was monitored with a self-rated measure."
+    const assistIntro = snapshot.assistEnabled
+      ? " Substance use was monitored using the Alcohol, Smoking and Substance Involvement Screening Test (ASSIST)."
+      : ""
+    content.push(paragraph(`${behaviouralTargetsIntro}${assistIntro}`))
     for (const { paragraph: text } of btpParagraphs) {
       content.push(paragraph(text))
     }

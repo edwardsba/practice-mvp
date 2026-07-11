@@ -44,6 +44,7 @@ export function renderLetterBodyPdf(
       const text = nodeText(node)
       if (text) {
         helpers.bodyText(doc, text)
+        doc.moveDown(0.4)
       } else {
         doc.moveDown(0.4)
       }

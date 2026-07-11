@@ -76,17 +76,18 @@ export function generateLetterBody(snapshot: ReportSnapshot): LetterBodyDoc {
   )
 
   if (phq9Paragraph || gad7Paragraph) {
-    content.push(heading("Ongoing emotional state supervision"))
+    content.push(heading("Mood and anxiety assessment"))
     content.push(
       paragraph(
-        `As part of the treatment plan, ongoing emotional state was monitored for ${clientFirstName} using the Patient Health Questionnaire (PHQ-9) and the Generalised Anxiety Disorder scale (GAD-7).`
+        `As part of the treatment plan, ongoing emotional state was monitored using the Patient Health Questionnaire (PHQ-9) and the Generalised Anxiety Disorder scale (GAD-7).`
       )
     )
     if (phq9Paragraph) content.push(paragraph(phq9Paragraph))
     if (gad7Paragraph) content.push(paragraph(gad7Paragraph))
   }
 
-  content.push(heading("Self-harm history"))
+  content.push(heading("Risk assessment"))
+
   content.push(paragraph(buildSelfHarmHistorySentence(snapshot.suicideAttempts)))
 
   const asqResults = getAsqResultsFromSnapshot(snapshot)
@@ -97,15 +98,14 @@ export function generateLetterBody(snapshot: ReportSnapshot): LetterBodyDoc {
       currentPositive: r.currentPositive ?? false,
     }))
   )
-  content.push(heading("ASQ results summary"))
+  const asqIntro =
+    "Suicide risk was monitored throughout treatment using the Ask Suicide-Screening Questions (ASQ)."
+  const asqNotAdministered =
+    "The Ask Suicide-Screening Questions Assessment (ASQ) was not administered during this period."
   content.push(
-    paragraph(
-      "Suicide risk was monitored throughout treatment using the Ask Suicide-Screening Questions (ASQ)."
-    )
+    paragraph(asqSentence ? `${asqIntro} ${asqSentence}` : asqNotAdministered)
   )
-  if (asqSentence) content.push(paragraph(asqSentence))
 
-  content.push(heading("Crisis plan"))
   content.push(
     paragraph(
       buildCrisisPlanSummarySentence(clientFirstName, snapshot.crisisPlanDate)

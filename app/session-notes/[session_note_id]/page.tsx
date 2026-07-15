@@ -12,6 +12,7 @@ import {
   RiskAssessmentTable,
   type RiskAssessmentRow,
 } from "@/components/session-notes/risk-assessment-table"
+import { MseStatusBadge } from "@/components/session-notes/mse-status-badge"
 import { SessionNoteActions } from "@/components/session-notes/session-note-actions"
 import { SessionNoteDocument } from "@/components/session-notes/session-note-document"
 import { SessionNotesEditor } from "@/components/session-notes/session-notes-editor"
@@ -34,6 +35,7 @@ import {
 } from "@/components/ui/table"
 import { formatClientNameLastFirst } from "@/lib/appointments/format"
 import { requirePractitionerContext } from "@/lib/auth"
+import { appendReturnTo } from "@/lib/navigation/back"
 import { formatSessionNoteDate } from "@/lib/session-notes/format"
 import { loadSessionNoteViewContext } from "@/lib/session-notes/load-context"
 import { loadSessionNoteForPractice } from "@/lib/session-notes/load"
@@ -173,6 +175,35 @@ export default async function SessionNoteViewPage({
                     </TableBody>
                   </Table>
                 </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Mental status examination</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {viewContext.mseInstance ? (
+                <div className="flex flex-wrap items-center gap-3">
+                  <MseStatusBadge instance={viewContext.mseInstance} />
+                  <Link
+                    href={appendReturnTo(
+                      `/clients/${note.clientId}/mse/${viewContext.mseInstance.assessmentInstanceId}`,
+                      sessionNoteUrl
+                    )}
+                    className="text-sm font-medium text-primary hover:underline"
+                  >
+                    View MSE
+                  </Link>
+                </div>
+              ) : (
+                <Link
+                  href={`/clients/${note.clientId}/mse/new?session_note_id=${sessionNoteId}&returnTo=${encodeURIComponent(sessionNoteUrl)}`}
+                  className="text-sm font-medium text-primary hover:underline"
+                >
+                  Administer MSE
+                </Link>
               )}
             </CardContent>
           </Card>

@@ -36,7 +36,7 @@ export function CollapsibleSection({
           </span>
         </CardTitle>
       </CardHeader>
-      {open ? <CardContent>{children}</CardContent> : null}
+      <CardContent className={open ? undefined : "hidden"}>{children}</CardContent>
     </Card>
   )
 }

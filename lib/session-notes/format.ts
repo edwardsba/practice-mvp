@@ -58,10 +58,28 @@ export function derivePsqStatus(
   return "not_sent"
 }
 
-export type AsqStatus = "not_done" | "completed"
+export type AssessmentCompletionStatus = "not_done" | "completed"
+
+export type AsqStatus = AssessmentCompletionStatus
+
+/** Shared completion status for assessments without scored results (and ASQ). */
+export function deriveAssessmentStatus(
+  instance:
+    | { status?: string | null; submittedAt?: Date | string | null }
+    | null
+    | undefined
+): AssessmentCompletionStatus {
+  if (!instance) return "not_done"
+  if (instance.status === "submitted" || instance.submittedAt != null) {
+    return "completed"
+  }
+  return "not_done"
+}
 
 export function deriveAsqStatus(
   asqCompleted: boolean | null | undefined
 ): AsqStatus {
-  return asqCompleted ? "completed" : "not_done"
+  return deriveAssessmentStatus(
+    asqCompleted ? { status: "submitted", submittedAt: new Date(0) } : null
+  )
 }

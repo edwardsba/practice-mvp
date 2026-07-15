@@ -54,6 +54,12 @@ export type SessionNoteAsqResult = {
   acuteRiskRating: string | null
 } | null
 
+export type SessionNoteMseInstance = {
+  assessmentInstanceId: string
+  status: string
+  submittedAt: Date | null
+} | null
+
 export type SessionNoteCrisisPlanInfo = {
   crisisPlanId: string
   versionNumber: number
@@ -76,6 +82,7 @@ export type SessionNoteViewContext = {
   btpTargets: SessionNoteBtpTarget[]
   assessments: SessionNoteAssessmentResult[]
   asqResult: SessionNoteAsqResult
+  mseInstance: SessionNoteMseInstance
   crisisPlan: SessionNoteCrisisPlanInfo
   nextAppointment: SessionNoteNextAppointment
   practitionerName: string
@@ -292,6 +299,35 @@ async function loadAsqForSession(
   }
 }
 
+async function loadMseForSession(
+  note: SessionNoteRow
+): Promise<SessionNoteMseInstance> {
+  const [row] = await db
+    .select({
+      assessmentInstanceId: assessmentInstances.assessmentInstanceId,
+      status: assessmentInstances.status,
+      submittedAt: assessmentInstances.submittedAt,
+    })
+    .from(assessmentInstances)
+    .innerJoin(
+      assessmentDefinitions,
+      eq(
+        assessmentInstances.assessmentDefinitionId,
+        assessmentDefinitions.assessmentDefinitionId
+      )
+    )
+    .where(
+      and(
+        eq(assessmentInstances.sessionNoteId, note.sessionNoteId),
+        eq(assessmentDefinitions.assessmentCode, "mse")
+      )
+    )
+    .orderBy(desc(assessmentInstances.submittedAt))
+    .limit(1)
+
+  return row ?? null
+}
+
 async function loadCrisisPlanForSession(
   note: SessionNoteRow
 ): Promise<SessionNoteCrisisPlanInfo> {
@@ -344,13 +380,14 @@ export async function loadSessionNoteViewContext(
     )
     .limit(1)
 
-  const [phq9, gad7, assist, btpTargets, asqResult, crisisPlan, nextAppt] =
+  const [phq9, gad7, assist, btpTargets, asqResult, mseInstance, crisisPlan, nextAppt] =
     await Promise.all([
       loadAssessmentForSession(note, "PHQ9", PHQ9_IMPAIRMENT_ELEMENT_KEY),
       loadAssessmentForSession(note, "GAD7", GAD7_IMPAIRMENT_ELEMENT_KEY),
       loadAssessmentForSession(note, "ASSIST"),
       loadBtpForSession(note),
       loadAsqForSession(note),
+      loadMseForSession(note),
       loadCrisisPlanForSession(note),
       loadNextAppointmentAfterSession(
         note.clientId,
@@ -372,6 +409,7 @@ export async function loadSessionNoteViewContext(
     btpTargets,
     assessments: [phq9, gad7, assist],
     asqResult,
+    mseInstance,
     crisisPlan,
     nextAppointment: nextAppt
       ? {

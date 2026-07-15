@@ -25,6 +25,8 @@ export const assessmentElements = pgTable('assessment_elements', {
   displayOrder: integer('display_order').notNull(),
   isRequired: boolean('is_required').notNull().default(true),
   isActive: boolean('is_active').notNull().default(true),
+  groupLabel: text('group_label'), // e.g. "Presentation", "Mental Function", "Discernment"
+  subgroupLabel: text('subgroup_label'), // e.g. "Perceptions", "Thoughts", "Cognitions" — null if the assessment has no secondary grouping
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 })
 
@@ -36,5 +38,6 @@ export const assessmentOptions = pgTable('assessment_options', {
   optionValue: text('option_value').notNull(),
   scoreValue: integer('score_value').notNull(),
   displayOrder: integer('display_order').notNull(),
+  isDefaultSelection: boolean('is_default_selection').notNull().default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 })

@@ -37,9 +37,14 @@ import {
   loadBtpResultsForAppointments,
   loadBtpResultsForDateRange,
 } from "@/lib/assessments/btp-results"
+import {
+  loadMseResultsForAppointments,
+  loadMseResultsForDateRange,
+} from "@/lib/mse/load-report-results"
 import { getMaxScoreForAssessmentDefinition } from "@/lib/assessments/max-score"
 import type {
   BtpReportResultRow,
+  MseReportResultRow,
   ReportFundingApproval,
   ReportRecipient,
   ReportResultRow,
@@ -60,6 +65,7 @@ export type ReportRangePreview = {
   phq9Results: ReportPreviewRow[]
   gad7Results: ReportPreviewRow[]
   asqResults: ReportPreviewRow[]
+  mseResults: MseReportResultRow[]
   assistResults: ReportPreviewRow[]
   btpResults: BtpReportResultRow[]
 }
@@ -343,6 +349,7 @@ export async function fetchReportResultsForRange(
         phq9Results: [],
         gad7Results: [],
         asqResults: [],
+        mseResults: [],
         assistResults: [],
         btpResults: [],
       },
@@ -356,6 +363,7 @@ export async function fetchReportResultsForRange(
         phq9Results: [],
         gad7Results: [],
         asqResults: [],
+        mseResults: [],
         assistResults: [],
         btpResults: [],
       },
@@ -370,6 +378,7 @@ export async function fetchReportResultsForRange(
         phq9Results: [],
         gad7Results: [],
         asqResults: [],
+        mseResults: [],
         assistResults: [],
         btpResults: [],
       },
@@ -380,7 +389,7 @@ export async function fetchReportResultsForRange(
   const rangeStart = new Date(`${dateRangeStart}T00:00:00`)
   const rangeEnd = new Date(`${dateRangeEnd}T23:59:59.999`)
 
-  const [phq9Results, gad7Results, asqResults, assistResults, btpSummaries] =
+  const [phq9Results, gad7Results, asqResults, mseResults, assistResults, btpSummaries] =
     await Promise.all([
     fetchResultsForAssessment(
       clientId,
@@ -406,6 +415,12 @@ export async function fetchReportResultsForRange(
       rangeEnd,
       { includeAcuteRisk: true }
     ),
+    loadMseResultsForDateRange(
+      clientId,
+      context.practiceId,
+      rangeStart,
+      rangeEnd
+    ),
     fetchResultsForAssessment(
       clientId,
       context.practiceId,
@@ -426,7 +441,14 @@ export async function fetchReportResultsForRange(
   }))
 
   return {
-    preview: { phq9Results, gad7Results, asqResults, assistResults, btpResults },
+    preview: {
+      phq9Results,
+      gad7Results,
+      asqResults,
+      mseResults,
+      assistResults,
+      btpResults,
+    },
   }
 }
 
@@ -442,6 +464,7 @@ export async function fetchReportResultsForAppointments(
         phq9Results: [],
         gad7Results: [],
         asqResults: [],
+        mseResults: [],
         assistResults: [],
         btpResults: [],
       },
@@ -456,6 +479,7 @@ export async function fetchReportResultsForAppointments(
         phq9Results: [],
         gad7Results: [],
         asqResults: [],
+        mseResults: [],
         assistResults: [],
         btpResults: [],
       },
@@ -463,7 +487,7 @@ export async function fetchReportResultsForAppointments(
     }
   }
 
-  const [phq9Results, gad7Results, asqResults, assistResults, btpSummaries] =
+  const [phq9Results, gad7Results, asqResults, mseResults, assistResults, btpSummaries] =
     await Promise.all([
       fetchResultsForAppointments(
         clientId,
@@ -486,6 +510,11 @@ export async function fetchReportResultsForAppointments(
         appointmentIds,
         { includeAcuteRisk: true, linkViaSessionNote: true }
       ),
+      loadMseResultsForAppointments(
+        clientId,
+        context.practiceId,
+        appointmentIds
+      ),
       fetchResultsForAppointments(
         clientId,
         context.practiceId,
@@ -506,7 +535,14 @@ export async function fetchReportResultsForAppointments(
   }))
 
   return {
-    preview: { phq9Results, gad7Results, asqResults, assistResults, btpResults },
+    preview: {
+      phq9Results,
+      gad7Results,
+      asqResults,
+      mseResults,
+      assistResults,
+      btpResults,
+    },
   }
 }
 
@@ -532,6 +568,7 @@ export async function buildSnapshot(
   phq9Results: ReportPreviewRow[],
   gad7Results: ReportPreviewRow[],
   asqResults: ReportPreviewRow[],
+  mseResults: MseReportResultRow[],
   assistResults: ReportPreviewRow[],
   btpResults: BtpReportResultRow[],
   clinicalSummaryText: string | null,
@@ -700,6 +737,7 @@ export async function buildSnapshot(
     phq9Results,
     gad7Results,
     asqResults,
+    mseResults,
     assistResults,
     btpResults,
     clinicalSummaryText,

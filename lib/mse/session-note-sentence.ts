@@ -81,6 +81,12 @@ const DISCERNMENT_FIELDS: {
   { key: "judgement", label: "Judgement" },
 ]
 
+export {
+  PRESENTATION_FIELDS as MSE_PRESENTATION_FIELDS,
+  MENTAL_FUNCTION_GROUPS as MSE_MENTAL_FUNCTION_GROUPS,
+  DISCERNMENT_FIELDS as MSE_DISCERNMENT_FIELDS,
+}
+
 /** 1 → itself; 2 → "A and B"; 3+ → "A, B and C" (no serial comma). */
 export function joinNames(names: string[]): string {
   if (names.length === 0) return ""
@@ -94,6 +100,8 @@ function lowercaseExceptFirst(names: string[]): string[] {
     index === 0 ? name : name.charAt(0).toLowerCase() + name.slice(1)
   )
 }
+
+export { lowercaseExceptFirst as mseLowercaseExceptFirst }
 
 function insertWord(
   fieldKey: MseSentenceFieldKey,

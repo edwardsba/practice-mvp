@@ -104,6 +104,7 @@ export function ReportForm({
     | "phq9Results"
     | "gad7Results"
     | "asqResults"
+    | "mseResults"
     | "assistResults"
     | "btpResults"
     | "clinicalSummaryText"
@@ -166,6 +167,9 @@ export function ReportForm({
   const [phq9Results, setPhq9Results] = useState<ReportPreviewRow[]>([])
   const [gad7Results, setGad7Results] = useState<ReportPreviewRow[]>([])
   const [asqResults, setAsqResults] = useState<ReportPreviewRow[]>([])
+  const [mseResults, setMseResults] = useState<
+    import("@/lib/reports/snapshot").MseReportResultRow[]
+  >([])
   const [assistResults, setAssistResults] = useState<ReportPreviewRow[]>([])
   const [btpResults, setBtpResults] = useState<
     import("@/lib/reports/snapshot").BtpReportResultRow[]
@@ -264,6 +268,7 @@ export function ReportForm({
           setPhq9Results([])
           setGad7Results([])
           setAsqResults([])
+          setMseResults([])
           setAssistResults([])
           setBtpResults([])
           setPreviewError(null)
@@ -278,6 +283,7 @@ export function ReportForm({
           setPhq9Results(preview.phq9Results)
           setGad7Results(preview.gad7Results)
           setAsqResults(preview.asqResults)
+          setMseResults(preview.mseResults)
           setAssistResults(preview.assistResults)
           setBtpResults(preview.btpResults)
           setPreviewError(error ?? null)
@@ -287,6 +293,7 @@ export function ReportForm({
           setPhq9Results([])
           setGad7Results([])
           setAsqResults([])
+          setMseResults([])
           setAssistResults([])
           setBtpResults([])
           setPreviewError(null)
@@ -302,6 +309,7 @@ export function ReportForm({
           setPhq9Results(preview.phq9Results)
           setGad7Results(preview.gad7Results)
           setAsqResults(preview.asqResults)
+          setMseResults(preview.mseResults)
           setAssistResults(preview.assistResults)
           setBtpResults(preview.btpResults)
           setPreviewError(error ?? null)
@@ -503,6 +511,7 @@ export function ReportForm({
           phq9Results: [],
           gad7Results: [],
           asqResults: [],
+          mseResults: [],
           assistResults: [],
           btpResults: [],
           clinicalSummaryText: clinicalSummary,
@@ -530,6 +539,7 @@ export function ReportForm({
           phq9Results,
           gad7Results,
           asqResults,
+          mseResults,
           assistResults,
           btpResults,
           clinicalSummaryText: null,

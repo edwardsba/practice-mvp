@@ -27,6 +27,17 @@ export type BtpReportResultRow = {
   targets: BtpReportTargetRow[]
 }
 
+/** Per-field MSE selection for Progress Report aggregation (suicidality excluded). */
+export type MseReportFieldValue = {
+  value: string
+  isBaseline: boolean
+}
+
+export type MseReportResultRow = {
+  date: string
+  fields: Partial<Record<string, MseReportFieldValue>>
+}
+
 export type ReportRecipient = {
   type: "referrer" | "client" | "none"
   name: string | null
@@ -73,6 +84,7 @@ export type ReportSnapshot = {
   phq9Results: ReportResultRow[]
   gad7Results: ReportResultRow[]
   asqResults: ReportResultRow[]
+  mseResults: MseReportResultRow[]
   assistResults: ReportResultRow[]
   btpResults: BtpReportResultRow[]
   /** @deprecated Legacy snapshots used a single results array */
@@ -99,6 +111,10 @@ export function getGad7ResultsFromSnapshot(snapshot: ReportSnapshot): ReportResu
 
 export function getAsqResultsFromSnapshot(snapshot: ReportSnapshot): ReportResultRow[] {
   return snapshot.asqResults ?? []
+}
+
+export function getMseResultsFromSnapshot(snapshot: ReportSnapshot): MseReportResultRow[] {
+  return snapshot.mseResults ?? []
 }
 
 export function getAssistResultsFromSnapshot(snapshot: ReportSnapshot): ReportResultRow[] {
@@ -140,6 +156,7 @@ export function parseReportSnapshot(value: unknown): ReportSnapshot | null {
   const phq9Results = getPhq9ResultsFromSnapshot(raw)
   const gad7Results = getGad7ResultsFromSnapshot(raw)
   const asqResults = getAsqResultsFromSnapshot(raw)
+  const mseResults = getMseResultsFromSnapshot(raw)
   const assistResults = getAssistResultsFromSnapshot(raw)
   const btpResults = getBtpResultsFromSnapshot(raw)
 
@@ -172,6 +189,7 @@ export function parseReportSnapshot(value: unknown): ReportSnapshot | null {
     phq9Results,
     gad7Results,
     asqResults,
+    mseResults,
     assistResults,
     btpResults,
     therapeuticTarget: raw.therapeuticTarget ?? null,

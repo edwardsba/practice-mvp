@@ -2,6 +2,7 @@ import { buildAsqSummarySentence } from "@/lib/assessment-summary/asq-template"
 import { buildCrisisPlanSummarySentence } from "@/lib/assessment-summary/crisis-plan-summary"
 import { buildSelfHarmHistorySentence } from "@/lib/assessment-summary/self-harm-history"
 import { buildBtpSummaryParagraphs } from "@/lib/assessment-summary/btp-template"
+import { buildMseProgressReportParagraph } from "@/lib/assessment-summary/mse-template"
 import {
   buildAssessmentSummaryParagraph,
   toAssessmentPoints,
@@ -13,6 +14,7 @@ import {
   getAssistResultsFromSnapshot,
   getBtpResultsFromSnapshot,
   getGad7ResultsFromSnapshot,
+  getMseResultsFromSnapshot,
   getPhq9ResultsFromSnapshot,
 } from "@/lib/reports/snapshot"
 import { buildTreatmentPlanSummary } from "@/lib/reports/treatment-plan-summary"
@@ -61,6 +63,16 @@ export function generateLetterBody(snapshot: ReportSnapshot): LetterBodyDoc {
   )
   content.push(heading("Treatment plan summary"))
   content.push(paragraph(treatmentPlanSummary))
+
+  const mseResults = getMseResultsFromSnapshot(snapshot)
+  const mseParagraph = buildMseProgressReportParagraph(mseResults)
+  content.push(heading("Mental status examination"))
+  content.push(
+    paragraph(
+      mseParagraph ??
+        "A Mental Status Examination (MSE) was not administered during this period."
+    )
+  )
 
   const phq9Results = getPhq9ResultsFromSnapshot(snapshot)
   const gad7Results = getGad7ResultsFromSnapshot(snapshot)

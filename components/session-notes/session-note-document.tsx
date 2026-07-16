@@ -152,6 +152,7 @@ export function SessionNoteDocument({
   therapeuticTarget,
   btpTargets,
   assessments,
+  mseSentence,
   asqResult,
   crisisPlan,
   practitionerNotes,
@@ -166,6 +167,7 @@ export function SessionNoteDocument({
   therapeuticTarget: string | null
   btpTargets: SessionNoteBtpTarget[]
   assessments: SessionNoteAssessmentResult[]
+  mseSentence?: string | null
   asqResult: SessionNoteAsqResult
   crisisPlan: SessionNoteCrisisPlanInfo
   practitionerNotes: string | null
@@ -191,6 +193,13 @@ export function SessionNoteDocument({
           {formatSessionNoteDate(sessionDate)}, {formatSessionNoteTime(sessionTime)}
         </p>
       </div>
+
+      {mseSentence ? (
+        <>
+          <h3 className="session-note-label">Mental Status Examination</h3>
+          <p className="text-sm leading-relaxed">{mseSentence}</p>
+        </>
+      ) : null}
 
       <h3 className="session-note-label">Objective Measures</h3>
       <ObjectiveMeasuresTable assessments={assessments} />

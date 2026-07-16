@@ -42,6 +42,7 @@ export type SessionNotePdfData = {
   therapeuticTarget: string | null
   btpTargets: SessionNoteBtpTarget[]
   assessments: SessionNoteAssessmentResult[]
+  mseSentence: string | null
   asqResult: SessionNoteAsqResult
   crisisPlan: SessionNoteCrisisPlanInfo
   practitionerNotes: string | null
@@ -151,6 +152,12 @@ export function generateSessionNotePdf(data: SessionNotePdfData): Promise<Buffer
       doc,
       `Session: ${formatSessionNoteDate(data.sessionDate)}, ${formatSessionNoteTime(data.sessionTime)}`
     )
+
+    // Mental Status Examination — above Objective Measures / Risk, matching page order
+    if (data.mseSentence) {
+      sectionLabel(doc, "Mental Status Examination")
+      bodyText(doc, data.mseSentence)
+    }
 
     // Objective Measures
     sectionLabel(doc, "Objective Measures")

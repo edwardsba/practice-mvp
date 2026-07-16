@@ -19,6 +19,7 @@ export async function buildSessionNotePdfData(
     therapeuticTarget: viewContext.treatmentPlan?.therapeuticTarget ?? null,
     btpTargets: viewContext.btpTargets,
     assessments: viewContext.assessments,
+    mseSentence: viewContext.mseInstance?.sentence ?? null,
     asqResult: viewContext.asqResult,
     crisisPlan: viewContext.crisisPlan,
     practitionerNotes: note.practitionerNotes,

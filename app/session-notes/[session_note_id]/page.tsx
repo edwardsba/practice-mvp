@@ -185,17 +185,24 @@ export default async function SessionNoteViewPage({
             </CardHeader>
             <CardContent>
               {viewContext.mseInstance ? (
-                <div className="flex flex-wrap items-center gap-3">
-                  <MseStatusBadge instance={viewContext.mseInstance} />
-                  <Link
-                    href={appendReturnTo(
-                      `/clients/${note.clientId}/mse/${viewContext.mseInstance.assessmentInstanceId}`,
-                      sessionNoteUrl
-                    )}
-                    className="text-sm font-medium text-primary hover:underline"
-                  >
-                    View MSE
-                  </Link>
+                <div className="space-y-3">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <MseStatusBadge instance={viewContext.mseInstance} />
+                    <Link
+                      href={appendReturnTo(
+                        `/clients/${note.clientId}/mse/${viewContext.mseInstance.assessmentInstanceId}`,
+                        sessionNoteUrl
+                      )}
+                      className="text-sm font-medium text-primary hover:underline"
+                    >
+                      View MSE
+                    </Link>
+                  </div>
+                  {viewContext.mseInstance.sentence ? (
+                    <p className="text-sm leading-relaxed">
+                      {viewContext.mseInstance.sentence}
+                    </p>
+                  ) : null}
                 </div>
               ) : (
                 <Link
@@ -287,6 +294,7 @@ export default async function SessionNoteViewPage({
           therapeuticTarget={viewContext.treatmentPlan?.therapeuticTarget ?? null}
           btpTargets={viewContext.btpTargets}
           assessments={viewContext.assessments}
+          mseSentence={viewContext.mseInstance?.sentence ?? null}
           asqResult={viewContext.asqResult}
           crisisPlan={viewContext.crisisPlan}
           practitionerNotes={note.practitionerNotes}

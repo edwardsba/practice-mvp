@@ -21,6 +21,7 @@ import {
   getFunctionalImpairmentLabelForResult,
   PHQ9_IMPAIRMENT_ELEMENT_KEY,
 } from "@/lib/assessments/impairment"
+import { loadMseSessionNoteSentence } from "@/lib/mse/load-session-note-sentence"
 import { getMaxScoreForAssessmentDefinition } from "@/lib/assessments/max-score"
 import { db } from "@/lib/db"
 import { loadActiveCrisisPlanSummary } from "@/lib/crisis-plans/load"
@@ -58,6 +59,7 @@ export type SessionNoteMseInstance = {
   assessmentInstanceId: string
   status: string
   submittedAt: Date | null
+  sentence: string | null
 } | null
 
 export type SessionNoteCrisisPlanInfo = {
@@ -325,7 +327,14 @@ async function loadMseForSession(
     .orderBy(desc(assessmentInstances.submittedAt))
     .limit(1)
 
-  return row ?? null
+  if (!row) return null
+
+  const sentence = await loadMseSessionNoteSentence(row.assessmentInstanceId)
+
+  return {
+    ...row,
+    sentence,
+  }
 }
 
 async function loadCrisisPlanForSession(

@@ -18,8 +18,10 @@ type MseField = {
   groupLabel: string
   subgroupLabel: string | null
   options: readonly string[]
-  /** Option label that should be pre-selected in the form UI. */
+  /** Option label pre-selected in the form UI. */
   defaultOptionLabel: string
+  /** Option label that counts as "normal" for reporting sentences. */
+  reportingBaselineOptionLabel: string
 }
 
 function optionValue(label: string): string {
@@ -39,6 +41,7 @@ const MSE_FIELDS: readonly MseField[] = [
     subgroupLabel: null,
     options: ["Neat", "Dishevelled", "Inappropriate", "Bizarre"],
     defaultOptionLabel: "Neat",
+    reportingBaselineOptionLabel: "Neat",
   },
   {
     key: "mse_behaviour",
@@ -58,6 +61,7 @@ const MSE_FIELDS: readonly MseField[] = [
       "Withdrawn",
     ],
     defaultOptionLabel: "Cooperative",
+    reportingBaselineOptionLabel: "Cooperative",
   },
   {
     key: "mse_eye_contact",
@@ -67,6 +71,7 @@ const MSE_FIELDS: readonly MseField[] = [
     subgroupLabel: null,
     options: ["Normal", "Intense", "Avoidant"],
     defaultOptionLabel: "Normal",
+    reportingBaselineOptionLabel: "Normal",
   },
   {
     key: "mse_motor_activity",
@@ -76,6 +81,7 @@ const MSE_FIELDS: readonly MseField[] = [
     subgroupLabel: null,
     options: ["Normal", "Restless", "Tics", "Slowed"],
     defaultOptionLabel: "Normal",
+    reportingBaselineOptionLabel: "Normal",
   },
   {
     key: "mse_affect",
@@ -85,6 +91,7 @@ const MSE_FIELDS: readonly MseField[] = [
     subgroupLabel: null,
     options: ["Full", "Constricted", "Flat", "Labile"],
     defaultOptionLabel: "Full",
+    reportingBaselineOptionLabel: "Full",
   },
   {
     key: "mse_hallucination",
@@ -94,6 +101,7 @@ const MSE_FIELDS: readonly MseField[] = [
     subgroupLabel: "Perceptions",
     options: ["None", "Auditory", "Visual"],
     defaultOptionLabel: "None",
+    reportingBaselineOptionLabel: "None",
   },
   {
     key: "mse_depersonalisation_derealisation",
@@ -103,6 +111,7 @@ const MSE_FIELDS: readonly MseField[] = [
     subgroupLabel: "Perceptions",
     options: ["None", "Derealisation", "Depersonalisation"],
     defaultOptionLabel: "None",
+    reportingBaselineOptionLabel: "None",
   },
   {
     key: "mse_homicidality",
@@ -112,6 +121,7 @@ const MSE_FIELDS: readonly MseField[] = [
     subgroupLabel: "Thoughts",
     options: ["None", "Aggressive", "Intent", "Plan"],
     defaultOptionLabel: "None",
+    reportingBaselineOptionLabel: "None",
   },
   {
     key: "mse_delusions",
@@ -121,6 +131,7 @@ const MSE_FIELDS: readonly MseField[] = [
     subgroupLabel: "Thoughts",
     options: ["None", "Grandiose", "Paranoid", "Religious"],
     defaultOptionLabel: "None",
+    reportingBaselineOptionLabel: "None",
   },
   {
     key: "mse_suicidality",
@@ -130,6 +141,7 @@ const MSE_FIELDS: readonly MseField[] = [
     subgroupLabel: "Thoughts",
     options: ["None", "Ideation", "Plan", "Intent", "Self-Harm"],
     defaultOptionLabel: "None",
+    reportingBaselineOptionLabel: "None",
   },
   {
     key: "mse_orientation",
@@ -139,6 +151,7 @@ const MSE_FIELDS: readonly MseField[] = [
     subgroupLabel: "Cognitions",
     options: ["None", "Place", "Object", "Person", "Time"],
     defaultOptionLabel: "None",
+    reportingBaselineOptionLabel: "None",
   },
   {
     key: "mse_memory",
@@ -148,6 +161,7 @@ const MSE_FIELDS: readonly MseField[] = [
     subgroupLabel: "Cognitions",
     options: ["None", "Short-Term", "Long-Term"],
     defaultOptionLabel: "None",
+    reportingBaselineOptionLabel: "None",
   },
   {
     key: "mse_attention",
@@ -157,6 +171,7 @@ const MSE_FIELDS: readonly MseField[] = [
     subgroupLabel: "Cognitions",
     options: ["Normal", "Distracted"],
     defaultOptionLabel: "Normal",
+    reportingBaselineOptionLabel: "Normal",
   },
   {
     key: "mse_insight",
@@ -167,6 +182,7 @@ const MSE_FIELDS: readonly MseField[] = [
     options: ["Good", "Fair", "Poor"],
     // UI convenience default — distinct from reporting baseline ("Good")
     defaultOptionLabel: "Fair",
+    reportingBaselineOptionLabel: "Good",
   },
   {
     key: "mse_judgement",
@@ -177,10 +193,11 @@ const MSE_FIELDS: readonly MseField[] = [
     options: ["Good", "Fair", "Poor"],
     // UI convenience default — distinct from reporting baseline ("Good")
     defaultOptionLabel: "Fair",
+    reportingBaselineOptionLabel: "Good",
   },
 ]
 
-async function applyDefaultSelections(
+async function applyOptionFlags(
   db: ReturnType<typeof drizzle>,
   definitionId: string
 ) {
@@ -200,7 +217,7 @@ async function applyDefaultSelections(
 
     await db
       .update(assessmentOptions)
-      .set({ isDefaultSelection: false })
+      .set({ isDefaultSelection: false, isReportingBaseline: false })
       .where(eq(assessmentOptions.assessmentElementId, element.assessmentElementId))
 
     await db
@@ -210,6 +227,16 @@ async function applyDefaultSelections(
         and(
           eq(assessmentOptions.assessmentElementId, element.assessmentElementId),
           eq(assessmentOptions.optionLabel, field.defaultOptionLabel)
+        )
+      )
+
+    await db
+      .update(assessmentOptions)
+      .set({ isReportingBaseline: true })
+      .where(
+        and(
+          eq(assessmentOptions.assessmentElementId, element.assessmentElementId),
+          eq(assessmentOptions.optionLabel, field.reportingBaselineOptionLabel)
         )
       )
   }
@@ -231,9 +258,9 @@ async function main() {
     .limit(1)
 
   if (existing) {
-    await applyDefaultSelections(db, existing.assessmentDefinitionId)
+    await applyOptionFlags(db, existing.assessmentDefinitionId)
     console.log(
-      "MSE assessment already seeded — default selections updated."
+      "MSE assessment already seeded — default and reporting-baseline flags updated."
     )
     await pool.end()
     return
@@ -278,6 +305,7 @@ async function main() {
         scoreValue: 0,
         displayOrder: index + 1,
         isDefaultSelection: label === field.defaultOptionLabel,
+        isReportingBaseline: label === field.reportingBaselineOptionLabel,
       }))
     )
   }

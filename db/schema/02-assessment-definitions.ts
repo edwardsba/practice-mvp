@@ -39,5 +39,6 @@ export const assessmentOptions = pgTable('assessment_options', {
   scoreValue: integer('score_value').notNull(),
   displayOrder: integer('display_order').notNull(),
   isDefaultSelection: boolean('is_default_selection').notNull().default(false),
+  isReportingBaseline: boolean('is_reporting_baseline').notNull().default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 })

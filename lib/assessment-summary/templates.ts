@@ -53,9 +53,17 @@ export function buildVariabilityPatternSentence(
 }
 
 /**
- * Builds the 3-sentence automated summary paragraph for a numeric tool
- * (PHQ-9, GAD-7, ASSIST): overview, merged variability+pattern, severity.
- * Returns null if there are no results in the period.
+ * Builds the automated summary paragraph for a numeric tool (PHQ-9, GAD-7,
+ * ASSIST). Returns null if there are no results in the period.
+ *
+ * Three shapes, depending on the result set:
+ * - n = 1: a single sentence reporting the one score. There's nothing to
+ *   compare it against, so no variability/pattern/severity sentences.
+ * - n > 1, all scores identical: a single sentence reporting the shared
+ *   score across all submissions. Variability/pattern/severity sentences
+ *   would only restate the same band name again, so they're omitted.
+ * - n > 1, scores vary: the original 3-sentence paragraph (overview,
+ *   merged variability+pattern, severity).
  */
 export function buildAssessmentSummaryParagraph(
   toolCode: NumericToolCode,
@@ -67,6 +75,30 @@ export function buildAssessmentSummaryParagraph(
   const config = NUMERIC_TOOL_CONFIG[toolCode]
   const stats = computeOverviewStats(toolCode, points)
   if (!stats) return null
+
+  // ASSIST reads as "an ASSIST score"; PHQ-9/GAD-7 read as "a PHQ-9/GAD-7 score".
+  const article = toolCode === "ASSIST" ? "an" : "a"
+
+  if (points.length === 1) {
+    const score = points[0].score
+    // Short band labels (e.g. "Moderate") — matches severity-pattern wording,
+    // not the longer severityFromScore strings used in the varying-scores overview.
+    const band = config.severityPatternBandFromScore(score)
+    return (
+      `${clientFirstName} reported ${article} ${config.toolName} score of ` +
+      `${score}/${config.maxScore} (${band}) at the only submission during this period.`
+    )
+  }
+
+  const allIdentical = points.every((p) => p.score === points[0].score)
+  if (allIdentical) {
+    const score = points[0].score
+    const band = config.severityPatternBandFromScore(score)
+    return (
+      `${clientFirstName} reported a consistent ${config.toolName} score of ` +
+      `${score}/${config.maxScore} (${band}) across all ${points.length} submissions during this period.`
+    )
+  }
 
   const overviewSentence =
     `${clientFirstName} reported ${config.toolName} scores between ` +

@@ -1,16 +1,35 @@
 import { and, eq, inArray } from "drizzle-orm"
 
-import { assessmentElements, assessmentResponses } from "@/db/schema"
-import { db } from "@/lib/db"
-
 export const ASQ_Q5_ELEMENT_KEY = "asq_q5"
-
+export const ASQ_HISTORICAL_ELEMENT_KEY = "asq_q4"
 export const ASQ_RECENT_ELEMENT_KEYS = ["asq_q1", "asq_q2", "asq_q3"]
 
-export function asqScreenOutcome(totalScore: number, q5ResponseValue: string): string {
-  if (q5ResponseValue === "yes") return "Acute positive screen"
-  if (totalScore === 0) return "Negative screen"
-  return "Non-acute positive screen"
+export type AsqFlags = {
+  historicalPositive: boolean
+  recentPositive: boolean
+  currentPositive: boolean
+}
+
+/**
+ * Computes the ASQ severity rating from the three independent flags:
+ * Historical (Q4 — lifetime attempt), Recent (Q1–3), Current (Q5).
+ * This is the single source of truth for ASQ severity — the result is
+ * stored once on assessmentResults.severity at submission time and read
+ * directly everywhere it's displayed (results page, session note,
+ * client overview). It is NOT used by the Progress Report ASQ paragraph,
+ * which has its own separate logic in lib/assessment-summary/asq-template.ts.
+ */
+export function asqScreenOutcome(flags: AsqFlags): string {
+  const { historicalPositive: h, recentPositive: r, currentPositive: c } = flags
+
+  if (!h && !r && !c) return "No history or TOSH"
+  if (h && !r && !c) return "Historical attempt, no TOSH"
+  if (h && r && !c) return "Historical attempt, recent no current TOSH"
+  if (h && r && c) return "Historical attempt, recent and current TOSH"
+  if (!h && r && !c) return "Recent no current TOSH"
+  if (!h && r && c) return "Recent and current TOSH"
+  if (!h && !r && c) return "Current TOSH"
+  return "Historical attempt, current TOSH" // h && !r && c
 }
 
 export async function getAsqRecentAndCurrentFlags(
@@ -25,6 +44,11 @@ export async function getAsqRecentAndCurrentFlags(
   for (const instanceId of assessmentInstanceIds) {
     result.set(instanceId, { recentPositive: false, currentPositive: false })
   }
+
+  // Lazy-load DB so pure helpers (asqScreenOutcome) can be unit-tested without
+  // pulling in Next's server-only module graph.
+  const { assessmentElements, assessmentResponses } = await import("@/db/schema")
+  const { db } = await import("@/lib/db")
 
   const rows = await db
     .select({

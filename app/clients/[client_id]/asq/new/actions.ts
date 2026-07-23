@@ -12,7 +12,12 @@ import {
   auditEvents,
   clients,
 } from "@/db/schema"
-import { ASQ_Q5_ELEMENT_KEY, asqScreenOutcome } from "@/lib/assessments/asq"
+import {
+  ASQ_HISTORICAL_ELEMENT_KEY,
+  ASQ_RECENT_ELEMENT_KEYS,
+  ASQ_Q5_ELEMENT_KEY,
+  asqScreenOutcome,
+} from "@/lib/assessments/asq"
 import { getAsqDefinitionId } from "@/lib/assessments/load-asq"
 import { requirePractitionerContext } from "@/lib/auth"
 import { db } from "@/lib/db"
@@ -114,7 +119,9 @@ export async function saveAsqResult(
   )
 
   let totalScore = 0
-  let q5ResponseValue = "no"
+  let historicalPositive = false
+  let recentPositive = false
+  let currentPositive = false
   const responseRows: {
     assessmentElementId: string
     responseValue: string
@@ -138,12 +145,19 @@ export async function saveAsqResult(
       totalScore += scoreValue
     }
 
-    if (elementKeyById.get(elementId) === ASQ_Q5_ELEMENT_KEY) {
-      q5ResponseValue = responseValue
+    const elementKey = elementKeyById.get(elementId)
+    if (elementKey === ASQ_HISTORICAL_ELEMENT_KEY && responseValue === "yes") {
+      historicalPositive = true
+    }
+    if (ASQ_RECENT_ELEMENT_KEYS.includes(elementKey ?? "") && responseValue === "yes") {
+      recentPositive = true
+    }
+    if (elementKey === ASQ_Q5_ELEMENT_KEY && responseValue === "yes") {
+      currentPositive = true
     }
   }
 
-  const severity = asqScreenOutcome(totalScore, q5ResponseValue)
+  const severity = asqScreenOutcome({ historicalPositive, recentPositive, currentPositive })
   const now = new Date()
 
   await db.transaction(async (tx) => {

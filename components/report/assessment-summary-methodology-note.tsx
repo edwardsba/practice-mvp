@@ -65,11 +65,14 @@ export function AssessmentSummaryMethodologyNote() {
         <div>
           <p className="font-medium text-foreground">ASQ</p>
           <p>
-            The ASQ does not use the numeric method above. It reports whichever
-            of Negative screen / Non-acute positive screen / Acute positive
-            screen applied at each administration, since a lifetime-history
-            item (e.g. a past suicide attempt) can produce a non-acute
-            positive screen indefinitely without indicating current risk.
+            The ASQ does not use the numeric method above. Its severity rating
+            is based on three independent flags from the screen: Historical
+            (a lifetime attempt, Q4), Recent (thoughts in recent weeks, Q1–3),
+            and Current (thoughts right now, Q5) — giving eight possible
+            combinations, each reported as its own short label (e.g.
+            &quot;Historical attempt, recent and current TOSH&quot;). This
+            keeps a lifetime history visible without it being confused for
+            current risk.
           </p>
         </div>
 

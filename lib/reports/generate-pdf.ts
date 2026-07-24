@@ -475,6 +475,7 @@ function drawProgressReportBody(doc: PDFKit.PDFDocument, snapshot: ReportSnapsho
       bodyText: (pdfDoc, text) =>
         bodyText(pdfDoc, text, { width: CONTENT_WIDTH }),
     })
+    drawSignature(doc, snapshot)
     drawAssessmentDataTables(doc, snapshot)
     return
   }
@@ -502,7 +503,7 @@ function drawProgressReportBody(doc: PDFKit.PDFDocument, snapshot: ReportSnapsho
     doc.moveDown(0.4)
     doc.text(
       `Thank you for your referral of ${snapshot.client.firstName} ${snapshot.client.lastName}. ` +
-        `Please find below a summary of the objective assessments completed across this referral period.`,
+        `This is a progress report for your review.`,
       { lineGap: LINE_GAP, width: PAGE_WIDTH - PAGE_MARGIN * 2 }
     )
     doc.y = doc.y + SECTION_GAP
@@ -665,6 +666,8 @@ function drawProgressReportBody(doc: PDFKit.PDFDocument, snapshot: ReportSnapsho
     sectionHeading(doc, "Recommendations")
     bodyText(doc, snapshot.recommendationsText.trim())
   }
+
+  drawSignature(doc, snapshot)
 }
 
 function drawReferralAcknowledgementBody(
@@ -732,9 +735,10 @@ function drawReferralAcknowledgementBody(
 }
 
 function drawSignature(doc: PDFKit.PDFDocument, snapshot: ReportSnapshot) {
-  const practitionerLines = [snapshot.practitioner.title, snapshot.practitioner.fullName]
-    .filter(Boolean)
-    .join(" ")
+  // See the matching note in report-document.tsx's SignatureBlock —
+  // fullName is already formatPractitionerName's output and must not have
+  // title re-prepended here.
+  const practitionerLines = snapshot.practitioner.fullName
     .replace(/\r\n/g, "\n")
     .replace(/\r/g, "\n")
     .split("\n")
@@ -787,11 +791,11 @@ export function generateReportPdf(snapshot: ReportSnapshot): Promise<Buffer> {
 
     if (templateKey === "referral_acknowledgement") {
       drawReferralAcknowledgementBody(doc, snapshot)
+      drawSignature(doc, snapshot)
     } else {
       drawProgressReportBody(doc, snapshot)
     }
 
-    drawSignature(doc, snapshot)
     doc.end()
   })
 }

@@ -38,6 +38,13 @@ function pivotByTarget(
  * Builds one summary paragraph per behavioural target (a client may have more
  * than one target running at once, each rated separately).
  *
+ * `behaviouralTargets` is the treatment plan's canonical, ordered target
+ * list — numbering ("Behavioural target 1: ...", "Behavioural target 2:
+ * ...") follows this order, matching the same numbering used in the
+ * Treatment Plan Summary section earlier in the report. Any target present
+ * in the results but not in this list is appended afterward, still
+ * numbered, rather than dropped.
+ *
  * Three shapes per target, matching the PHQ-9/GAD-7/ASSIST pattern:
  * - n = 1: a single sentence reporting the one rating.
  * - n > 1, all ratings identical: a single sentence reporting the shared
@@ -46,17 +53,29 @@ function pivotByTarget(
  */
 export function buildBtpSummaryParagraphs(
   results: BtpReportResultRow[],
-  clientFirstName: string
+  clientFirstName: string,
+  behaviouralTargets: string[]
 ): { target: string; paragraph: string }[] {
   const byTarget = pivotByTarget(results)
   const config = BTP_TOOL_CONFIG
   const output: { target: string; paragraph: string }[] = []
 
-  for (const [target, points] of byTarget.entries()) {
-    const stats = computeGenericOverviewStats(points, config.variabilityBands)
-    if (!stats) continue
+  const orderedTargets = [...behaviouralTargets]
+  for (const target of byTarget.keys()) {
+    if (!orderedTargets.includes(target)) {
+      orderedTargets.push(target)
+    }
+  }
 
-    const targetSentence = `For the behavioural target: ${target}.`
+  orderedTargets.forEach((target, index) => {
+    const points = byTarget.get(target)
+    if (!points) return
+
+    const stats = computeGenericOverviewStats(points, config.variabilityBands)
+    if (!stats) return
+
+    const targetNumber = index + 1
+    const targetSentence = `Behavioural target ${targetNumber}: ${target}.`
 
     if (points.length === 1) {
       const score = points[0].score
@@ -67,7 +86,7 @@ export function buildBtpSummaryParagraphs(
           `${targetSentence} ${clientFirstName} rated their effectiveness at ` +
           `${score}/${config.maxScore} (${band}) at the only submission during this period.`,
       })
-      continue
+      return
     }
 
     const allIdentical = points.every((p) => p.score === points[0].score)
@@ -80,7 +99,7 @@ export function buildBtpSummaryParagraphs(
           `${targetSentence} ${clientFirstName} rated their effectiveness at a consistent ` +
           `${score}/${config.maxScore} (${band}) across all ${points.length} submissions during this period.`,
       })
-      continue
+      return
     }
 
     const resultsSentence =
@@ -112,7 +131,7 @@ export function buildBtpSummaryParagraphs(
       target,
       paragraph: [overviewSentence, variabilityPatternSentence, severitySentence].join(" "),
     })
-  }
+  })
 
   return output
 }

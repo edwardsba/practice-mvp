@@ -18,7 +18,7 @@ import { buildAsqSummarySentence } from "@/lib/assessment-summary/asq-template"
 import { buildCrisisPlanSummarySentence } from "@/lib/assessment-summary/crisis-plan-summary"
 import { buildSelfHarmHistorySentence } from "@/lib/assessment-summary/self-harm-history"
 import { buildBtpSummaryParagraphs } from "@/lib/assessment-summary/btp-template"
-import { buildTreatmentPlanSummary } from "@/lib/reports/treatment-plan-summary"
+import { buildTreatmentPlanSummaryLines } from "@/lib/reports/treatment-plan-summary"
 import type { LetterBodyDoc } from "@/lib/reports/letter-body-types"
 import {
   ReportAsqResultsTable,
@@ -119,9 +119,13 @@ function LetterHeader({ snapshot }: { snapshot: ReportSnapshot }) {
 }
 
 function SignatureBlock({ snapshot }: { snapshot: ReportSnapshot }) {
-  const practitionerLine = [snapshot.practitioner.title, snapshot.practitioner.fullName]
-    .filter(Boolean)
-    .join(" ")
+  // snapshot.practitioner.fullName is already formatPractitionerName's
+  // output — it returns the practitioner's reportSignature field verbatim
+  // if one is set, otherwise composes "Title FirstName LastName" itself.
+  // Do NOT re-prepend title here — that duplicates it whenever
+  // reportSignature is empty and title is set (e.g. "Mr Mr Benjamin
+  // Edwards"). fullName is the single source of truth for this block.
+  const practitionerLine = snapshot.practitioner.fullName
 
   const practitionerLines = practitionerLine
     .split("\n")
@@ -330,9 +334,13 @@ function LegacyProgressReportBody({
     clientFirstName,
     snapshot.crisisPlanDate
   )
-  const btpParagraphs = buildBtpSummaryParagraphs(btpResults, clientFirstName)
+  const btpParagraphs = buildBtpSummaryParagraphs(
+    btpResults,
+    clientFirstName,
+    snapshot.behaviouralTargets
+  )
 
-  const treatmentPlanSummary = buildTreatmentPlanSummary(
+  const treatmentPlanLines = buildTreatmentPlanSummaryLines(
     clientFirstName,
     snapshot.therapeuticTarget,
     snapshot.behaviouralTargets
@@ -354,15 +362,18 @@ function LegacyProgressReportBody({
           </p>
           <p>
             Thank you for your referral of {snapshot.client.firstName}{" "}
-            {snapshot.client.lastName}. Please find below a summary of the objective
-            assessments completed across this referral period.
+            {snapshot.client.lastName}. This is a progress report for your review.
           </p>
         </section>
       ) : null}
 
       <section className="report-treatment-plan-summary space-y-2">
         <h3 className="text-lg font-semibold">Treatment plan summary</h3>
-        <p className="text-sm leading-relaxed">{treatmentPlanSummary}</p>
+        {treatmentPlanLines.map((line) => (
+          <p key={line} className="text-sm leading-relaxed">
+            {line}
+          </p>
+        ))}
       </section>
 
       {(!omitEmptySections || phq9Paragraph || gad7Paragraph) ? (
@@ -415,7 +426,7 @@ function LegacyProgressReportBody({
 
       {(!omitEmptySections || btpParagraphs.length > 0 || assistParagraph) ? (
         <section className="report-group-behavioural-targets space-y-2">
-          <h3 className="text-sm font-semibold">Behavioural targets</h3>
+          <h3 className="text-sm font-semibold">Behavioural targets summary</h3>
           <p className="text-sm leading-relaxed">
             Progress toward behavioural change was monitored using self-rated
             behavioural targets identified in the treatment plan
@@ -465,6 +476,8 @@ function LegacyProgressReportBody({
         )}
       </section>
 
+      <SignatureBlock snapshot={snapshot} />
+
       <AssessmentDataSection
         snapshot={snapshot}
         omitEmptySections={omitEmptySections}
@@ -503,6 +516,8 @@ function RichTextProgressReportBody({
           />
         </section>
       ) : null}
+
+      <SignatureBlock snapshot={snapshot} />
 
       <AssessmentDataSection
         snapshot={snapshot}
@@ -574,6 +589,8 @@ function ReferralAcknowledgementBody({
       ) : null}
 
       <p>Yours sincerely,</p>
+
+      <SignatureBlock snapshot={snapshot} />
     </div>
   )
 }
@@ -636,7 +653,6 @@ export function ReportDocument({
           onRecommendationsChange={onRecommendationsChange}
         />
       )}
-      <SignatureBlock snapshot={snapshot} />
     </article>
   )
 }

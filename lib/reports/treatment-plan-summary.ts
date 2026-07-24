@@ -34,3 +34,31 @@ export function buildTreatmentPlanSummary(
 
   return sentences.join(" ")
 }
+
+/**
+ * Itemized-lines version of the treatment plan summary, used by the
+ * current Progress Report letter body. The intro sentence stays a single
+ * paragraph; therapeutic target and each behavioural target become their
+ * own line, numbered to match the same order used in the Behavioural
+ * Targets Summary section later in the report.
+ */
+export function buildTreatmentPlanSummaryLines(
+  clientFirstName: string,
+  therapeuticTarget: string | null,
+  behaviouralTargets: string[]
+): string[] {
+  const lines: string[] = [
+    `The treatment plan was designed in collaboration with ${clientFirstName} using the principles of Cognitive Behaviour Therapy (CBT).`,
+  ]
+
+  if (therapeuticTarget) {
+    lines.push(`Therapeutic target: ${therapeuticTarget}`)
+  }
+
+  behaviouralTargets.forEach((target, i) => {
+    lines.push(`Behavioural target ${i + 1}: ${target}`)
+  })
+
+  return lines
+}
+

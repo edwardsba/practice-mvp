@@ -17,7 +17,7 @@ import {
   getMseResultsFromSnapshot,
   getPhq9ResultsFromSnapshot,
 } from "@/lib/reports/snapshot"
-import { buildTreatmentPlanSummary } from "@/lib/reports/treatment-plan-summary"
+import { buildTreatmentPlanSummaryLines } from "@/lib/reports/treatment-plan-summary"
 
 function heading(text: string): LetterBodyNode {
   return {
@@ -51,22 +51,24 @@ export function generateLetterBody(snapshot: ReportSnapshot): LetterBodyDoc {
     content.push(paragraph(`Dear ${referrerFirstName},`))
     content.push(
       paragraph(
-        `Thank you for your referral of ${clientFirstName} ${clientLastName}. Please find below a summary of the objective assessments completed across this referral period.`
+        `Thank you for your referral of ${clientFirstName} ${clientLastName}. This is a progress report for your review.`
       )
     )
   }
 
-  const treatmentPlanSummary = buildTreatmentPlanSummary(
+  const treatmentPlanLines = buildTreatmentPlanSummaryLines(
     clientFirstName,
     snapshot.therapeuticTarget,
     snapshot.behaviouralTargets
   )
   content.push(heading("Treatment plan summary"))
-  content.push(paragraph(treatmentPlanSummary))
+  for (const line of treatmentPlanLines) {
+    content.push(paragraph(line))
+  }
 
   const mseResults = getMseResultsFromSnapshot(snapshot)
   const mseParagraph = buildMseProgressReportParagraph(mseResults)
-  content.push(heading("Mental status examination"))
+  content.push(heading("MSE summary"))
   content.push(
     paragraph(
       mseParagraph ??
@@ -88,7 +90,7 @@ export function generateLetterBody(snapshot: ReportSnapshot): LetterBodyDoc {
   )
 
   if (phq9Paragraph || gad7Paragraph) {
-    content.push(heading("Mood and anxiety assessment"))
+    content.push(heading("Mood assessment summary"))
     content.push(
       paragraph(
         `As part of the treatment plan, ongoing emotional state was monitored using the Patient Health Questionnaire (PHQ-9) and the Generalised Anxiety Disorder scale (GAD-7).`
@@ -98,7 +100,7 @@ export function generateLetterBody(snapshot: ReportSnapshot): LetterBodyDoc {
     if (gad7Paragraph) content.push(paragraph(gad7Paragraph))
   }
 
-  content.push(heading("Risk assessment"))
+  content.push(heading("Risk assessment summary"))
 
   content.push(paragraph(buildSelfHarmHistorySentence(snapshot.suicideAttempts)))
 
@@ -133,10 +135,14 @@ export function generateLetterBody(snapshot: ReportSnapshot): LetterBodyDoc {
         clientFirstName
       )
     : null
-  const btpParagraphs = buildBtpSummaryParagraphs(btpResults, clientFirstName)
+  const btpParagraphs = buildBtpSummaryParagraphs(
+    btpResults,
+    clientFirstName,
+    snapshot.behaviouralTargets
+  )
 
   if (btpParagraphs.length > 0 || assistParagraph) {
-    content.push(heading("Behavioural targets"))
+    content.push(heading("Behavioural targets summary"))
     const behaviouralTargetsIntro =
       "Progress towards the client's behavioural targets was monitored with a self-rated measure."
     const assistIntro = snapshot.assistEnabled

@@ -3,8 +3,10 @@ import { notFound } from "next/navigation"
 import { and, desc, eq, ne } from "drizzle-orm"
 
 import { AppShell } from "@/components/app-shell"
+import { BackButton } from "@/components/ui/back-button"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { EntityPageHeader } from "@/components/ui/entity-page-header"
 import {
   Table,
   TableBody,
@@ -93,13 +95,16 @@ export default async function ClientReportsPage({
   return (
     <AppShell>
       <div className="mb-6">
-        <Button variant="ghost" size="sm" asChild className="mb-2 -ml-2">
-          <Link href={`/clients/${clientId}`}>← {clientName}</Link>
-        </Button>
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <h1 className="text-2xl font-semibold tracking-tight">
-            Reports — {clientName}
-          </h1>
+        <BackButton
+          fallbackHref={`/clients/${clientId}`}
+          label={`← ${clientName}`}
+        />
+      </div>
+      <EntityPageHeader
+        kicker="Reports"
+        name={clientName}
+        subheading={`${reports.length} report${reports.length === 1 ? "" : "s"}`}
+        action={
           <Button asChild>
             <Link
               href={`/clients/${clientId}/reports/new?returnTo=${encodeURIComponent(reportsListUrl)}`}
@@ -107,8 +112,8 @@ export default async function ClientReportsPage({
               Create Report
             </Link>
           </Button>
-        </div>
-      </div>
+        }
+      />
 
       <div className="rounded-lg border">
         <Table>

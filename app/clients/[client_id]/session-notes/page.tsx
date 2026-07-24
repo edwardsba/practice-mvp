@@ -8,6 +8,7 @@ import { PsqStatusBadge } from "@/components/session-notes/psq-status-badge"
 import { SessionNotePdfDownloadLink } from "@/components/session-notes/session-note-pdf-download-link"
 import { AppShell } from "@/components/app-shell"
 import { Button } from "@/components/ui/button"
+import { EntityPageHeader } from "@/components/ui/entity-page-header"
 import { StatusBadge } from "@/components/ui/status-badge"
 import {
   Table,
@@ -69,17 +70,19 @@ export default async function ClientSessionNotesPage({
         <Button variant="ghost" size="sm" asChild className="mb-2 -ml-2">
           <Link href={`/clients/${clientId}`}>← {clientName}</Link>
         </Button>
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <h1 className="text-2xl font-semibold tracking-tight">
-            Session Notes — {clientName}
-          </h1>
+      </div>
+      <EntityPageHeader
+        kicker="Session notes"
+        name={clientName}
+        subheading={`${notes.length} session note${notes.length === 1 ? "" : "s"}`}
+        action={
           <form
             action={createDraftSessionNote.bind(null, clientId, null, returnTo)}
           >
             <Button type="submit">New Session Note</Button>
           </form>
-        </div>
-      </div>
+        }
+      />
 
       <div className="rounded-lg border">
         <Table>

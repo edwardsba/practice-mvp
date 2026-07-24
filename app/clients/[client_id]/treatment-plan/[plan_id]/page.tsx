@@ -5,6 +5,8 @@ import { TreatmentPlanView } from "@/components/treatment-plan/treatment-plan-vi
 import { TreatmentPlanToolbar } from "@/components/treatment-plan/treatment-plan-toolbar"
 import { AppShell } from "@/components/app-shell"
 import { BackButton } from "@/components/ui/back-button"
+import { Badge } from "@/components/ui/badge"
+import { EntityPageHeader } from "@/components/ui/entity-page-header"
 import {
   Card,
   CardContent,
@@ -69,35 +71,34 @@ export default async function TreatmentPlanViewPage({
           fallbackHref={`/clients/${clientId}`}
           label="← Back to client"
         />
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">
-              Treatment plan
-            </h1>
-            <p className="mt-1 text-muted-foreground">{clientName}</p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              v{plan.versionNumber} - Created{" "}
-              {plan.createdAt.toLocaleDateString("en-AU", {
-                day: "numeric",
-                month: "long",
-                year: "numeric",
-              })}
-            </p>
-          </div>
-          <TreatmentPlanToolbar
-            clientId={clientId}
-            treatmentPlanId={planId}
-            isActive={plan.isActive}
-            clientEmail={client.email?.trim() || null}
-            templateVariables={{
-              client_first_name: client.firstName.trim() || "there",
-              practice_name: emailContext?.practiceName ?? "your practice",
-              practitioner_name:
-                emailContext?.practitionerName ?? "your practitioner",
-            }}
-            autoOpenSend={openSend === "1"}
-          />
-        </div>
+      </div>
+      <EntityPageHeader
+        kicker="Treatment plan"
+        name={clientName}
+        subheading={`v${plan.versionNumber} - Created ${plan.createdAt.toLocaleDateString(
+          "en-AU",
+          { day: "numeric", month: "long", year: "numeric" }
+        )}`}
+        badge={
+          <Badge variant={plan.isActive ? "default" : "outline"}>
+            {plan.isActive ? "Current version" : "Superseded"}
+          </Badge>
+        }
+      />
+      <div className="no-print mb-6 flex flex-wrap gap-3">
+        <TreatmentPlanToolbar
+          clientId={clientId}
+          treatmentPlanId={planId}
+          isActive={plan.isActive}
+          clientEmail={client.email?.trim() || null}
+          templateVariables={{
+            client_first_name: client.firstName.trim() || "there",
+            practice_name: emailContext?.practiceName ?? "your practice",
+            practitioner_name:
+              emailContext?.practitionerName ?? "your practitioner",
+          }}
+          autoOpenSend={openSend === "1"}
+        />
       </div>
 
       <TreatmentPlanView plan={plan} />

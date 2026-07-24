@@ -11,9 +11,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
-import { StatusBadge } from "@/components/ui/status-badge"
 import { appendReturnTo } from "@/lib/navigation/back"
-import { SESSION_NOTE_STATUS_CONFIG } from "@/lib/status"
 import {
   formatSessionNoteDate,
   formatSessionNoteTime,
@@ -24,7 +22,6 @@ export function SessionNoteActions({
   sessionNoteUrl,
   clientId,
   clientName,
-  status,
   isFinalised,
   pdfStoragePath,
   appointmentId,
@@ -59,12 +56,8 @@ export function SessionNoteActions({
 
   return (
     <Card className="no-print">
-      <CardHeader className="flex flex-row items-center justify-between gap-3">
+      <CardHeader>
         <CardTitle>Status</CardTitle>
-        <StatusBadge
-          status={isFinalised ? "finalised" : status}
-          statusMap={SESSION_NOTE_STATUS_CONFIG}
-        />
       </CardHeader>
       <CardContent>
         <dl className="grid gap-4">

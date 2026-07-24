@@ -17,7 +17,9 @@ import { SessionNoteDocument } from "@/components/session-notes/session-note-doc
 import { SessionNoteEditorPanel } from "@/components/session-notes/session-note-editor-panel"
 import { AppShell } from "@/components/app-shell"
 import { BackButton } from "@/components/ui/back-button"
+import { EntityPageHeader } from "@/components/ui/entity-page-header"
 import { EntityDeleteSection } from "@/components/entity-delete-section"
+import { StatusBadge } from "@/components/ui/status-badge"
 import {
   Card,
   CardContent,
@@ -38,6 +40,7 @@ import { appendReturnTo } from "@/lib/navigation/back"
 import { formatSessionNoteDate } from "@/lib/session-notes/format"
 import { loadSessionNoteViewContext } from "@/lib/session-notes/load-context"
 import { loadSessionNoteForPractice } from "@/lib/session-notes/load"
+import { SESSION_NOTE_STATUS_CONFIG } from "@/lib/status"
 
 import "@/components/session-notes/session-note-print.css"
 
@@ -88,14 +91,18 @@ export default async function SessionNoteViewPage({
           fallbackHref={`/clients/${note.clientId}`}
           label="← Back to client"
         />
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Session note</h1>
-          <p className="text-sm text-muted-foreground">{clientName}</p>
-          <p className="text-sm text-muted-foreground">
-            Date of birth: {formatDob(note.clientDateOfBirth)}
-          </p>
-        </div>
       </div>
+      <EntityPageHeader
+        kicker="Session note"
+        name={clientName}
+        subheading={`Date of birth: ${formatDob(note.clientDateOfBirth)}`}
+        badge={
+          <StatusBadge
+            status={isFinalised ? "finalised" : note.status}
+            statusMap={SESSION_NOTE_STATUS_CONFIG}
+          />
+        }
+      />
 
       <SessionNoteEditorPanel
         sessionNoteId={sessionNoteId}

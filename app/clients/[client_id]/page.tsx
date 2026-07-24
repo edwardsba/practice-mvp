@@ -8,6 +8,7 @@ import { EmergencyContactsSection } from "@/components/emergency-contacts/emerge
 import { ClientStatusControl } from "@/components/clients/client-status-control"
 import { AppShell } from "@/components/app-shell"
 import { BackButton } from "@/components/ui/back-button"
+import { EntityPageHeader } from "@/components/ui/entity-page-header"
 import { StatusBadge } from "@/components/ui/status-badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -45,7 +46,7 @@ import { REPORTING_REQUIREMENT_STATUS_CONFIG } from "@/lib/funding/reporting-sta
 import { buildTemplateVariablesFromLinkResponse } from "@/lib/email/link-response"
 import { getQuestionnaireEmailContext } from "@/lib/email/practitioner-context"
 import { loadActiveTreatmentPlanSummary } from "@/lib/treatment-plans/load"
-import { ATTENDANCE_RISK_CONFIG } from "@/lib/status"
+import { ATTENDANCE_RISK_CONFIG, CLIENT_STATUS_CONFIG } from "@/lib/status"
 
 function formatDate(value: Date | string | null) {
   if (!value) return "—"
@@ -140,10 +141,15 @@ export default async function ClientDetailPage({
     <AppShell>
       <div className="mb-6">
         <BackButton fallbackHref="/clients" label="← Back to clients" />
-        <h1 className="text-2xl font-semibold tracking-tight">
-          {client.firstName} {client.lastName}
-        </h1>
       </div>
+      <EntityPageHeader
+        kicker="Client details"
+        name={`${client.firstName} ${client.lastName}`}
+        subheading={`Date of birth: ${formatDate(client.dateOfBirth)}`}
+        badge={
+          <StatusBadge status={client.clientStatus} statusMap={CLIENT_STATUS_CONFIG} />
+        }
+      />
 
       <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[1fr_200px]">
         <div>

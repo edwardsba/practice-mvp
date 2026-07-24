@@ -41,7 +41,7 @@ export function btpLogicalElementKey(index: number): string {
 }
 
 export function btpQuestionText(target: string): string {
-  return `How much (or how often) have you been effective with your behavioural target: ${target}`
+  return target
 }
 
 export function parseBtpInstanceElementsJson(

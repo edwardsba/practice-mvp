@@ -26,7 +26,7 @@ const PHQ9_STYLE_INSTRUCTION =
   "Over the last 2 weeks, how often have you been bothered by any of the following problems?"
 
 const BTP_INSTRUCTION =
-  "Over the last 2 weeks, choose the answer that best describes you."
+  "Over the past 2 weeks, how frequently did you practice your target behaviour, and how effective was it?"
 
 const PSF_INSTRUCTION =
   "As a result of this session... Please choose the answer that best describes you."

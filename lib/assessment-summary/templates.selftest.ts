@@ -74,4 +74,10 @@ check(
   console.log("ok — PHQ-9: same band, different scores does not collapse")
 }
 
+check(
+  "PHQ-9: n=2, real difference, no contradiction (regression test)",
+  buildAssessmentSummaryParagraph("PHQ9", pts([9, 10]), "Ben"),
+  "Ben reported PHQ-9 scores between 9/27 (Mild depression symptoms) and 10/27 (Moderate depression symptoms) across the referral period, with a mean score of 9.5/27 (Moderate depression symptoms) and a median score of 9.5/27 (Moderate depression symptoms) (n = 2). These scores were relatively consistent. The results moved from the Mild severity rating to the Moderate severity rating."
+)
+
 console.log("\nAll assessment-summary paragraph checks passed.")

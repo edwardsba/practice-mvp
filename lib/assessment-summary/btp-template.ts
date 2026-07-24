@@ -37,6 +37,12 @@ function pivotByTarget(
 /**
  * Builds one summary paragraph per behavioural target (a client may have more
  * than one target running at once, each rated separately).
+ *
+ * Three shapes per target, matching the PHQ-9/GAD-7/ASSIST pattern:
+ * - n = 1: a single sentence reporting the one rating.
+ * - n > 1, all ratings identical: a single sentence reporting the shared
+ *   rating across all submissions.
+ * - n > 1, ratings vary: the original 3-sentence paragraph.
  */
 export function buildBtpSummaryParagraphs(
   results: BtpReportResultRow[],
@@ -52,16 +58,41 @@ export function buildBtpSummaryParagraphs(
 
     const targetSentence = `For the behavioural target: ${target}.`
 
+    if (points.length === 1) {
+      const score = points[0].score
+      const band = config.ratingFromScore(score)
+      output.push({
+        target,
+        paragraph:
+          `${targetSentence} ${clientFirstName} rated their effectiveness at ` +
+          `${score}/${config.maxScore} (${band}) at the only submission during this period.`,
+      })
+      continue
+    }
+
+    const allIdentical = points.every((p) => p.score === points[0].score)
+    if (allIdentical) {
+      const score = points[0].score
+      const band = config.ratingFromScore(score)
+      output.push({
+        target,
+        paragraph:
+          `${targetSentence} ${clientFirstName} rated their effectiveness at a consistent ` +
+          `${score}/${config.maxScore} (${band}) across all ${points.length} submissions during this period.`,
+      })
+      continue
+    }
+
     const resultsSentence =
       `Across the referral period, ${clientFirstName} rated their effectiveness between ` +
       `${stats.min}/${config.maxScore} (${config.ratingFromScore(stats.min)}) and ` +
       `${stats.max}/${config.maxScore} (${config.ratingFromScore(stats.max)}), ` +
       `with a mean rating of ${stats.mean}/${config.maxScore} (${config.ratingFromScore(Math.round(stats.mean))}) ` +
-      `and a median rating of ${stats.median}/${config.maxScore} (n = ${stats.n}).`
+      `and a median rating of ${stats.median}/${config.maxScore} (${config.ratingFromScore(Math.round(stats.median))}) (n = ${stats.n}).`
 
     const overviewSentence = `${targetSentence} ${resultsSentence}`
 
-    const trendShape = classifyTrend(points)
+    const trendShape = classifyTrend(points, config.maxScore)
     const variabilityPatternSentence = buildVariabilityPatternSentence(
       stats.variabilityLabel,
       trendShape,

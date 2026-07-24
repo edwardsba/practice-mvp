@@ -1,11 +1,12 @@
 import { AssessmentPoint } from "./stats"
 
 export type TrendShape =
-  | "linear_decreasing"
   | "linear_increasing"
+  | "linear_decreasing"
+  | "linear_flat"
   | "dip"
   | "peak"
-  | "flat"
+  | "no_pattern"
 
 function mean(values: number[]): number {
   return values.reduce((sum, v) => sum + v, 0) / values.length
@@ -49,29 +50,56 @@ function linearRegression(
 }
 
 /**
- * Classifies the shape of a small (typically n=4-6) assessment score series.
+ * Classifies the shape of a small (typically n=2-6) assessment score series.
  *
+ * n = 2: two points always form a perfect line — classified directly by
+ * comparing the two scores (flat / increasing / decreasing), no regression
+ * needed, and no ambiguity possible.
+ *
+ * n >= 3, in order:
  * Step 1: fit a straight line. If it explains at least half the variation
- * (R² >= 0.5), call it a genuine linear trend.
- *
+ * (R² >= 0.5), call it a genuine linear trend (increasing/decreasing).
  * Step 2: otherwise, compare the average of the interior points against the
  * average of the two endpoints. If the interior deviates by at least one SD,
- * call it a "dip" (interior lower) or "peak" (interior higher).
+ * call it a "dip" (interior lower) or "peak" (interior higher). This must
+ * run before Step 3, since a genuine dip/peak often has a near-zero overall
+ * slope too, and dip/peak is the more informative label when it applies.
+ * Step 3: otherwise, split on the fitted slope across ALL points (never just
+ * the endpoints — see below) into "linear_flat" (small overall slope,
+ * whatever session-to-session noise exists) or "no_pattern" (a slope too
+ * large to ignore, but too poor a linear fit to count as Step 1's genuine
+ * trend).
  *
- * Step 3: otherwise, flat/stable.
+ * Step 3 deliberately uses the regression slope, not a comparison of the
+ * first and last score. A sequence like [10, 20, 3, 11] has similar
+ * first/last values but a real downward slope (-1.4/session) once fit
+ * across all four points — the big swing through the middle is exactly what
+ * an endpoints-only check would miss, wrongly calling a real decline "flat."
  *
  * With only 3-6 points a full curve-fit (e.g. quadratic regression) risks
  * overfitting - a quadratic through 4 points fits almost perfectly by
  * construction regardless of whether there's a real pattern. This heuristic
  * avoids that.
+ *
+ * `maxScore` scales the flat-vs-no_pattern threshold (10% of maxScore)
+ * consistently across tools with very different scales (e.g. PHQ-9's 27 vs
+ * BTP's 5).
  */
-export function classifyTrend(points: AssessmentPoint[]): TrendShape {
-  if (points.length < 3) return "flat"
+export function classifyTrend(
+  points: AssessmentPoint[],
+  maxScore: number
+): TrendShape {
+  if (points.length < 2) return "linear_flat"
 
   const sorted = [...points].sort((a, b) => a.sessionIndex - b.sessionIndex)
   const scores = sorted.map((p) => p.score)
-  const idx = sorted.map((p) => p.sessionIndex)
 
+  if (scores.length === 2) {
+    if (scores[1] === scores[0]) return "linear_flat"
+    return scores[1] > scores[0] ? "linear_increasing" : "linear_decreasing"
+  }
+
+  const idx = sorted.map((p) => p.sessionIndex)
   const { slope, r2 } = linearRegression(idx, scores)
 
   if (r2 >= 0.5) {
@@ -89,5 +117,8 @@ export function classifyTrend(points: AssessmentPoint[]): TrendShape {
     return interiorDeviation < 0 ? "dip" : "peak"
   }
 
-  return "flat"
+  const flatThreshold = maxScore * 0.1
+  const lineImpliedChange = slope * (idx[idx.length - 1] - idx[0])
+
+  return Math.abs(lineImpliedChange) < flatThreshold ? "linear_flat" : "no_pattern"
 }

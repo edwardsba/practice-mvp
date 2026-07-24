@@ -37,18 +37,22 @@ export function buildVariabilityPatternSentence(
 
   const variabilityWord =
     variabilityLabel === "Some fluctuation" ? "moderate" : "considerable"
+  const variabilityAdverb =
+    variabilityLabel === "Some fluctuation" ? "moderately" : "considerably"
 
   switch (trendShape) {
     case "linear_increasing":
       return `These ${nounWord} demonstrate ${variabilityWord} variability with an upward linear trend.`
     case "linear_decreasing":
       return `These ${nounWord} demonstrate ${variabilityWord} variability with a downward linear trend.`
+    case "linear_flat":
+      return `These ${nounWord} fluctuated ${variabilityAdverb} from session to session, with no overall increase or decrease across the referral period.`
     case "dip":
       return `These ${nounWord} demonstrate ${variabilityWord} variability, dipping midway through the referral period and then rising again.`
     case "peak":
       return `These ${nounWord} demonstrate ${variabilityWord} variability, peaking midway through the referral period and then dropping again.`
-    case "flat":
-      return `These ${nounWord} demonstrate ${variabilityWord} variability, with no consistent pattern across the referral period.`
+    case "no_pattern":
+      return `These ${nounWord} fluctuated ${variabilityAdverb} with no identifiable pattern across the referral period.`
   }
 }
 
@@ -107,7 +111,7 @@ export function buildAssessmentSummaryParagraph(
     `${stats.mean}/${config.maxScore} (${stats.meanBand}) and a median score of ` +
     `${stats.median}/${config.maxScore} (${stats.medianBand}) (n = ${stats.n}).`
 
-  const trendShape = classifyTrend(points)
+  const trendShape = classifyTrend(points, config.maxScore)
   const variabilityPatternSentence = buildVariabilityPatternSentence(
     stats.variabilityLabel,
     trendShape,

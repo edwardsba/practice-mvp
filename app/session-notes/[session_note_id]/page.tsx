@@ -2,7 +2,6 @@ import Link from "next/link"
 import { notFound } from "next/navigation"
 
 import { OngoingAssessmentsTable } from "@/components/session-notes/ongoing-assessments-table"
-import { PrintButton } from "@/components/session-notes/print-button"
 import { ResendBatteryButton } from "@/components/session-notes/resend-battery-button"
 import {
   deleteSessionNote,
@@ -15,7 +14,7 @@ import {
 import { MseStatusBadge } from "@/components/session-notes/mse-status-badge"
 import { SessionNoteActions } from "@/components/session-notes/session-note-actions"
 import { SessionNoteDocument } from "@/components/session-notes/session-note-document"
-import { SessionNotesEditor } from "@/components/session-notes/session-notes-editor"
+import { SessionNoteEditorPanel } from "@/components/session-notes/session-note-editor-panel"
 import { AppShell } from "@/components/app-shell"
 import { BackButton } from "@/components/ui/back-button"
 import { EntityDeleteSection } from "@/components/entity-delete-section"
@@ -80,6 +79,7 @@ export default async function SessionNoteViewPage({
   const sessionNoteUrl = returnTo
     ? `/session-notes/${sessionNoteId}?returnTo=${encodeURIComponent(returnTo)}`
     : `/session-notes/${sessionNoteId}`
+  const cancelHref = returnTo ?? `/clients/${note.clientId}/session-notes`
 
   return (
     <AppShell>
@@ -88,209 +88,203 @@ export default async function SessionNoteViewPage({
           fallbackHref={`/clients/${note.clientId}`}
           label="← Back to client"
         />
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">Session note</h1>
-            <p className="text-sm text-muted-foreground">{clientName}</p>
-            <p className="text-sm text-muted-foreground">
-              Date of birth: {formatDob(note.clientDateOfBirth)}
-            </p>
-          </div>
-          <PrintButton />
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Session note</h1>
+          <p className="text-sm text-muted-foreground">{clientName}</p>
+          <p className="text-sm text-muted-foreground">
+            Date of birth: {formatDob(note.clientDateOfBirth)}
+          </p>
         </div>
       </div>
 
-      <div className="no-print grid grid-cols-1 gap-6 lg:grid-cols-[1.6fr_1fr]">
-        <div className="order-2 lg:order-1">
-          <SessionNotesEditor
-            sessionNoteId={sessionNoteId}
-            initialNotes={note.practitionerNotes ?? ""}
-            readOnly={isFinalised}
-          />
-        </div>
+      <SessionNoteEditorPanel
+        sessionNoteId={sessionNoteId}
+        initialNotes={note.practitionerNotes ?? ""}
+        isFinalised={isFinalised}
+        cancelHref={cancelHref}
+        rightColumn={
+          <>
+            <SessionNoteActions
+              sessionNoteId={sessionNoteId}
+              sessionNoteUrl={sessionNoteUrl}
+              clientId={note.clientId}
+              clientName={clientName}
+              status={note.status}
+              isFinalised={isFinalised}
+              pdfStoragePath={note.pdfStoragePath ?? null}
+              appointmentId={note.appointmentId ?? null}
+              sessionDate={note.sessionDate}
+              sessionTime={note.sessionTime}
+              nextAppointment={viewContext.nextAppointment ?? null}
+              preSessionBatterySentAt={note.preSessionBatterySentAt}
+              psqBatteryStatus={note.psqBatteryStatus}
+              asqCompleted={Boolean(viewContext.asqResult)}
+            />
 
-        <div className="order-1 flex flex-col gap-6 lg:order-2">
-          <SessionNoteActions
-            sessionNoteId={sessionNoteId}
-            sessionNoteUrl={sessionNoteUrl}
-            clientId={note.clientId}
-            clientName={clientName}
-            status={note.status}
-            pdfStoragePath={note.pdfStoragePath ?? null}
-            appointmentId={note.appointmentId ?? null}
-            sessionDate={note.sessionDate}
-            sessionTime={note.sessionTime}
-            nextAppointment={viewContext.nextAppointment ?? null}
-            preSessionBatterySentAt={note.preSessionBatterySentAt}
-            psqBatteryStatus={note.psqBatteryStatus}
-            asqCompleted={Boolean(viewContext.asqResult)}
-          />
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Mental status examination</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {viewContext.mseInstance ? (
-                <div className="space-y-3">
-                  <div className="flex flex-wrap items-center gap-3">
-                    <MseStatusBadge instance={viewContext.mseInstance} />
-                    <Link
-                      href={appendReturnTo(
-                        `/clients/${note.clientId}/mse/${viewContext.mseInstance.assessmentInstanceId}`,
-                        sessionNoteUrl
-                      )}
-                      className="text-sm font-medium text-primary hover:underline"
-                    >
-                      View MSE
-                    </Link>
+            <Card>
+              <CardHeader>
+                <CardTitle>Mental status examination</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {viewContext.mseInstance ? (
+                  <div className="space-y-3">
+                    <div className="flex flex-wrap items-center gap-3">
+                      <MseStatusBadge instance={viewContext.mseInstance} />
+                      <Link
+                        href={appendReturnTo(
+                          `/clients/${note.clientId}/mse/${viewContext.mseInstance.assessmentInstanceId}`,
+                          sessionNoteUrl
+                        )}
+                        className="text-sm font-medium text-primary hover:underline"
+                      >
+                        View MSE
+                      </Link>
+                    </div>
+                    {viewContext.mseInstance.sentence ? (
+                      <p className="text-sm leading-relaxed">
+                        {viewContext.mseInstance.sentence}
+                      </p>
+                    ) : null}
                   </div>
-                  {viewContext.mseInstance.sentence ? (
-                    <p className="text-sm leading-relaxed">
-                      {viewContext.mseInstance.sentence}
-                    </p>
-                  ) : null}
-                </div>
-              ) : (
-                <Link
-                  href={`/clients/${note.clientId}/mse/new?session_note_id=${sessionNoteId}&returnTo=${encodeURIComponent(sessionNoteUrl)}`}
-                  className="text-sm font-medium text-primary hover:underline"
-                >
-                  Administer MSE
-                </Link>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between gap-3">
-              <CardTitle>Mood Assessment</CardTitle>
-              {!isFinalised &&
-              note.appointmentId &&
-              viewContext.assessments.some((a) => !a.assessmentResultId) ? (
-                <ResendBatteryButton appointmentId={note.appointmentId} />
-              ) : null}
-            </CardHeader>
-            <CardContent>
-              <OngoingAssessmentsTable
-                assessments={viewContext.assessments}
-                clientId={note.clientId}
-                returnTo={sessionNoteUrl}
-              />
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Risk assessment</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <RiskAssessmentTable
-                rows={[
-                  {
-                    code: "ASQ",
-                    name: "ASQ",
-                    assessmentResultId: viewContext.asqResult?.assessmentResultId ?? null,
-                    score: viewContext.asqResult?.score ?? null,
-                    maxScore: viewContext.asqResult?.maxScore ?? null,
-                    acuteRiskRating: viewContext.asqResult?.acuteRiskRating ?? null,
-                    administerHref: `/clients/${note.clientId}/asq/new?session_note_id=${sessionNoteId}&returnTo=${encodeURIComponent(sessionNoteUrl)}`,
-                  } satisfies RiskAssessmentRow,
-                ]}
-                clientId={note.clientId}
-                returnTo={sessionNoteUrl}
-              />
-              <div>
-                <p className="mb-1 text-sm font-medium">Crisis plan</p>
-                {viewContext.crisisPlan ? (
-                  <Link
-                    href={`/clients/${note.clientId}/crisis-plan/${viewContext.crisisPlan.crisisPlanId}?returnTo=${encodeURIComponent(sessionNoteUrl)}`}
-                    className="text-sm text-primary hover:underline"
-                  >
-                    v{viewContext.crisisPlan.versionNumber} (
-                    {formatSessionNoteDate(viewContext.crisisPlan.dateOfPlan)})
-                  </Link>
                 ) : (
-                  <p className="text-sm text-muted-foreground">No active crisis plan.</p>
+                  <Link
+                    href={`/clients/${note.clientId}/mse/new?session_note_id=${sessionNoteId}&returnTo=${encodeURIComponent(sessionNoteUrl)}`}
+                    className="text-sm font-medium text-primary hover:underline"
+                  >
+                    Administer MSE
+                  </Link>
                 )}
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Treatment Plan Progress</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {viewContext.treatmentPlan ? (
-                <Link
-                  href={`/clients/${note.clientId}/treatment-plan/${viewContext.treatmentPlan.treatmentPlanId}?returnTo=${encodeURIComponent(sessionNoteUrl)}`}
-                  className="mb-3 block text-sm font-medium text-primary hover:underline"
-                >
-                  v.{viewContext.treatmentPlan.versionNumber} created:{" "}
-                  {formatSessionNoteDate(viewContext.treatmentPlan.startDate)}
-                </Link>
-              ) : (
-                <p className="mb-3 text-sm text-muted-foreground">
-                  No treatment plan
-                </p>
-              )}
-              {viewContext.treatmentPlan?.therapeuticTarget ? (
-                <p className="mb-3 text-sm">
-                  <span className="font-medium">Therapeutic target: </span>
-                  {viewContext.treatmentPlan.therapeuticTarget}
-                </p>
-              ) : null}
-              {viewContext.btpTargets.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  No BTP results for this session.
-                </p>
-              ) : (
-                <div className="rounded-lg border">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Target</TableHead>
-                        <TableHead>Score</TableHead>
-                        <TableHead>Rating</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {viewContext.btpTargets.map((row) => (
-                        <TableRow key={row.target}>
-                          <TableCell>{row.target}</TableCell>
-                          <TableCell>{row.score} / 5</TableCell>
-                          <TableCell>{row.ratingLabel}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-              {viewContext.assistResult ? (
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between gap-3">
+                <CardTitle>Mood Assessment</CardTitle>
+                {!isFinalised &&
+                note.appointmentId &&
+                viewContext.assessments.some((a) => !a.assessmentResultId) ? (
+                  <ResendBatteryButton appointmentId={note.appointmentId} />
+                ) : null}
+              </CardHeader>
+              <CardContent>
+                <OngoingAssessmentsTable
+                  assessments={viewContext.assessments}
+                  clientId={note.clientId}
+                  returnTo={sessionNoteUrl}
+                />
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Risk assessment</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
                 <RiskAssessmentTable
                   rows={[
                     {
-                      code: "ASSIST",
-                      name: "ASSIST",
-                      assessmentResultId: viewContext.assistResult.assessmentResultId,
-                      score: viewContext.assistResult.score,
-                      maxScore: viewContext.assistResult.maxScore,
-                      acuteRiskRating: viewContext.assistResult.severity,
-                      administerHref: null,
+                      code: "ASQ",
+                      name: "ASQ",
+                      assessmentResultId: viewContext.asqResult?.assessmentResultId ?? null,
+                      score: viewContext.asqResult?.score ?? null,
+                      maxScore: viewContext.asqResult?.maxScore ?? null,
+                      acuteRiskRating: viewContext.asqResult?.acuteRiskRating ?? null,
+                      administerHref: `/clients/${note.clientId}/asq/new?session_note_id=${sessionNoteId}&returnTo=${encodeURIComponent(sessionNoteUrl)}`,
                     } satisfies RiskAssessmentRow,
                   ]}
                   clientId={note.clientId}
                   returnTo={sessionNoteUrl}
-                  outcomeColumnLabel="Risk Level"
                 />
-              ) : null}
-            </CardContent>
-          </Card>
+                <div>
+                  <p className="mb-1 text-sm font-medium">Crisis plan</p>
+                  {viewContext.crisisPlan ? (
+                    <Link
+                      href={`/clients/${note.clientId}/crisis-plan/${viewContext.crisisPlan.crisisPlanId}?returnTo=${encodeURIComponent(sessionNoteUrl)}`}
+                      className="text-sm text-primary hover:underline"
+                    >
+                      v{viewContext.crisisPlan.versionNumber} (
+                      {formatSessionNoteDate(viewContext.crisisPlan.dateOfPlan)})
+                    </Link>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No active crisis plan.</p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
 
-        </div>
-
-        <div className="order-3 lg:order-2 lg:col-start-2">
+            <Card>
+              <CardHeader>
+                <CardTitle>Treatment Plan Progress</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {viewContext.treatmentPlan ? (
+                  <Link
+                    href={`/clients/${note.clientId}/treatment-plan/${viewContext.treatmentPlan.treatmentPlanId}?returnTo=${encodeURIComponent(sessionNoteUrl)}`}
+                    className="mb-3 block text-sm font-medium text-primary hover:underline"
+                  >
+                    v.{viewContext.treatmentPlan.versionNumber} created:{" "}
+                    {formatSessionNoteDate(viewContext.treatmentPlan.startDate)}
+                  </Link>
+                ) : (
+                  <p className="mb-3 text-sm text-muted-foreground">
+                    No treatment plan
+                  </p>
+                )}
+                {viewContext.treatmentPlan?.therapeuticTarget ? (
+                  <p className="mb-3 text-sm">
+                    <span className="font-medium">Therapeutic target: </span>
+                    {viewContext.treatmentPlan.therapeuticTarget}
+                  </p>
+                ) : null}
+                {viewContext.btpTargets.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    No BTP results for this session.
+                  </p>
+                ) : (
+                  <div className="rounded-lg border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Target</TableHead>
+                          <TableHead>Score</TableHead>
+                          <TableHead>Rating</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {viewContext.btpTargets.map((row) => (
+                          <TableRow key={row.target}>
+                            <TableCell>{row.target}</TableCell>
+                            <TableCell>{row.score} / 5</TableCell>
+                            <TableCell>{row.ratingLabel}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+                {viewContext.assistResult ? (
+                  <RiskAssessmentTable
+                    rows={[
+                      {
+                        code: "ASSIST",
+                        name: "ASSIST",
+                        assessmentResultId: viewContext.assistResult.assessmentResultId,
+                        score: viewContext.assistResult.score,
+                        maxScore: viewContext.assistResult.maxScore,
+                        acuteRiskRating: viewContext.assistResult.severity,
+                        administerHref: null,
+                      } satisfies RiskAssessmentRow,
+                    ]}
+                    clientId={note.clientId}
+                    returnTo={sessionNoteUrl}
+                    outcomeColumnLabel="Risk Level"
+                  />
+                ) : null}
+              </CardContent>
+            </Card>
+          </>
+        }
+        deleteSection={
           <EntityDeleteSection
             entityName="Session note"
             blockedReason={deleteStatus.blockedReason}
@@ -300,8 +294,8 @@ export default async function SessionNoteViewPage({
               context.practiceId
             )}
           />
-        </div>
-      </div>
+        }
+      />
 
       <div className="session-note-print-area hidden print:block">
         <SessionNoteDocument

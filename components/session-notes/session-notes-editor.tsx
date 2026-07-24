@@ -2,58 +2,24 @@
 
 import { useState } from "react"
 
-import { updateSessionNoteNotes } from "@/app/session-notes/actions"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
 
-function formatSavedTime(date: Date): string {
-  return date.toLocaleTimeString("en-AU", {
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-  })
-}
-
 export function SessionNotesEditor({
-  sessionNoteId,
-  initialNotes,
+  notes,
+  onNotesChange,
   readOnly,
 }: {
-  sessionNoteId: string
-  initialNotes: string
+  notes: string
+  onNotesChange: (value: string) => void
   readOnly: boolean
 }) {
-  const [notes, setNotes] = useState(initialNotes)
-  const [savedAt, setSavedAt] = useState<Date | null>(null)
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState<string | null>(null)
   const [expanded, setExpanded] = useState(false)
-
-  function handleSaveDraft() {
-    setSaving(true)
-    setError(null)
-    updateSessionNoteNotes(sessionNoteId, notes)
-      .then((result) => {
-        if (result.error) {
-          setError(result.error)
-          return
-        }
-        setSavedAt(new Date())
-      })
-      .finally(() => setSaving(false))
-  }
-
-  let statusLabel = ""
-  if (saving) {
-    statusLabel = "Saving…"
-  } else if (savedAt) {
-    statusLabel = `Saved at ${formatSavedTime(savedAt)}`
-  }
 
   const sharedTextareaProps = {
     value: notes,
-    onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => setNotes(e.target.value),
+    onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => onNotesChange(e.target.value),
     readOnly,
     placeholder: "Start typing session notes…",
   }
@@ -63,27 +29,11 @@ export function SessionNotesEditor({
       <Card className="flex flex-col">
         <CardHeader className="flex flex-row items-center justify-between gap-3">
           <CardTitle>Practitioner notes</CardTitle>
-          <div className="flex items-center gap-3">
-            {statusLabel ? (
-              <span className="text-sm text-muted-foreground">{statusLabel}</span>
-            ) : null}
-            {error ? <span className="text-sm text-destructive">{error}</span> : null}
-            {!readOnly ? (
-              <>
-                <Button
-                  type="button"
-                  size="sm"
-                  disabled={saving}
-                  onClick={handleSaveDraft}
-                >
-                  {saving ? "Saving…" : "Save Draft"}
-                </Button>
-                <Button type="button" variant="outline" size="sm" onClick={() => setExpanded(true)}>
-                  Expand
-                </Button>
-              </>
-            ) : null}
-          </div>
+          {!readOnly ? (
+            <Button type="button" variant="outline" size="sm" onClick={() => setExpanded(true)}>
+              Expand
+            </Button>
+          ) : null}
         </CardHeader>
         <CardContent className="flex-1">
           {expanded ? (
@@ -100,30 +50,10 @@ export function SessionNotesEditor({
       {expanded ? (
         <div className="no-print fixed inset-0 z-50 flex flex-col gap-3 bg-background p-4 sm:p-8">
           <div className="flex items-center justify-between gap-3">
-            <p className="text-sm font-medium">
-              Practitioner notes
-              {statusLabel ? (
-                <span className="ml-3 font-normal text-muted-foreground">{statusLabel}</span>
-              ) : null}
-              {error ? (
-                <span className="ml-3 font-normal text-destructive">{error}</span>
-              ) : null}
-            </p>
-            <div className="flex items-center gap-3">
-              {!readOnly ? (
-                <Button
-                  type="button"
-                  size="sm"
-                  disabled={saving}
-                  onClick={handleSaveDraft}
-                >
-                  {saving ? "Saving…" : "Save Draft"}
-                </Button>
-              ) : null}
-              <Button type="button" onClick={() => setExpanded(false)}>
-                Done
-              </Button>
-            </div>
+            <p className="text-sm font-medium">Practitioner notes</p>
+            <Button type="button" onClick={() => setExpanded(false)}>
+              Done
+            </Button>
           </div>
           <Textarea
             {...sharedTextareaProps}

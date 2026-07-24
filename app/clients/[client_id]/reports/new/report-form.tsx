@@ -329,10 +329,6 @@ export function ReportForm({
     loadPreview([], dateRangeStart, value)
   }
 
-  function handlePrint() {
-    window.print()
-  }
-
   useEffect(() => {
     const approval =
       fundingApprovals.find((fa) => fa.fundingApprovalId === fundingApprovalId) ??
@@ -866,15 +862,7 @@ export function ReportForm({
               onClick={() => setPreviewDismissed(false)}
               disabled={previewPending || !reportTypeId || !fundingApprovalId}
             >
-              {previewPending ? "Generating preview…" : "Finalise"}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={handlePrint}
-              disabled={!previewSnapshot}
-            >
-              Print / Save as PDF
+              {previewPending ? "Generating preview…" : "Review and Finalise"}
             </Button>
             <Button type="button" variant="outline" asChild>
               <Link href={cancelHref}>Cancel</Link>
@@ -949,15 +937,7 @@ export function ReportForm({
                   : !dateRangeStart || !dateRangeEnd)
               }
             >
-              {previewPending ? "Generating preview…" : "Finalise"}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={handlePrint}
-              disabled={!previewSnapshot}
-            >
-              Print / Save as PDF
+              {previewPending ? "Generating preview…" : "Review and Finalise"}
             </Button>
             <Button type="button" variant="outline" asChild>
               <Link href={cancelHref}>Cancel</Link>
@@ -987,13 +967,13 @@ export function ReportForm({
             clinical_summary_text: clinicalSummary,
             recommendations_text: recommendations,
           }}
-          saveLabel="Save"
+          saveLabel="Finalise"
           savePending={finalisePending}
           saveFormAction={finaliseFormAction}
-          saveAndDownloadLabel="Save and download"
+          saveAndDownloadLabel="Finalise and download"
           saveAndDownloadPending={finaliseAndDownloadPending}
           saveAndDownloadFormAction={finaliseAndDownloadFormAction}
-          saveAndSendLabel="Save and send"
+          saveAndSendLabel="Finalise and send"
           saveAndSendPending={finaliseAndSendPending}
           saveAndSendFormAction={finaliseAndSendFormAction}
         />

@@ -14,22 +14,22 @@ export function EntityPageHeader({
   action?: ReactNode
 }) {
   return (
-    <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-      <div>
+    <div className="mb-6">
+      <div className="flex items-center justify-between gap-4">
         <p className="text-sm font-medium tracking-wide text-muted-foreground uppercase">
           {kicker}
         </p>
-        <h1 className="mt-1 text-2xl font-semibold tracking-tight">{name}</h1>
-        {subheading ? (
-          <div className="mt-1.5 text-sm text-muted-foreground">
-            {subheading}
+        {badge || action ? (
+          <div className="flex flex-shrink-0 items-center gap-2">
+            {action}
+            {badge}
           </div>
         ) : null}
       </div>
-      {badge || action ? (
-        <div className="flex flex-shrink-0 items-center gap-2">
-          {action}
-          {badge}
+      <h1 className="mt-1 text-2xl font-semibold tracking-tight">{name}</h1>
+      {subheading ? (
+        <div className="mt-1.5 text-sm text-muted-foreground">
+          {subheading}
         </div>
       ) : null}
     </div>

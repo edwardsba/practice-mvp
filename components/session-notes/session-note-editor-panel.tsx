@@ -133,8 +133,6 @@ export function SessionNoteEditorPanel({
         </div>
 
         <div className="order-1 flex flex-col gap-6 lg:order-2">{rightColumn}</div>
-
-        <div className="order-3 lg:order-2 lg:col-start-2">{deleteSection}</div>
       </div>
 
       {!isFinalised ? (
@@ -184,6 +182,8 @@ export function SessionNoteEditorPanel({
           {finaliseAndDownloadState.error}
         </p>
       ) : null}
+
+      <div className="no-print mt-6">{deleteSection}</div>
 
       {showPreviewModal ? (
         <DocumentPreviewModal

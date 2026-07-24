@@ -849,6 +849,9 @@ export function ReportForm({
           ) : null}
 
           <div className="no-print flex flex-wrap gap-3">
+            <Button type="button" variant="outline" asChild>
+              <Link href={cancelHref}>Cancel</Link>
+            </Button>
             <Button
               type="submit"
               variant="outline"
@@ -863,9 +866,6 @@ export function ReportForm({
               disabled={previewPending || !reportTypeId || !fundingApprovalId}
             >
               {previewPending ? "Generating preview…" : "Review and Finalise"}
-            </Button>
-            <Button type="button" variant="outline" asChild>
-              <Link href={cancelHref}>Cancel</Link>
             </Button>
           </div>
         </form>
@@ -908,6 +908,9 @@ export function ReportForm({
           ) : null}
 
           <div className="no-print flex flex-wrap gap-3">
+            <Button type="button" variant="outline" asChild>
+              <Link href={cancelHref}>Cancel</Link>
+            </Button>
             <Button
               type="submit"
               variant="outline"
@@ -938,9 +941,6 @@ export function ReportForm({
               }
             >
               {previewPending ? "Generating preview…" : "Review and Finalise"}
-            </Button>
-            <Button type="button" variant="outline" asChild>
-              <Link href={cancelHref}>Cancel</Link>
             </Button>
           </div>
         </form>

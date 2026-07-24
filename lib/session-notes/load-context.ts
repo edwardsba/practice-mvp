@@ -83,6 +83,7 @@ export type SessionNoteViewContext = {
   } | null
   btpTargets: SessionNoteBtpTarget[]
   assessments: SessionNoteAssessmentResult[]
+  assistResult: SessionNoteAssessmentResult | null
   asqResult: SessionNoteAsqResult
   mseInstance: SessionNoteMseInstance
   crisisPlan: SessionNoteCrisisPlanInfo
@@ -406,6 +407,8 @@ export async function loadSessionNoteViewContext(
       ),
     ])
 
+  const assistEnabled = treatmentPlan?.ongoingAssessmentsJson?.assist ?? false
+
   return {
     treatmentPlan: treatmentPlan
       ? {
@@ -416,7 +419,8 @@ export async function loadSessionNoteViewContext(
         }
       : null,
     btpTargets,
-    assessments: [phq9, gad7, assist],
+    assessments: [phq9, gad7],
+    assistResult: assistEnabled ? assist : null,
     asqResult,
     mseInstance,
     crisisPlan,

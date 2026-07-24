@@ -42,6 +42,7 @@ export type SessionNotePdfData = {
   therapeuticTarget: string | null
   btpTargets: SessionNoteBtpTarget[]
   assessments: SessionNoteAssessmentResult[]
+  assistResult: SessionNoteAssessmentResult | null
   mseSentence: string | null
   asqResult: SessionNoteAsqResult
   crisisPlan: SessionNoteCrisisPlanInfo
@@ -159,8 +160,8 @@ export function generateSessionNotePdf(data: SessionNotePdfData): Promise<Buffer
       bodyText(doc, data.mseSentence)
     }
 
-    // Objective Measures
-    sectionLabel(doc, "Objective Measures")
+    // Mood Assessment
+    sectionLabel(doc, "Mood Assessment")
     const completedAssessments = data.assessments.filter(
       (a) => a.assessmentResultId
     )
@@ -230,6 +231,24 @@ export function generateSessionNotePdf(data: SessionNotePdfData): Promise<Buffer
           { header: "Rating", width: 150 },
         ],
         data.btpTargets.map((t) => [t.target, `${t.score}/5`, t.ratingLabel])
+      )
+    }
+    if (data.assistResult) {
+      doc.moveDown(0.3)
+      drawTable(
+        doc,
+        [
+          { header: "Assessment", width: 165 },
+          { header: "Score", width: 165 },
+          { header: "Risk Level", width: 165 },
+        ],
+        [
+          [
+            "ASSIST",
+            `${data.assistResult.score}${data.assistResult.maxScore != null ? `/${data.assistResult.maxScore}` : ""}`,
+            data.assistResult.severity ?? "—",
+          ],
+        ]
       )
     }
 

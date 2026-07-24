@@ -107,9 +107,11 @@ function RiskAssessmentTable({
 function TreatmentPlanProgress({
   therapeuticTarget,
   btpTargets,
+  assistResult,
 }: {
   therapeuticTarget: string | null
   btpTargets: SessionNoteBtpTarget[]
+  assistResult: SessionNoteAssessmentResult | null
 }) {
   return (
     <>
@@ -140,6 +142,27 @@ function TreatmentPlanProgress({
           </tbody>
         </table>
       )}
+      {assistResult ? (
+        <table className="report-results-table w-full text-sm">
+          <thead>
+            <tr>
+              <th>Assessment</th>
+              <th>Score</th>
+              <th>Risk Level</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>ASSIST</td>
+              <td>
+                {assistResult.score}
+                {assistResult.maxScore != null ? `/${assistResult.maxScore}` : ""}
+              </td>
+              <td>{assistResult.severity ?? "—"}</td>
+            </tr>
+          </tbody>
+        </table>
+      ) : null}
     </>
   )
 }
@@ -152,6 +175,7 @@ export function SessionNoteDocument({
   therapeuticTarget,
   btpTargets,
   assessments,
+  assistResult,
   mseSentence,
   asqResult,
   crisisPlan,
@@ -167,6 +191,7 @@ export function SessionNoteDocument({
   therapeuticTarget: string | null
   btpTargets: SessionNoteBtpTarget[]
   assessments: SessionNoteAssessmentResult[]
+  assistResult: SessionNoteAssessmentResult | null
   mseSentence?: string | null
   asqResult: SessionNoteAsqResult
   crisisPlan: SessionNoteCrisisPlanInfo
@@ -201,7 +226,7 @@ export function SessionNoteDocument({
         </>
       ) : null}
 
-      <h3 className="session-note-label">Objective Measures</h3>
+      <h3 className="session-note-label">Mood Assessment</h3>
       <ObjectiveMeasuresTable assessments={assessments} />
 
       <h3 className="session-note-label">Risk Assessment</h3>
@@ -211,6 +236,7 @@ export function SessionNoteDocument({
       <TreatmentPlanProgress
         therapeuticTarget={therapeuticTarget}
         btpTargets={btpTargets}
+        assistResult={assistResult}
       />
 
       <h3 className="session-note-label">Notes</h3>

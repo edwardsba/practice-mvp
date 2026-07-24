@@ -128,59 +128,6 @@ export default async function SessionNoteViewPage({
 
           <Card>
             <CardHeader>
-              <CardTitle>Treatment plan</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {viewContext.treatmentPlan ? (
-                <Link
-                  href={`/clients/${note.clientId}/treatment-plan/${viewContext.treatmentPlan.treatmentPlanId}?returnTo=${encodeURIComponent(sessionNoteUrl)}`}
-                  className="mb-3 block text-sm font-medium text-primary hover:underline"
-                >
-                  v.{viewContext.treatmentPlan.versionNumber} created:{" "}
-                  {formatSessionNoteDate(viewContext.treatmentPlan.startDate)}
-                </Link>
-              ) : (
-                <p className="mb-3 text-sm text-muted-foreground">
-                  No treatment plan
-                </p>
-              )}
-              {viewContext.treatmentPlan?.therapeuticTarget ? (
-                <p className="mb-3 text-sm">
-                  <span className="font-medium">Therapeutic target: </span>
-                  {viewContext.treatmentPlan.therapeuticTarget}
-                </p>
-              ) : null}
-              {viewContext.btpTargets.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  No BTP results for this session.
-                </p>
-              ) : (
-                <div className="rounded-lg border">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Target</TableHead>
-                        <TableHead>Score</TableHead>
-                        <TableHead>Rating</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {viewContext.btpTargets.map((row) => (
-                        <TableRow key={row.target}>
-                          <TableCell>{row.target}</TableCell>
-                          <TableCell>{row.score} / 5</TableCell>
-                          <TableCell>{row.ratingLabel}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
               <CardTitle>Mental status examination</CardTitle>
             </CardHeader>
             <CardContent>
@@ -217,7 +164,7 @@ export default async function SessionNoteViewPage({
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between gap-3">
-              <CardTitle>Ongoing assessments</CardTitle>
+              <CardTitle>Mood Assessment</CardTitle>
               {!isFinalised &&
               note.appointmentId &&
               viewContext.assessments.some((a) => !a.assessmentResultId) ? (
@@ -270,6 +217,77 @@ export default async function SessionNoteViewPage({
             </CardContent>
           </Card>
 
+          <Card>
+            <CardHeader>
+              <CardTitle>Treatment Plan Progress</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {viewContext.treatmentPlan ? (
+                <Link
+                  href={`/clients/${note.clientId}/treatment-plan/${viewContext.treatmentPlan.treatmentPlanId}?returnTo=${encodeURIComponent(sessionNoteUrl)}`}
+                  className="mb-3 block text-sm font-medium text-primary hover:underline"
+                >
+                  v.{viewContext.treatmentPlan.versionNumber} created:{" "}
+                  {formatSessionNoteDate(viewContext.treatmentPlan.startDate)}
+                </Link>
+              ) : (
+                <p className="mb-3 text-sm text-muted-foreground">
+                  No treatment plan
+                </p>
+              )}
+              {viewContext.treatmentPlan?.therapeuticTarget ? (
+                <p className="mb-3 text-sm">
+                  <span className="font-medium">Therapeutic target: </span>
+                  {viewContext.treatmentPlan.therapeuticTarget}
+                </p>
+              ) : null}
+              {viewContext.btpTargets.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  No BTP results for this session.
+                </p>
+              ) : (
+                <div className="rounded-lg border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Target</TableHead>
+                        <TableHead>Score</TableHead>
+                        <TableHead>Rating</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {viewContext.btpTargets.map((row) => (
+                        <TableRow key={row.target}>
+                          <TableCell>{row.target}</TableCell>
+                          <TableCell>{row.score} / 5</TableCell>
+                          <TableCell>{row.ratingLabel}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+              {viewContext.assistResult ? (
+                <RiskAssessmentTable
+                  rows={[
+                    {
+                      code: "ASSIST",
+                      name: "ASSIST",
+                      assessmentResultId: viewContext.assistResult.assessmentResultId,
+                      score: viewContext.assistResult.score,
+                      maxScore: viewContext.assistResult.maxScore,
+                      acuteRiskRating: viewContext.assistResult.severity,
+                      administerHref: null,
+                    } satisfies RiskAssessmentRow,
+                  ]}
+                  clientId={note.clientId}
+                  returnTo={sessionNoteUrl}
+                  outcomeColumnLabel="Risk Level"
+                />
+              ) : null}
+            </CardContent>
+          </Card>
+
         </div>
 
         <div className="order-3 lg:order-2 lg:col-start-2">
@@ -294,6 +312,7 @@ export default async function SessionNoteViewPage({
           therapeuticTarget={viewContext.treatmentPlan?.therapeuticTarget ?? null}
           btpTargets={viewContext.btpTargets}
           assessments={viewContext.assessments}
+          assistResult={viewContext.assistResult}
           mseSentence={viewContext.mseInstance?.sentence ?? null}
           asqResult={viewContext.asqResult}
           crisisPlan={viewContext.crisisPlan}

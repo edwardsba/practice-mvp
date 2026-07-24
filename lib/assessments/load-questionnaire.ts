@@ -19,6 +19,7 @@ export type QuestionnaireOption = {
 export type QuestionnaireQuestion = {
   elementId: string
   questionText: string
+  isRequired: boolean
   options: QuestionnaireOption[]
 }
 
@@ -74,6 +75,7 @@ async function loadElementsForInstance(
       .select({
         assessmentElementId: assessmentElements.assessmentElementId,
         questionText: assessmentElements.questionText,
+        isRequired: assessmentElements.isRequired,
         displayOrder: assessmentElements.displayOrder,
       })
       .from(assessmentElements)
@@ -90,6 +92,7 @@ async function loadElementsForInstance(
     .select({
       assessmentElementId: assessmentElements.assessmentElementId,
       questionText: assessmentElements.questionText,
+      isRequired: assessmentElements.isRequired,
       displayOrder: assessmentElements.displayOrder,
     })
     .from(assessmentElements)
@@ -207,6 +210,7 @@ export async function loadQuestionnaireForToken(
   const questions: QuestionnaireQuestion[] = elements.map((element) => ({
     elementId: element.assessmentElementId,
     questionText: element.questionText,
+    isRequired: element.isRequired,
     options: optionsByElement.get(element.assessmentElementId) ?? [],
   }))
 

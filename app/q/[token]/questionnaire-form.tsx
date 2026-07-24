@@ -76,6 +76,7 @@ export function QuestionnaireForm({
   const [confirmationMessage, setConfirmationMessage] = useState<string | null>(
     null
   )
+  const [unansweredIds, setUnansweredIds] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     setResponses(readStoredResponses(token))
@@ -90,14 +91,28 @@ export function QuestionnaireForm({
       writeStoredResponses(token, next)
       return next
     })
+    setUnansweredIds((prev) => {
+      if (!prev.has(elementId)) return prev
+      const next = new Set(prev)
+      next.delete(elementId)
+      return next
+    })
   }
 
   function validateResponses() {
-    const unanswered = questions.filter((q) => !responses[q.elementId])
+    const unanswered = questions.filter(
+      (q) => q.isRequired && !responses[q.elementId]
+    )
     if (unanswered.length > 0) {
-      setError("Please answer all questions before submitting.")
+      setUnansweredIds(new Set(unanswered.map((q) => q.elementId)))
+      setError("Please answer the highlighted question(s) below.")
+      const firstElement = document.getElementById(
+        `question-${unanswered[0].elementId}`
+      )
+      firstElement?.scrollIntoView({ behavior: "smooth", block: "center" })
       return false
     }
+    setUnansweredIds(new Set())
     return true
   }
 
@@ -186,9 +201,12 @@ export function QuestionnaireForm({
   if (confirmationMessage) {
     return (
       <div className="flex min-h-full flex-1 items-center justify-center px-4 py-16">
-        <p className="max-w-md text-center text-lg font-medium">
-          {confirmationMessage}
-        </p>
+        <div className="max-w-md space-y-2 text-center">
+          <p className="text-lg font-medium">{confirmationMessage}</p>
+          <p className="text-sm text-muted-foreground">
+            You may now safely close this window.
+          </p>
+        </div>
       </div>
     )
   }
@@ -197,7 +215,7 @@ export function QuestionnaireForm({
     <div className="mx-auto w-full max-w-lg px-4 py-8 pb-16">
       <header className="mb-8 space-y-3">
         <h1 className="text-2xl font-semibold tracking-tight">{assessmentName}</h1>
-        <p className="text-sm leading-relaxed text-muted-foreground">
+        <p className="text-base leading-relaxed text-muted-foreground">
           {instructionText}
         </p>
       </header>
@@ -210,6 +228,7 @@ export function QuestionnaireForm({
             question={question}
             value={responses[question.elementId]}
             onValueChange={(value) => setAnswer(question.elementId, value)}
+            hasError={unansweredIds.has(question.elementId)}
           />
         ))}
 
@@ -255,17 +274,28 @@ function QuestionBlock({
   question,
   value,
   onValueChange,
+  hasError,
 }: {
   index: number
   question: QuestionnaireQuestion
   value?: string
   onValueChange: (value: string) => void
+  hasError: boolean
 }) {
   return (
-    <fieldset className="space-y-3 rounded-xl border bg-card p-4 shadow-sm">
+    <fieldset
+      id={`question-${question.elementId}`}
+      className={cn(
+        "space-y-3 rounded-xl border bg-card p-4 shadow-sm",
+        hasError ? "border-destructive" : ""
+      )}
+    >
       <legend className="text-base leading-snug font-medium">
         <span className="text-muted-foreground">{index}. </span>
         {question.questionText}
+        {question.isRequired ? (
+          <span className="text-destructive"> *</span>
+        ) : null}
       </legend>
       <RadioGroup
         value={value}
@@ -288,6 +318,9 @@ function QuestionBlock({
           </label>
         ))}
       </RadioGroup>
+      {hasError ? (
+        <p className="text-sm text-destructive">This question is required</p>
+      ) : null}
     </fieldset>
   )
 }

@@ -1,5 +1,6 @@
 import Link from "next/link"
 
+import { getPractitionerProfile } from "@/app/practitioner/actions"
 import { AppShell } from "@/components/app-shell"
 import { PsqStatusBadge } from "@/components/session-notes/psq-status-badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -26,15 +27,22 @@ export default async function DashboardPage() {
     outstandingReportsCount,
     missingNotesCount,
     clientsWithoutAppointmentCount,
+    profile,
   ] = await Promise.all([
     loadTodaysAppointments(context.practiceId),
     countOutstandingReports(context.practiceId),
     countAppointmentsMissingFinalisedNote(context.practiceId),
     countActiveClientsWithoutUpcomingAppointment(context.practiceId),
+    getPractitionerProfile(),
   ])
 
+  const firstNameForGreeting = profile?.preferredName?.trim() || profile?.firstName?.trim()
+  const welcomeHeading = firstNameForGreeting
+    ? `Welcome, ${firstNameForGreeting}`
+    : "Welcome"
+
   return (
-    <AppShell title="Welcome">
+    <AppShell title={welcomeHeading}>
       <div className="space-y-6">
         <Card>
           <CardHeader>

@@ -195,7 +195,7 @@ export default async function SavedReportPage({
       </div>
       <div className="no-print">
         <EntityPageHeader
-          kicker="Reports"
+          kicker="Report"
           name={clientName}
           subheading={`${snapshot.reportTitle}${fundingApproval ? ` — ${fundingApproval.approvalTypeName}` : ""}`}
         />

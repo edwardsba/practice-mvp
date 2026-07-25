@@ -6,6 +6,7 @@ import { deleteReportDraft } from "@/app/clients/[client_id]/reports/[report_id]
 import { AppShell } from "@/components/app-shell"
 import { BackButton } from "@/components/ui/back-button"
 import { EntityDeleteSection } from "@/components/entity-delete-section"
+import { EntityPageHeader } from "@/components/ui/entity-page-header"
 import {
   clients,
   practitionerProfiles,
@@ -180,16 +181,16 @@ export default async function EditReportPage({
           fallbackHref={`/clients/${clientId}/reports/${reportId}`}
           label="← Back to report"
         />
-        <h1 className="text-2xl font-semibold tracking-tight">
-          {isFinalised ? "Correct report" : "Edit report"}
-        </h1>
-        <p className="mt-1 text-muted-foreground">
-          {clientName}
-          {isFinalised
-            ? " — saving creates a new version; the original stays on file."
-            : ""}
-        </p>
       </div>
+      <EntityPageHeader
+        kicker={isFinalised ? "Report edit new version" : "Report edit"}
+        name={clientName}
+        subheading={
+          isFinalised
+            ? "Saving creates a new version; the original stays on file."
+            : undefined
+        }
+      />
 
       <ReportForm
         clientId={clientId}

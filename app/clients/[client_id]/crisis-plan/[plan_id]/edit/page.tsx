@@ -7,6 +7,7 @@ import { AppShell } from "@/components/app-shell"
 import { BackButton } from "@/components/ui/back-button"
 import { EntityDeleteSection } from "@/components/entity-delete-section"
 import { Badge } from "@/components/ui/badge"
+import { EntityPageHeader } from "@/components/ui/entity-page-header"
 import {
   loadCrisisPlanForPractice,
   loadEmergencyContacts,
@@ -46,17 +47,13 @@ export default async function EditCrisisPlanPage({
           fallbackHref={`/clients/${clientId}/crisis-plan/${planId}`}
           label="← Back to crisis plan"
         />
-        <div className="flex flex-wrap items-center gap-2">
-          <h1 className="text-2xl font-semibold tracking-tight">
-            Edit crisis plan
-          </h1>
-          <Badge variant="secondary">Version {plan.versionNumber}</Badge>
-        </div>
-        <p className="mt-1 text-muted-foreground">
-          {clientName} — saving creates version {plan.versionNumber + 1} and
-          archives prior versions.
-        </p>
       </div>
+      <EntityPageHeader
+        kicker="Crisis plan"
+        name={clientName}
+        subheading={`Saving creates version ${plan.versionNumber + 1} and archives prior versions.`}
+        badge={<Badge variant="secondary">Version {plan.versionNumber}</Badge>}
+      />
 
       <CrisisPlanForm
         clientId={clientId}

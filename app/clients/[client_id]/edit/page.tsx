@@ -6,6 +6,7 @@ import { EditClientForm } from "@/app/clients/[client_id]/edit/edit-client-form"
 import { deleteClient, getClientDeleteStatus } from "@/app/clients/actions"
 import { AppShell } from "@/components/app-shell"
 import { BackButton } from "@/components/ui/back-button"
+import { EntityPageHeader } from "@/components/ui/entity-page-header"
 import { EntityDeleteSection } from "@/components/entity-delete-section"
 import {
   Card,
@@ -66,9 +67,8 @@ export default async function EditClientPage({
           fallbackHref={`/clients/${clientId}`}
           label="← Back to client"
         />
-        <h1 className="text-2xl font-semibold tracking-tight">Edit client</h1>
-        <p className="mt-1 text-muted-foreground">{clientName}</p>
       </div>
+      <EntityPageHeader kicker="Client details" name={clientName} />
 
       <Card className="max-w-xl">
         <CardHeader>

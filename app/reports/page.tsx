@@ -2,6 +2,7 @@ import Link from "next/link"
 
 import { AppShell } from "@/components/app-shell"
 import { Badge } from "@/components/ui/badge"
+import { ListPageHeader } from "@/components/ui/list-page-header"
 import {
   Table,
   TableBody,
@@ -22,9 +23,7 @@ export default async function AllReportsPage() {
 
   return (
     <AppShell>
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold tracking-tight">Reports</h1>
-      </div>
+      <ListPageHeader heading="Reports" />
 
       <div className="rounded-lg border">
         <Table>

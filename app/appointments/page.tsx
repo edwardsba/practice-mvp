@@ -5,6 +5,7 @@ import { TestAutomationsButton } from "@/app/appointments/test-automations-butto
 import { AppShell } from "@/components/app-shell"
 import { StatusBadge } from "@/components/ui/status-badge"
 import { Button } from "@/components/ui/button"
+import { ListPageHeader } from "@/components/ui/list-page-header"
 import {
   Table,
   TableBody,
@@ -50,9 +51,14 @@ export default async function AppointmentsPage({
 
   return (
     <AppShell>
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold tracking-tight">Appointments</h1>
-      </div>
+      <ListPageHeader
+        heading="Appointments"
+        action={
+          <Button asChild>
+            <Link href="/appointments/new">Add Appointment</Link>
+          </Button>
+        }
+      />
 
       <div className="mb-6 flex items-center justify-between gap-4">
         <AppointmentsFilter currentFilter={filter} />
@@ -60,9 +66,6 @@ export default async function AppointmentsPage({
           {process.env.NODE_ENV === "development" ? (
             <TestAutomationsButton />
           ) : null}
-          <Button asChild>
-            <Link href="/appointments/new">Add Appointment</Link>
-          </Button>
         </div>
       </div>
 

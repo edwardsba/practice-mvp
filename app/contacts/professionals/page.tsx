@@ -2,6 +2,7 @@ import Link from "next/link"
 
 import { AppShell } from "@/components/app-shell"
 import { Button } from "@/components/ui/button"
+import { ListPageHeader } from "@/components/ui/list-page-header"
 import {
   Table,
   TableBody,
@@ -20,12 +21,14 @@ export default async function ProfessionalsPage() {
 
   return (
     <AppShell>
-      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-2xl font-semibold tracking-tight">Professionals</h1>
-        <Button asChild>
-          <Link href="/contacts/professionals/new">Add Professional</Link>
-        </Button>
-      </div>
+      <ListPageHeader
+        heading="Professionals"
+        action={
+          <Button asChild>
+            <Link href="/contacts/professionals/new">Add Professional</Link>
+          </Button>
+        }
+      />
 
       <div className="rounded-lg border">
         <Table>

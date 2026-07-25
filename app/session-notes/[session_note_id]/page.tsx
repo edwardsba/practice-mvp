@@ -44,17 +44,6 @@ import { SESSION_NOTE_STATUS_CONFIG } from "@/lib/status"
 
 import "@/components/session-notes/session-note-print.css"
 
-function formatDob(value: string | null) {
-  if (!value) return "—"
-  const date = new Date(value.includes("T") ? value : `${value}T00:00:00`)
-  if (Number.isNaN(date.getTime())) return value
-  return date.toLocaleDateString("en-AU", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  })
-}
-
 export default async function SessionNoteViewPage({
   params,
   searchParams,
@@ -95,7 +84,7 @@ export default async function SessionNoteViewPage({
       <EntityPageHeader
         kicker="Session note"
         name={clientName}
-        subheading={`Date of birth: ${formatDob(note.clientDateOfBirth)}`}
+        subheading={formatSessionNoteDate(note.sessionDate)}
         badge={
           <StatusBadge
             status={isFinalised ? "finalised" : note.status}

@@ -5,6 +5,7 @@ import { and, desc, eq } from "drizzle-orm"
 import { ReportForm } from "@/app/clients/[client_id]/reports/new/report-form"
 import { AppShell } from "@/components/app-shell"
 import { BackButton } from "@/components/ui/back-button"
+import { EntityPageHeader } from "@/components/ui/entity-page-header"
 import { clients, practitionerProfiles, practices, treatmentPlans } from "@/db/schema"
 import { getClientFundingApprovalsForReport } from "@/lib/actions/funding"
 import { loadActiveCrisisPlanSummary } from "@/lib/crisis-plans/load"
@@ -135,8 +136,13 @@ export default async function NewReportPage({
           fallbackHref={`/clients/${clientId}`}
           label="← Back to client"
         />
-        <h1 className="text-2xl font-semibold tracking-tight">Create report</h1>
-        <p className="mt-1 text-muted-foreground">{clientName}</p>
+      </div>
+      <div className="no-print">
+        <EntityPageHeader
+          kicker="Report"
+          name={clientName}
+          subheading="New report"
+        />
       </div>
 
       <ReportForm

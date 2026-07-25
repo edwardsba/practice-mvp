@@ -4,6 +4,7 @@ import { notFound } from "next/navigation"
 import { MseForm } from "@/app/clients/[client_id]/mse/new/mse-form"
 import { AppShell } from "@/components/app-shell"
 import { BackButton } from "@/components/ui/back-button"
+import { EntityPageHeader } from "@/components/ui/entity-page-header"
 import { clients } from "@/db/schema"
 import { loadMseQuestionnaire } from "@/lib/assessments/load-mse"
 import { requirePractitionerContext } from "@/lib/auth"
@@ -56,11 +57,12 @@ export default async function AdministerMsePage({
           fallbackHref={`/clients/${clientId}`}
           label="← Back to client"
         />
-        <h1 className="text-2xl font-semibold tracking-tight">
-          Administer MSE
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">{clientName}</p>
       </div>
+      <EntityPageHeader
+        kicker="MSE"
+        name={clientName}
+        subheading="New MSE"
+      />
 
       <MseForm
         clientId={clientId}

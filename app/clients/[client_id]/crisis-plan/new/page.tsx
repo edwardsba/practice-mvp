@@ -4,6 +4,7 @@ import { notFound } from "next/navigation"
 import { CrisisPlanForm } from "@/components/crisis-plan/crisis-plan-form"
 import { AppShell } from "@/components/app-shell"
 import { BackButton } from "@/components/ui/back-button"
+import { EntityPageHeader } from "@/components/ui/entity-page-header"
 import {
   loadEmergencyContacts,
   verifyClientInPractice,
@@ -33,11 +34,12 @@ export default async function NewCrisisPlanPage({
           fallbackHref={`/clients/${clientId}`}
           label="← Back to client"
         />
-        <h1 className="text-2xl font-semibold tracking-tight">
-          Create crisis plan
-        </h1>
-        <p className="mt-1 text-muted-foreground">{clientName}</p>
       </div>
+      <EntityPageHeader
+        kicker="Crisis plan"
+        name={clientName}
+        subheading="New crisis plan"
+      />
 
       <CrisisPlanForm
         clientId={clientId}

@@ -4,6 +4,7 @@ import { notFound } from "next/navigation"
 import { TreatmentPlanForm } from "@/components/treatment-plan/treatment-plan-form"
 import { AppShell } from "@/components/app-shell"
 import { BackButton } from "@/components/ui/back-button"
+import { EntityPageHeader } from "@/components/ui/entity-page-header"
 import { verifyClientInPractice } from "@/lib/treatment-plans/load"
 import { requirePractitionerContext } from "@/lib/auth"
 
@@ -29,11 +30,12 @@ export default async function NewTreatmentPlanPage({
           fallbackHref={`/clients/${clientId}`}
           label="← Back to client"
         />
-        <h1 className="text-2xl font-semibold tracking-tight">
-          Create treatment plan
-        </h1>
-        <p className="mt-1 text-muted-foreground">{clientName}</p>
       </div>
+      <EntityPageHeader
+        kicker="Treatment plan"
+        name={clientName}
+        subheading="New treatment plan"
+      />
 
       <TreatmentPlanForm
         clientId={clientId}

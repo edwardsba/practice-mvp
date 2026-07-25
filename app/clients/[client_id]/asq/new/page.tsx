@@ -5,6 +5,7 @@ import { notFound } from "next/navigation"
 import { AsqForm } from "@/app/clients/[client_id]/asq/new/asq-form"
 import { AppShell } from "@/components/app-shell"
 import { BackButton } from "@/components/ui/back-button"
+import { EntityPageHeader } from "@/components/ui/entity-page-header"
 import {
   Card,
   CardContent,
@@ -60,9 +61,12 @@ export default async function AdministerAsqPage({
           fallbackHref={`/clients/${clientId}`}
           label="← Back to client"
         />
-        <h1 className="text-2xl font-semibold tracking-tight">Administer ASQ</h1>
-        <p className="mt-1 text-sm text-muted-foreground">{clientName}</p>
       </div>
+      <EntityPageHeader
+        kicker="ASQ"
+        name={clientName}
+        subheading="New ASQ screen"
+      />
 
       <Card>
         <CardHeader>

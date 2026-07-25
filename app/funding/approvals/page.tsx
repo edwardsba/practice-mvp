@@ -3,6 +3,7 @@ import Link from "next/link"
 import { AppShell } from "@/components/app-shell"
 import { StatusBadge } from "@/components/ui/status-badge"
 import { Button } from "@/components/ui/button"
+import { ListPageHeader } from "@/components/ui/list-page-header"
 import {
   Table,
   TableBody,
@@ -22,14 +23,14 @@ export default async function FundingApprovalsPage() {
 
   return (
     <AppShell>
-      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-2xl font-semibold tracking-tight">
-          Funding approvals
-        </h1>
-        <Button asChild>
-          <Link href="/funding/approvals/new">Add Funding Approval</Link>
-        </Button>
-      </div>
+      <ListPageHeader
+        heading="Funding approvals"
+        action={
+          <Button asChild>
+            <Link href="/funding/approvals/new">Add Funding Approval</Link>
+          </Button>
+        }
+      />
 
       <div className="rounded-lg border">
         <Table>

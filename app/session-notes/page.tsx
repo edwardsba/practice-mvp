@@ -2,6 +2,7 @@ import Link from "next/link"
 
 import { SessionNotesFilter } from "@/app/session-notes/session-notes-filter"
 import { AppShell } from "@/components/app-shell"
+import { ListPageHeader } from "@/components/ui/list-page-header"
 import { AsqStatusBadge } from "@/components/session-notes/asq-status-badge"
 import { PsqStatusBadge } from "@/components/session-notes/psq-status-badge"
 import {
@@ -60,17 +61,7 @@ export default async function SessionNotesPage({
 
   return (
     <AppShell>
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold tracking-tight">Session Notes</h1>
-        {clientId ? (
-          <p className="mt-1 text-sm text-muted-foreground">
-            Showing notes for one client.{" "}
-            <Link href="/session-notes" className="text-primary hover:underline">
-              View all
-            </Link>
-          </p>
-        ) : null}
-      </div>
+      <ListPageHeader heading="Session Notes" />
 
       <div className="mb-6">
         <SessionNotesFilter currentFilter={filter} clientId={clientId} />

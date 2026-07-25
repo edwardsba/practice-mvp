@@ -2,6 +2,7 @@ import Link from "next/link"
 
 import { AppShell } from "@/components/app-shell"
 import { Button } from "@/components/ui/button"
+import { ListPageHeader } from "@/components/ui/list-page-header"
 import {
   Table,
   TableBody,
@@ -32,13 +33,15 @@ export default async function ClaimsPage({
         <Button variant="ghost" size="sm" asChild className="mb-2 -ml-2">
           <Link href={backHref}>← Back</Link>
         </Button>
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <h1 className="text-2xl font-semibold tracking-tight">Claims</h1>
+      </div>
+      <ListPageHeader
+        heading="Claims"
+        action={
           <Button asChild>
             <Link href="/funding/claims/new">Add Claim</Link>
           </Button>
-        </div>
-      </div>
+        }
+      />
 
       <div className="rounded-lg border">
         <Table>

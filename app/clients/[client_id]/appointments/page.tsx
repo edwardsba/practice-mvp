@@ -4,6 +4,7 @@ import { and, eq } from "drizzle-orm"
 
 import { AppShell } from "@/components/app-shell"
 import { Button } from "@/components/ui/button"
+import { EntityPageHeader } from "@/components/ui/entity-page-header"
 import { StatusBadge } from "@/components/ui/status-badge"
 import {
   Table,
@@ -68,17 +69,19 @@ export default async function ClientAppointmentsPage({
         <Button variant="ghost" size="sm" asChild className="mb-2 -ml-2">
           <Link href={`/clients/${clientId}`}>← {clientName}</Link>
         </Button>
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <h1 className="text-2xl font-semibold tracking-tight">
-            Appointments — {clientName}
-          </h1>
+      </div>
+      <EntityPageHeader
+        kicker="Appointments"
+        name={clientName}
+        subheading={`${appointments.length} appointment${appointments.length === 1 ? "" : "s"}`}
+        action={
           <Button asChild>
             <Link href={appendReturnTo(`/appointments/new?clientId=${clientId}`, returnTo)}>
               Add Appointment
             </Link>
           </Button>
-        </div>
-      </div>
+        }
+      />
 
       <div className="rounded-lg border">
         <Table>

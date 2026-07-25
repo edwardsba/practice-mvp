@@ -7,6 +7,7 @@ import { AppShell } from "@/components/app-shell"
 import { BackButton } from "@/components/ui/back-button"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { EntityPageHeader } from "@/components/ui/entity-page-header"
 import {
   Card,
   CardContent,
@@ -73,22 +74,17 @@ export default async function CrisisPlanViewPage({
           fallbackHref={`/clients/${clientId}`}
           label="← Back to client"
         />
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-2xl font-semibold tracking-tight">
-                Crisis plan
-              </h1>
-              <Badge variant={plan.isActive ? "default" : "secondary"}>
-                Version {plan.versionNumber}
-                {plan.isActive ? " · Active" : ""}
-              </Badge>
-            </div>
-            <p className="mt-1 text-muted-foreground">{clientName}</p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Created {formatVersionDate(plan.createdAt)}
-            </p>
-          </div>
+        <EntityPageHeader
+          kicker="Crisis plan"
+          name={clientName}
+          subheading={`v${plan.versionNumber} - Created ${formatVersionDate(plan.createdAt)}`}
+          badge={
+            <Badge variant={plan.isActive ? "default" : "secondary"}>
+              {plan.isActive ? "Active" : "Inactive"}
+            </Badge>
+          }
+        />
+        <div className="mb-6 flex justify-end">
           <CrisisPlanToolbar
             clientId={clientId}
             crisisPlanId={planId}

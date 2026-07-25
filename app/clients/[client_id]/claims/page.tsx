@@ -4,6 +4,7 @@ import { and, eq } from "drizzle-orm"
 
 import { AppShell } from "@/components/app-shell"
 import { Button } from "@/components/ui/button"
+import { EntityPageHeader } from "@/components/ui/entity-page-header"
 import {
   Table,
   TableBody,
@@ -55,10 +56,12 @@ export default async function ClientClaimsPage({
         <Button variant="ghost" size="sm" asChild className="mb-2 -ml-2">
           <Link href={`/clients/${clientId}`}>← {clientName}</Link>
         </Button>
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <h1 className="text-2xl font-semibold tracking-tight">
-            Claims — {clientName}
-          </h1>
+      </div>
+      <EntityPageHeader
+        kicker="Claims"
+        name={clientName}
+        subheading={`${claims.length} claim${claims.length === 1 ? "" : "s"}`}
+        action={
           <Button asChild>
             <Link
               href={`/funding/claims/new?client_id=${clientId}&returnTo=${encodeURIComponent(returnTo)}`}
@@ -66,8 +69,8 @@ export default async function ClientClaimsPage({
               Add Claim
             </Link>
           </Button>
-        </div>
-      </div>
+        }
+      />
 
       <div className="rounded-lg border">
         <Table>

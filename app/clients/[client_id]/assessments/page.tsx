@@ -5,6 +5,7 @@ import { and, eq } from "drizzle-orm"
 import { AssessmentsTable } from "@/app/clients/[client_id]/assessments/assessments-table"
 import { AppShell } from "@/components/app-shell"
 import { Button } from "@/components/ui/button"
+import { EntityPageHeader } from "@/components/ui/entity-page-header"
 import { clients } from "@/db/schema"
 import { loadAssessmentResultsForClient } from "@/lib/assessments/load-results"
 import { requirePractitionerContext } from "@/lib/auth"
@@ -49,10 +50,12 @@ export default async function ClientAssessmentsPage({
         <Button variant="ghost" size="sm" asChild className="mb-2 -ml-2">
           <Link href={`/clients/${clientId}`}>← {clientName}</Link>
         </Button>
-        <h1 className="text-2xl font-semibold tracking-tight">
-          Assessments — {clientName}
-        </h1>
       </div>
+      <EntityPageHeader
+        kicker="Assessments"
+        name={clientName}
+        subheading={`${results.length} result${results.length === 1 ? "" : "s"}`}
+      />
 
       <AssessmentsTable clientId={clientId} results={results} />
     </AppShell>

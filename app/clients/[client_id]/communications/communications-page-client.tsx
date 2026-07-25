@@ -6,6 +6,7 @@ import { useEffect, useState } from "react"
 import { CommunicationPreferencesCard } from "@/app/clients/[client_id]/communication-preferences-card"
 import { SendCommunicationModal } from "@/components/email/send-communication-modal"
 import { Button } from "@/components/ui/button"
+import { EntityPageHeader } from "@/components/ui/entity-page-header"
 import {
   Dialog,
   DialogContent,
@@ -139,10 +140,12 @@ export function CommunicationsPageClient({
         <Button variant="ghost" size="sm" asChild className="mb-2 -ml-2">
           <Link href={`/clients/${clientId}`}>← {clientName}</Link>
         </Button>
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <h1 className="text-2xl font-semibold tracking-tight">
-            Communications — {clientName}
-          </h1>
+      </div>
+      <EntityPageHeader
+        kicker="Communications"
+        name={clientName}
+        subheading={`${communications.length} communication${communications.length === 1 ? "" : "s"}`}
+        action={
           <Button
             type="button"
             onClick={() => setSendModalOpen(true)}
@@ -150,8 +153,8 @@ export function CommunicationsPageClient({
           >
             Send Communication
           </Button>
-        </div>
-      </div>
+        }
+      />
 
       <CommunicationPreferencesCard clientId={clientId} preferences={preferences} />
 

@@ -148,6 +148,8 @@ export type QuestionnaireEmailTemplateVariables = {
   practice_name: string
   practitioner_name: string
   expiry_date: string
+  appointment_date?: string
+  appointment_time?: string
 }
 
 export function getDefaultEmailDraft(

@@ -1,4 +1,8 @@
 import {
+  formatAppointmentDate,
+  formatAppointmentTime,
+} from "@/lib/appointments/format"
+import {
   formatQuestionnaireExpiryDate,
   type QuestionnaireEmailTemplateVariables,
 } from "@/lib/email/templates"
@@ -17,6 +21,8 @@ export function buildTemplateVariablesFromLinkResponse(
     practiceName: string
     practitionerName: string
     expiresAt: Date
+    appointmentDate?: string | null
+    appointmentTime?: string | null
   }
 ): QuestionnaireEmailTemplateVariables {
   return {
@@ -24,5 +30,11 @@ export function buildTemplateVariablesFromLinkResponse(
     practice_name: data.practiceName,
     practitioner_name: data.practitionerName,
     expiry_date: formatQuestionnaireExpiryDate(data.expiresAt),
+    ...(data.appointmentDate
+      ? { appointment_date: formatAppointmentDate(data.appointmentDate) }
+      : {}),
+    ...(data.appointmentTime
+      ? { appointment_time: formatAppointmentTime(data.appointmentTime) }
+      : {}),
   }
 }

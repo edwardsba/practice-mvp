@@ -2,6 +2,7 @@ import { randomBytes } from "crypto"
 import { and, eq } from "drizzle-orm"
 
 import {
+  appointments,
   assessmentAccessLinks,
   assessmentDefinitions,
   assessmentInstances,
@@ -70,6 +71,28 @@ export async function createAssessmentLink(
       error: "Practice or practitioner not found.",
       status: 404,
     }
+  }
+
+  let appointmentInfo: {
+    appointmentDate: string
+    appointmentTime: string
+  } | null = null
+
+  if (params.appointmentId) {
+    const [appointmentRow] = await db
+      .select({
+        appointmentDate: appointments.appointmentDate,
+        appointmentTime: appointments.appointmentTime,
+      })
+      .from(appointments)
+      .where(
+        and(
+          eq(appointments.appointmentId, params.appointmentId),
+          eq(appointments.practiceId, practiceId)
+        )
+      )
+      .limit(1)
+    appointmentInfo = appointmentRow ?? null
   }
 
   const [definition] = await db
@@ -170,6 +193,8 @@ export async function createAssessmentLink(
       practiceName: emailContext.practiceName,
       practitionerName: emailContext.practitionerName,
       expiresAt,
+      appointmentDate: appointmentInfo?.appointmentDate ?? null,
+      appointmentTime: appointmentInfo?.appointmentTime ?? null,
     }),
   }
 }

@@ -3,6 +3,7 @@ import Link from "next/link"
 import { AppShell } from "@/components/app-shell"
 import { BackButton } from "@/components/ui/back-button"
 import { Button } from "@/components/ui/button"
+import { ListPageHeader } from "@/components/ui/list-page-header"
 import {
   Table,
   TableBody,
@@ -23,19 +24,14 @@ export default async function ReportTypesPage() {
     <AppShell>
       <div className="mb-6">
         <BackButton fallbackHref="/practice" label="← Back to practice" />
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">
-              Report Types
-            </h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Manage report types used in funding approval requirements.
-            </p>
-          </div>
-          <Button asChild>
-            <Link href="/settings/report-types/new">Add Report Type</Link>
-          </Button>
-        </div>
+        <ListPageHeader
+          heading="Report Types"
+          action={
+            <Button asChild>
+              <Link href="/settings/report-types/new">Add Report Type</Link>
+            </Button>
+          }
+        />
       </div>
 
       <div className="rounded-lg border">

@@ -4,6 +4,7 @@ import { notFound } from "next/navigation"
 import { SavedReportView } from "@/app/clients/[client_id]/reports/[report_id]/saved-report-view"
 import { AppShell } from "@/components/app-shell"
 import { BackButton } from "@/components/ui/back-button"
+import { EntityPageHeader } from "@/components/ui/entity-page-header"
 import {
   clients,
   fundingApprovalTypeReports,
@@ -182,6 +183,7 @@ export default async function SavedReportPage({
     report.recipientType === "client"
       ? client.email?.trim() || ""
       : addressOptions[0]?.value ?? ""
+  const clientName = `${client.firstName} ${client.lastName}`
 
   return (
     <AppShell>
@@ -190,13 +192,13 @@ export default async function SavedReportPage({
           fallbackHref={`/clients/${clientId}`}
           label="← Back to client"
         />
-        <h1 className="text-2xl font-semibold tracking-tight">
-          {snapshot.reportTitle}
-        </h1>
-        <p className="mt-1 text-muted-foreground">
-          {client.lastName}, {client.firstName}
-          {fundingApproval ? ` — ${fundingApproval.approvalTypeName}` : ""}
-        </p>
+      </div>
+      <div className="no-print">
+        <EntityPageHeader
+          kicker="Reports"
+          name={clientName}
+          subheading={`${snapshot.reportTitle}${fundingApproval ? ` — ${fundingApproval.approvalTypeName}` : ""}`}
+        />
       </div>
 
       <SavedReportView

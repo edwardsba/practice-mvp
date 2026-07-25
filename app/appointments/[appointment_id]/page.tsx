@@ -5,6 +5,7 @@ import { createDraftSessionNote } from "@/app/session-notes/actions"
 import { AppointmentStatusControl } from "@/components/appointments/appointment-status-control"
 import { AppShell } from "@/components/app-shell"
 import { Button } from "@/components/ui/button"
+import { EntityPageHeader } from "@/components/ui/entity-page-header"
 import {
   Card,
   CardContent,
@@ -84,34 +85,39 @@ export default async function AppointmentDetailPage({
         <Button variant="ghost" size="sm" asChild className="mb-2 -ml-2">
           <Link href={back.href}>{back.label}</Link>
         </Button>
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <h1 className="text-2xl font-semibold tracking-tight">Appointment</h1>
-          <div className="flex flex-wrap justify-end gap-2">
-            {linkedSessionNote ? (
-              <Button asChild variant="default">
-                <Link
-                  href={`/session-notes/${linkedSessionNote.sessionNoteId}?returnTo=${encodeURIComponent(appointmentUrl)}`}
-                >
-                  View Session Note
-                </Link>
-              </Button>
-            ) : (
-              <form
-                action={createDraftSessionNote.bind(
-                  null,
-                  appointment.clientId,
-                  appointmentId,
-                  appointmentUrl
-                )}
-              >
-                <Button type="submit" variant="default">
-                  Create Session Note
-                </Button>
-              </form>
-            )}
-          </div>
-        </div>
       </div>
+      <EntityPageHeader
+        kicker="Appointment"
+        name={clientName}
+        subheading={formatAppointmentDateTime(
+          appointment.appointmentDate,
+          appointment.appointmentTime
+        )}
+        action={
+          linkedSessionNote ? (
+            <Button asChild variant="default">
+              <Link
+                href={`/session-notes/${linkedSessionNote.sessionNoteId}?returnTo=${encodeURIComponent(appointmentUrl)}`}
+              >
+                View Session Note
+              </Link>
+            </Button>
+          ) : (
+            <form
+              action={createDraftSessionNote.bind(
+                null,
+                appointment.clientId,
+                appointmentId,
+                appointmentUrl
+              )}
+            >
+              <Button type="submit" variant="default">
+                Create Session Note
+              </Button>
+            </form>
+          )
+        }
+      />
 
       <Card className="mb-6">
         <CardHeader className="flex flex-row items-center justify-between gap-3">

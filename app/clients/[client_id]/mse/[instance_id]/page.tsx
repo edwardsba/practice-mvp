@@ -4,6 +4,7 @@ import { notFound } from "next/navigation"
 
 import { AppShell } from "@/components/app-shell"
 import { BackButton } from "@/components/ui/back-button"
+import { EntityPageHeader } from "@/components/ui/entity-page-header"
 import {
   Card,
   CardContent,
@@ -225,17 +226,12 @@ export default async function ViewMsePage({
           fallbackHref={`/clients/${clientId}`}
           label="← Back to client"
         />
-        <h1 className="text-2xl font-semibold tracking-tight">{clientName}</h1>
       </div>
-
-      <div className="mb-6 space-y-1">
-        <p className="text-sm font-medium text-muted-foreground">
-          {instance.assessmentName}
-        </p>
-        <p className="text-sm text-muted-foreground">
-          Completed {formatCompletedDate(instance.submittedAt)}
-        </p>
-      </div>
+      <EntityPageHeader
+        kicker="MSE"
+        name={clientName}
+        subheading={`${instance.assessmentName} · Completed ${formatCompletedDate(instance.submittedAt)}`}
+      />
 
       <Card className="mb-6">
         <CardHeader>

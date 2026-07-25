@@ -5,6 +5,7 @@ import { and, asc, eq } from "drizzle-orm"
 import { MarkReviewedButton } from "@/app/clients/[client_id]/results/[result_id]/mark-reviewed-button"
 import { AppShell } from "@/components/app-shell"
 import { BackButton } from "@/components/ui/back-button"
+import { EntityPageHeader } from "@/components/ui/entity-page-header"
 import {
   Card,
   CardContent,
@@ -168,17 +169,19 @@ export default async function AssessmentResultDetailPage({
             fallbackHref={`/clients/${clientId}/assessments`}
             label="← Back to assessments"
           />
-          <h1 className="text-2xl font-semibold tracking-tight">{clientName}</h1>
         </div>
-
-        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div />
-          <MarkReviewedButton
-            clientId={clientId}
-            resultId={resultId}
-            status={result.status}
-          />
-        </div>
+        <EntityPageHeader
+          kicker={result.assessmentName}
+          name={clientName}
+          subheading={`Completed ${formatDate(result.assessmentDate)}`}
+          action={
+            <MarkReviewedButton
+              clientId={clientId}
+              resultId={resultId}
+              status={result.status}
+            />
+          }
+        />
 
         <Card className="mb-6">
           <CardHeader>
@@ -296,24 +299,19 @@ export default async function AssessmentResultDetailPage({
           fallbackHref={`/clients/${clientId}`}
           label="← Back to client"
         />
-        <h1 className="text-2xl font-semibold tracking-tight">{clientName}</h1>
       </div>
-
-      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="space-y-1">
-          <p className="text-sm font-medium text-muted-foreground">
-            {result.assessmentName}
-          </p>
-          <p className="text-sm text-muted-foreground">
-            Completed {formatDate(result.assessmentDate)}
-          </p>
-        </div>
-        <MarkReviewedButton
-          clientId={clientId}
-          resultId={resultId}
-          status={result.status}
-        />
-      </div>
+      <EntityPageHeader
+        kicker={result.assessmentName}
+        name={clientName}
+        subheading={`Completed ${formatDate(result.assessmentDate)}`}
+        action={
+          <MarkReviewedButton
+            clientId={clientId}
+            resultId={resultId}
+            status={result.status}
+          />
+        }
+      />
 
       <Card className="mb-6">
         <CardHeader>

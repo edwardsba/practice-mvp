@@ -1,5 +1,6 @@
 import { AppShell } from "@/components/app-shell"
 import { BackButton } from "@/components/ui/back-button"
+import { ListPageHeader } from "@/components/ui/list-page-header"
 import { ProfessionalForm } from "@/components/contacts/professional-form"
 import {
   getProfessionalOrganisations,
@@ -27,10 +28,8 @@ export default async function NewProfessionalPage({
           fallbackHref={returnTo ?? "/contacts/professionals"}
           label="← Back"
         />
-        <h1 className="text-2xl font-semibold tracking-tight">
-          Add professional
-        </h1>
       </div>
+      <ListPageHeader heading="Add professional" />
 
       <ProfessionalForm
         action={saveProfessionalAction.bind(

@@ -4,6 +4,7 @@ import { getActiveClients } from "@/app/clients/actions"
 import { AppointmentForm } from "@/components/appointments/appointment-form"
 import { AppShell } from "@/components/app-shell"
 import { BackButton } from "@/components/ui/back-button"
+import { ListPageHeader } from "@/components/ui/list-page-header"
 import { getMemberships } from "@/lib/actions/practitioner-practice"
 import { requirePractitionerContext } from "@/lib/auth"
 import { resolveBackNavigation } from "@/lib/navigation/back"
@@ -52,10 +53,8 @@ export default async function NewAppointmentPage({
     <AppShell>
       <div className="mb-6">
         <BackButton fallbackHref={back.href} label={back.label} />
-        <h1 className="text-2xl font-semibold tracking-tight">
-          Add appointment
-        </h1>
       </div>
+      <ListPageHeader heading="Add appointment" />
 
       <AppointmentForm
         action={createAppointment.bind(null, returnTo)}

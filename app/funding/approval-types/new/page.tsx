@@ -1,6 +1,7 @@
 import { ApprovalTypeForm } from "@/components/funding/approval-type-form"
 import { AppShell } from "@/components/app-shell"
 import { BackButton } from "@/components/ui/back-button"
+import { ListPageHeader } from "@/components/ui/list-page-header"
 import { getClaimTypes } from "@/lib/actions/funding"
 import { getReportTypes } from "@/lib/actions/report-types"
 import { requirePractitionerContext } from "@/lib/auth"
@@ -19,10 +20,8 @@ export default async function NewFundingApprovalTypePage() {
           fallbackHref="/funding/approval-types"
           label="← Back to approval types"
         />
-        <h1 className="text-2xl font-semibold tracking-tight">
-          Add funding approval type
-        </h1>
       </div>
+      <ListPageHeader heading="Add funding approval type" />
 
       <ApprovalTypeForm
         practiceId={context.practiceId}

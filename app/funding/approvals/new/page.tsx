@@ -2,6 +2,7 @@ import { getActiveClients } from "@/app/clients/actions"
 import { FundingApprovalForm } from "@/components/funding/funding-approval-form"
 import { AppShell } from "@/components/app-shell"
 import { BackButton } from "@/components/ui/back-button"
+import { ListPageHeader } from "@/components/ui/list-page-header"
 import {
   getClaimById,
   getClaims,
@@ -50,10 +51,8 @@ export default async function NewFundingApprovalPage({
           fallbackHref={returnTo ?? "/funding/approvals"}
           label="← Back"
         />
-        <h1 className="text-2xl font-semibold tracking-tight">
-          Add funding approval
-        </h1>
       </div>
+      <ListPageHeader heading="Add funding approval" />
 
       <FundingApprovalForm
         clients={clients}

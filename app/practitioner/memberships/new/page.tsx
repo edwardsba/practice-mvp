@@ -2,6 +2,7 @@ import { getPracticesForMembershipSelect } from "@/lib/actions/practitioner-prac
 import { MembershipForm } from "@/components/practitioner/membership-form"
 import { AppShell } from "@/components/app-shell"
 import { BackButton } from "@/components/ui/back-button"
+import { ListPageHeader } from "@/components/ui/list-page-header"
 import { requirePractitionerContext } from "@/lib/auth"
 
 export default async function NewMembershipPage() {
@@ -12,8 +13,8 @@ export default async function NewMembershipPage() {
     <AppShell>
       <div className="mb-6">
         <BackButton fallbackHref="/practitioner" label="← Back to profile" />
-        <h1 className="text-2xl font-semibold tracking-tight">Add practice</h1>
       </div>
+      <ListPageHeader heading="Add practice" />
 
       <MembershipForm practices={practices} />
     </AppShell>

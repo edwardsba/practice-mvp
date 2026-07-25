@@ -2,6 +2,7 @@ import { getActiveClients } from "@/app/clients/actions"
 import { ClaimForm } from "@/components/funding/claim-form"
 import { AppShell } from "@/components/app-shell"
 import { BackButton } from "@/components/ui/back-button"
+import { ListPageHeader } from "@/components/ui/list-page-header"
 import { getClaimTypes } from "@/lib/actions/funding"
 import { getProfessionalOrganisations } from "@/lib/actions/contacts"
 import { requirePractitionerContext } from "@/lib/auth"
@@ -26,8 +27,8 @@ export default async function NewClaimPage({
           fallbackHref={returnTo ?? "/funding/claims"}
           label="← Back"
         />
-        <h1 className="text-2xl font-semibold tracking-tight">Add claim</h1>
       </div>
+      <ListPageHeader heading="Add claim" />
 
       <ClaimForm
         clients={clients}

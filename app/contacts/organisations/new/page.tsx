@@ -2,6 +2,7 @@ import Link from "next/link"
 
 import { AppShell } from "@/components/app-shell"
 import { Button } from "@/components/ui/button"
+import { ListPageHeader } from "@/components/ui/list-page-header"
 import { OrganisationForm } from "@/components/contacts/organisation-form"
 import { saveProfessionalOrganisationAction } from "@/lib/actions/contacts"
 import { requirePractitionerContext } from "@/lib/auth"
@@ -26,10 +27,8 @@ export default async function NewOrganisationPage({
         <Button variant="ghost" size="sm" asChild className="mb-2 -ml-2">
           <Link href={back.href}>{back.label}</Link>
         </Button>
-        <h1 className="text-2xl font-semibold tracking-tight">
-          Add organisation
-        </h1>
       </div>
+      <ListPageHeader heading="Add organisation" />
       <OrganisationForm
         action={saveProfessionalOrganisationAction.bind(
           null,

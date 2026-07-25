@@ -527,7 +527,41 @@ function RichTextProgressReportBody({
   )
 }
 
-function ReferralAcknowledgementBody({
+function RichTextReferralAcknowledgementBody({
+  snapshot,
+  editable = false,
+  letterBodyPending = false,
+  onLetterBodyChange,
+}: {
+  snapshot: ReportSnapshot
+  editable?: boolean
+  letterBodyPending?: boolean
+  onLetterBodyChange?: (value: LetterBodyDoc) => void
+}) {
+  return (
+    <div className="space-y-4">
+      <ProgressReportFixedHeader snapshot={snapshot} />
+
+      {letterBodyPending ? (
+        <p className="text-sm text-muted-foreground">
+          This letter will be generated once you save this draft.
+        </p>
+      ) : snapshot.letterBodyJson ? (
+        <section className="report-letter-body">
+          <LetterBodyEditor
+            value={snapshot.letterBodyJson}
+            onChange={onLetterBodyChange}
+            editable={editable}
+          />
+        </section>
+      ) : null}
+
+      <SignatureBlock snapshot={snapshot} />
+    </div>
+  )
+}
+
+function LegacyReferralAcknowledgementBody({
   snapshot,
   editable = false,
   onClinicalSummaryChange,
@@ -617,8 +651,8 @@ export function ReportDocument({
   onLetterBodyChange?: (value: LetterBodyDoc) => void
 }) {
   const templateKey = resolveTemplateKey(snapshot.templateKey)
+  const isReferralAcknowledgement = templateKey === "referral_acknowledgement"
   const useRichTextBody =
-    templateKey !== "referral_acknowledgement" &&
     !useLegacyProgressBody &&
     (snapshot.letterBodyJson !== null || letterBodyPending)
 
@@ -628,20 +662,29 @@ export function ReportDocument({
         <LetterHeader snapshot={snapshot} />
         <h2 className="text-lg font-semibold">{snapshot.reportTitle}</h2>
       </header>
-      {templateKey === "referral_acknowledgement" ? (
-        <ReferralAcknowledgementBody
+      {useRichTextBody ? (
+        isReferralAcknowledgement ? (
+          <RichTextReferralAcknowledgementBody
+            snapshot={snapshot}
+            editable={editable}
+            letterBodyPending={letterBodyPending}
+            onLetterBodyChange={onLetterBodyChange}
+          />
+        ) : (
+          <RichTextProgressReportBody
+            snapshot={snapshot}
+            editable={editable}
+            letterBodyPending={letterBodyPending}
+            onLetterBodyChange={onLetterBodyChange}
+            omitEmptySections={omitEmptySections}
+          />
+        )
+      ) : isReferralAcknowledgement ? (
+        <LegacyReferralAcknowledgementBody
           snapshot={snapshot}
           readOnly={readOnly}
           editable={editable}
           onClinicalSummaryChange={onClinicalSummaryChange}
-        />
-      ) : useRichTextBody ? (
-        <RichTextProgressReportBody
-          snapshot={snapshot}
-          editable={editable}
-          letterBodyPending={letterBodyPending}
-          onLetterBodyChange={onLetterBodyChange}
-          omitEmptySections={omitEmptySections}
         />
       ) : (
         <LegacyProgressReportBody

@@ -492,7 +492,7 @@ export function ReportForm({
             postalAddress: null,
           }
 
-  const letterBodyPending = !isReferralAck && !letterBodyJson
+  const letterBodyPending = !letterBodyJson
 
   const previewSnapshot: ReportSnapshot | null = isReferralAck
     ? fundingApprovalId
@@ -510,9 +510,9 @@ export function ReportForm({
           mseResults: [],
           assistResults: [],
           btpResults: [],
-          clinicalSummaryText: clinicalSummary,
+          clinicalSummaryText: null,
           recommendationsText: null,
-          letterBodyJson: null,
+          letterBodyJson,
           recipient,
           fundingApproval: null,
           selectedAppointmentIds: [],

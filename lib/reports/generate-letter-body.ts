@@ -162,3 +162,30 @@ export function generateLetterBody(snapshot: ReportSnapshot): LetterBodyDoc {
 
   return { type: "doc", content }
 }
+
+export function generateReferralAcknowledgementLetterBody(
+  snapshot: ReportSnapshot
+): LetterBodyDoc {
+  const content: LetterBodyNode[] = []
+  const clientFirstName = snapshot.client.firstName
+  const clientLastName = snapshot.client.lastName
+  const referrerFirstName = snapshot.recipient?.firstName?.trim() || "Colleague"
+
+  content.push(paragraph(`Dear ${referrerFirstName},`))
+  content.push(
+    paragraph(
+      `Thank you for your referral of ${clientFirstName} ${clientLastName}. ` +
+        `I am writing to confirm that the referral has been received and treatment has commenced.`
+    )
+  )
+  content.push(
+    paragraph(
+      `I will update you with progress in due course. Please do not hesitate to contact me ` +
+        `should you require any further information.`
+    )
+  )
+  content.push(paragraph(""))
+  content.push(paragraph("Yours sincerely,"))
+
+  return { type: "doc", content }
+}

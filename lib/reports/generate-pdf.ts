@@ -674,6 +674,25 @@ function drawReferralAcknowledgementBody(
   doc: PDFKit.PDFDocument,
   snapshot: ReportSnapshot
 ) {
+  if (isLetterBodyDoc(snapshot.letterBodyJson)) {
+    drawProgressReportFixedHeader(doc, snapshot)
+    renderLetterBodyPdf(doc, snapshot.letterBodyJson, {
+      groupHeading,
+      bodyText: (pdfDoc, text) =>
+        bodyText(pdfDoc, text, { width: CONTENT_WIDTH }),
+    })
+    drawSignature(doc, snapshot)
+    return
+  }
+
+  drawLegacyReferralAcknowledgementBody(doc, snapshot)
+  drawSignature(doc, snapshot)
+}
+
+function drawLegacyReferralAcknowledgementBody(
+  doc: PDFKit.PDFDocument,
+  snapshot: ReportSnapshot
+) {
   const fa = snapshot.fundingApproval
   const notes = snapshot.clinicalSummaryText?.trim()
   const referrerFirstName = snapshot.recipient?.firstName?.trim() || null
@@ -791,7 +810,6 @@ export function generateReportPdf(snapshot: ReportSnapshot): Promise<Buffer> {
 
     if (templateKey === "referral_acknowledgement") {
       drawReferralAcknowledgementBody(doc, snapshot)
-      drawSignature(doc, snapshot)
     } else {
       drawProgressReportBody(doc, snapshot)
     }

@@ -2,7 +2,10 @@ import { eq } from "drizzle-orm"
 
 import { simpleReports } from "@/db/schema"
 import { db } from "@/lib/db"
-import { generateLetterBody } from "@/lib/reports/generate-letter-body"
+import {
+  generateLetterBody,
+  generateReferralAcknowledgementLetterBody,
+} from "@/lib/reports/generate-letter-body"
 import type { LetterBodyDoc } from "@/lib/reports/letter-body-types"
 import { parseLetterBodyJson } from "@/lib/reports/letter-body-types"
 import type { ReportSnapshot } from "@/lib/reports/snapshot"
@@ -21,10 +24,6 @@ export async function resolveLetterBodyJson({
   previousVersionId: string | null
   formLetterBodyJson: unknown
 }): Promise<LetterBodyDoc | null> {
-  if (resolveTemplateKey(templateKey) === "referral_acknowledgement") {
-    return null
-  }
-
   const fromForm = parseLetterBodyJson(formLetterBodyJson)
   if (fromForm) {
     return fromForm
@@ -51,7 +50,9 @@ export async function resolveLetterBodyJson({
     }
   }
 
-  return generateLetterBody(snapshot)
+  return resolveTemplateKey(templateKey) === "referral_acknowledgement"
+    ? generateReferralAcknowledgementLetterBody(snapshot)
+    : generateLetterBody(snapshot)
 }
 
 export function attachLetterBodyToSnapshot(

@@ -1,5 +1,7 @@
 "use client"
 
+import { PdfViewer } from "@/components/documents/pdf-viewer"
+
 function HiddenFields({ fields }: { fields?: Record<string, string> }) {
   if (!fields) return null
   return (
@@ -100,11 +102,7 @@ export function DocumentPreviewModal({
         </div>
       </div>
       <div className="flex-1 overflow-hidden p-4">
-        <iframe
-          src={`data:application/pdf;base64,${pdfBase64}`}
-          className="h-full w-full rounded-lg border"
-          title={title}
-        />
+        <PdfViewer pdfBase64={pdfBase64} title={title} />
       </div>
     </div>
   )

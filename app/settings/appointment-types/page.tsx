@@ -4,6 +4,7 @@ import { AppShell } from "@/components/app-shell"
 import { BackButton } from "@/components/ui/back-button"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { ListPageHeader } from "@/components/ui/list-page-header"
 import {
   Table,
   TableBody,
@@ -28,21 +29,16 @@ export default async function AppointmentTypesPage() {
     <AppShell>
       <div className="mb-6">
         <BackButton fallbackHref="/practice" label="← Back to practice" />
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">
-              Appointment Types
-            </h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Manage appointment templates, billing item numbers, and fees.
-            </p>
-          </div>
-          <Button asChild>
-            <Link href="/settings/appointment-types/new">
-              Add Appointment Type
-            </Link>
-          </Button>
-        </div>
+        <ListPageHeader
+          heading="Appointment Types"
+          action={
+            <Button asChild>
+              <Link href="/settings/appointment-types/new">
+                Add Appointment Type
+              </Link>
+            </Button>
+          }
+        />
       </div>
 
       <div className="rounded-lg border">

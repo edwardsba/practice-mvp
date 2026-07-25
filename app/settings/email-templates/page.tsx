@@ -4,6 +4,7 @@ import { EmailTemplateForm } from "@/components/email-templates/email-template-f
 import { AppShell } from "@/components/app-shell"
 import { BackButton } from "@/components/ui/back-button"
 import { Button } from "@/components/ui/button"
+import { ListPageHeader } from "@/components/ui/list-page-header"
 import {
   Table,
   TableBody,
@@ -28,19 +29,14 @@ export default async function EmailTemplatesPage() {
     <AppShell>
       <div className="mb-6">
         <BackButton fallbackHref="/practice" label="← Back to practice" />
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">
-              Email Templates
-            </h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Manage email templates for client communications.
-            </p>
-          </div>
-          <Button asChild>
-            <Link href="/settings/email-templates/new">Add Template</Link>
-          </Button>
-        </div>
+        <ListPageHeader
+          heading="Email Templates"
+          action={
+            <Button asChild>
+              <Link href="/settings/email-templates/new">Add Template</Link>
+            </Button>
+          }
+        />
       </div>
 
       <div className="rounded-lg border">

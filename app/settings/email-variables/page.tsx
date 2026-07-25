@@ -1,5 +1,6 @@
 import { AppShell } from "@/components/app-shell"
 import { BackButton } from "@/components/ui/back-button"
+import { ListPageHeader } from "@/components/ui/list-page-header"
 import {
   Card,
   CardContent,
@@ -24,15 +25,7 @@ export default async function EmailVariablesPage() {
     <AppShell>
       <div className="mb-6">
         <BackButton fallbackHref="/practice" label="← Back to practice" />
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">
-            Email Variables
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Placeholders you can insert into email template subject and message
-            fields.
-          </p>
-        </div>
+        <ListPageHeader heading="Email Variables" />
       </div>
 
       <Card>

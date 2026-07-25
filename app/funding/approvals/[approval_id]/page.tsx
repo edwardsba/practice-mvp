@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/table"
 import { PsqStatusBadge } from "@/components/session-notes/psq-status-badge"
 import { BackButton } from "@/components/ui/back-button"
+import { EntityPageHeader } from "@/components/ui/entity-page-header"
 import { StatusBadge } from "@/components/ui/status-badge"
 import { getFundingApprovalById } from "@/lib/actions/funding"
 import {
@@ -112,14 +113,12 @@ export default async function FundingApprovalDetailPage({
           fallbackHref="/funding/approvals"
           label="← Back to funding approvals"
         />
-        <h1 className="text-2xl font-semibold tracking-tight">
-          Funding approval
-        </h1>
-        <p className="mt-1 text-muted-foreground">
-          {approval.clientLastName}, {approval.clientFirstName}
-          {approval.approvalTypeName ? ` — ${approval.approvalTypeName}` : ""}
-        </p>
       </div>
+      <EntityPageHeader
+        kicker="Funding approval"
+        name={`${approval.clientFirstName} ${approval.clientLastName}`}
+        subheading={approval.approvalTypeName ?? undefined}
+      />
 
       <Card className="mb-6">
         <CardHeader>

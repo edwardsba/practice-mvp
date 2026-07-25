@@ -33,6 +33,7 @@ import {
 } from "@/lib/funding/format"
 import { formatReportType } from "@/lib/reports/snapshot"
 import { BackButton } from "@/components/ui/back-button"
+import { EntityPageHeader } from "@/components/ui/entity-page-header"
 
 function displayValue(value: string | null | undefined) {
   return value?.trim() || "—"
@@ -70,8 +71,12 @@ export default async function ClaimDetailPage({
     <AppShell>
       <div className="mb-6">
         <BackButton fallbackHref="/funding/claims" label="← Back to claims" />
-        <h1 className="text-2xl font-semibold tracking-tight">Claim</h1>
       </div>
+      <EntityPageHeader
+        kicker="Claim"
+        name={`${claim.clientFirstName} ${claim.clientLastName}`}
+        subheading={claim.claimTypeName}
+      />
 
       <Card className="mb-6">
         <CardHeader className="flex flex-row items-center justify-between">

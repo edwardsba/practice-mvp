@@ -49,7 +49,7 @@ export default async function EditCrisisPlanPage({
         />
       </div>
       <EntityPageHeader
-        kicker="Crisis plan"
+        kicker="Crisis plan edit"
         name={clientName}
         subheading={`Saving creates version ${plan.versionNumber + 1} and archives prior versions.`}
         badge={<Badge variant="secondary">Version {plan.versionNumber}</Badge>}

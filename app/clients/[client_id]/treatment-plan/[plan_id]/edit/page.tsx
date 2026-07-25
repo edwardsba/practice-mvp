@@ -51,7 +51,7 @@ export default async function EditTreatmentPlanPage({
         />
       </div>
       <EntityPageHeader
-        kicker="Treatment plan"
+        kicker="Treatment plan edit"
         name={clientName}
         subheading={`Saving creates version ${plan.versionNumber + 1} and archives prior versions.`}
         badge={<Badge variant="secondary">Version {plan.versionNumber}</Badge>}

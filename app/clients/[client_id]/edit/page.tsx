@@ -68,7 +68,7 @@ export default async function EditClientPage({
           label="← Back to client"
         />
       </div>
-      <EntityPageHeader kicker="Client details" name={clientName} />
+      <EntityPageHeader kicker="Client details edit" name={clientName} />
 
       <Card className="max-w-xl">
         <CardHeader>

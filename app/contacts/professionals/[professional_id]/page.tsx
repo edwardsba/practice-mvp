@@ -4,6 +4,7 @@ import { notFound } from "next/navigation"
 import { AppShell } from "@/components/app-shell"
 import { BackButton } from "@/components/ui/back-button"
 import { Button } from "@/components/ui/button"
+import { EntityPageHeader } from "@/components/ui/entity-page-header"
 import {
   Card,
   CardContent,
@@ -51,15 +52,12 @@ export default async function ProfessionalDetailPage({
           fallbackHref="/contacts/professionals"
           label="← Back to professionals"
         />
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">
-            {displayName}
-          </h1>
-          <p className="mt-1 text-muted-foreground">
-            {professional.professionName ?? "No profession set"}
-          </p>
-        </div>
       </div>
+      <EntityPageHeader
+        kicker="Professional"
+        name={displayName}
+        subheading={professional.professionName ?? "No profession set"}
+      />
 
       <Card className="mb-6">
         <CardHeader className="flex flex-row items-center justify-between">

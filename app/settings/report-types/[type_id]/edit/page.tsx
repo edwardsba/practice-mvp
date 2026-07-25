@@ -3,6 +3,7 @@ import { notFound } from "next/navigation"
 import { ReportTypeForm } from "@/components/settings/report-type-form"
 import { AppShell } from "@/components/app-shell"
 import { BackButton } from "@/components/ui/back-button"
+import { EntityPageHeader } from "@/components/ui/entity-page-header"
 import { EntityDeleteSection } from "@/components/entity-delete-section"
 import {
   deleteReportType,
@@ -36,10 +37,8 @@ export default async function EditReportTypePage({
           fallbackHref={`/settings/report-types/${typeId}`}
           label="← Back to report type"
         />
-        <h1 className="text-2xl font-semibold tracking-tight">
-          Edit report type
-        </h1>
       </div>
+      <EntityPageHeader kicker="Report type edit" name={reportType.name} />
 
       <ReportTypeForm
         practiceId={context.practiceId}

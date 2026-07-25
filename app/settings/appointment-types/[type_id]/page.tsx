@@ -4,6 +4,7 @@ import { notFound } from "next/navigation"
 import { AppShell } from "@/components/app-shell"
 import { BackButton } from "@/components/ui/back-button"
 import { Button } from "@/components/ui/button"
+import { EntityPageHeader } from "@/components/ui/entity-page-header"
 import {
   Card,
   CardContent,
@@ -48,16 +49,17 @@ export default async function AppointmentTypeDetailPage({
           fallbackHref="/settings/appointment-types"
           label="← Back to appointment types"
         />
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <h1 className="text-2xl font-semibold tracking-tight">
-            {type.nickname}
-          </h1>
-          <Button variant="outline" size="sm" asChild>
-            <Link href={`/settings/appointment-types/${typeId}/edit`}>
-              Edit
-            </Link>
-          </Button>
-        </div>
+        <EntityPageHeader
+          kicker="Appointment type"
+          name={type.nickname}
+          action={
+            <Button variant="outline" size="sm" asChild>
+              <Link href={`/settings/appointment-types/${typeId}/edit`}>
+                Edit
+              </Link>
+            </Button>
+          }
+        />
       </div>
 
       <Card className="mb-6">

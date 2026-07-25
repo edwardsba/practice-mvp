@@ -3,6 +3,7 @@ import { notFound } from "next/navigation"
 
 import { AppShell } from "@/components/app-shell"
 import { BackButton } from "@/components/ui/back-button"
+import { EntityPageHeader } from "@/components/ui/entity-page-header"
 import {
   Card,
   CardContent,
@@ -63,10 +64,11 @@ export default async function AssessmentDefinitionDetailPage({
           fallbackHref="/settings/assessments"
           label="← Back to assessments"
         />
-        <h1 className="text-2xl font-semibold tracking-tight">
-          {definition.assessmentName}
-        </h1>
       </div>
+      <EntityPageHeader
+        kicker="Assessment definition"
+        name={definition.assessmentName}
+      />
 
       <Card className="mb-6">
         <CardHeader>

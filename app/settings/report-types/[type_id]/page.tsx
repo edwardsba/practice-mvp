@@ -4,6 +4,7 @@ import { notFound } from "next/navigation"
 import { AppShell } from "@/components/app-shell"
 import { BackButton } from "@/components/ui/back-button"
 import { Button } from "@/components/ui/button"
+import { EntityPageHeader } from "@/components/ui/entity-page-header"
 import {
   Card,
   CardContent,
@@ -34,10 +35,8 @@ export default async function ReportTypeDetailPage({
           fallbackHref="/settings/report-types"
           label="← Back to report types"
         />
-        <h1 className="text-2xl font-semibold tracking-tight">
-          {reportType.name}
-        </h1>
       </div>
+      <EntityPageHeader kicker="Report type" name={reportType.name} />
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">

@@ -3,6 +3,7 @@ import { notFound } from "next/navigation"
 import { EmailTemplateForm } from "@/components/email-templates/email-template-form"
 import { AppShell } from "@/components/app-shell"
 import { BackButton } from "@/components/ui/back-button"
+import { EntityPageHeader } from "@/components/ui/entity-page-header"
 import { getEmailTemplateById } from "@/lib/actions/email-templates"
 import { requirePractitionerContext } from "@/lib/auth"
 
@@ -26,10 +27,8 @@ export default async function EditEmailTemplatePage({
           fallbackHref="/settings/email-templates"
           label="← Back to email templates"
         />
-        <h1 className="text-2xl font-semibold tracking-tight">
-          Edit email template
-        </h1>
       </div>
+      <EntityPageHeader kicker="Email template edit" name={template.name} />
 
       <EmailTemplateForm
         practiceId={context.practiceId}

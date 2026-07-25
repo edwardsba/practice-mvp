@@ -3,6 +3,7 @@ import { notFound } from "next/navigation"
 import { AppointmentTypeForm } from "@/components/appointment-types/appointment-type-form"
 import { AppShell } from "@/components/app-shell"
 import { BackButton } from "@/components/ui/back-button"
+import { EntityPageHeader } from "@/components/ui/entity-page-header"
 import {
   getAppointmentTypeById,
   getClaimTypesForAppointmentTypes,
@@ -41,10 +42,8 @@ export default async function EditAppointmentTypePage({
           fallbackHref={`/settings/appointment-types/${typeId}`}
           label="← Back to appointment type"
         />
-        <h1 className="text-2xl font-semibold tracking-tight">
-          Edit appointment type
-        </h1>
       </div>
+      <EntityPageHeader kicker="Appointment type edit" name={type.nickname} />
 
       <AppointmentTypeForm
         practiceId={context.practiceId}

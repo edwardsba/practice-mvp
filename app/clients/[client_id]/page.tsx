@@ -455,7 +455,7 @@ export default async function ClientDetailPage({
             </CardContent>
           </Card>
 
-          <Card className="mb-6">
+          <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Crisis plan</CardTitle>
               {!activeCrisisPlan ? (

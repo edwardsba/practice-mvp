@@ -32,7 +32,7 @@ export default async function PracticePage() {
     <AppShell>
       <EntityPageHeader kicker="Practice" name={practice.practiceName} />
 
-      <Card className="mb-6">
+      <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Practice details</CardTitle>
           <Button variant="outline" size="sm" asChild>

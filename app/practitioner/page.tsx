@@ -114,7 +114,7 @@ export default async function PractitionerPage() {
         </CardContent>
       </Card>
 
-      <Card className="mb-6">
+      <Card>
         <CardHeader>
           <CardTitle>Practice memberships</CardTitle>
         </CardHeader>

@@ -4,6 +4,7 @@ import { getActiveClients } from "@/app/clients/actions"
 import { FundingApprovalForm } from "@/components/funding/funding-approval-form"
 import { AppShell } from "@/components/app-shell"
 import { BackButton } from "@/components/ui/back-button"
+import { EntityPageHeader } from "@/components/ui/entity-page-header"
 import {
   getClaimsForClientDropdown,
   getFundingApprovalById,
@@ -41,10 +42,12 @@ export default async function EditFundingApprovalPage({
           fallbackHref={`/funding/approvals/${approvalId}`}
           label="← Back to funding approval"
         />
-        <h1 className="text-2xl font-semibold tracking-tight">
-          Edit funding approval
-        </h1>
       </div>
+      <EntityPageHeader
+        kicker="Funding approval edit"
+        name={`${approval.clientFirstName} ${approval.clientLastName}`}
+        subheading={approval.approvalTypeName ?? undefined}
+      />
 
       <FundingApprovalForm
         clients={clients}

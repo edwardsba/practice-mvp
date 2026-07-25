@@ -3,6 +3,7 @@ import { notFound } from "next/navigation"
 
 import { AppShell } from "@/components/app-shell"
 import { Button } from "@/components/ui/button"
+import { EntityPageHeader } from "@/components/ui/entity-page-header"
 import { ProfessionalForm } from "@/components/contacts/professional-form"
 import {
   getProfessionalById,
@@ -12,6 +13,7 @@ import {
   deleteProfessional,
   getProfessionalDeleteStatus,
 } from "@/lib/actions/contacts"
+import { formatProfessionalName } from "@/lib/contacts/format"
 import { requirePractitionerContext } from "@/lib/auth"
 import { EntityDeleteSection } from "@/components/entity-delete-section"
 
@@ -34,6 +36,11 @@ export default async function EditProfessionalPage({
   }
 
   const deleteStatus = await getProfessionalDeleteStatus(professionalId)
+  const displayName = formatProfessionalName(
+    data.professional.title,
+    data.professional.firstName,
+    data.professional.lastName
+  )
 
   return (
     <AppShell>
@@ -41,10 +48,8 @@ export default async function EditProfessionalPage({
         <Button variant="ghost" size="sm" asChild className="mb-2 -ml-2">
           <Link href={`/contacts/professionals/${professionalId}`}>← Back</Link>
         </Button>
-        <h1 className="text-2xl font-semibold tracking-tight">
-          Edit professional
-        </h1>
       </div>
+      <EntityPageHeader kicker="Professional edit" name={displayName} />
 
       <ProfessionalForm
         action={saveProfessionalAction.bind(

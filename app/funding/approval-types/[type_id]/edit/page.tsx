@@ -3,6 +3,7 @@ import { notFound } from "next/navigation"
 import { ApprovalTypeForm } from "@/components/funding/approval-type-form"
 import { AppShell } from "@/components/app-shell"
 import { BackButton } from "@/components/ui/back-button"
+import { EntityPageHeader } from "@/components/ui/entity-page-header"
 import { getClaimTypes, getFundingApprovalTypeById, deleteFundingApprovalType, getFundingApprovalTypeDeleteStatus } from "@/lib/actions/funding"
 import { getReportTypes } from "@/lib/actions/report-types"
 import { requirePractitionerContext } from "@/lib/auth"
@@ -37,10 +38,8 @@ export default async function EditFundingApprovalTypePage({
           fallbackHref={`/funding/approval-types/${typeId}`}
           label="← Back to approval type"
         />
-        <h1 className="text-2xl font-semibold tracking-tight">
-          Edit funding approval type
-        </h1>
       </div>
+      <EntityPageHeader kicker="Funding approval type edit" name={type.name} />
 
       <ApprovalTypeForm
         practiceId={context.practiceId}

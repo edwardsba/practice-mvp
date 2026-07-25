@@ -3,6 +3,7 @@ import { notFound } from "next/navigation"
 
 import { AppShell } from "@/components/app-shell"
 import { Button } from "@/components/ui/button"
+import { EntityPageHeader } from "@/components/ui/entity-page-header"
 import { OrganisationForm } from "@/components/contacts/organisation-form"
 import {
   getProfessionalOrganisationById,
@@ -35,10 +36,11 @@ export default async function EditOrganisationPage({
         <Button variant="ghost" size="sm" asChild className="mb-2 -ml-2">
           <Link href={`/contacts/organisations/${organisationId}`}>← Back</Link>
         </Button>
-        <h1 className="text-2xl font-semibold tracking-tight">
-          Edit organisation
-        </h1>
       </div>
+      <EntityPageHeader
+        kicker="Professional organisation edit"
+        name={organisation.organisationName}
+      />
 
       <OrganisationForm
         action={saveProfessionalOrganisationAction.bind(

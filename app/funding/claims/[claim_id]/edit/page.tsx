@@ -4,6 +4,7 @@ import { getActiveClients } from "@/app/clients/actions"
 import { ClaimForm } from "@/components/funding/claim-form"
 import { AppShell } from "@/components/app-shell"
 import { BackButton } from "@/components/ui/back-button"
+import { EntityPageHeader } from "@/components/ui/entity-page-header"
 import { getClaimById, getClaimTypes, deleteClaim, getClaimDeleteStatus } from "@/lib/actions/funding"
 import { getProfessionalOrganisations } from "@/lib/actions/contacts"
 import { requirePractitionerContext } from "@/lib/auth"
@@ -36,8 +37,12 @@ export default async function EditClaimPage({
           fallbackHref={`/funding/claims/${claimId}`}
           label="← Back to claim"
         />
-        <h1 className="text-2xl font-semibold tracking-tight">Edit claim</h1>
       </div>
+      <EntityPageHeader
+        kicker="Claim edit"
+        name={`${claim.clientFirstName} ${claim.clientLastName}`}
+        subheading={claim.claimTypeName}
+      />
 
       <ClaimForm
         clients={clients}

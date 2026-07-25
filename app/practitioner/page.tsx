@@ -3,6 +3,7 @@ import Link from "next/link"
 import { getPractitionerProfile } from "@/app/practitioner/actions"
 import { AppShell } from "@/components/app-shell"
 import { Button } from "@/components/ui/button"
+import { EntityPageHeader } from "@/components/ui/entity-page-header"
 import {
   Card,
   CardContent,
@@ -44,7 +45,7 @@ export default async function PractitionerPage() {
 
   return (
     <AppShell>
-      <h1 className="mb-6 text-2xl font-semibold tracking-tight">Profile</h1>
+      <EntityPageHeader kicker="Profile" name={formatPractitionerViewName(profile)} />
 
       <Card className="mb-6">
         <CardHeader className="flex flex-row items-center justify-between">

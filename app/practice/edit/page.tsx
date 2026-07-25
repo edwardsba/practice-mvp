@@ -4,6 +4,7 @@ import { getPractice } from "@/app/practice/actions"
 import { PracticeForm } from "@/app/practice/practice-form"
 import { AppShell } from "@/components/app-shell"
 import { BackButton } from "@/components/ui/back-button"
+import { EntityPageHeader } from "@/components/ui/entity-page-header"
 
 export default async function EditPracticePage() {
   const practice = await getPractice()
@@ -23,8 +24,8 @@ export default async function EditPracticePage() {
     <AppShell>
       <div className="mb-6">
         <BackButton fallbackHref="/practice" label="← Back to practice" />
-        <h1 className="text-2xl font-semibold tracking-tight">Edit practice</h1>
       </div>
+      <EntityPageHeader kicker="Practice edit" name={practice.practiceName} />
 
       <PracticeForm practice={practice} />
     </AppShell>

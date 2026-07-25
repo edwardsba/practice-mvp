@@ -3,6 +3,7 @@ import Link from "next/link"
 import { getPractice } from "@/app/practice/actions"
 import { AppShell } from "@/components/app-shell"
 import { Button } from "@/components/ui/button"
+import { EntityPageHeader } from "@/components/ui/entity-page-header"
 import {
   Card,
   CardContent,
@@ -29,7 +30,7 @@ export default async function PracticePage() {
 
   return (
     <AppShell>
-      <h1 className="mb-6 text-2xl font-semibold tracking-tight">Practice</h1>
+      <EntityPageHeader kicker="Practice" name={practice.practiceName} />
 
       <Card className="mb-6">
         <CardHeader className="flex flex-row items-center justify-between">

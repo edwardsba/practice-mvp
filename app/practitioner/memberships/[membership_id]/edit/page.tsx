@@ -4,6 +4,7 @@ import { getMembership } from "@/lib/actions/practitioner-practice"
 import { MembershipForm } from "@/components/practitioner/membership-form"
 import { AppShell } from "@/components/app-shell"
 import { BackButton } from "@/components/ui/back-button"
+import { EntityPageHeader } from "@/components/ui/entity-page-header"
 import { requirePractitionerContext } from "@/lib/auth"
 
 export default async function EditMembershipPage({
@@ -23,10 +24,12 @@ export default async function EditMembershipPage({
     <AppShell>
       <div className="mb-6">
         <BackButton fallbackHref="/practitioner" label="← Back to profile" />
-        <h1 className="text-2xl font-semibold tracking-tight">
-          Edit practice membership
-        </h1>
       </div>
+      <EntityPageHeader
+        kicker="Practice membership edit"
+        name={membership.practiceName}
+        subheading={membership.role}
+      />
 
       <MembershipForm
         practices={[]}

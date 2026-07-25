@@ -4,6 +4,8 @@ import { getPractitionerProfile } from "@/app/practitioner/actions"
 import { PractitionerForm } from "@/app/practitioner/practitioner-form"
 import { AppShell } from "@/components/app-shell"
 import { BackButton } from "@/components/ui/back-button"
+import { EntityPageHeader } from "@/components/ui/entity-page-header"
+import { formatPractitionerViewName } from "@/lib/practitioner/format"
 
 export default async function EditPractitionerPage() {
   const profile = await getPractitionerProfile()
@@ -23,8 +25,11 @@ export default async function EditPractitionerPage() {
     <AppShell>
       <div className="mb-6">
         <BackButton fallbackHref="/practitioner" label="← Back to profile" />
-        <h1 className="text-2xl font-semibold tracking-tight">Edit profile</h1>
       </div>
+      <EntityPageHeader
+        kicker="Profile edit"
+        name={formatPractitionerViewName(profile)}
+      />
 
       <PractitionerForm profile={profile} />
     </AppShell>

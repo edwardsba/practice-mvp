@@ -1,7 +1,6 @@
 import Link from "next/link"
 
 import { AppShell } from "@/components/app-shell"
-import { BackButton } from "@/components/ui/back-button"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { ListPageHeader } from "@/components/ui/list-page-header"
@@ -27,19 +26,16 @@ export default async function AppointmentTypesPage() {
 
   return (
     <AppShell>
-      <div className="mb-6">
-        <BackButton fallbackHref="/practice" label="← Back to practice" />
-        <ListPageHeader
-          heading="Appointment Types"
-          action={
-            <Button asChild>
-              <Link href="/settings/appointment-types/new">
-                Add Appointment Type
-              </Link>
-            </Button>
-          }
-        />
-      </div>
+      <ListPageHeader
+        heading="Appointment Types"
+        action={
+          <Button asChild>
+            <Link href="/settings/appointment-types/new">
+              Add Appointment Type
+            </Link>
+          </Button>
+        }
+      />
 
       <div className="rounded-lg border">
         <Table>

@@ -1,5 +1,4 @@
 import { AppShell } from "@/components/app-shell"
-import { BackButton } from "@/components/ui/back-button"
 import { ListPageHeader } from "@/components/ui/list-page-header"
 import {
   Card,
@@ -23,10 +22,7 @@ export default async function EmailVariablesPage() {
 
   return (
     <AppShell>
-      <div className="mb-6">
-        <BackButton fallbackHref="/practice" label="← Back to practice" />
-        <ListPageHeader heading="Email Variables" />
-      </div>
+      <ListPageHeader heading="Email Variables" />
 
       <Card>
         <CardHeader>

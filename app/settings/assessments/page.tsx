@@ -1,7 +1,6 @@
 import Link from "next/link"
 
 import { AppShell } from "@/components/app-shell"
-import { BackButton } from "@/components/ui/back-button"
 import { ListPageHeader } from "@/components/ui/list-page-header"
 import {
   Table,
@@ -28,10 +27,7 @@ export default async function AssessmentDefinitionsPage() {
 
   return (
     <AppShell>
-      <div className="mb-6">
-        <BackButton fallbackHref="/practice" label="← Back to practice" />
-        <ListPageHeader heading="Assessment Definitions" />
-      </div>
+      <ListPageHeader heading="Assessment Definitions" />
 
       <div className="rounded-lg border">
         <Table>

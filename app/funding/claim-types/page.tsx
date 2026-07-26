@@ -1,5 +1,4 @@
 import { AppShell } from "@/components/app-shell"
-import { BackButton } from "@/components/ui/back-button"
 import { ListPageHeader } from "@/components/ui/list-page-header"
 import { ClaimTypesManager } from "@/components/funding/claim-types-manager"
 import { getClaimTypes } from "@/lib/actions/funding"
@@ -11,9 +10,6 @@ export default async function ClaimTypesPage() {
 
   return (
     <AppShell>
-      <div className="mb-6">
-        <BackButton fallbackHref="/practice" label="← Back to practice" />
-      </div>
       <ListPageHeader heading="Claim types" />
 
       <ClaimTypesManager

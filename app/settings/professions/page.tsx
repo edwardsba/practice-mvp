@@ -1,5 +1,4 @@
 import { AppShell } from "@/components/app-shell"
-import { BackButton } from "@/components/ui/back-button"
 import { ListPageHeader } from "@/components/ui/list-page-header"
 import { ProfessionsManager } from "@/components/contacts/professions-manager"
 import { getProfessions } from "@/lib/actions/contacts"
@@ -11,9 +10,6 @@ export default async function ProfessionsSettingsPage() {
 
   return (
     <AppShell>
-      <div className="mb-6">
-        <BackButton fallbackHref="/practice" label="← Back to practice" />
-      </div>
       <ListPageHeader heading="Professions" />
 
       <ProfessionsManager

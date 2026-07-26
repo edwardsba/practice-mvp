@@ -1,7 +1,6 @@
 import Link from "next/link"
 
 import { AppShell } from "@/components/app-shell"
-import { BackButton } from "@/components/ui/back-button"
 import { Button } from "@/components/ui/button"
 import { ListPageHeader } from "@/components/ui/list-page-header"
 import {
@@ -22,17 +21,14 @@ export default async function ReportTypesPage() {
 
   return (
     <AppShell>
-      <div className="mb-6">
-        <BackButton fallbackHref="/practice" label="← Back to practice" />
-        <ListPageHeader
-          heading="Report Types"
-          action={
-            <Button asChild>
-              <Link href="/settings/report-types/new">Add Report Type</Link>
-            </Button>
-          }
-        />
-      </div>
+      <ListPageHeader
+        heading="Report Types"
+        action={
+          <Button asChild>
+            <Link href="/settings/report-types/new">Add Report Type</Link>
+          </Button>
+        }
+      />
 
       <div className="rounded-lg border">
         <Table>

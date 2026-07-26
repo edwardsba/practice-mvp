@@ -2,7 +2,6 @@ import Link from "next/link"
 
 import { EmailTemplateForm } from "@/components/email-templates/email-template-form"
 import { AppShell } from "@/components/app-shell"
-import { BackButton } from "@/components/ui/back-button"
 import { Button } from "@/components/ui/button"
 import { ListPageHeader } from "@/components/ui/list-page-header"
 import {
@@ -27,17 +26,14 @@ export default async function EmailTemplatesPage() {
 
   return (
     <AppShell>
-      <div className="mb-6">
-        <BackButton fallbackHref="/practice" label="← Back to practice" />
-        <ListPageHeader
-          heading="Email Templates"
-          action={
-            <Button asChild>
-              <Link href="/settings/email-templates/new">Add Template</Link>
-            </Button>
-          }
-        />
-      </div>
+      <ListPageHeader
+        heading="Email Templates"
+        action={
+          <Button asChild>
+            <Link href="/settings/email-templates/new">Add Template</Link>
+          </Button>
+        }
+      />
 
       <div className="rounded-lg border">
         <Table>

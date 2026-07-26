@@ -1,7 +1,6 @@
 import Link from "next/link"
 
 import { AppShell } from "@/components/app-shell"
-import { BackButton } from "@/components/ui/back-button"
 import { Button } from "@/components/ui/button"
 import { ListPageHeader } from "@/components/ui/list-page-header"
 import {
@@ -22,9 +21,6 @@ export default async function ClaimsPage() {
 
   return (
     <AppShell>
-      <div className="mb-6">
-        <BackButton fallbackHref="/clients" label="← Back to clients" />
-      </div>
       <ListPageHeader
         heading="Claims"
         action={

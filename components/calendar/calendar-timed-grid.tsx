@@ -43,15 +43,23 @@ function AppointmentBlock({
 }) {
   const blockHeight = rowSpan * CALENDAR_SLOT_HEIGHT_PX - 8
   const showExtraDetail = detailed && blockHeight >= 72
+  const isCancelled = appointment.status === "cancelled"
 
   if (!showExtraDetail) {
     return (
       <Link
         href={`/appointments/${appointment.appointmentId}?returnTo=/calendar`}
-        className="flex h-full min-h-0 flex-col justify-center truncate rounded-md border border-primary/20 bg-primary/10 px-1 text-[10px] font-medium leading-tight text-primary hover:bg-primary/15 sm:px-2 sm:text-xs"
+        className={cn(
+          "flex h-full min-h-0 flex-col justify-center truncate rounded-md border px-1 text-[10px] font-medium leading-tight sm:px-2 sm:text-xs",
+          isCancelled
+            ? "border-muted-foreground/20 bg-muted/40 text-muted-foreground hover:bg-muted/50"
+            : "border-primary/20 bg-primary/10 text-primary hover:bg-primary/15"
+        )}
         style={{ minHeight: blockHeight }}
       >
-        {formatAppointmentClientName(appointment)}
+        <span className={cn(isCancelled && "line-through")}>
+          {formatAppointmentClientName(appointment)}
+        </span>
       </Link>
     )
   }
@@ -69,17 +77,35 @@ function AppointmentBlock({
   return (
     <Link
       href={`/appointments/${appointment.appointmentId}?returnTo=/calendar`}
-      className="flex h-full min-h-0 flex-col justify-center gap-1 truncate rounded-md border border-primary/20 bg-primary/10 px-2 py-1.5 text-xs font-medium leading-tight text-primary hover:bg-primary/15"
+      className={cn(
+        "flex h-full min-h-0 flex-col justify-center gap-1 truncate rounded-md border px-2 py-1.5 text-xs font-medium leading-tight",
+        isCancelled
+          ? "border-muted-foreground/20 bg-muted/40 text-muted-foreground hover:bg-muted/50"
+          : "border-primary/20 bg-primary/10 text-primary hover:bg-primary/15"
+      )}
       style={{ minHeight: blockHeight }}
     >
-      <span className="truncate">{formatAppointmentClientName(appointment)}</span>
-      <span className="truncate text-[11px] font-normal text-primary/80">
+      <span className={cn("truncate", isCancelled && "line-through")}>
+        {formatAppointmentClientName(appointment)}
+      </span>
+      <span
+        className={cn(
+          "truncate text-[11px] font-normal",
+          isCancelled ? "text-muted-foreground" : "text-primary/80"
+        )}
+      >
         {locationText}
       </span>
-      <PsqStatusBadge
-        sentAt={appointment.preSessionBatterySentAt}
-        psqBatteryStatus={appointment.psqBatteryStatus}
-      />
+      {isCancelled ? (
+        <span className="text-[11px] font-normal text-muted-foreground">
+          Cancelled
+        </span>
+      ) : (
+        <PsqStatusBadge
+          sentAt={appointment.preSessionBatterySentAt}
+          psqBatteryStatus={appointment.psqBatteryStatus}
+        />
+      )}
     </Link>
   )
 }

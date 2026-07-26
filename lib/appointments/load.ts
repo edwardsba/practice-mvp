@@ -38,6 +38,7 @@ export type CalendarAppointment = {
   practiceLocationNickname: string | null
   preSessionBatterySentAt: Date | null
   psqBatteryStatus: string | null
+  status: string
 }
 
 export async function loadAppointmentsForPractitionerInRange(
@@ -63,6 +64,7 @@ export async function loadAppointmentsForPractitionerInRange(
       practiceAddress: practices.address,
       practiceLocationNickname: practices.locationNickname,
       preSessionBatterySentAt: appointments.preSessionBatterySentAt,
+      status: appointments.status,
       psqBatteryStatus: sql<string | null>`(
         SELECT
           CASE

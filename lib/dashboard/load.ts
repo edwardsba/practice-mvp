@@ -59,7 +59,8 @@ export async function loadTodaysAppointments(practiceId: string) {
     .where(
       and(
         eq(appointments.practiceId, practiceId),
-        eq(appointments.appointmentDate, today)
+        eq(appointments.appointmentDate, today),
+        sql`${appointments.status} != 'cancelled'`
       )
     )
     .orderBy(asc(appointments.appointmentTime))

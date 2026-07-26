@@ -99,7 +99,12 @@ export function CalendarMonthView({
                       {mobileVisible.map((appointment) => (
                         <span
                           key={appointment.appointmentId}
-                          className="block truncate rounded border border-primary/20 bg-primary/10 px-1 text-[10px] font-medium text-primary"
+                          className={cn(
+                            "block truncate rounded border px-1 text-[10px] font-medium",
+                            appointment.status === "cancelled"
+                              ? "border-muted-foreground/20 bg-muted/40 text-muted-foreground line-through"
+                              : "border-primary/20 bg-primary/10 text-primary"
+                          )}
                         >
                           {formatAppointmentClientName(appointment)}
                         </span>
@@ -114,7 +119,12 @@ export function CalendarMonthView({
                       {desktopVisible.map((appointment) => (
                         <span
                           key={appointment.appointmentId}
-                          className="block truncate rounded border border-primary/20 bg-primary/10 px-2 text-xs font-medium text-primary"
+                          className={cn(
+                            "block truncate rounded border px-2 text-xs font-medium",
+                            appointment.status === "cancelled"
+                              ? "border-muted-foreground/20 bg-muted/40 text-muted-foreground line-through"
+                              : "border-primary/20 bg-primary/10 text-primary"
+                          )}
                         >
                           {formatAppointmentClientName(appointment)}
                         </span>

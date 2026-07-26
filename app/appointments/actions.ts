@@ -279,6 +279,23 @@ export async function updateAppointment(
   if (parsed.clientId !== existing.clientId) {
     revalidatePath(`/clients/${existing.clientId}`)
   }
+
+  // Mirror System C's same-day safety net (see createAppointment above):
+  // if this edit reschedules the appointment onto today from a different
+  // day, the normal "tomorrow" pre-session sweep can never catch it
+  // either — same structural gap as a brand-new same-day booking, just
+  // reached via reschedule instead. Bypass returnTo the same way, and
+  // land on the appointment's own page with the send dialog prompted.
+  // The page itself already guards autoOpen on !preSessionBatterySentAt,
+  // so nothing pops up if it's already been sent.
+  const movedToToday =
+    existing.appointmentDate !== todayDateString() &&
+    parsed.appointmentDate === todayDateString()
+
+  if (movedToToday) {
+    redirect(`/appointments/${appointmentId}?promptPreSession=1`)
+  }
+
   redirect(
     returnTo
       ? `/appointments/${appointmentId}?returnTo=${returnTo}`

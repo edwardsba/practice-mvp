@@ -94,6 +94,7 @@ export async function testAppointmentAutomations(): Promise<TestAutomationsState
     }
 
     const result: AppointmentAutomationSummary = {
+      appointments_completed: payload.appointments_completed ?? 0,
       reminders_sent: payload.reminders_sent ?? 0,
       batteries_sent: payload.batteries_sent ?? 0,
       post_session_sent: payload.post_session_sent ?? 0,

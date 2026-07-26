@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNull } from "drizzle-orm"
+import { and, eq, inArray, isNull, lte } from "drizzle-orm"
 
 import { appointments, auditEvents, clients } from "@/db/schema"
 import { batteryCodesFromTreatmentPlan } from "@/lib/assessments/battery-defaults"
@@ -13,6 +13,7 @@ import {
   resolveAppointmentLocationPhrase,
   resolveAppointmentLocationText,
 } from "@/lib/appointments/location"
+import { appointmentEndTimeUtc, todayDateString } from "@/lib/dates/practice-time"
 import { db } from "@/lib/db"
 import { getEmailTemplateByKey } from "@/lib/email/template-loader"
 import { getQuestionnaireEmailContext } from "@/lib/email/practitioner-context"
@@ -30,6 +31,7 @@ const ACTIVE_STATUSES = ["scheduled", "confirmed"] as const
 const COMPLETED_STATUS = "completed"
 
 export type AppointmentAutomationSummary = {
+  appointments_completed: number
   reminders_sent: number
   batteries_sent: number
   post_session_sent: number
@@ -78,19 +80,22 @@ async function logAppointmentAuditEvent(
 
 export async function runAppointmentAutomations(): Promise<AppointmentAutomationSummary> {
   const summary: AppointmentAutomationSummary = {
+    appointments_completed: 0,
     reminders_sent: 0,
     batteries_sent: 0,
     post_session_sent: 0,
     errors: [],
   }
 
+  // Runs first: completion + post-session feedback are both triggered by
+  // each appointment's own end time (System A), not a calendar-day sweep.
+  await processElapsedAppointments(summary)
+
   const reminderDate = sydneyDatePlusDays(2)
   const batteryDate = sydneyDatePlusDays(1)
-  const postSessionDate = sydneyDatePlusDays(-1)
 
   await processReminders(reminderDate, summary)
   await processPreSessionBatteries(batteryDate, summary)
-  await processPostSessionQuestionnaires(postSessionDate, summary)
 
   return summary
 }
@@ -465,16 +470,22 @@ async function processPreSessionBatteries(
   }
 }
 
-async function processPostSessionQuestionnaires(
-  targetDate: string,
+async function processElapsedAppointments(
   summary: AppointmentAutomationSummary
 ) {
+  const todayStr = todayDateString()
+  const bufferMs = 60 * 60_000 // 60 minutes after the appointment's own end time
+  const now = new Date()
+
   const rows = await db
     .select({
       appointmentId: appointments.appointmentId,
       clientId: appointments.clientId,
       practiceId: appointments.practiceId,
       practitionerProfileId: appointments.practitionerProfileId,
+      appointmentDate: appointments.appointmentDate,
+      appointmentTime: appointments.appointmentTime,
+      durationMinutes: appointments.durationMinutes,
       clientEmail: clients.email,
       commsOptOut: clients.commsOptOut,
       postSessionOptOut: clients.postSessionOptOut,
@@ -483,15 +494,52 @@ async function processPostSessionQuestionnaires(
     .innerJoin(clients, eq(appointments.clientId, clients.clientId))
     .where(
       and(
-        eq(appointments.appointmentDate, targetDate),
-        eq(appointments.status, COMPLETED_STATUS),
-        isNull(appointments.postSessionSentAt)
+        lte(appointments.appointmentDate, todayStr),
+        inArray(appointments.status, ACTIVE_STATUSES)
       )
     )
 
+  const elapsed = rows.filter((row) => {
+    const endTime = appointmentEndTimeUtc(
+      row.appointmentDate,
+      row.appointmentTime,
+      row.durationMinutes
+    )
+    return endTime.getTime() + bufferMs <= now.getTime()
+  })
+
+  if (elapsed.length === 0) {
+    return
+  }
+
+  await db.transaction(async (tx) => {
+    await tx
+      .update(appointments)
+      .set({ status: COMPLETED_STATUS, updatedAt: now })
+      .where(
+        inArray(
+          appointments.appointmentId,
+          elapsed.map((row) => row.appointmentId)
+        )
+      )
+
+    await tx.insert(auditEvents).values(
+      elapsed.map((row) => ({
+        practiceId: row.practiceId,
+        userId: null,
+        clientId: row.clientId,
+        eventType: "appointment.auto_completed",
+        entityType: "appointment",
+        entityId: row.appointmentId,
+      }))
+    )
+  })
+
+  summary.appointments_completed += elapsed.length
+
   const templateCache = new Map<string, EmailTemplateRow | null>()
 
-  for (const row of rows) {
+  for (const row of elapsed) {
     if (row.commsOptOut || row.postSessionOptOut) {
       await logAppointmentAuditEvent(
         row.practiceId,
@@ -590,11 +638,11 @@ async function processPostSessionQuestionnaires(
         continue
       }
 
-      const now = new Date()
+      const sentAt = new Date()
       await db.transaction(async (tx) => {
         await tx
           .update(appointments)
-          .set({ postSessionSentAt: now, updatedAt: now })
+          .set({ postSessionSentAt: sentAt, updatedAt: sentAt })
           .where(eq(appointments.appointmentId, row.appointmentId))
 
         await tx.insert(auditEvents).values({
@@ -608,16 +656,10 @@ async function processPostSessionQuestionnaires(
 
       summary.post_session_sent += 1
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Unknown error"
+      const message =
+        error instanceof Error ? error.message : "Post-session feedback failed."
       summary.errors.push(
         `Post-session feedback failed for appointment ${row.appointmentId}: ${message}`
-      )
-      await logAppointmentAuditEvent(
-        row.practiceId,
-        row.clientId,
-        row.appointmentId,
-        "appointment.post_session_failed",
-        { error: message }
       )
     }
   }

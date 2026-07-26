@@ -9,12 +9,12 @@ import { fromZonedTime, toZonedTime } from "date-fns-tz"
  * to change: swap the constant for an async lookup of the practice's
  * configured timezone (e.g. a field on practitionerProfiles).
  *
- * One thing to know before making that change: the daily cron sweep
- * (lib/appointments/auto-complete.ts, lib/appointments/run-automations.ts)
- * currently computes "today" ONCE per run, globally, and compares every
- * practice's appointments against it. A per-practice timezone would need
- * that sweep to compute "today" per practice inside the loop instead —
- * a change to the query shape, not just this constant.
+ * One thing to know before making that change: the cron sweep in
+ * lib/appointments/run-automations.ts currently computes "today" ONCE per
+ * run, globally, and compares every practice's appointments against it.
+ * A per-practice timezone would need that sweep to compute "today" per
+ * practice inside the loop instead — a change to the query shape, not
+ * just this constant.
  */
 export const PRACTICE_TIMEZONE = "Australia/Sydney"
 
@@ -39,6 +39,23 @@ export function sydneyDatePlusDays(days: number): string {
  */
 export function practiceLocalToUtc(localDateTime: Date): Date {
   return fromZonedTime(localDateTime, PRACTICE_TIMEZONE)
+}
+
+/**
+ * Computes the actual end-time instant of an appointment, as a UTC Date.
+ * Combines the appointment's local wall-clock date + time with its
+ * duration, in the practice's timezone.
+ */
+export function appointmentEndTimeUtc(
+  appointmentDate: string,
+  appointmentTime: string,
+  durationMinutes: number
+): Date {
+  const [hours, minutes] = appointmentTime.split(":").map(Number)
+  const [year, month, day] = appointmentDate.split("-").map(Number)
+  const localStart = new Date(year, month - 1, day, hours, minutes, 0, 0)
+  const localEnd = new Date(localStart.getTime() + durationMinutes * 60_000)
+  return practiceLocalToUtc(localEnd)
 }
 
 /**

@@ -41,29 +41,8 @@ export function PdfViewer({
   const [status, setStatus] = useState<"loading" | "ready" | "error">(
     "loading"
   )
-  // TEMPORARY — diagnostic only, remove once the real mobile issue is found.
-  const [debugMessage, setDebugMessage] = useState<string | null>(null)
 
   useEffect(() => {
-    // TEMPORARY — catches errors pdf.js/the worker throws outside our own
-    // try/catch below (e.g. errors surfaced asynchronously from the worker
-    // thread), so nothing fails silently on screen.
-    function handleWindowError(event: ErrorEvent) {
-      setDebugMessage(`window error: ${event.message}`)
-    }
-    function handleRejection(event: PromiseRejectionEvent) {
-      const reason = event.reason
-      setDebugMessage(
-        `unhandled rejection: ${
-          reason instanceof Error
-            ? `${reason.name}: ${reason.message}`
-            : String(reason)
-        }`
-      )
-    }
-    window.addEventListener("error", handleWindowError)
-    window.addEventListener("unhandledrejection", handleRejection)
-
     let cancelled = false
     let pdfDoc: pdfjsLib.PDFDocumentProxy | null = null
     const renderTasks: ReturnType<pdfjsLib.PDFPageProxy["render"]>[] = []
@@ -119,14 +98,7 @@ export function PdfViewer({
         }
       } catch (error) {
         console.error("Failed to render PDF preview", error)
-        if (!cancelled) {
-          setDebugMessage(
-            error instanceof Error
-              ? `${error.name}: ${error.message}`
-              : String(error)
-          )
-          setStatus("error")
-        }
+        if (!cancelled) setStatus("error")
       }
     }
 
@@ -134,8 +106,6 @@ export function PdfViewer({
 
     return () => {
       cancelled = true
-      window.removeEventListener("error", handleWindowError)
-      window.removeEventListener("unhandledrejection", handleRejection)
       renderTasks.forEach((task) => task.cancel())
       // pdfjs-dist v6 exposes destroy on the loading task, not the document proxy.
       void pdfDoc?.loadingTask.destroy()
@@ -150,12 +120,6 @@ export function PdfViewer({
         className
       )}
     >
-      {/* TEMPORARY — diagnostic banner, remove once real cause is found. */}
-      {debugMessage ? (
-        <div className="break-words border-b-2 border-red-500 bg-red-50 p-3 text-xs text-red-900">
-          <strong>DEBUG:</strong> {debugMessage}
-        </div>
-      ) : null}
       {status === "error" ? (
         <div className="flex h-full flex-col items-center justify-center gap-2 p-6 text-center text-sm text-muted-foreground">
           <p>Couldn&apos;t load the preview.</p>

@@ -1,6 +1,7 @@
 import Link from "next/link"
 import { notFound } from "next/navigation"
 
+import { PreSessionBatteryStatus } from "@/app/appointments/[appointment_id]/pre-session-battery-status"
 import { createDraftSessionNote } from "@/app/session-notes/actions"
 import { AppointmentStatusControl } from "@/components/appointments/appointment-status-control"
 import { AppShell } from "@/components/app-shell"
@@ -49,10 +50,10 @@ export default async function AppointmentDetailPage({
   searchParams,
 }: {
   params: Promise<{ appointment_id: string }>
-  searchParams: Promise<{ returnTo?: string }>
+  searchParams: Promise<{ returnTo?: string; promptPreSession?: string }>
 }) {
   const { appointment_id: appointmentId } = await params
-  const { returnTo: returnToParam } = await searchParams
+  const { returnTo: returnToParam, promptPreSession } = await searchParams
   const returnTo = returnToParam?.trim() || undefined
   const context = await requirePractitionerContext()
 
@@ -308,10 +309,19 @@ export default async function AppointmentDetailPage({
               <dt className="text-sm text-muted-foreground">
                 Pre-session battery
               </dt>
-              <dd className="font-medium">
-                {appointment.preSessionBatterySentAt
-                  ? `Pre-session battery sent: ${formatAutomationTimestamp(appointment.preSessionBatterySentAt)}`
-                  : "Pre-session battery not yet sent"}
+              <dd>
+                <PreSessionBatteryStatus
+                  appointmentId={appointmentId}
+                  sentAtLabel={
+                    appointment.preSessionBatterySentAt
+                      ? `Pre-session battery sent: ${formatAutomationTimestamp(appointment.preSessionBatterySentAt)}`
+                      : null
+                  }
+                  autoOpen={
+                    promptPreSession === "1" &&
+                    !appointment.preSessionBatterySentAt
+                  }
+                />
               </dd>
             </div>
             <div>

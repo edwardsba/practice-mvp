@@ -9,6 +9,7 @@ import { parseAppointmentFormData } from "@/lib/appointments/parse-form"
 import type { AppointmentAutomationSummary } from "@/lib/appointments/run-automations"
 import { loadAppointmentForPractice } from "@/lib/appointments/load"
 import { requirePractitionerContext } from "@/lib/auth"
+import { todayDateString } from "@/lib/dates/practice-time"
 import { db } from "@/lib/db"
 import {
   countNonFinalisedSessionNotesByAppointment,
@@ -150,6 +151,7 @@ export async function createAppointment(
   }
 
   const now = new Date()
+  let createdAppointmentId: string | undefined
 
   try {
     await db.transaction(async (tx) => {
@@ -172,6 +174,8 @@ export async function createAppointment(
         })
         .returning({ appointmentId: appointments.appointmentId })
 
+      createdAppointmentId = appointment.appointmentId
+
       await tx.insert(auditEvents).values({
         practiceId: context.practiceId,
         userId: context.userId,
@@ -188,6 +192,16 @@ export async function createAppointment(
   revalidatePath("/appointments")
   revalidatePath("/calendar")
   revalidatePath(`/clients/${parsed.clientId}`)
+
+  // Same-day bookings bypass the normal returnTo destination — the
+  // scheduled reminder/pre-session sweep can never catch a same-day
+  // appointment (it only ever looks for "tomorrow"), so land on the new
+  // appointment's own page with the pre-session send dialog ready instead
+  // of returning to wherever the practitioner came from.
+  if (createdAppointmentId && parsed.appointmentDate === todayDateString()) {
+    redirect(`/appointments/${createdAppointmentId}?promptPreSession=1`)
+  }
+
   redirect(returnTo ?? "/appointments")
 }
 

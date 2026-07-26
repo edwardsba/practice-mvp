@@ -91,7 +91,7 @@ export function PdfViewer({
           const renderTask = page.render({
             canvasContext: context,
             viewport,
-            canvas,
+            canvas: null,
           })
           renderTasks.push(renderTask)
           await renderTask.promise

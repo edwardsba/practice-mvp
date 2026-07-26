@@ -72,7 +72,7 @@ export default async function DashboardPage() {
                   return (
                     <li key={appt.appointmentId} className="py-3">
                       <Link
-                        href={`/appointments/${appt.appointmentId}`}
+                        href={`/appointments/${appt.appointmentId}?returnTo=${encodeURIComponent("/dashboard")}`}
                         className="flex flex-col gap-1 hover:underline"
                       >
                         <span className="flex flex-wrap items-center justify-between gap-2">

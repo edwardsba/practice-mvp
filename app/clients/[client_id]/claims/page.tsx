@@ -3,6 +3,7 @@ import { notFound } from "next/navigation"
 import { and, eq } from "drizzle-orm"
 
 import { AppShell } from "@/components/app-shell"
+import { BackButton } from "@/components/ui/back-button"
 import { Button } from "@/components/ui/button"
 import { EntityPageHeader } from "@/components/ui/entity-page-header"
 import {
@@ -53,9 +54,10 @@ export default async function ClientClaimsPage({
   return (
     <AppShell>
       <div className="mb-6">
-        <Button variant="ghost" size="sm" asChild className="mb-2 -ml-2">
-          <Link href={`/clients/${clientId}`}>← {clientName}</Link>
-        </Button>
+        <BackButton
+          fallbackHref={`/clients/${clientId}`}
+          label={`← ${clientName}`}
+        />
       </div>
       <EntityPageHeader
         kicker="Claims"

@@ -1,6 +1,7 @@
 import Link from "next/link"
 
 import { AppShell } from "@/components/app-shell"
+import { BackButton } from "@/components/ui/back-button"
 import { Button } from "@/components/ui/button"
 import { ListPageHeader } from "@/components/ui/list-page-header"
 import {
@@ -15,24 +16,14 @@ import { getClaims } from "@/lib/actions/funding"
 import { formatDisplayDate } from "@/lib/funding/format"
 import { requirePractitionerContext } from "@/lib/auth"
 
-export default async function ClaimsPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ clientId?: string; client_id?: string }>
-}) {
+export default async function ClaimsPage() {
   const context = await requirePractitionerContext()
-  const { clientId: clientIdCamel, client_id: clientIdSnake } =
-    await searchParams
-  const clientId = clientIdCamel ?? clientIdSnake
-  const backHref = clientId ? `/clients/${clientId}` : "/clients"
   const claims = await getClaims(context.practiceId)
 
   return (
     <AppShell>
       <div className="mb-6">
-        <Button variant="ghost" size="sm" asChild className="mb-2 -ml-2">
-          <Link href={backHref}>← Back</Link>
-        </Button>
+        <BackButton fallbackHref="/clients" label="← Back to clients" />
       </div>
       <ListPageHeader
         heading="Claims"

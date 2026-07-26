@@ -1,10 +1,10 @@
 "use client"
 
-import Link from "next/link"
 import { useEffect, useState } from "react"
 
 import { CommunicationPreferencesCard } from "@/app/clients/[client_id]/communication-preferences-card"
 import { SendCommunicationModal } from "@/components/email/send-communication-modal"
+import { BackButton } from "@/components/ui/back-button"
 import { Button } from "@/components/ui/button"
 import { EntityPageHeader } from "@/components/ui/entity-page-header"
 import {
@@ -137,9 +137,10 @@ export function CommunicationsPageClient({
   return (
     <>
       <div className="mb-6">
-        <Button variant="ghost" size="sm" asChild className="mb-2 -ml-2">
-          <Link href={`/clients/${clientId}`}>← {clientName}</Link>
-        </Button>
+        <BackButton
+          fallbackHref={`/clients/${clientId}`}
+          label={`← ${clientName}`}
+        />
       </div>
       <EntityPageHeader
         kicker="Communications"

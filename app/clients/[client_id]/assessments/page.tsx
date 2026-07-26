@@ -1,10 +1,9 @@
-import Link from "next/link"
 import { notFound } from "next/navigation"
 import { and, eq } from "drizzle-orm"
 
 import { AssessmentsTable } from "@/app/clients/[client_id]/assessments/assessments-table"
 import { AppShell } from "@/components/app-shell"
-import { Button } from "@/components/ui/button"
+import { BackButton } from "@/components/ui/back-button"
 import { EntityPageHeader } from "@/components/ui/entity-page-header"
 import { clients } from "@/db/schema"
 import { loadAssessmentResultsForClient } from "@/lib/assessments/load-results"
@@ -47,9 +46,10 @@ export default async function ClientAssessmentsPage({
   return (
     <AppShell>
       <div className="mb-6">
-        <Button variant="ghost" size="sm" asChild className="mb-2 -ml-2">
-          <Link href={`/clients/${clientId}`}>← {clientName}</Link>
-        </Button>
+        <BackButton
+          fallbackHref={`/clients/${clientId}`}
+          label={`← ${clientName}`}
+        />
       </div>
       <EntityPageHeader
         kicker="Assessments"

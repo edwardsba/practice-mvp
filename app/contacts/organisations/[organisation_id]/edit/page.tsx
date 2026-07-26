@@ -1,8 +1,7 @@
-import Link from "next/link"
 import { notFound } from "next/navigation"
 
 import { AppShell } from "@/components/app-shell"
-import { Button } from "@/components/ui/button"
+import { BackButton } from "@/components/ui/back-button"
 import { EntityPageHeader } from "@/components/ui/entity-page-header"
 import { OrganisationForm } from "@/components/contacts/organisation-form"
 import {
@@ -33,9 +32,10 @@ export default async function EditOrganisationPage({
   return (
     <AppShell>
       <div className="mb-6">
-        <Button variant="ghost" size="sm" asChild className="mb-2 -ml-2">
-          <Link href={`/contacts/organisations/${organisationId}`}>← Back</Link>
-        </Button>
+        <BackButton
+          fallbackHref={`/contacts/organisations/${organisationId}`}
+          label="← Back to organisation"
+        />
       </div>
       <EntityPageHeader
         kicker="Professional organisation edit"

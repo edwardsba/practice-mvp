@@ -5,6 +5,7 @@ import { PreSessionBatteryStatus } from "@/app/appointments/[appointment_id]/pre
 import { createDraftSessionNote } from "@/app/session-notes/actions"
 import { AppointmentStatusControl } from "@/components/appointments/appointment-status-control"
 import { AppShell } from "@/components/app-shell"
+import { BackButton } from "@/components/ui/back-button"
 import { Button } from "@/components/ui/button"
 import { EntityPageHeader } from "@/components/ui/entity-page-header"
 import {
@@ -38,7 +39,6 @@ import {
   formatApprovalProgress,
   formatDisplayDate,
 } from "@/lib/funding/format"
-import { resolveBackNavigation } from "@/lib/navigation/back"
 import { loadSessionNoteForAppointment } from "@/lib/session-notes/load"
 
 function formatAppointmentDateTime(date: string, time: string): string {
@@ -70,11 +70,6 @@ export default async function AppointmentDetailPage({
     appointment.clientFirstName,
     appointment.clientLastName
   )
-  const back = resolveBackNavigation(
-    returnTo,
-    "/appointments",
-    "← Back to appointments"
-  )
   const notes = appointment.notes?.trim() ?? ""
   const appointmentUrl = returnTo
     ? `/appointments/${appointmentId}?returnTo=${encodeURIComponent(returnTo)}`
@@ -83,9 +78,7 @@ export default async function AppointmentDetailPage({
   return (
     <AppShell>
       <div className="mb-6">
-        <Button variant="ghost" size="sm" asChild className="mb-2 -ml-2">
-          <Link href={back.href}>{back.label}</Link>
-        </Button>
+        <BackButton fallbackHref="/appointments" label="← Back to appointments" />
       </div>
       <EntityPageHeader
         kicker="Appointment"

@@ -1,4 +1,3 @@
-import Link from "next/link"
 import { notFound } from "next/navigation"
 
 import { updateAppointment, deleteAppointment, getAppointmentDeleteStatus } from "@/app/appointments/actions"
@@ -7,7 +6,8 @@ import { getActiveClients } from "@/app/clients/actions"
 import { AppointmentForm } from "@/components/appointments/appointment-form"
 import { AppShell } from "@/components/app-shell"
 import { EntityDeleteSection } from "@/components/entity-delete-section"
-import { Button } from "@/components/ui/button"
+import { BackButton } from "@/components/ui/back-button"
+import { EntityPageHeader } from "@/components/ui/entity-page-header"
 import { getMemberships } from "@/lib/actions/practitioner-practice"
 import { loadAppointmentForPractice } from "@/lib/appointments/load"
 import { requirePractitionerContext } from "@/lib/auth"
@@ -56,22 +56,12 @@ export default async function EditAppointmentPage({
   return (
     <AppShell>
       <div className="mb-6">
-        <Button variant="ghost" size="sm" asChild className="mb-2 -ml-2">
-          <Link
-            href={
-              returnTo
-                ? `/appointments/${appointmentId}?returnTo=${encodeURIComponent(returnTo)}`
-                : `/appointments/${appointmentId}`
-            }
-          >
-            ← Back
-          </Link>
-        </Button>
-        <h1 className="text-2xl font-semibold tracking-tight">
-          Edit appointment
-        </h1>
-        <p className="mt-1 text-muted-foreground">{clientName}</p>
+        <BackButton
+          fallbackHref={`/appointments/${appointmentId}`}
+          label="← Back to appointment"
+        />
       </div>
+      <EntityPageHeader kicker="Appointment edit" name={clientName} />
 
       <AppointmentForm
         action={updateAppointment.bind(null, appointmentId, returnTo)}

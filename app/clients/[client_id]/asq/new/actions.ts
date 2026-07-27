@@ -218,3 +218,192 @@ export async function saveAsqResult(
 
   redirect(sessionNoteId ? `/session-notes/${sessionNoteId}` : `/clients/${clientId}`)
 }
+
+export type UpdateAsqResultState = {
+  error?: string
+}
+
+export async function updateAsqResult(
+  clientId: string,
+  instanceId: string,
+  _prevState: UpdateAsqResultState,
+  formData: FormData
+): Promise<UpdateAsqResultState> {
+  const context = await requirePractitionerContext()
+
+  const [instance] = await db
+    .select({ assessmentInstanceId: assessmentInstances.assessmentInstanceId })
+    .from(assessmentInstances)
+    .where(
+      and(
+        eq(assessmentInstances.assessmentInstanceId, instanceId),
+        eq(assessmentInstances.clientId, clientId),
+        eq(assessmentInstances.practiceId, context.practiceId)
+      )
+    )
+    .limit(1)
+
+  if (!instance) {
+    return { error: "ASQ not found." }
+  }
+
+  const [existingResult] = await db
+    .select({ assessmentResultId: assessmentResults.assessmentResultId })
+    .from(assessmentResults)
+    .where(eq(assessmentResults.assessmentInstanceId, instanceId))
+    .limit(1)
+
+  if (!existingResult) {
+    return { error: "ASQ result not found." }
+  }
+
+  const returnToRaw = String(formData.get("returnTo") ?? "").trim()
+  const returnTo = returnToRaw || null
+
+  const definitionId = await getAsqDefinitionId()
+  if (!definitionId) {
+    return { error: "ASQ is not configured. Run the ASQ seed script." }
+  }
+
+  const elements = await db
+    .select({
+      assessmentElementId: assessmentElements.assessmentElementId,
+      elementKey: assessmentElements.elementKey,
+      dataType: assessmentElements.dataType,
+    })
+    .from(assessmentElements)
+    .where(
+      and(
+        eq(assessmentElements.assessmentDefinitionId, definitionId),
+        eq(assessmentElements.isActive, true)
+      )
+    )
+
+  const responses: Record<string, string> = {}
+  for (const element of elements) {
+    const value = String(formData.get(`response_${element.assessmentElementId}`) ?? "").trim()
+    if (!value) {
+      return { error: "Please answer all questions before submitting." }
+    }
+    responses[element.assessmentElementId] = value
+  }
+
+  const elementIds = Object.keys(responses)
+  const optionRows = await db
+    .select({
+      assessmentElementId: assessmentOptions.assessmentElementId,
+      optionValue: assessmentOptions.optionValue,
+      scoreValue: assessmentOptions.scoreValue,
+    })
+    .from(assessmentOptions)
+    .where(
+      and(
+        eq(assessmentOptions.assessmentDefinitionId, definitionId),
+        inArray(assessmentOptions.assessmentElementId, elementIds)
+      )
+    )
+
+  const scoreByElementAndValue = new Map<string, number>()
+  for (const row of optionRows) {
+    scoreByElementAndValue.set(
+      `${row.assessmentElementId}:${row.optionValue}`,
+      row.scoreValue
+    )
+  }
+
+  const dataTypeByElementId = new Map(
+    elements.map((e) => [e.assessmentElementId, e.dataType])
+  )
+  const elementKeyById = new Map(
+    elements.map((e) => [e.assessmentElementId, e.elementKey])
+  )
+
+  let totalScore = 0
+  let historicalPositive = false
+  let recentPositive = false
+  let currentPositive = false
+  const responseRows: {
+    assessmentElementId: string
+    responseValue: string
+    scoreValue: number
+  }[] = []
+
+  for (const elementId of elementIds) {
+    const responseValue = responses[elementId]
+    const scoreValue = scoreByElementAndValue.get(`${elementId}:${responseValue}`)
+    if (scoreValue === undefined) {
+      return { error: "One or more responses are invalid." }
+    }
+
+    responseRows.push({
+      assessmentElementId: elementId,
+      responseValue,
+      scoreValue,
+    })
+
+    if (dataTypeByElementId.get(elementId) === "integer") {
+      totalScore += scoreValue
+    }
+
+    const elementKey = elementKeyById.get(elementId)
+    if (elementKey === ASQ_HISTORICAL_ELEMENT_KEY && responseValue === "yes") {
+      historicalPositive = true
+    }
+    if (ASQ_RECENT_ELEMENT_KEYS.includes(elementKey ?? "") && responseValue === "yes") {
+      recentPositive = true
+    }
+    if (elementKey === ASQ_Q5_ELEMENT_KEY && responseValue === "yes") {
+      currentPositive = true
+    }
+  }
+
+  const severity = asqScreenOutcome({ historicalPositive, recentPositive, currentPositive })
+  const now = new Date()
+
+  await db.transaction(async (tx) => {
+    await tx
+      .delete(assessmentResponses)
+      .where(eq(assessmentResponses.assessmentInstanceId, instanceId))
+
+    await tx.insert(assessmentResponses).values(
+      responseRows.map((row) => ({
+        assessmentInstanceId: instanceId,
+        assessmentElementId: row.assessmentElementId,
+        clientId,
+        practiceId: context.practiceId,
+        responseValue: row.responseValue,
+        scoreValue: row.scoreValue,
+      }))
+    )
+
+    await tx
+      .update(assessmentResults)
+      .set({ score: totalScore, severity })
+      .where(eq(assessmentResults.assessmentResultId, existingResult.assessmentResultId))
+
+    await tx
+      .update(assessmentInstances)
+      .set({ updatedAt: now })
+      .where(eq(assessmentInstances.assessmentInstanceId, instanceId))
+
+    await tx.insert(auditEvents).values({
+      practiceId: context.practiceId,
+      userId: context.userId,
+      clientId,
+      eventType: "assessment.updated",
+      entityType: "assessment_instance",
+      entityId: instanceId,
+    })
+
+    await tx.insert(auditEvents).values({
+      practiceId: context.practiceId,
+      userId: context.userId,
+      clientId,
+      eventType: "assessment_result.rescored",
+      entityType: "assessment_result",
+      entityId: existingResult.assessmentResultId,
+    })
+  })
+
+  redirect(returnTo || `/clients/${clientId}/results/${existingResult.assessmentResultId}`)
+}

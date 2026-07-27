@@ -13,14 +13,27 @@ export function AsqForm({
   clientName,
   questions,
   sessionNoteId,
+  returnTo,
+  existingResponses,
+  action,
+  submitLabel = "Save ASQ Result",
+  warningMessage,
 }: {
   clientId: string
   clientName: string
   questions: AsqQuestion[]
   sessionNoteId?: string | null
+  returnTo?: string | null
+  existingResponses?: Record<string, string>
+  action?: (
+    state: SaveAsqResultState,
+    formData: FormData
+  ) => Promise<SaveAsqResultState>
+  submitLabel?: string
+  warningMessage?: string
 }) {
   const [state, formAction, pending] = useActionState(
-    saveAsqResult.bind(null, clientId),
+    action ?? saveAsqResult.bind(null, clientId),
     initialState
   )
 
@@ -28,6 +41,14 @@ export function AsqForm({
     <form action={formAction} className="space-y-8">
       {sessionNoteId ? (
         <input type="hidden" name="session_note_id" value={sessionNoteId} />
+      ) : null}
+      {returnTo ? (
+        <input type="hidden" name="returnTo" value={returnTo} />
+      ) : null}
+      {warningMessage ? (
+        <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+          {warningMessage}
+        </div>
       ) : null}
       <p className="text-sm text-muted-foreground">
         Ask Suicide-Screening Questions (ASQ) for {clientName}. Answer each question
@@ -51,6 +72,11 @@ export function AsqForm({
                   id={`${question.elementId}-${option.value}`}
                   name={`response_${question.elementId}`}
                   value={option.value}
+                  defaultChecked={
+                    existingResponses
+                      ? existingResponses[question.elementId] === option.value
+                      : undefined
+                  }
                   required
                   className="size-4 accent-primary"
                 />
@@ -66,7 +92,7 @@ export function AsqForm({
       ) : null}
 
       <Button type="submit" disabled={pending}>
-        {pending ? "Saving…" : "Save ASQ Result"}
+        {pending ? "Saving…" : submitLabel}
       </Button>
     </form>
   )

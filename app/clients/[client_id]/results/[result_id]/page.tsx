@@ -38,6 +38,7 @@ import { getMaxScoreForAssessmentDefinition } from "@/lib/assessments/max-score"
 import { calculatePsfScore } from "@/lib/assessments/psf"
 import { requirePractitionerContext } from "@/lib/auth"
 import { db } from "@/lib/db"
+import { appendReturnTo } from "@/lib/navigation/back"
 
 function formatDate(value: Date | string | null) {
   if (!value) return "—"
@@ -53,10 +54,14 @@ function formatDate(value: Date | string | null) {
 
 export default async function AssessmentResultDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ client_id: string; result_id: string }>
+  searchParams: Promise<{ returnTo?: string }>
 }) {
   const { client_id: clientId, result_id: resultId } = await params
+  const { returnTo: returnToParam } = await searchParams
+  const returnTo = returnToParam?.trim() || null
   const context = await requirePractitionerContext()
 
   const [client] = await db
@@ -305,11 +310,26 @@ export default async function AssessmentResultDetailPage({
         name={clientName}
         subheading={`Completed ${formatDate(result.assessmentDate)}`}
         action={
-          <MarkReviewedButton
-            clientId={clientId}
-            resultId={resultId}
-            status={result.status}
-          />
+          <div className="flex items-center gap-3">
+            {isAsq ? (
+              <Link
+                href={appendReturnTo(
+                  `/clients/${clientId}/asq/${result.assessmentInstanceId}/edit`,
+                  returnTo
+                    ? `/clients/${clientId}/results/${resultId}?returnTo=${encodeURIComponent(returnTo)}`
+                    : `/clients/${clientId}/results/${resultId}`
+                )}
+                className="text-sm font-medium text-primary hover:underline"
+              >
+                Edit ASQ
+              </Link>
+            ) : null}
+            <MarkReviewedButton
+              clientId={clientId}
+              resultId={resultId}
+              status={result.status}
+            />
+          </div>
         }
       />
 

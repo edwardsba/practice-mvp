@@ -40,6 +40,7 @@ import { appendReturnTo } from "@/lib/navigation/back"
 import { formatSessionNoteDate } from "@/lib/session-notes/format"
 import { loadSessionNoteViewContext } from "@/lib/session-notes/load-context"
 import { loadSessionNoteForPractice } from "@/lib/session-notes/load"
+import { loadSessionNoteVersionHistory } from "@/lib/session-notes/version-history"
 import { SESSION_NOTE_STATUS_CONFIG } from "@/lib/status"
 
 import "@/components/session-notes/session-note-print.css"
@@ -63,6 +64,10 @@ export default async function SessionNoteViewPage({
 
   const viewContext = await loadSessionNoteViewContext(note)
   const deleteStatus = await getSessionNoteDeleteStatus(sessionNoteId)
+  const versions = await loadSessionNoteVersionHistory(
+    sessionNoteId,
+    context.practiceId
+  )
   const clientName = formatClientNameLastFirst(
     note.clientFirstName,
     note.clientLastName
@@ -280,6 +285,40 @@ export default async function SessionNoteViewPage({
                 ) : null}
               </CardContent>
             </Card>
+
+            {versions.length > 1 ? (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Version history</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ul className="space-y-2">
+                    {versions.map((version) => (
+                      <li key={version.sessionNoteId}>
+                        <Link
+                          href={`/session-notes/${version.sessionNoteId}`}
+                          className={`text-sm hover:underline ${
+                            version.isCurrentVersion
+                              ? "font-semibold text-primary"
+                              : "text-primary"
+                          }`}
+                        >
+                          Version {version.versionNumber} —{" "}
+                          {version.status === "finalised"
+                            ? "Finalised"
+                            : "Draft"}
+                          {version.isCurrentVersion ? (
+                            <span className="ml-2 font-medium text-foreground">
+                              (Current)
+                            </span>
+                          ) : null}
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                </CardContent>
+              </Card>
+            ) : null}
           </>
         }
         deleteSection={

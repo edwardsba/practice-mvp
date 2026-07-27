@@ -27,15 +27,26 @@ export function MseForm({
   questions,
   sessionNoteId,
   returnTo,
+  existingResponses,
+  action,
+  submitLabel = "Save MSE",
+  warningMessage,
 }: {
   clientId: string
   clientName: string
   questions: MseQuestion[]
   sessionNoteId?: string | null
   returnTo?: string | null
+  existingResponses?: Record<string, string>
+  action?: (
+    state: SaveMseResultState,
+    formData: FormData
+  ) => Promise<SaveMseResultState>
+  submitLabel?: string
+  warningMessage?: string
 }) {
   const [state, formAction, pending] = useActionState(
-    saveMseResult.bind(null, clientId),
+    action ?? saveMseResult.bind(null, clientId),
     initialState
   )
 
@@ -48,6 +59,11 @@ export function MseForm({
       ) : null}
       {returnTo ? (
         <input type="hidden" name="returnTo" value={returnTo} />
+      ) : null}
+      {warningMessage ? (
+        <div className="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+          {warningMessage}
+        </div>
       ) : null}
       <p className="mb-6 text-sm text-muted-foreground">
         Mental Status Examination (MSE) for {clientName}. Select one option for
@@ -88,7 +104,12 @@ export function MseForm({
                             id={`${question.elementId}-${option.value}`}
                             name={`response_${question.elementId}`}
                             value={option.value}
-                            defaultChecked={option.isDefaultSelection}
+                            defaultChecked={
+                              existingResponses
+                                ? existingResponses[question.elementId] ===
+                                  option.value
+                                : option.isDefaultSelection
+                            }
                             required
                             className="size-4 accent-primary"
                           />
@@ -109,7 +130,7 @@ export function MseForm({
       ) : null}
 
       <Button type="submit" disabled={pending}>
-        {pending ? "Saving…" : "Save MSE"}
+        {pending ? "Saving…" : submitLabel}
       </Button>
     </form>
   )

@@ -31,6 +31,7 @@ import {
 } from "@/db/schema"
 import { requirePractitionerContext } from "@/lib/auth"
 import { db } from "@/lib/db"
+import { appendReturnTo } from "@/lib/navigation/back"
 import { formatPractitionerName } from "@/lib/practitioner/format"
 import { formatSessionNoteDate } from "@/lib/session-notes/format"
 
@@ -93,10 +94,14 @@ function buildGroupedRows(responses: ResponseRow[]) {
 
 export default async function ViewMsePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ client_id: string; instance_id: string }>
+  searchParams: Promise<{ returnTo?: string }>
 }) {
   const { client_id: clientId, instance_id: instanceId } = await params
+  const { returnTo: returnToParam } = await searchParams
+  const returnTo = returnToParam?.trim() || null
   const context = await requirePractitionerContext()
 
   const [client] = await db
@@ -210,6 +215,9 @@ export default async function ViewMsePage({
   }
 
   const clientName = `${client.firstName} ${client.lastName}`
+  const mseDetailUrl = returnTo
+    ? `/clients/${clientId}/mse/${instanceId}?returnTo=${encodeURIComponent(returnTo)}`
+    : `/clients/${clientId}/mse/${instanceId}`
   const practitionerName = formatPractitionerName({
     firstName: instance.practitionerFirstName,
     preferredName: instance.practitionerPreferredName,
@@ -231,6 +239,17 @@ export default async function ViewMsePage({
         kicker="MSE"
         name={clientName}
         subheading={`${instance.assessmentName} · Completed ${formatCompletedDate(instance.submittedAt)}`}
+        action={
+          <Link
+            href={appendReturnTo(
+              `/clients/${clientId}/mse/${instanceId}/edit`,
+              mseDetailUrl
+            )}
+            className="text-sm font-medium text-primary hover:underline"
+          >
+            Edit MSE
+          </Link>
+        }
       />
 
       <Card className="mb-6">

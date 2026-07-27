@@ -88,6 +88,8 @@ export default async function EditAppointmentPage({
       <EntityDeleteSection
         entityName="Appointment"
         blockedReason={deleteStatus.blockedReason}
+        requiresReportConfirmation={deleteStatus.requiresCascadeConfirmation}
+        confirmationMessage={deleteStatus.cascadeConfirmationMessage}
         deleteAction={deleteAppointment.bind(
           null,
           appointmentId,

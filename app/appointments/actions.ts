@@ -8,13 +8,14 @@ import { appointments, auditEvents, clients } from "@/db/schema"
 import { parseAppointmentFormData } from "@/lib/appointments/parse-form"
 import type { AppointmentAutomationSummary } from "@/lib/appointments/run-automations"
 import { loadAppointmentForPractice } from "@/lib/appointments/load"
+import {
+  cascadeDeleteAppointment,
+  getAppointmentCascadeSummary,
+} from "@/lib/appointments/cascade-delete"
 import { requirePractitionerContext } from "@/lib/auth"
 import { todayDateString } from "@/lib/dates/practice-time"
 import { db } from "@/lib/db"
-import {
-  countNonFinalisedSessionNotesByAppointment,
-  logDeleteAuditEvent,
-} from "@/lib/delete/delete-utils"
+import { logDeleteAuditEvent } from "@/lib/delete/delete-utils"
 import { getNoShowAppointmentType } from "@/lib/actions/appointment-types"
 import { APPOINTMENT_STATUS_TRANSITIONS } from "@/lib/status"
 
@@ -314,23 +315,44 @@ export async function getAppointmentDeleteStatus(appointmentId: string) {
     return { blockedReason: "Appointment not found." }
   }
 
-  const sessionNoteCount = await countNonFinalisedSessionNotesByAppointment(
+  const summary = await getAppointmentCascadeSummary(
     appointmentId,
     context.practiceId
   )
 
-  if (sessionNoteCount > 0) {
-    return {
-      blockedReason: `Cannot delete: appointment has ${sessionNoteCount} non-finalised session notes.`,
-    }
+  const hasAttachedData =
+    summary.totalSessionNoteCount > 0 || summary.assessmentInstanceCount > 0
+
+  if (!hasAttachedData) {
+    return {}
   }
 
-  return {}
+  const parts: string[] = []
+  if (summary.totalSessionNoteCount > 0) {
+    const finalisedNote =
+      summary.finalisedSessionNoteCount > 0
+        ? ` (${summary.finalisedSessionNoteCount} finalised)`
+        : ""
+    parts.push(
+      `${summary.totalSessionNoteCount} session note${summary.totalSessionNoteCount === 1 ? "" : "s"}${finalisedNote}`
+    )
+  }
+  if (summary.assessmentInstanceCount > 0) {
+    parts.push(
+      `${summary.assessmentInstanceCount} assessment${summary.assessmentInstanceCount === 1 ? "" : "s"}`
+    )
+  }
+
+  return {
+    requiresCascadeConfirmation: true,
+    cascadeConfirmationMessage: `This appointment has ${parts.join(" and ")} attached. Deleting it will permanently remove all of it as well. You must type the word "delete" below to confirm you understand this action cannot be undone.`,
+  }
 }
 
 export async function deleteAppointment(
   appointmentId: string,
-  practiceId: string
+  practiceId: string,
+  options?: { acknowledgeReports?: boolean }
 ): Promise<{ success?: boolean; error?: string; blockedReason?: string }> {
   const context = await requirePractitionerContext()
   if (context.practiceId !== practiceId) {
@@ -340,6 +362,14 @@ export async function deleteAppointment(
   const status = await getAppointmentDeleteStatus(appointmentId)
   if (status.blockedReason) {
     return { blockedReason: status.blockedReason }
+  }
+
+  if (status.requiresCascadeConfirmation && !options?.acknowledgeReports) {
+    return {
+      blockedReason:
+        status.cascadeConfirmationMessage ??
+        "Extra confirmation required: this appointment has clinical data attached.",
+    }
   }
 
   const appointment = await loadAppointmentForPractice(
@@ -352,12 +382,7 @@ export async function deleteAppointment(
 
   try {
     await db.transaction(async (tx) => {
-      await applyAppointmentCancellation(
-        tx,
-        appointmentId,
-        practiceId,
-        "practitioner"
-      )
+      await cascadeDeleteAppointment(tx, appointmentId, practiceId)
     })
 
     await logDeleteAuditEvent({
@@ -368,11 +393,13 @@ export async function deleteAppointment(
       entityType: "appointment",
       entityId: appointmentId,
     })
-  } catch {
+  } catch (error) {
+    console.error("deleteAppointment failed:", error)
     return { error: "Unable to delete appointment. Please try again." }
   }
 
   revalidatePath("/appointments")
+  revalidatePath("/calendar")
   revalidatePath(`/appointments/${appointmentId}`)
   revalidatePath(`/clients/${appointment.clientId}`)
   redirect("/appointments")

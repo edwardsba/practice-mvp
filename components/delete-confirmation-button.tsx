@@ -19,12 +19,17 @@ export function DeleteConfirmationButton({
   blockedReason,
   isLoading = false,
   dangerouslyRequireConfirmation = false,
+  confirmationMessage,
 }: {
   onDelete: () => Promise<void>
   entityName: string
   blockedReason?: string
   isLoading?: boolean
   dangerouslyRequireConfirmation?: boolean
+  /** Custom message shown in the extra-confirmation dialog. Falls back
+   * to the client/reports wording below if not provided, so the
+   * existing client delete call site doesn't need to change. */
+  confirmationMessage?: string
 }) {
   const [open, setOpen] = useState(false)
   const [confirmText, setConfirmText] = useState("")
@@ -90,9 +95,8 @@ export function DeleteConfirmationButton({
           {dangerouslyRequireConfirmation ? (
             <div className="space-y-4">
               <p className="text-sm text-muted-foreground">
-                This client has reports on file. You must type the word
-                &quot;delete&quot; below to confirm you understand this action
-                cannot be undone.
+                {confirmationMessage ??
+                  'This client has reports on file. You must type the word "delete" below to confirm you understand this action cannot be undone.'}
               </p>
               <div className="space-y-2">
                 <Label htmlFor="delete_confirm_text">Type delete to confirm</Label>

@@ -966,7 +966,12 @@ export async function getClientFundingApprovalsForReport(
               status: sessionNotes.status,
             })
             .from(sessionNotes)
-            .where(inArray(sessionNotes.appointmentId, apptIds))
+            .where(
+              and(
+                inArray(sessionNotes.appointmentId, apptIds),
+                eq(sessionNotes.isCurrentVersion, true)
+              )
+            )
         : []
 
       const snByAppt = new Map<string, string | null>()

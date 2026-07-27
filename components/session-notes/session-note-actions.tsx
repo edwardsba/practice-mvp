@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 
+import { createNewSessionNoteVersionAction } from "@/app/session-notes/actions"
 import { AsqStatusBadge } from "@/components/session-notes/asq-status-badge"
 import { PsqStatusBadge } from "@/components/session-notes/psq-status-badge"
 import { Button } from "@/components/ui/button"
@@ -31,6 +32,8 @@ export function SessionNoteActions({
   preSessionBatterySentAt,
   psqBatteryStatus,
   asqCompleted,
+  versionNumber,
+  previousVersionId,
 }: {
   sessionNoteId: string
   sessionNoteUrl: string
@@ -46,6 +49,8 @@ export function SessionNoteActions({
   preSessionBatterySentAt: Date | null
   psqBatteryStatus: string | null
   asqCompleted: boolean
+  versionNumber: number
+  previousVersionId: string | null
 }) {
   const sessionDateTime = (
     <>
@@ -78,12 +83,38 @@ export function SessionNoteActions({
               <dt className="mb-2 text-sm text-muted-foreground">
                 Session note
               </dt>
-              <dd className="flex flex-wrap items-center gap-3">
-                <Button variant="outline" size="sm" asChild>
-                  <a href={`/api/session-notes/${sessionNoteId}/pdf`} download>
-                    Download PDF
-                  </a>
-                </Button>
+              <dd className="flex flex-col gap-3">
+                <div className="flex flex-wrap items-center gap-3">
+                  <Button variant="outline" size="sm" asChild>
+                    <a href={`/api/session-notes/${sessionNoteId}/pdf`} download>
+                      Download PDF
+                    </a>
+                  </Button>
+                  <form
+                    action={createNewSessionNoteVersionAction.bind(
+                      null,
+                      sessionNoteId
+                    )}
+                  >
+                    <Button variant="outline" size="sm" type="submit">
+                      Edit / Create new version
+                    </Button>
+                  </form>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Version {versionNumber}
+                  {previousVersionId ? (
+                    <>
+                      {" · "}
+                      <Link
+                        href={`/session-notes/${previousVersionId}`}
+                        className="text-primary hover:underline"
+                      >
+                        View previous version
+                      </Link>
+                    </>
+                  ) : null}
+                </p>
               </dd>
             </div>
           ) : null}

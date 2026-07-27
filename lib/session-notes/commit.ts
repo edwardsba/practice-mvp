@@ -4,6 +4,9 @@ import { assessmentInstances, auditEvents, sessionNotes } from "@/db/schema"
 import { db } from "@/lib/db"
 import { loadSessionNoteForPractice } from "@/lib/session-notes/load"
 
+type DbClient = typeof db
+type DbTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0]
+
 /**
  * Forks a new draft version from a finalised session note.
  *
@@ -12,10 +15,13 @@ import { loadSessionNoteForPractice } from "@/lib/session-notes/load"
  * intentionally does NOT copy status/finalisedAt/pdfStoragePath — the new
  * row starts life as a fresh draft.
  *
- * Does NOT repoint assessment_instances (MSE/ASQ) here — that only
- * happens when the new version is finalised (see finaliseNewSessionNoteVersion
- * in Phase 2's actions.ts wiring), so an abandoned draft never orphans
- * clinical data away from the still-current finalised version.
+ * Repoints any MSE/ASQ (assessment_instances) linked to the previous
+ * version onto the new one, in the same transaction as the fork itself.
+ * This happens at fork time, not finalise time: isCurrentVersion already
+ * moves to the new draft the moment it's created, so "current" has
+ * already shifted before finalise — delaying the repoint would just
+ * leave the draft's MSE/ASQ view empty while it's being edited, with no
+ * real safety benefit.
  */
 export async function createSessionNoteVersion({
   previousVersionId,
@@ -64,6 +70,12 @@ export async function createSessionNoteVersion({
 
     newSessionNoteId = inserted.sessionNoteId
 
+    await repointAssessmentInstancesToNewVersion({
+      previousVersionId,
+      newSessionNoteId: inserted.sessionNoteId,
+      client: tx,
+    })
+
     await tx.insert(auditEvents).values({
       practiceId,
       userId,
@@ -79,18 +91,21 @@ export async function createSessionNoteVersion({
 
 /**
  * Repoints any MSE/ASQ assessment_instances rows that were recorded
- * against the previous version onto the new (now-finalised) version.
- * Call this at the moment a forked draft version is finalised, not when
- * it's created — see the module doc comment above for why.
+ * against the previous version onto the new version. Called from inside
+ * createSessionNoteVersion's own transaction (pass `client: tx`); the
+ * plain `db` default is only for any one-off/manual use outside that
+ * flow.
  */
 export async function repointAssessmentInstancesToNewVersion({
   previousVersionId,
   newSessionNoteId,
+  client = db,
 }: {
   previousVersionId: string
   newSessionNoteId: string
+  client?: DbClient | DbTransaction
 }): Promise<void> {
-  await db
+  await client
     .update(assessmentInstances)
     .set({ sessionNoteId: newSessionNoteId, updatedAt: new Date() })
     .where(eq(assessmentInstances.sessionNoteId, previousVersionId))

@@ -16,6 +16,7 @@ import {
 import { requirePractitionerContext } from "@/lib/auth"
 import { db } from "@/lib/db"
 import { buildSessionNotePdfData } from "@/lib/session-notes/build-pdf-data"
+import { createSessionNoteVersion } from "@/lib/session-notes/commit"
 import {
   loadSessionNoteForPractice,
 } from "@/lib/session-notes/load"
@@ -94,6 +95,27 @@ export async function createDraftSessionNote(
       ? appendReturnTo(`/session-notes/${sessionNoteId!}`, returnTo)
       : `/session-notes/${sessionNoteId!}`
   )
+}
+
+export async function createNewSessionNoteVersionAction(
+  sessionNoteId: string
+) {
+  const context = await requirePractitionerContext()
+
+  const note = await loadSessionNoteForPractice(sessionNoteId, context.practiceId)
+  if (!note) {
+    throw new Error("Session note not found.")
+  }
+
+  const { sessionNoteId: newSessionNoteId } = await createSessionNoteVersion({
+    previousVersionId: sessionNoteId,
+    practiceId: context.practiceId,
+    userId: context.userId,
+  })
+
+  revalidatePath("/session-notes")
+  revalidatePath(`/clients/${note.clientId}`)
+  redirect(`/session-notes/${newSessionNoteId}`)
 }
 
 export type UpdateSessionNoteNotesState = {
@@ -363,7 +385,8 @@ export async function exportSessionNotePdfs(
         eq(sessionNotes.clientId, clientId),
         eq(sessionNotes.practiceId, context.practiceId),
         eq(sessionNotes.status, "finalised"),
-        eq(sessionNotes.isActive, true)
+        eq(sessionNotes.isActive, true),
+        eq(sessionNotes.isCurrentVersion, true)
       )
     )
     .orderBy(asc(sessionNotes.sessionDate))

@@ -12,6 +12,7 @@ export async function loadSessionNotesForPractice(
   const conditions = [
     eq(sessionNotes.practiceId, practiceId),
     eq(sessionNotes.isActive, true),
+    eq(sessionNotes.isCurrentVersion, true),
   ]
 
   if (filter === "draft") {
@@ -99,6 +100,8 @@ export async function loadSessionNoteForPractice(
       status: sessionNotes.status,
       finalisedAt: sessionNotes.finalisedAt,
       pdfStoragePath: sessionNotes.pdfStoragePath,
+      versionNumber: sessionNotes.versionNumber,
+      previousVersionId: sessionNotes.previousVersionId,
       clientFirstName: clients.firstName,
       clientLastName: clients.lastName,
       clientDateOfBirth: clients.dateOfBirth,
@@ -164,7 +167,8 @@ export async function loadSessionNoteForAppointment(
       and(
         eq(sessionNotes.appointmentId, appointmentId),
         eq(sessionNotes.practiceId, practiceId),
-        eq(sessionNotes.isActive, true)
+        eq(sessionNotes.isActive, true),
+        eq(sessionNotes.isCurrentVersion, true)
       )
     )
     .limit(1)
@@ -187,7 +191,8 @@ export async function loadLatestSessionNoteForClient(
       and(
         eq(sessionNotes.clientId, clientId),
         eq(sessionNotes.practiceId, practiceId),
-        eq(sessionNotes.isActive, true)
+        eq(sessionNotes.isActive, true),
+        eq(sessionNotes.isCurrentVersion, true)
       )
     )
     .orderBy(desc(sessionNotes.sessionDate), desc(sessionNotes.sessionTime))

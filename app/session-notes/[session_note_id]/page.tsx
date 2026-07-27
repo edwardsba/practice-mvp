@@ -115,6 +115,8 @@ export default async function SessionNoteViewPage({
               preSessionBatterySentAt={note.preSessionBatterySentAt}
               psqBatteryStatus={note.psqBatteryStatus}
               asqCompleted={Boolean(viewContext.asqResult)}
+              versionNumber={note.versionNumber}
+              previousVersionId={note.previousVersionId ?? null}
             />
 
             <Card>

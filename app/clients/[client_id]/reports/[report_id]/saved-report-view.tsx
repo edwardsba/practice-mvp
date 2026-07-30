@@ -1,24 +1,16 @@
-"use client"
-
 import Link from "next/link"
-import { useState } from "react"
 
 import { ReportDocument } from "@/components/report/report-document"
 import { AssessmentSummaryMethodologyNote } from "@/components/report/assessment-summary-methodology-note"
-import { SendReportEmailModal } from "@/components/report/send-report-email-modal"
-import { Button } from "@/components/ui/button"
 import {
   Card,
   CardContent,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
-import { StatusBadge } from "@/components/ui/status-badge"
-import type { ReportEmailVariables } from "@/lib/email/report-templates"
 import { formatDisplayDate } from "@/lib/funding/format"
 import type { ReportSnapshot } from "@/lib/reports/snapshot"
 import type { ReportVersionSummary } from "@/lib/reports/version-history"
-import { REPORT_STATUS_CONFIG } from "@/lib/status"
 
 function formatVersionDate(value: Date) {
   return value.toLocaleDateString("en-AU", {
@@ -30,8 +22,6 @@ function formatVersionDate(value: Date) {
 
 export function SavedReportView({
   clientId,
-  reportId,
-  reportStatus,
   versionNumber,
   isCurrentVersion,
   snapshot,
@@ -39,14 +29,8 @@ export function SavedReportView({
   fundingApproval,
   reportingRequirement,
   versions,
-  defaultSendTo,
-  addressOptions,
-  autoOpenSend = false,
-  templateVariables,
 }: {
   clientId: string
-  reportId: string
-  reportStatus: string
   versionNumber: number
   isCurrentVersion: boolean
   snapshot: ReportSnapshot
@@ -54,15 +38,7 @@ export function SavedReportView({
   fundingApproval: { approvalTypeName: string; startDate: string | null } | null
   reportingRequirement: { appointmentNumber: number; reportType: string } | null
   versions: ReportVersionSummary[]
-  defaultSendTo: string
-  addressOptions: { label: string; value: string }[]
-  autoOpenSend?: boolean
-  templateVariables: ReportEmailVariables
 }) {
-  const [emailModalOpen, setEmailModalOpen] = useState(autoOpenSend)
-  const [emailStatus, setEmailStatus] = useState<string | null>(null)
-
-  const isFinalised = reportStatus === "finalised"
   const currentVersion = versions.find((v) => v.isCurrentVersion)
 
   return (
@@ -104,47 +80,9 @@ export function SavedReportView({
               <dt className="mb-2 text-sm text-muted-foreground">
                 Report status
               </dt>
-              <dd className="flex flex-wrap items-center gap-3">
-                <StatusBadge
-                  status={isFinalised ? "finalised" : "draft"}
-                  statusMap={REPORT_STATUS_CONFIG}
-                />
-                <span className="text-sm text-muted-foreground">
-                  Version {versionNumber}
-                  {isCurrentVersion ? " · Current" : " · Superseded"}
-                </span>
-                {!isFinalised ? (
-                  <Button variant="outline" size="sm" asChild>
-                    <Link href={`/clients/${clientId}/reports/${reportId}/edit`}>
-                      Continue editing
-                    </Link>
-                  </Button>
-                ) : null}
-                {isFinalised && isCurrentVersion ? (
-                  <Button variant="outline" size="sm" asChild>
-                    <Link href={`/clients/${clientId}/reports/${reportId}/edit`}>
-                      Edit / Create new version
-                    </Link>
-                  </Button>
-                ) : null}
-                <Button variant="outline" size="sm" asChild>
-                  <a href={`/api/reports/${reportId}/pdf`} download>
-                    Download PDF
-                  </a>
-                </Button>
-                {isFinalised && defaultSendTo ? (
-                  <Button
-                    type="button"
-                    size="sm"
-                    onClick={() => setEmailModalOpen(true)}
-                  >
-                    Send Report
-                  </Button>
-                ) : isFinalised ? (
-                  <Button type="button" size="sm" disabled title="No recipient address on file">
-                    Send Report
-                  </Button>
-                ) : null}
+              <dd className="text-sm text-muted-foreground">
+                Version {versionNumber}
+                {isCurrentVersion ? " · Current" : " · Superseded"}
               </dd>
             </div>
           </dl>
@@ -164,28 +102,6 @@ export function SavedReportView({
       </Card>
 
       <AssessmentSummaryMethodologyNote />
-
-      {emailStatus ? (
-        <p className="no-print text-sm font-medium text-foreground">{emailStatus}</p>
-      ) : null}
-
-      {defaultSendTo ? (
-        <SendReportEmailModal
-          open={emailModalOpen}
-          onOpenChange={setEmailModalOpen}
-          reportId={reportId}
-          defaultTo={defaultSendTo}
-          addressOptions={addressOptions}
-          templateVariables={templateVariables}
-          onSendComplete={({ sent }) => {
-            setEmailStatus(
-              sent
-                ? `Email sent to ${defaultSendTo}`
-                : "Email failed — try Download PDF and send manually."
-            )
-          }}
-        />
-      ) : null}
 
       <div id="report-print-area" className="report-print-area">
         <ReportDocument

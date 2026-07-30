@@ -1,10 +1,14 @@
 import { and, eq } from "drizzle-orm"
+import Link from "next/link"
 import { notFound } from "next/navigation"
 
+import { ReportActionsToolbar } from "@/components/report/report-actions-toolbar"
 import { SavedReportView } from "@/app/clients/[client_id]/reports/[report_id]/saved-report-view"
 import { AppShell } from "@/components/app-shell"
 import { BackButton } from "@/components/ui/back-button"
+import { Button } from "@/components/ui/button"
 import { EntityPageHeader } from "@/components/ui/entity-page-header"
+import { StatusBadge } from "@/components/ui/status-badge"
 import {
   clients,
   fundingApprovalTypeReports,
@@ -19,6 +23,7 @@ import { parseReportSnapshot } from "@/lib/reports/snapshot"
 import { parseLetterBodyJson } from "@/lib/reports/letter-body-types"
 import { getReferrerEmailOptions } from "@/lib/reports/referrer-contact"
 import { loadReportVersionHistory } from "@/lib/reports/version-history"
+import { REPORT_STATUS_CONFIG } from "@/lib/status"
 
 import "@/components/report/report-print.css"
 
@@ -184,6 +189,7 @@ export default async function SavedReportPage({
       ? client.email?.trim() || ""
       : addressOptions[0]?.value ?? ""
   const clientName = `${client.firstName} ${client.lastName}`
+  const isFinalised = report.reportStatus === "finalised"
 
   return (
     <AppShell>
@@ -198,13 +204,52 @@ export default async function SavedReportPage({
           kicker="Report"
           name={clientName}
           subheading={`${snapshot.reportTitle}${fundingApproval ? ` — ${fundingApproval.approvalTypeName}` : ""}`}
+          badge={
+            <StatusBadge
+              status={isFinalised ? "finalised" : "draft"}
+              statusMap={REPORT_STATUS_CONFIG}
+            />
+          }
+          subheadingAction={
+            !isFinalised ? (
+              <Button variant="outline" size="sm" asChild>
+                <Link href={`/clients/${clientId}/reports/${reportId}/edit`}>
+                  Continue editing
+                </Link>
+              </Button>
+            ) : isFinalised && report.isCurrentVersion ? (
+              <Button variant="outline" size="sm" asChild>
+                <Link href={`/clients/${clientId}/reports/${reportId}/edit`}>
+                  Edit / Create new version
+                </Link>
+              </Button>
+            ) : undefined
+          }
+          actionRow={
+            <ReportActionsToolbar
+              reportId={reportId}
+              isFinalised={isFinalised}
+              defaultSendTo={defaultSendTo}
+              addressOptions={addressOptions}
+              autoOpenSend={openSend === "1"}
+              templateVariables={{
+                recipient_name:
+                  report.recipientType === "referrer"
+                    ? snapshot.recipient?.name || "Colleague"
+                    : client.firstName.trim() || "there",
+                client_name: `${client.firstName} ${client.lastName}`,
+                report_title: snapshot.reportTitle,
+                report_title_lower: snapshot.reportTitle.toLowerCase(),
+                practice_name: emailContext?.practiceName ?? "your practice",
+                practitioner_name: emailContext?.practitionerName ?? "your practitioner",
+              }}
+            />
+          }
         />
       </div>
 
       <SavedReportView
         clientId={clientId}
-        reportId={reportId}
-        reportStatus={report.reportStatus}
         versionNumber={report.versionNumber}
         isCurrentVersion={report.isCurrentVersion}
         snapshot={displaySnapshot}
@@ -212,20 +257,6 @@ export default async function SavedReportPage({
         fundingApproval={fundingApproval}
         reportingRequirement={reportingRequirement}
         versions={versions}
-        defaultSendTo={defaultSendTo}
-        addressOptions={addressOptions}
-        autoOpenSend={openSend === "1"}
-        templateVariables={{
-          recipient_name:
-            report.recipientType === "referrer"
-              ? snapshot.recipient?.name || "Colleague"
-              : client.firstName.trim() || "there",
-          client_name: `${client.firstName} ${client.lastName}`,
-          report_title: snapshot.reportTitle,
-          report_title_lower: snapshot.reportTitle.toLowerCase(),
-          practice_name: emailContext?.practiceName ?? "your practice",
-          practitioner_name: emailContext?.practitionerName ?? "your practitioner",
-        }}
       />
     </AppShell>
   )

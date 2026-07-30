@@ -6,6 +6,7 @@ import { TreatmentPlanToolbar } from "@/components/treatment-plan/treatment-plan
 import { AppShell } from "@/components/app-shell"
 import { BackButton } from "@/components/ui/back-button"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import { EntityPageHeader } from "@/components/ui/entity-page-header"
 import {
   Card,
@@ -84,22 +85,31 @@ export default async function TreatmentPlanViewPage({
             {plan.isActive ? "Current version" : "Superseded"}
           </Badge>
         }
+        subheadingAction={
+          plan.isActive ? (
+            <Button variant="outline" asChild>
+              <Link
+                href={`/clients/${clientId}/treatment-plan/${planId}/edit`}
+              >
+                Edit / Create new version
+              </Link>
+            </Button>
+          ) : undefined
+        }
+        actionRow={
+          <TreatmentPlanToolbar
+            treatmentPlanId={planId}
+            clientEmail={client.email?.trim() || null}
+            templateVariables={{
+              client_first_name: client.firstName.trim() || "there",
+              practice_name: emailContext?.practiceName ?? "your practice",
+              practitioner_name:
+                emailContext?.practitionerName ?? "your practitioner",
+            }}
+            autoOpenSend={openSend === "1"}
+          />
+        }
       />
-      <div className="no-print mb-6 flex flex-wrap gap-3">
-        <TreatmentPlanToolbar
-          clientId={clientId}
-          treatmentPlanId={planId}
-          isActive={plan.isActive}
-          clientEmail={client.email?.trim() || null}
-          templateVariables={{
-            client_first_name: client.firstName.trim() || "there",
-            practice_name: emailContext?.practiceName ?? "your practice",
-            practitioner_name:
-              emailContext?.practitionerName ?? "your practitioner",
-          }}
-          autoOpenSend={openSend === "1"}
-        />
-      </div>
 
       <TreatmentPlanView plan={plan} />
 

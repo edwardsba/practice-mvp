@@ -1,6 +1,5 @@
 "use client"
 
-import Link from "next/link"
 import { useState } from "react"
 
 import { SendCrisisPlanEmailModal } from "@/components/crisis-plan/send-crisis-plan-email-modal"
@@ -8,16 +7,12 @@ import { Button } from "@/components/ui/button"
 import type { CrisisPlanEmailVariables } from "@/lib/email/crisis-plan-templates"
 
 export function CrisisPlanToolbar({
-  clientId,
   crisisPlanId,
-  isActive,
   clientEmail,
   templateVariables,
   autoOpenSend = false,
 }: {
-  clientId: string
   crisisPlanId: string
-  isActive: boolean
   clientEmail: string | null
   templateVariables: CrisisPlanEmailVariables
   autoOpenSend?: boolean
@@ -27,14 +22,7 @@ export function CrisisPlanToolbar({
 
   return (
     <div className="space-y-2">
-      <div className="flex flex-wrap gap-2">
-        {isActive ? (
-          <Button asChild variant="outline">
-            <Link href={`/clients/${clientId}/crisis-plan/${crisisPlanId}/edit`}>
-              Edit / Create new version
-            </Link>
-          </Button>
-        ) : null}
+      <div className="flex flex-wrap items-center justify-end gap-2">
         <Button variant="outline" asChild>
           <a href={`/api/crisis-plan/${crisisPlanId}/pdf`} download>
             Download PDF

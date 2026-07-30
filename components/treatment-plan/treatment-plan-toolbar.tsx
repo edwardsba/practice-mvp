@@ -1,6 +1,5 @@
 "use client"
 
-import Link from "next/link"
 import { useState } from "react"
 
 import { SendTreatmentPlanEmailModal } from "@/components/treatment-plan/send-treatment-plan-email-modal"
@@ -8,16 +7,12 @@ import { Button } from "@/components/ui/button"
 import type { TreatmentPlanEmailVariables } from "@/lib/email/treatment-plan-templates"
 
 export function TreatmentPlanToolbar({
-  clientId,
   treatmentPlanId,
-  isActive,
   clientEmail,
   templateVariables,
   autoOpenSend = false,
 }: {
-  clientId: string
   treatmentPlanId: string
-  isActive: boolean
   clientEmail: string | null
   templateVariables: TreatmentPlanEmailVariables
   autoOpenSend?: boolean
@@ -27,16 +22,7 @@ export function TreatmentPlanToolbar({
 
   return (
     <div className="space-y-2">
-      <div className="flex flex-wrap gap-2">
-        {isActive ? (
-          <Button asChild variant="outline">
-            <Link
-              href={`/clients/${clientId}/treatment-plan/${treatmentPlanId}/edit`}
-            >
-              Edit / Create new version
-            </Link>
-          </Button>
-        ) : null}
+      <div className="flex flex-wrap items-center justify-end gap-2">
         <Button variant="outline" asChild>
           <a href={`/api/treatment-plans/${treatmentPlanId}/pdf`} download>
             Download PDF

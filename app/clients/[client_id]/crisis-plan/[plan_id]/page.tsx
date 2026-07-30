@@ -83,22 +83,29 @@ export default async function CrisisPlanViewPage({
               {plan.isActive ? "Active" : "Inactive"}
             </Badge>
           }
+          subheadingAction={
+            plan.isActive ? (
+              <Button variant="outline" asChild>
+                <Link href={`/clients/${clientId}/crisis-plan/${planId}/edit`}>
+                  Edit / Create new version
+                </Link>
+              </Button>
+            ) : undefined
+          }
+          actionRow={
+            <CrisisPlanToolbar
+              crisisPlanId={planId}
+              clientEmail={client.email?.trim() || null}
+              templateVariables={{
+                client_first_name: client.firstName.trim() || "there",
+                practice_name: emailContext?.practiceName ?? "your practice",
+                practitioner_name:
+                  emailContext?.practitionerName ?? "your practitioner",
+              }}
+              autoOpenSend={openSend === "1"}
+            />
+          }
         />
-        <div className="mb-6 flex justify-end">
-          <CrisisPlanToolbar
-            clientId={clientId}
-            crisisPlanId={planId}
-            isActive={plan.isActive}
-            clientEmail={client.email?.trim() || null}
-            templateVariables={{
-              client_first_name: client.firstName.trim() || "there",
-              practice_name: emailContext?.practiceName ?? "your practice",
-              practitioner_name:
-                emailContext?.practitionerName ?? "your practitioner",
-            }}
-            autoOpenSend={openSend === "1"}
-          />
-        </div>
       </div>
 
       <CrisisPlanView plan={plan} contacts={contacts} clientName={clientName} />

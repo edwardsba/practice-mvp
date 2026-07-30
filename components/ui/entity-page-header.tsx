@@ -7,6 +7,7 @@ export function EntityPageHeader({
   badge,
   action,
   subheadingAction,
+  actionRow,
 }: {
   kicker: string
   name: string
@@ -14,6 +15,7 @@ export function EntityPageHeader({
   badge?: ReactNode
   action?: ReactNode
   subheadingAction?: ReactNode
+  actionRow?: ReactNode
 }) {
   return (
     <div className="mb-6">
@@ -41,6 +43,7 @@ export function EntityPageHeader({
           ) : null}
         </div>
       ) : null}
+      {actionRow ? <div className="mt-4">{actionRow}</div> : null}
     </div>
   )
 }

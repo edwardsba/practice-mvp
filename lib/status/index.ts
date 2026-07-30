@@ -13,11 +13,11 @@ export type StatusConfig = {
 }
 
 export const APPOINTMENT_STATUS_CONFIG: Record<string, StatusConfig> = {
-  scheduled: { label: "Scheduled", variant: "default" },
-  confirmed: { label: "Confirmed", variant: "default" },
+  scheduled: { label: "Scheduled", variant: "warning" },
+  confirmed: { label: "Confirmed", variant: "warning" },
   completed: { label: "Attended", variant: "success" },
   no_show: { label: "No-show", variant: "destructive" },
-  cancelled: { label: "Cancelled", variant: "destructive" },
+  cancelled: { label: "Cancelled", variant: "muted" },
 }
 
 export const APPOINTMENT_STATUS_TRANSITIONS: Record<string, string[]> = {
@@ -29,10 +29,10 @@ export const APPOINTMENT_STATUS_TRANSITIONS: Record<string, string[]> = {
 }
 
 export const FUNDING_APPROVAL_STATUS_CONFIG: Record<string, StatusConfig> = {
-  active: { label: "Active", variant: "default" },
-  expired: { label: "Expired", variant: "muted" },
-  exhausted: { label: "Exhausted", variant: "muted" },
-  cancelled: { label: "Cancelled", variant: "destructive" },
+  active: { label: "Active", variant: "success" },
+  expired: { label: "Expired", variant: "destructive" },
+  exhausted: { label: "Exhausted", variant: "destructive" },
+  cancelled: { label: "Cancelled", variant: "muted" },
 }
 
 export const SESSION_NOTE_STATUS_CONFIG: Record<string, StatusConfig> = {
@@ -41,15 +41,15 @@ export const SESSION_NOTE_STATUS_CONFIG: Record<string, StatusConfig> = {
 }
 
 export const REPORT_STATUS_CONFIG: Record<string, StatusConfig> = {
-  draft: { label: "Draft", variant: "default" },
+  draft: { label: "Draft", variant: "warning" },
   finalised: { label: "Finalised", variant: "success" },
 }
 
 export const CLIENT_STATUS_CONFIG: Record<string, StatusConfig> = {
-  active: { label: "Active", variant: "default" },
+  active: { label: "Active", variant: "success" },
   on_hold: { label: "On hold", variant: "warning" },
-  discharged: { label: "Discharged", variant: "success" },
-  inactive: { label: "Inactive", variant: "muted" },
+  discharged: { label: "Discharged", variant: "muted" },
+  inactive: { label: "Inactive", variant: "destructive" },
 }
 
 export const CLIENT_STATUS_TRANSITIONS: Record<string, string[]> = {

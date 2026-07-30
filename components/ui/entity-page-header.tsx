@@ -6,12 +6,14 @@ export function EntityPageHeader({
   subheading,
   badge,
   action,
+  subheadingAction,
 }: {
   kicker: string
   name: string
   subheading?: ReactNode
   badge?: ReactNode
   action?: ReactNode
+  subheadingAction?: ReactNode
 }) {
   return (
     <div className="mb-6">
@@ -27,9 +29,16 @@ export function EntityPageHeader({
         ) : null}
       </div>
       <h1 className="mt-1 text-2xl font-semibold tracking-tight">{name}</h1>
-      {subheading ? (
-        <div className="mt-1.5 text-sm text-muted-foreground">
-          {subheading}
+      {subheading || subheadingAction ? (
+        <div className="mt-1.5 flex items-center justify-between gap-4">
+          {subheading ? (
+            <div className="text-sm text-muted-foreground">{subheading}</div>
+          ) : (
+            <div />
+          )}
+          {subheadingAction ? (
+            <div className="flex-shrink-0">{subheadingAction}</div>
+          ) : null}
         </div>
       ) : null}
     </div>

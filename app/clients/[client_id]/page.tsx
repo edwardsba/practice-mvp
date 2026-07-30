@@ -149,6 +149,11 @@ export default async function ClientDetailPage({
         badge={
           <StatusBadge status={client.clientStatus} statusMap={CLIENT_STATUS_CONFIG} />
         }
+        subheadingAction={
+          <Button variant="outline" size="sm" asChild>
+            <Link href={`/clients/${clientId}/edit`}>Edit Client</Link>
+          </Button>
+        }
       />
 
       <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[1fr_200px]">
@@ -237,11 +242,8 @@ export default async function ClientDetailPage({
           </Card>
 
           <Card className="mb-6">
-            <CardHeader className="flex flex-row items-center justify-between">
+            <CardHeader>
               <CardTitle>Client details</CardTitle>
-              <Button variant="outline" size="sm" asChild>
-                <Link href={`/clients/${clientId}/edit`}>Edit Client</Link>
-              </Button>
             </CardHeader>
             <CardContent>
               <dl className="grid gap-3 sm:grid-cols-2">

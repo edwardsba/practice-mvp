@@ -118,6 +118,17 @@ export default async function FundingApprovalDetailPage({
         kicker="Funding approval"
         name={`${approval.clientFirstName} ${approval.clientLastName}`}
         subheading={approval.approvalTypeName ?? undefined}
+        badge={
+          <StatusBadge
+            status={approval.approvalStatus}
+            statusMap={FUNDING_APPROVAL_STATUS_CONFIG}
+          />
+        }
+        subheadingAction={
+          <Button variant="outline" size="sm" asChild>
+            <Link href={`/funding/approvals/${approvalId}/edit`}>Edit</Link>
+          </Button>
+        }
       />
 
       <Card className="mb-6">
@@ -126,15 +137,6 @@ export default async function FundingApprovalDetailPage({
         </CardHeader>
         <CardContent>
           <dl className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <dt className="text-sm text-muted-foreground">Approval status</dt>
-              <dd className="mt-0.5">
-                <StatusBadge
-                  status={approval.approvalStatus}
-                  statusMap={FUNDING_APPROVAL_STATUS_CONFIG}
-                />
-              </dd>
-            </div>
             <div>
               <dt className="text-sm text-muted-foreground">Reporting status</dt>
               <dd className="mt-0.5">
@@ -190,11 +192,8 @@ export default async function FundingApprovalDetailPage({
       </Card>
 
       <Card className="mb-6">
-        <CardHeader className="flex flex-row items-center justify-between">
+        <CardHeader>
           <CardTitle>Approval details</CardTitle>
-          <Button variant="outline" size="sm" asChild>
-            <Link href={`/funding/approvals/${approvalId}/edit`}>Edit</Link>
-          </Button>
         </CardHeader>
         <CardContent>
           <dl className="grid gap-3 sm:grid-cols-2">

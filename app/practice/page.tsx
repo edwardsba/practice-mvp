@@ -30,14 +30,20 @@ export default async function PracticePage() {
 
   return (
     <AppShell>
-      <EntityPageHeader kicker="Practice" name={practice.practiceName} />
-
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>Practice details</CardTitle>
+      <EntityPageHeader
+        kicker="Practice"
+        name={practice.practiceName}
+        subheading={practice.address?.trim() || practice.abn?.trim() || undefined}
+        subheadingAction={
           <Button variant="outline" size="sm" asChild>
             <Link href="/practice/edit">Edit</Link>
           </Button>
+        }
+      />
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Practice details</CardTitle>
         </CardHeader>
         <CardContent>
           <dl className="grid gap-3 sm:grid-cols-2">

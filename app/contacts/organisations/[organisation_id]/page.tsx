@@ -47,16 +47,19 @@ export default async function OrganisationDetailPage({
       <EntityPageHeader
         kicker="Professional organisation"
         name={organisation.organisationName}
-      />
-
-      <Card className="mb-6">
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>Details</CardTitle>
+        subheading={organisation.organisationType ?? "No organisation type set"}
+        subheadingAction={
           <Button variant="outline" size="sm" asChild>
             <Link href={`/contacts/organisations/${organisationId}/edit`}>
               Edit
             </Link>
           </Button>
+        }
+      />
+
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle>Details</CardTitle>
         </CardHeader>
         <CardContent>
           <dl className="grid gap-4 sm:grid-cols-2">

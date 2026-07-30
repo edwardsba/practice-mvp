@@ -36,14 +36,20 @@ export default async function ReportTypeDetailPage({
           label="← Back to report types"
         />
       </div>
-      <EntityPageHeader kicker="Report type" name={reportType.name} />
-
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>Details</CardTitle>
+      <EntityPageHeader
+        kicker="Report type"
+        name={reportType.name}
+        subheading={REPORT_TEMPLATE_LABELS[resolveTemplateKey(reportType.templateKey)]}
+        subheadingAction={
           <Button variant="outline" size="sm" asChild>
             <Link href={`/settings/report-types/${typeId}/edit`}>Edit</Link>
           </Button>
+        }
+      />
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Details</CardTitle>
         </CardHeader>
         <CardContent>
           <dl className="grid gap-3 sm:grid-cols-2">

@@ -43,14 +43,20 @@ export default async function FundingApprovalTypeDetailPage({
           label="← Back to approval types"
         />
       </div>
-      <EntityPageHeader kicker="Funding approval type" name={type.name} />
-
-      <Card className="mb-6">
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>Details</CardTitle>
+      <EntityPageHeader
+        kicker="Funding approval type"
+        name={type.name}
+        subheading={type.claimTypeName ?? "No claim type set"}
+        subheadingAction={
           <Button variant="outline" size="sm" asChild>
             <Link href={`/funding/approval-types/${typeId}/edit`}>Edit</Link>
           </Button>
+        }
+      />
+
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle>Details</CardTitle>
         </CardHeader>
         <CardContent>
           <dl className="grid gap-3 sm:grid-cols-2">

@@ -52,7 +52,8 @@ export default async function AppointmentTypeDetailPage({
         <EntityPageHeader
           kicker="Appointment type"
           name={type.nickname}
-          action={
+          subheading={`${formatAppointmentDuration(type.durationMinutes)} · ${type.claimTypeName ?? "No claim type"}`}
+          subheadingAction={
             <Button variant="outline" size="sm" asChild>
               <Link href={`/settings/appointment-types/${typeId}/edit`}>
                 Edit

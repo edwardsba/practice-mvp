@@ -76,14 +76,16 @@ export default async function ClaimDetailPage({
         kicker="Claim"
         name={`${claim.clientFirstName} ${claim.clientLastName}`}
         subheading={claim.claimTypeName}
-      />
-
-      <Card className="mb-6">
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>Overview</CardTitle>
+        subheadingAction={
           <Button variant="outline" size="sm" asChild>
             <Link href={`/funding/claims/${claimId}/edit`}>Edit</Link>
           </Button>
+        }
+      />
+
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle>Overview</CardTitle>
         </CardHeader>
         <CardContent>
           <dl className="grid gap-3 sm:grid-cols-2">

@@ -57,16 +57,18 @@ export default async function ProfessionalDetailPage({
         kicker="Professional"
         name={displayName}
         subheading={professional.professionName ?? "No profession set"}
-      />
-
-      <Card className="mb-6">
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>Details</CardTitle>
+        subheadingAction={
           <Button variant="outline" size="sm" asChild>
             <Link href={`/contacts/professionals/${professionalId}/edit`}>
               Edit
             </Link>
           </Button>
+        }
+      />
+
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle>Details</CardTitle>
         </CardHeader>
         <CardContent>
           <dl className="grid gap-4 sm:grid-cols-2">

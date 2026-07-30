@@ -45,14 +45,23 @@ export default async function PractitionerPage() {
 
   return (
     <AppShell>
-      <EntityPageHeader kicker="Profile" name={formatPractitionerViewName(profile)} />
-
-      <Card className="mb-6">
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>Practitioner details</CardTitle>
+      <EntityPageHeader
+        kicker="Profile"
+        name={formatPractitionerViewName(profile)}
+        subheading={formatPractitionerRegistration(
+          profile.registrationBody,
+          profile.registrationNumber
+        )}
+        subheadingAction={
           <Button variant="outline" size="sm" asChild>
             <Link href="/practitioner/edit">Edit</Link>
           </Button>
+        }
+      />
+
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle>Practitioner details</CardTitle>
         </CardHeader>
         <CardContent>
           <dl className="grid gap-3 sm:grid-cols-2">

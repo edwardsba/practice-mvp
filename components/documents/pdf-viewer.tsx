@@ -1,15 +1,9 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import * as pdfjsLib from "pdfjs-dist"
+import type * as PdfJsLib from "pdfjs-dist"
 
 import { cn } from "@/lib/utils"
-
-// Loaded from a CDN matching the installed pdfjs-dist version, rather than
-// bundled locally — sidesteps bundler-specific asset-resolution quirks
-// with the worker file across Next.js's webpack/Turbopack configurations.
-// No CSP is configured in this app (see next.config.ts) so this is safe.
-pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`
 
 function base64ToUint8Array(base64: string): Uint8Array {
   const binary = atob(base64)
@@ -25,6 +19,15 @@ function base64ToUint8Array(base64: string): Uint8Array {
  * a scrollable container. Used in place of embedding the PDF in an
  * <iframe>, since mobile browsers' built-in PDF viewers are unreliable
  * inside iframes (commonly only render the first page, no scroll).
+ *
+ * pdfjs-dist is loaded dynamically inside the effect below, not as a
+ * top-level import. pdfjs-dist's own module code calls `new DOMMatrix()`
+ * at load time, which doesn't exist in Node — a top-level import gets
+ * evaluated during Next.js's server-side render pass even for a "use
+ * client" component, which crashes the whole module before this
+ * component's actual (correctly client-only) rendering logic ever runs.
+ * Dynamic import here guarantees pdfjs-dist is only ever loaded in the
+ * browser.
  */
 export function PdfViewer({
   pdfBase64,
@@ -44,8 +47,8 @@ export function PdfViewer({
 
   useEffect(() => {
     let cancelled = false
-    let pdfDoc: pdfjsLib.PDFDocumentProxy | null = null
-    const renderTasks: ReturnType<pdfjsLib.PDFPageProxy["render"]>[] = []
+    let pdfDoc: PdfJsLib.PDFDocumentProxy | null = null
+    const renderTasks: ReturnType<PdfJsLib.PDFPageProxy["render"]>[] = []
 
     async function renderAllPages() {
       setStatus("loading")
@@ -53,6 +56,15 @@ export function PdfViewer({
       canvasRefs.current = []
 
       try {
+        const pdfjsLib = await import("pdfjs-dist")
+
+        // Loaded from a CDN matching the installed pdfjs-dist version,
+        // rather than bundled locally — sidesteps bundler-specific
+        // asset-resolution quirks with the worker file across Next.js's
+        // webpack/Turbopack configurations. No CSP is configured in this
+        // app (see next.config.ts) so this is safe.
+        pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`
+
         const data = base64ToUint8Array(pdfBase64)
         pdfDoc = await pdfjsLib.getDocument({ data }).promise
         if (cancelled || !pdfDoc) return

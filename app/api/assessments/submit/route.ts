@@ -17,6 +17,9 @@ import {
   markBatteryInProgress,
   validateBatteryNextToken,
 } from "@/lib/assessments/battery-chain"
+import { calculateAsrsScores } from "@/lib/assessments/asrs"
+import { calculateLevel1XcDomainScores } from "@/lib/assessments/level1xc"
+import { calculatePcPtsd5Score } from "@/lib/assessments/pcptsd5"
 import { calculatePsfScore, formatPsfSeverity } from "@/lib/assessments/psf"
 import { severityFromAssessmentCode } from "@/lib/assessments/severity"
 import { hashAssessmentToken } from "@/lib/assessments/token"
@@ -119,6 +122,9 @@ export async function POST(request: Request) {
 
   const isBtp = definition.assessmentCode === "BTP"
   const isPsf = definition.assessmentCode === "PSF"
+  const isLevel1Xc = definition.assessmentCode === "LEVEL1_XC"
+  const isPcPtsd5 = definition.assessmentCode === "PC_PTSD5"
+  const isAsrs = definition.assessmentCode === "ASRS"
 
   const elementIds = Object.keys(responses)
   if (elementIds.length === 0) {
@@ -131,6 +137,8 @@ export async function POST(request: Request) {
   const activeElements = await db
     .select({
       assessmentElementId: assessmentElements.assessmentElementId,
+      elementKey: assessmentElements.elementKey,
+      domainCode: assessmentElements.domainCode,
       dataType: assessmentElements.dataType,
     })
     .from(assessmentElements)
@@ -155,6 +163,12 @@ export async function POST(request: Request) {
 
   const dataTypeByElementId = new Map(
     activeElements.map((row) => [row.assessmentElementId, row.dataType])
+  )
+  const elementMetaById = new Map(
+    activeElements.map((row) => [
+      row.assessmentElementId,
+      { elementKey: row.elementKey, domainCode: row.domainCode },
+    ])
   )
   const requiredElementIds = new Set(
     activeElements.map((row) => row.assessmentElementId)
@@ -214,7 +228,14 @@ export async function POST(request: Request) {
       scoreValue,
     })
 
-    if (!isBtp && !isPsf && dataTypeByElementId.get(elementId) === "integer") {
+    if (
+      !isBtp &&
+      !isPsf &&
+      !isLevel1Xc &&
+      !isPcPtsd5 &&
+      !isAsrs &&
+      dataTypeByElementId.get(elementId) === "integer"
+    ) {
       totalScore += scoreValue
     }
 
@@ -249,8 +270,18 @@ export async function POST(request: Request) {
     }
   }
 
-  let resultScore: number
+  let resultScore: number | null
   let severity: string | null
+  let structuredScore: Record<string, unknown> | null = null
+
+  const scoredResponses = responseRows.map((row) => {
+    const meta = elementMetaById.get(row.assessmentElementId)
+    return {
+      elementKey: meta?.elementKey ?? "",
+      domainCode: meta?.domainCode ?? null,
+      scoreValue: row.scoreValue,
+    }
+  })
 
   if (isBtp) {
     resultScore = 0
@@ -259,6 +290,17 @@ export async function POST(request: Request) {
     const psfResult = calculatePsfScore(psfResponseScores)
     resultScore = psfResult.netScore
     severity = formatPsfSeverity(psfResult)
+  } else if (isLevel1Xc) {
+    resultScore = null
+    severity = null
+    structuredScore = calculateLevel1XcDomainScores(scoredResponses)
+  } else if (isPcPtsd5) {
+    resultScore = calculatePcPtsd5Score(scoredResponses)
+    severity = null
+  } else if (isAsrs) {
+    resultScore = null
+    severity = null
+    structuredScore = calculateAsrsScores(scoredResponses)
   } else {
     resultScore = totalScore
     severity = severityFromAssessmentCode(definition.assessmentCode, totalScore)
@@ -319,6 +361,7 @@ export async function POST(request: Request) {
           .set({
             score: resultScore,
             severity,
+            structuredScoreJson: structuredScore,
             assessmentDate: now,
           })
           .where(
@@ -387,6 +430,7 @@ export async function POST(request: Request) {
             practiceId: instance.practiceId,
             score: resultScore,
             severity,
+            structuredScoreJson: structuredScore,
             assessmentDate: now,
           })
           .returning({ assessmentResultId: assessmentResults.assessmentResultId })

@@ -323,7 +323,8 @@ function drawProgressReportFixedHeader(
   }
 }
 
-function scoreCell(score: number, maxScore?: number | null): string {
+function scoreCell(score: number | null, maxScore?: number | null): string {
+  if (score === null) return "—"
   return maxScore != null ? `${score} / ${maxScore}` : String(score)
 }
 

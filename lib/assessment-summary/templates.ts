@@ -9,7 +9,13 @@ import {
 } from "./severity-pattern"
 
 export function toAssessmentPoints(results: ReportResultRow[]): AssessmentPoint[] {
-  const sorted = [...results].sort(
+  // This function is only ever called with PHQ9/GAD7/ASSIST data (see NumericToolCode),
+  // which always have a real score. The filter below is defensive — excluding a null
+  // from the dataset rather than coercing it to 0, which would corrupt the trend line.
+  const withScores = results.filter(
+    (r): r is ReportResultRow & { score: number } => r.score !== null
+  )
+  const sorted = [...withScores].sort(
     (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
   )
   return sorted.map((r, i) => ({

@@ -35,7 +35,7 @@ const ASSESSMENT_TYPE_LABELS: Record<string, string> = {
 type AssessmentResultRow = {
   assessmentResultId: string
   assessmentDate: Date
-  score: number
+  score: number | null
   severity: string | null
   acuteRiskRating: string | null
   assessmentCode: string
@@ -57,6 +57,7 @@ function formatAssessmentType(code: string, name: string) {
 }
 
 function formatScore(result: AssessmentResultRow) {
+  if (result.score === null) return "—"
   if (result.assessmentCode === "PSF") {
     return result.score > 0 ? `+${result.score}` : String(result.score)
   }

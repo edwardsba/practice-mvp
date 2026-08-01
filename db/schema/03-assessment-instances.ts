@@ -51,9 +51,10 @@ export const assessmentResults = pgTable('assessment_results', {
   assessmentInstanceId: uuid('assessment_instance_id').notNull().references(() => assessmentInstances.assessmentInstanceId),
   clientId: uuid('client_id').notNull().references(() => clients.clientId),
   practiceId: uuid('practice_id').notNull().references(() => practices.practiceId),
-  score: integer('score').notNull(),
+  score: integer('score'), // nullable — structured-only instruments (e.g. Level 1 XC's 13 domain scores) use structuredScoreJson instead and leave this null
   severity: text('severity'),
   acuteRiskRating: text('acute_risk_rating'),
+  structuredScoreJson: jsonb('structured_score_json'), // domain scores / subscales / facets, instrument-specific shape — see lib/assessments/scoring/*.ts
   assessmentDate: timestamp('assessment_date', { withTimezone: true }).notNull().defaultNow(),
   status: text('status').notNull().default('scored'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),

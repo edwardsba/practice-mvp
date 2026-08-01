@@ -296,7 +296,7 @@ async function loadAsqForSession(
   return {
     assessmentResultId: row.assessmentResultId,
     assessmentDate: row.assessmentDate,
-    score: row.score,
+    score: row.score ?? 0, // ASQ always produces a real score in practice — this coercion is just to satisfy the now-nullable DB column type, not a real null case for ASQ
     maxScore,
     acuteRiskRating: row.severity,
   }

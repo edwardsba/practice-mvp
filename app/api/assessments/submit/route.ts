@@ -17,7 +17,7 @@ import {
   markBatteryInProgress,
   validateBatteryNextToken,
 } from "@/lib/assessments/battery-chain"
-import { calculateAsrsScores } from "@/lib/assessments/asrs"
+import { calculateAsrsPartAScore, calculateAsrsPartBRawScores } from "@/lib/assessments/asrs"
 import { calculateLevel1XcDomainScores } from "@/lib/assessments/level1xc"
 import { calculatePcPtsd5Score } from "@/lib/assessments/pcptsd5"
 import { calculatePsfScore, formatPsfSeverity } from "@/lib/assessments/psf"
@@ -124,7 +124,8 @@ export async function POST(request: Request) {
   const isPsf = definition.assessmentCode === "PSF"
   const isLevel1Xc = definition.assessmentCode === "LEVEL1_XC"
   const isPcPtsd5 = definition.assessmentCode === "PC_PTSD5"
-  const isAsrs = definition.assessmentCode === "ASRS"
+  const isAsrsPartA = definition.assessmentCode === "ASRS_PART_A"
+  const isAsrsPartB = definition.assessmentCode === "ASRS_PART_B"
 
   const elementIds = Object.keys(responses)
   if (elementIds.length === 0) {
@@ -233,7 +234,8 @@ export async function POST(request: Request) {
       !isPsf &&
       !isLevel1Xc &&
       !isPcPtsd5 &&
-      !isAsrs &&
+      !isAsrsPartA &&
+      !isAsrsPartB &&
       dataTypeByElementId.get(elementId) === "integer"
     ) {
       totalScore += scoreValue
@@ -297,10 +299,14 @@ export async function POST(request: Request) {
   } else if (isPcPtsd5) {
     resultScore = calculatePcPtsd5Score(scoredResponses)
     severity = null
-  } else if (isAsrs) {
+  } else if (isAsrsPartA) {
     resultScore = null
     severity = null
-    structuredScore = calculateAsrsScores(scoredResponses)
+    structuredScore = calculateAsrsPartAScore(scoredResponses)
+  } else if (isAsrsPartB) {
+    resultScore = null
+    severity = null
+    structuredScore = calculateAsrsPartBRawScores(scoredResponses)
   } else {
     resultScore = totalScore
     severity = severityFromAssessmentCode(definition.assessmentCode, totalScore)

@@ -27,6 +27,8 @@ export const assessmentElements = pgTable('assessment_elements', {
   isActive: boolean('is_active').notNull().default(true),
   groupLabel: text('group_label'), // e.g. "Presentation", "Mental Function", "Discernment"
   subgroupLabel: text('subgroup_label'), // e.g. "Perceptions", "Thoughts", "Cognitions" — null if the assessment has no secondary grouping
+  domainCode: text('domain_code'), // e.g. 'depression', 'anxiety', 'psychosis' — used by battery_trigger_rules to evaluate Level 1 XC domain flags. Null for non-diagnostic-battery assessments.
+  isUrgentFlag: boolean('is_urgent_flag').notNull().default(false), // true only for the SI item (Level 1 XC #11) — drives the highlighted row in the Diagnostic Assessment Report
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 })
 

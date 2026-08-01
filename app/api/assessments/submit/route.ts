@@ -18,6 +18,7 @@ import {
   validateBatteryNextToken,
 } from "@/lib/assessments/battery-chain"
 import { calculateAsrsPartAScore, calculateAsrsPartBRawScores } from "@/lib/assessments/asrs"
+import { evaluateAndAppendTriggers } from "@/lib/assessments/evaluate-triggers"
 import { calculateLevel1XcDomainScores } from "@/lib/assessments/level1xc"
 import { calculatePcPtsd5Score } from "@/lib/assessments/pcptsd5"
 import { calculatePsfScore, formatPsfSeverity } from "@/lib/assessments/psf"
@@ -91,6 +92,7 @@ export async function POST(request: Request) {
       assessmentDefinitionId: assessmentInstances.assessmentDefinitionId,
       clientId: assessmentInstances.clientId,
       practiceId: assessmentInstances.practiceId,
+      practitionerProfileId: assessmentInstances.practitionerProfileId,
     })
     .from(assessmentInstances)
     .where(
@@ -459,13 +461,29 @@ export async function POST(request: Request) {
       }
     })
 
-    if (batteryNextToken) {
-      if (!isResubmit) {
+    if (!isResubmit) {
+      // Diagnostic battery trigger evaluation: may reactively create a new module (e.g. ASRS
+      // Part B) and set nextAccessLinkId/nextRawToken on this access link — which is why
+      // buildNextQuestionnaireUrl below is checked unconditionally, not just when the client
+      // already knew about a next link at page-load time (batteryNextToken).
+      await evaluateAndAppendTriggers({
+        assessmentInstanceId: instance.assessmentInstanceId,
+        assessmentCode: definition.assessmentCode,
+        score: resultScore,
+        structuredScore,
+        clientId: instance.clientId,
+        practiceId: instance.practiceId,
+        practitionerProfileId: instance.practitionerProfileId,
+      })
+
+      if (batteryNextToken) {
         await markBatteryInProgress(accessLink.assessmentAccessLinkId)
       }
-      const nextUrl =
-        (await buildNextQuestionnaireUrl(accessLink.assessmentAccessLinkId)) ??
-        `/q/${batteryNextToken}`
+    }
+
+    const nextUrl = await buildNextQuestionnaireUrl(accessLink.assessmentAccessLinkId)
+
+    if (nextUrl) {
       return NextResponse.json({
         success: true,
         nextUrl,

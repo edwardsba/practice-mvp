@@ -43,6 +43,7 @@ export const batteryTriggerRules = pgTable('battery_trigger_rules', {
   comparisonOperator: text('comparison_operator').notNull(), // 'gte' | 'gt' | 'eq'
   thresholdValue: integer('threshold_value').notNull(),
   targetAssessmentCode: text('target_assessment_code').notNull(), // which assessment gets queued when the rule fires
+  targetTier: text('target_tier').notNull(), // 'tier_1' | 'tier_2' | 'tier_3' — the tier of the assessment being queued, written onto its battery_instance_modules row
   isActive: boolean('is_active').notNull().default(true),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),

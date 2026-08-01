@@ -125,7 +125,7 @@ export function QuestionnaireForm({
     writeBatteryForwardUrl(token, nextUrl)
   }
 
-  async function submitCurrentStep(advance: boolean) {
+  async function submitCurrentStep() {
     setError(null)
     if (!validateResponses()) return
 
@@ -156,11 +156,15 @@ export function QuestionnaireForm({
         return
       }
 
-      if (advance) {
-        const forwardUrl = readBatteryForwardUrl(token)
-        const navigateUrl = forwardUrl ?? data.nextUrl
-        if (!navigateUrl) return
+      // Always check the actual response for a next step, rather than deciding in advance
+      // from client-side batteryNav state computed at page load. That state can be stale —
+      // e.g. a diagnostic battery trigger (like ASRS Part A -> Part B) may create the next
+      // link reactively, during this very submission, which the client couldn't have known
+      // about when the page first loaded.
+      const forwardUrl = readBatteryForwardUrl(token)
+      const navigateUrl = forwardUrl ?? data.nextUrl
 
+      if (navigateUrl) {
         if (!forwardUrl && data.nextUrl) {
           rememberBatteryNavigation(data.nextUrl)
         }
@@ -190,7 +194,7 @@ export function QuestionnaireForm({
 
   async function handleFormSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    await submitCurrentStep(batteryNav.isBatteryStep && !batteryNav.isLastInBattery)
+    await submitCurrentStep()
   }
 
   const showPrevious = batteryNav.isBatteryStep && Boolean(previousUrl)

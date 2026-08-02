@@ -18,6 +18,7 @@ import {
   validateBatteryNextToken,
 } from "@/lib/assessments/battery-chain"
 import { calculateAsrsPartAScore, calculateAsrsPartBRawScores } from "@/lib/assessments/asrs"
+import { calculateDass21SubscaleScores } from "@/lib/assessments/dass21"
 import { evaluateAndAppendTriggers } from "@/lib/assessments/evaluate-triggers"
 import { calculateLevel1XcDomainScores } from "@/lib/assessments/level1xc"
 import { calculatePcPtsd5Score } from "@/lib/assessments/pcptsd5"
@@ -128,6 +129,7 @@ export async function POST(request: Request) {
   const isPcPtsd5 = definition.assessmentCode === "PC_PTSD5"
   const isAsrsPartA = definition.assessmentCode === "ASRS_PART_A"
   const isAsrsPartB = definition.assessmentCode === "ASRS_PART_B"
+  const isDass21 = definition.assessmentCode === "DASS21"
 
   const elementIds = Object.keys(responses)
   if (elementIds.length === 0) {
@@ -238,6 +240,7 @@ export async function POST(request: Request) {
       !isPcPtsd5 &&
       !isAsrsPartA &&
       !isAsrsPartB &&
+      !isDass21 &&
       dataTypeByElementId.get(elementId) === "integer"
     ) {
       totalScore += scoreValue
@@ -309,6 +312,10 @@ export async function POST(request: Request) {
     resultScore = null
     severity = null
     structuredScore = calculateAsrsPartBRawScores(scoredResponses)
+  } else if (isDass21) {
+    resultScore = null
+    severity = null
+    structuredScore = calculateDass21SubscaleScores(scoredResponses)
   } else {
     resultScore = totalScore
     severity = severityFromAssessmentCode(definition.assessmentCode, totalScore)

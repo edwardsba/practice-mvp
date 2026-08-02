@@ -24,6 +24,7 @@ import { calculateLevel1XcDomainScores } from "@/lib/assessments/level1xc"
 import { calculatePcPtsd5Score } from "@/lib/assessments/pcptsd5"
 import { calculatePhq15Score } from "@/lib/assessments/phq15"
 import { calculatePsfScore, formatPsfSeverity } from "@/lib/assessments/psf"
+import { calculateDesBScore } from "@/lib/assessments/des-b"
 import { calculateSubstanceUseL2Scores } from "@/lib/assessments/substance-use-l2"
 import { phq15SeverityFromScore, severityFromAssessmentCode } from "@/lib/assessments/severity"
 import { hashAssessmentToken } from "@/lib/assessments/token"
@@ -134,6 +135,7 @@ export async function POST(request: Request) {
   const isDass21 = definition.assessmentCode === "DASS21"
   const isPhq15 = definition.assessmentCode === "PHQ15"
   const isSubstanceUseL2 = definition.assessmentCode === "SUBSTANCE_USE_L2"
+  const isDesB = definition.assessmentCode === "DES_B"
 
   const elementIds = Object.keys(responses)
   if (elementIds.length === 0) {
@@ -247,6 +249,7 @@ export async function POST(request: Request) {
       !isDass21 &&
       !isPhq15 &&
       !isSubstanceUseL2 &&
+      !isDesB &&
       dataTypeByElementId.get(elementId) === "integer"
     ) {
       totalScore += scoreValue
@@ -329,6 +332,9 @@ export async function POST(request: Request) {
     resultScore = null
     severity = null
     structuredScore = calculateSubstanceUseL2Scores(scoredResponses)
+  } else if (isDesB) {
+    resultScore = calculateDesBScore(scoredResponses)
+    severity = null
   } else {
     resultScore = totalScore
     severity = severityFromAssessmentCode(definition.assessmentCode, totalScore)

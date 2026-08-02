@@ -15,6 +15,7 @@
     "seed:btp": "tsx db/seed-btp.ts",
     "seed:level1xc": "tsx db/seed-level1-xc.ts",
     "seed:pcptsd5": "tsx db/seed-pcptsd5.ts",
+    "seed:dass21": "tsx db/seed-dass21.ts",
     "seed:asrs": "tsx db/seed-asrs.ts",
     "cleanup:old-asrs": "tsx db/cleanup-old-asrs.ts",
     "seed:asrs-part-a": "tsx db/seed-asrs-part-a.ts",

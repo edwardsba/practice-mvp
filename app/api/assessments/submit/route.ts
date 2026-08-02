@@ -22,8 +22,9 @@ import { calculateDass21SubscaleScores } from "@/lib/assessments/dass21"
 import { evaluateAndAppendTriggers } from "@/lib/assessments/evaluate-triggers"
 import { calculateLevel1XcDomainScores } from "@/lib/assessments/level1xc"
 import { calculatePcPtsd5Score } from "@/lib/assessments/pcptsd5"
+import { calculatePhq15Score } from "@/lib/assessments/phq15"
 import { calculatePsfScore, formatPsfSeverity } from "@/lib/assessments/psf"
-import { severityFromAssessmentCode } from "@/lib/assessments/severity"
+import { phq15SeverityFromScore, severityFromAssessmentCode } from "@/lib/assessments/severity"
 import { hashAssessmentToken } from "@/lib/assessments/token"
 import { db } from "@/lib/db"
 
@@ -130,6 +131,7 @@ export async function POST(request: Request) {
   const isAsrsPartA = definition.assessmentCode === "ASRS_PART_A"
   const isAsrsPartB = definition.assessmentCode === "ASRS_PART_B"
   const isDass21 = definition.assessmentCode === "DASS21"
+  const isPhq15 = definition.assessmentCode === "PHQ15"
 
   const elementIds = Object.keys(responses)
   if (elementIds.length === 0) {
@@ -241,6 +243,7 @@ export async function POST(request: Request) {
       !isAsrsPartA &&
       !isAsrsPartB &&
       !isDass21 &&
+      !isPhq15 &&
       dataTypeByElementId.get(elementId) === "integer"
     ) {
       totalScore += scoreValue
@@ -316,6 +319,9 @@ export async function POST(request: Request) {
     resultScore = null
     severity = null
     structuredScore = calculateDass21SubscaleScores(scoredResponses)
+  } else if (isPhq15) {
+    resultScore = calculatePhq15Score(scoredResponses)
+    severity = resultScore === null ? null : phq15SeverityFromScore(resultScore)
   } else {
     resultScore = totalScore
     severity = severityFromAssessmentCode(definition.assessmentCode, totalScore)

@@ -19,6 +19,13 @@ export function assistSeverityFromScore(score: number): string {
   return "High Risk"
 }
 
+export function phq15SeverityFromScore(score: number): string {
+  if (score <= 4) return "Minimal somatic symptom severity"
+  if (score <= 9) return "Low somatic symptom severity"
+  if (score <= 14) return "Medium somatic symptom severity"
+  return "High somatic symptom severity"
+}
+
 export function severityFromAssessmentCode(
   assessmentCode: string,
   score: number

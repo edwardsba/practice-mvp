@@ -50,7 +50,7 @@ export function DocumentPreviewModal({
     savePending || Boolean(saveAndDownloadPending) || Boolean(saveAndSendPending)
 
   return (
-    <div className="no-print fixed inset-0 z-50 flex flex-col bg-background/95 backdrop-blur-sm">
+    <div className="no-print fixed inset-0 z-50 flex min-h-0 flex-col bg-background/95 backdrop-blur-sm">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b px-6 py-4">
         <div>
           <h2 className="text-lg font-semibold">{title}</h2>
@@ -101,7 +101,7 @@ export function DocumentPreviewModal({
           </button>
         </div>
       </div>
-      <div className="flex-1 overflow-hidden p-4">
+      <div className="min-h-0 flex-1 overflow-hidden p-4">
         <PdfViewer pdfBase64={pdfBase64} title={title} />
       </div>
     </div>

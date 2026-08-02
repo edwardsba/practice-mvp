@@ -7,6 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "copy:pdf-worker": "node scripts/copy-pdf-worker.mjs",
+    "postinstall": "node scripts/copy-pdf-worker.mjs",
     "seed:phq9": "tsx db/seed-phq9.ts",
     "seed:gad7": "tsx db/seed-gad7.ts",
     "seed:asq": "tsx db/seed-asq.ts",

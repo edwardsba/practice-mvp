@@ -15,6 +15,46 @@ function base64ToUint8Array(base64: string): Uint8Array {
 }
 
 /**
+ * Served from /public so we do not depend on a CDN (blocked on some mobile
+ * networks) or on bundler-specific worker asset resolution.
+ * Kept in sync with the installed pdfjs-dist version via `npm run copy:pdf-worker`
+ * (also run from postinstall).
+ */
+const PDFJS_WORKER_SRC = "/pdfjs/pdf.worker.min.mjs"
+
+const LAYOUT_WAIT_FRAMES = 120
+
+/**
+ * Wait until the scroll container has a real width and every canvas for the
+ * known page count has mounted. A single rAF is not enough on slower mobile
+ * devices — React may not have committed the canvas nodes yet, and flex
+ * layout may still report clientWidth === 0.
+ */
+async function waitForCanvasesAndWidth(
+  getWidth: () => number,
+  canvasesReady: () => boolean,
+  isCancelled: () => boolean
+): Promise<number> {
+  for (let frame = 0; frame < LAYOUT_WAIT_FRAMES; frame++) {
+    if (isCancelled()) {
+      throw new DOMException("PDF preview cancelled", "AbortError")
+    }
+    const width = getWidth()
+    if (width > 0 && canvasesReady()) {
+      return width
+    }
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+  }
+
+  const width = getWidth()
+  if (width > 0 && canvasesReady()) {
+    return width
+  }
+
+  throw new Error("PDF preview layout was not ready in time")
+}
+
+/**
  * Renders every page of a base64-encoded PDF onto stacked canvases inside
  * a scrollable container. Used in place of embedding the PDF in an
  * <iframe>, since mobile browsers' built-in PDF viewers are unreliable
@@ -44,6 +84,17 @@ export function PdfViewer({
   const [status, setStatus] = useState<"loading" | "ready" | "error">(
     "loading"
   )
+  const [downloadUrl, setDownloadUrl] = useState<string | null>(null)
+
+  useEffect(() => {
+    const bytes = base64ToUint8Array(pdfBase64)
+    const blob = new Blob([new Uint8Array(bytes)], { type: "application/pdf" })
+    const url = URL.createObjectURL(blob)
+    setDownloadUrl(url)
+    return () => {
+      URL.revokeObjectURL(url)
+    }
+  }, [pdfBase64])
 
   useEffect(() => {
     let cancelled = false
@@ -57,35 +108,38 @@ export function PdfViewer({
 
       try {
         const pdfjsLib = await import("pdfjs-dist")
-
-        // Loaded from a CDN matching the installed pdfjs-dist version,
-        // rather than bundled locally — sidesteps bundler-specific
-        // asset-resolution quirks with the worker file across Next.js's
-        // webpack/Turbopack configurations. No CSP is configured in this
-        // app (see next.config.ts) so this is safe.
-        pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`
+        pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS_WORKER_SRC
 
         const data = base64ToUint8Array(pdfBase64)
         pdfDoc = await pdfjsLib.getDocument({ data }).promise
         if (cancelled || !pdfDoc) return
 
+        // Mount canvas elements while still showing the loading state, then
+        // wait until they exist and the container has a measurable width
+        // before drawing (critical on mobile where one rAF is too early).
         setNumPages(pdfDoc.numPages)
-        setStatus("ready")
 
-        // Wait a tick so the <canvas> elements below have mounted before
-        // we try to draw into them.
-        await new Promise((resolve) => requestAnimationFrame(resolve))
-        if (cancelled) return
+        const containerWidth = await waitForCanvasesAndWidth(
+          () => scrollContainerRef.current?.clientWidth ?? 0,
+          () =>
+            canvasRefs.current.length >= (pdfDoc?.numPages ?? 0) &&
+            canvasRefs.current
+              .slice(0, pdfDoc?.numPages ?? 0)
+              .every((canvas) => canvas != null),
+          () => cancelled
+        )
+        if (cancelled || !pdfDoc) return
 
-        const containerWidth = scrollContainerRef.current?.clientWidth ?? 800
         const dpr =
           typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1
-        const targetWidth = Math.min(containerWidth - 32, 768)
+        const targetWidth = Math.min(Math.max(containerWidth - 32, 1), 768)
 
         for (let pageNumber = 1; pageNumber <= pdfDoc.numPages; pageNumber++) {
           if (cancelled) break
           const canvas = canvasRefs.current[pageNumber - 1]
-          if (!canvas) continue
+          if (!canvas) {
+            throw new Error(`PDF page canvas ${pageNumber} was not mounted`)
+          }
 
           const page = await pdfDoc.getPage(pageNumber)
           const unscaledViewport = page.getViewport({ scale: 1 })
@@ -98,17 +152,28 @@ export function PdfViewer({
           canvas.style.height = `${viewport.height / dpr}px`
 
           const context = canvas.getContext("2d")
-          if (!context) continue
+          if (!context) {
+            throw new Error("Could not get a 2D canvas context for PDF preview")
+          }
 
           const renderTask = page.render({
             canvasContext: context,
             viewport,
+            // pdfjs v6: canvas must be null when supplying canvasContext.
             canvas: null,
           })
           renderTasks.push(renderTask)
           await renderTask.promise
         }
+
+        if (!cancelled) setStatus("ready")
       } catch (error) {
+        if (
+          cancelled ||
+          (error instanceof DOMException && error.name === "AbortError")
+        ) {
+          return
+        }
         console.error("Failed to render PDF preview", error)
         if (!cancelled) setStatus("error")
       }
@@ -128,20 +193,22 @@ export function PdfViewer({
     <div
       ref={scrollContainerRef}
       className={cn(
-        "h-full w-full overflow-y-auto rounded-lg border bg-muted/30",
+        "h-full min-h-0 w-full overflow-y-auto rounded-lg border bg-muted/30",
         className
       )}
     >
       {status === "error" ? (
         <div className="flex h-full flex-col items-center justify-center gap-2 p-6 text-center text-sm text-muted-foreground">
           <p>Couldn&apos;t load the preview.</p>
-          <a
-            href={`data:application/pdf;base64,${pdfBase64}`}
-            download={title ? `${title}.pdf` : "document.pdf"}
-            className="text-primary underline"
-          >
-            Download the PDF instead
-          </a>
+          {downloadUrl ? (
+            <a
+              href={downloadUrl}
+              download={title ? `${title}.pdf` : "document.pdf"}
+              className="text-primary underline"
+            >
+              Download the PDF instead
+            </a>
+          ) : null}
         </div>
       ) : (
         <div className="mx-auto flex flex-col items-center gap-4 p-4">

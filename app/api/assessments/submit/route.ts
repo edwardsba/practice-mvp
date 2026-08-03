@@ -25,8 +25,9 @@ import { calculatePcPtsd5Score } from "@/lib/assessments/pcptsd5"
 import { calculatePhq15Score } from "@/lib/assessments/phq15"
 import { calculatePsfScore, formatPsfSeverity } from "@/lib/assessments/psf"
 import { calculateDesBScore } from "@/lib/assessments/des-b"
+import { calculateSciScore } from "@/lib/assessments/sci"
 import { calculateSubstanceUseL2Scores } from "@/lib/assessments/substance-use-l2"
-import { phq15SeverityFromScore, severityFromAssessmentCode } from "@/lib/assessments/severity"
+import { phq15SeverityFromScore, sciSeverityFromScore, severityFromAssessmentCode } from "@/lib/assessments/severity"
 import { hashAssessmentToken } from "@/lib/assessments/token"
 import { db } from "@/lib/db"
 
@@ -136,6 +137,7 @@ export async function POST(request: Request) {
   const isPhq15 = definition.assessmentCode === "PHQ15"
   const isSubstanceUseL2 = definition.assessmentCode === "SUBSTANCE_USE_L2"
   const isDesB = definition.assessmentCode === "DES_B"
+  const isSci = definition.assessmentCode === "SCI"
 
   const elementIds = Object.keys(responses)
   if (elementIds.length === 0) {
@@ -250,6 +252,7 @@ export async function POST(request: Request) {
       !isPhq15 &&
       !isSubstanceUseL2 &&
       !isDesB &&
+      !isSci &&
       dataTypeByElementId.get(elementId) === "integer"
     ) {
       totalScore += scoreValue
@@ -335,6 +338,9 @@ export async function POST(request: Request) {
   } else if (isDesB) {
     resultScore = calculateDesBScore(scoredResponses)
     severity = null
+  } else if (isSci) {
+    resultScore = calculateSciScore(scoredResponses)
+    severity = resultScore === null ? null : sciSeverityFromScore(resultScore)
   } else {
     resultScore = totalScore
     severity = severityFromAssessmentCode(definition.assessmentCode, totalScore)

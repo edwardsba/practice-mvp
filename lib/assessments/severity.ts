@@ -26,6 +26,13 @@ export function phq15SeverityFromScore(score: number): string {
   return "High somatic symptom severity"
 }
 
+// IMPORTANT: SCI is reverse-scored — LOW score is the concerning direction here, opposite
+// to every other severity function in this file.
+export function sciSeverityFromScore(score: number): string {
+  if (score <= 16) return "Meets threshold criteria for probable insomnia disorder"
+  return "Below insomnia disorder threshold"
+}
+
 export function severityFromAssessmentCode(
   assessmentCode: string,
   score: number

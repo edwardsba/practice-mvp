@@ -33,6 +33,11 @@ export function sciSeverityFromScore(score: number): string {
   return "Below insomnia disorder threshold"
 }
 
+export function asrmSeverityFromScore(score: number): string {
+  if (score >= 6) return "High probability of a manic or hypomanic condition"
+  return "Less likely to be associated with significant symptoms of mania"
+}
+
 export function severityFromAssessmentCode(
   assessmentCode: string,
   score: number

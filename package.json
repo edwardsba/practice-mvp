@@ -23,6 +23,7 @@
     "seed:des-b": "tsx db/seed-des-b.ts",
     "seed:sci": "tsx db/seed-sci.ts",
     "seed:asrm": "tsx db/seed-asrm.ts",
+    "seed:pid5-fbf": "tsx db/seed-pid5-fbf.ts",
     "seed:asrs": "tsx db/seed-asrs.ts",
     "cleanup:old-asrs": "tsx db/cleanup-old-asrs.ts",
     "seed:asrs-part-a": "tsx db/seed-asrs-part-a.ts",

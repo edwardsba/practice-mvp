@@ -19,10 +19,12 @@ import { getQuestionnaireEmailContext } from "@/lib/email/practitioner-context"
 
 const LINK_TTL_MS = 7 * 24 * 60 * 60 * 1000
 
-// Fixed Tier 1 baseline — every diagnostic battery starts with these three, in this order.
-// Everything past this point (Tier 2/3) is adaptive and gets appended reactively by
-// appendTriggeredModule as results come in, not created here.
-const TIER_1_BASELINE_CODES = ["LEVEL1_XC", "PC_PTSD5", "ASRS_PART_A"] as const
+// Fixed Tier 1 baseline — every diagnostic battery starts with these four, in this order.
+// PID5_FBF is last: it has no urgent-flag mechanism and no timeframe dependency, so the
+// safety-relevant/shorter instruments come first and the 100-item form comes last once the
+// client's already committed. Everything past this point (Tier 2/3) is adaptive and gets
+// appended reactively by appendTriggeredModule as results come in, not created here.
+const TIER_1_BASELINE_CODES = ["LEVEL1_XC", "PC_PTSD5", "ASRS_PART_A", "PID5_FBF"] as const
 
 export type CreateDiagnosticBatteryInstanceParams = {
   clientId: string

@@ -17,6 +17,87 @@ const RULES = [
     targetAssessmentCode: "ASRS_PART_B",
     targetTier: "tier_1",
   },
+  // Level 1 XC domain-flag rules — thresholds and targets are the APA's own official
+  // "next-step activation" table (Level 1 XC results scoring table). Depression and Anxiety
+  // both target DASS21 — relies on the dedup check in evaluateAndAppendTriggers so a client
+  // flagging both domains at once only gets DASS21 queued once.
+  {
+    ruleCode: "level1xc_depression_to_dass21",
+    sourceAssessmentCode: "LEVEL1_XC",
+    domainCode: "depression",
+    comparisonOperator: "gte",
+    thresholdValue: 2,
+    targetAssessmentCode: "DASS21",
+    targetTier: "tier_2",
+  },
+  {
+    ruleCode: "level1xc_anxiety_to_dass21",
+    sourceAssessmentCode: "LEVEL1_XC",
+    domainCode: "anxiety",
+    comparisonOperator: "gte",
+    thresholdValue: 2,
+    targetAssessmentCode: "DASS21",
+    targetTier: "tier_2",
+  },
+  {
+    ruleCode: "level1xc_mania_to_asrm",
+    sourceAssessmentCode: "LEVEL1_XC",
+    domainCode: "mania",
+    comparisonOperator: "gte",
+    thresholdValue: 2,
+    targetAssessmentCode: "ASRM",
+    targetTier: "tier_2",
+  },
+  {
+    ruleCode: "level1xc_somatic_to_phq15",
+    sourceAssessmentCode: "LEVEL1_XC",
+    domainCode: "somatic",
+    comparisonOperator: "gte",
+    thresholdValue: 2,
+    targetAssessmentCode: "PHQ15",
+    targetTier: "tier_2",
+  },
+  {
+    ruleCode: "level1xc_sleep_to_sci",
+    sourceAssessmentCode: "LEVEL1_XC",
+    domainCode: "sleep",
+    comparisonOperator: "gte",
+    thresholdValue: 2,
+    targetAssessmentCode: "SCI",
+    targetTier: "tier_2",
+  },
+  {
+    ruleCode: "level1xc_dissociation_to_des_b",
+    sourceAssessmentCode: "LEVEL1_XC",
+    domainCode: "dissociation",
+    comparisonOperator: "gte",
+    thresholdValue: 2,
+    targetAssessmentCode: "DES_B",
+    targetTier: "tier_2",
+  },
+  {
+    // Substance Use's threshold is 1 ("Slight"), not 2 like the other domains — matches the
+    // official table (same lower threshold as Suicidal Ideation).
+    ruleCode: "level1xc_substance_use_to_substance_use_l2",
+    sourceAssessmentCode: "LEVEL1_XC",
+    domainCode: "substance_use",
+    comparisonOperator: "gte",
+    thresholdValue: 1,
+    targetAssessmentCode: "SUBSTANCE_USE_L2",
+    targetTier: "tier_2",
+  },
+  {
+    // "Part 1 -> Part 2" — any substance endorsed in the past 2 weeks triggers the existing
+    // ASSIST assessment (NIDA Questions 2-7, involvement scoring). Reuses the ASSIST
+    // definition as-is; no rebuild needed.
+    ruleCode: "substance_use_l2_to_assist",
+    sourceAssessmentCode: "SUBSTANCE_USE_L2",
+    domainCode: "endorsedCount", // matches the structuredScoreJson field from calculateSubstanceUseL2Scores
+    comparisonOperator: "gte",
+    thresholdValue: 1,
+    targetAssessmentCode: "ASSIST",
+    targetTier: "tier_2",
+  },
 ] as const
 
 async function main() {

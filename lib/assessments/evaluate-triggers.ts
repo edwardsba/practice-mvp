@@ -75,6 +75,25 @@ export async function evaluateAndAppendTriggers(
 
     if (!passes) continue
 
+    // Avoid queuing the same target assessment twice within one battery chain — e.g. if both
+    // Depression and Anxiety domains flag simultaneously, both rules target DASS21, but it
+    // should only be appended once.
+    const [alreadyQueued] = await db
+      .select({ batteryInstanceModuleId: batteryInstanceModules.batteryInstanceModuleId })
+      .from(batteryInstanceModules)
+      .where(
+        and(
+          eq(
+            batteryInstanceModules.diagnosticBatteryInstanceId,
+            module.diagnosticBatteryInstanceId
+          ),
+          eq(batteryInstanceModules.assessmentCode, rule.targetAssessmentCode)
+        )
+      )
+      .limit(1)
+
+    if (alreadyQueued) continue
+
     const result = await appendTriggeredModule({
       diagnosticBatteryInstanceId: module.diagnosticBatteryInstanceId,
       previousAccessLinkId: module.assessmentAccessLinkId,

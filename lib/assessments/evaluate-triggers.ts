@@ -1,6 +1,7 @@
 import { and, eq } from "drizzle-orm"
 
 import { db } from "@/lib/db"
+import { assessmentAccessLinks } from "@/db/schema/03-assessment-instances"
 import { batteryInstanceModules } from "@/db/schema/17-diagnostic-battery"
 import { batteryTriggerRules } from "@/db/schema/17-diagnostic-battery"
 import { appendTriggeredModule } from "@/lib/assessments/append-triggered-module"
@@ -42,6 +43,21 @@ export async function evaluateAndAppendTriggers(
     return []
   }
 
+  // Capture whatever this module's link already pointed to (e.g. Level 1 XC's baseline
+  // continuation to PC-PTSD-5) so it can be re-attached after any reactively-triggered
+  // modules, instead of being silently overwritten by them.
+  const [currentLink] = await db
+    .select({
+      nextAccessLinkId: assessmentAccessLinks.nextAccessLinkId,
+      nextRawToken: assessmentAccessLinks.nextRawToken,
+    })
+    .from(assessmentAccessLinks)
+    .where(eq(assessmentAccessLinks.assessmentAccessLinkId, module.assessmentAccessLinkId))
+    .limit(1)
+
+  const originalNextAccessLinkId = currentLink?.nextAccessLinkId ?? null
+  const originalNextRawToken = currentLink?.nextRawToken ?? null
+
   const rules = await db
     .select()
     .from(batteryTriggerRules)
@@ -53,6 +69,7 @@ export async function evaluateAndAppendTriggers(
     )
 
   const fired: TriggerFireResult[] = []
+  let tailAccessLinkId = module.assessmentAccessLinkId
 
   for (const rule of rules) {
     // domainCode doubles as "which field to read from structuredScoreJson" — for Level 1 XC
@@ -96,7 +113,7 @@ export async function evaluateAndAppendTriggers(
 
     const result = await appendTriggeredModule({
       diagnosticBatteryInstanceId: module.diagnosticBatteryInstanceId,
-      previousAccessLinkId: module.assessmentAccessLinkId,
+      previousAccessLinkId: tailAccessLinkId,
       triggeredByModuleId: module.battleryInstanceModuleId,
       targetAssessmentCode: rule.targetAssessmentCode,
       tier: rule.targetTier as "tier_1" | "tier_2" | "tier_3",
@@ -112,7 +129,26 @@ export async function evaluateAndAppendTriggers(
         assessmentInstanceId: result.assessmentInstanceId,
         assessmentAccessLinkId: result.assessmentAccessLinkId,
       })
+      tailAccessLinkId = result.assessmentAccessLinkId
     }
+  }
+
+  // If any triggers fired, the tail has moved past the source module's own link — re-attach
+  // whatever this submission's link originally pointed to (e.g. PC-PTSD-5) onto the end of
+  // the newly appended chain, so the reactive detour rejoins the original path afterward.
+  if (
+    tailAccessLinkId !== module.assessmentAccessLinkId &&
+    originalNextAccessLinkId &&
+    originalNextRawToken
+  ) {
+    await db
+      .update(assessmentAccessLinks)
+      .set({
+        nextAccessLinkId: originalNextAccessLinkId,
+        nextRawToken: originalNextRawToken,
+        updatedAt: new Date(),
+      })
+      .where(eq(assessmentAccessLinks.assessmentAccessLinkId, tailAccessLinkId))
   }
 
   return fired

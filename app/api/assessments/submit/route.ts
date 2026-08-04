@@ -34,6 +34,7 @@ import { calculatePanicDisorderScore } from "@/lib/assessments/panic-disorder"
 import { calculateAgoraphobiaScore } from "@/lib/assessments/agoraphobia"
 import { calculateSocialAnxietyScore } from "@/lib/assessments/social-anxiety"
 import { calculateSeparationAnxietyScore } from "@/lib/assessments/separation-anxiety"
+import { calculateSpecificPhobiaScore } from "@/lib/assessments/specific-phobia"
 import { anxietySubtypeSeverityFromScore, asrmSeverityFromScore, phq15SeverityFromScore, sciSeverityFromScore, severityFromAssessmentCode } from "@/lib/assessments/severity"
 import { hashAssessmentToken } from "@/lib/assessments/token"
 import { db } from "@/lib/db"
@@ -152,6 +153,7 @@ export async function POST(request: Request) {
   const isAgoraphobia = definition.assessmentCode === "AGORAPHOBIA"
   const isSocialAnxiety = definition.assessmentCode === "SOCIAL_ANXIETY"
   const isSeparationAnxiety = definition.assessmentCode === "SEPARATION_ANXIETY"
+  const isSpecificPhobia = definition.assessmentCode === "SPECIFIC_PHOBIA"
 
   const elementIds = Object.keys(responses)
   if (elementIds.length === 0) {
@@ -274,6 +276,7 @@ export async function POST(request: Request) {
       !isAgoraphobia &&
       !isSocialAnxiety &&
       !isSeparationAnxiety &&
+      !isSpecificPhobia &&
       dataTypeByElementId.get(elementId) === "integer"
     ) {
       totalScore += scoreValue
@@ -384,6 +387,9 @@ export async function POST(request: Request) {
     severity = resultScore === null ? null : anxietySubtypeSeverityFromScore(resultScore)
   } else if (isSeparationAnxiety) {
     resultScore = calculateSeparationAnxietyScore(scoredResponses)
+    severity = resultScore === null ? null : anxietySubtypeSeverityFromScore(resultScore)
+  } else if (isSpecificPhobia) {
+    resultScore = calculateSpecificPhobiaScore(scoredResponses)
     severity = resultScore === null ? null : anxietySubtypeSeverityFromScore(resultScore)
   } else {
     resultScore = totalScore

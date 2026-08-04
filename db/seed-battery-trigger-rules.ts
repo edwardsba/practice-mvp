@@ -92,6 +92,18 @@ const RULES = [
     targetTier: "tier_3",
   },
   {
+    // Different threshold logic from the other 4 subtype rules — specific_phobia_cluster is
+    // 0 ("None of these") or 1-5 (which cluster), not a 0-4 frequency rating, so >= 1 means
+    // "any cluster was chosen" rather than "moderate or higher frequency."
+    ruleCode: "specific_disorder_selector_specific_phobia_to_specific_phobia",
+    sourceAssessmentCode: "SPECIFIC_DISORDER_SELECTOR",
+    domainCode: "specific_phobia_cluster",
+    comparisonOperator: "gte",
+    thresholdValue: 1,
+    targetAssessmentCode: "SPECIFIC_PHOBIA",
+    targetTier: "tier_3",
+  },
+  {
     ruleCode: "level1xc_mania_to_asrm",
     sourceAssessmentCode: "LEVEL1_XC",
     domainCode: "mania",

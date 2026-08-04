@@ -29,6 +29,7 @@ import { calculateAsrmScore } from "@/lib/assessments/asrm"
 import { calculateSciScore } from "@/lib/assessments/sci"
 import { calculateSubstanceUseL2Scores } from "@/lib/assessments/substance-use-l2"
 import { calculatePid5FbfScores } from "@/lib/assessments/pid5-fbf"
+import { calculateSpecificDisorderSelectorScores } from "@/lib/assessments/specific-disorder-selector"
 import { asrmSeverityFromScore, phq15SeverityFromScore, sciSeverityFromScore, severityFromAssessmentCode } from "@/lib/assessments/severity"
 import { hashAssessmentToken } from "@/lib/assessments/token"
 import { db } from "@/lib/db"
@@ -142,6 +143,7 @@ export async function POST(request: Request) {
   const isSci = definition.assessmentCode === "SCI"
   const isAsrm = definition.assessmentCode === "ASRM"
   const isPid5Fbf = definition.assessmentCode === "PID5_FBF"
+  const isSpecificDisorderSelector = definition.assessmentCode === "SPECIFIC_DISORDER_SELECTOR"
 
   const elementIds = Object.keys(responses)
   if (elementIds.length === 0) {
@@ -259,6 +261,7 @@ export async function POST(request: Request) {
       !isSci &&
       !isAsrm &&
       !isPid5Fbf &&
+      !isSpecificDisorderSelector &&
       dataTypeByElementId.get(elementId) === "integer"
     ) {
       totalScore += scoreValue
@@ -354,6 +357,10 @@ export async function POST(request: Request) {
     resultScore = null
     severity = null
     structuredScore = calculatePid5FbfScores(scoredResponses)
+  } else if (isSpecificDisorderSelector) {
+    resultScore = null
+    severity = null
+    structuredScore = calculateSpecificDisorderSelectorScores(scoredResponses)
   } else {
     resultScore = totalScore
     severity = severityFromAssessmentCode(definition.assessmentCode, totalScore)

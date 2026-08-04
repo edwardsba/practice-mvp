@@ -40,6 +40,18 @@ const RULES = [
     targetTier: "tier_2",
   },
   {
+    // Sibling of the rule above, not downstream of it — the SAME Level 1 XC anxiety flag
+    // fires both DASS21 and this selector directly, off one Level 1 XC submission. The
+    // selector is NOT gated behind DASS-21's own Anxiety subscale threshold.
+    ruleCode: "level1xc_anxiety_to_specific_disorder_selector",
+    sourceAssessmentCode: "LEVEL1_XC",
+    domainCode: "anxiety",
+    comparisonOperator: "gte",
+    thresholdValue: 2,
+    targetAssessmentCode: "SPECIFIC_DISORDER_SELECTOR",
+    targetTier: "tier_2",
+  },
+  {
     ruleCode: "level1xc_mania_to_asrm",
     sourceAssessmentCode: "LEVEL1_XC",
     domainCode: "mania",

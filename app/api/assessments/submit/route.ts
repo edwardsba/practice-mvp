@@ -35,6 +35,11 @@ import { calculateAgoraphobiaScore } from "@/lib/assessments/agoraphobia"
 import { calculateSocialAnxietyScore } from "@/lib/assessments/social-anxiety"
 import { calculateSeparationAnxietyScore } from "@/lib/assessments/separation-anxiety"
 import { calculateSpecificPhobiaScore } from "@/lib/assessments/specific-phobia"
+import {
+  calculatePcl5TotalScore,
+  calculatePcl5StructuredScore,
+  pcl5SeverityLabel,
+} from "@/lib/assessments/pcl5"
 import { anxietySubtypeSeverityFromScore, asrmSeverityFromScore, phq15SeverityFromScore, sciSeverityFromScore, severityFromAssessmentCode } from "@/lib/assessments/severity"
 import { hashAssessmentToken } from "@/lib/assessments/token"
 import { db } from "@/lib/db"
@@ -154,6 +159,7 @@ export async function POST(request: Request) {
   const isSocialAnxiety = definition.assessmentCode === "SOCIAL_ANXIETY"
   const isSeparationAnxiety = definition.assessmentCode === "SEPARATION_ANXIETY"
   const isSpecificPhobia = definition.assessmentCode === "SPECIFIC_PHOBIA"
+  const isPcl5 = definition.assessmentCode === "PCL5"
 
   const elementIds = Object.keys(responses)
   if (elementIds.length === 0) {
@@ -277,6 +283,7 @@ export async function POST(request: Request) {
       !isSocialAnxiety &&
       !isSeparationAnxiety &&
       !isSpecificPhobia &&
+      !isPcl5 &&
       dataTypeByElementId.get(elementId) === "integer"
     ) {
       totalScore += scoreValue
@@ -391,6 +398,12 @@ export async function POST(request: Request) {
   } else if (isSpecificPhobia) {
     resultScore = calculateSpecificPhobiaScore(scoredResponses)
     severity = resultScore === null ? null : anxietySubtypeSeverityFromScore(resultScore)
+  } else if (isPcl5) {
+    const totalScore = calculatePcl5TotalScore(scoredResponses)
+    const pcl5Structured = calculatePcl5StructuredScore(scoredResponses)
+    resultScore = totalScore
+    severity = pcl5SeverityLabel(totalScore, pcl5Structured)
+    structuredScore = pcl5Structured
   } else {
     resultScore = totalScore
     severity = severityFromAssessmentCode(definition.assessmentCode, totalScore)

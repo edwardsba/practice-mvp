@@ -32,12 +32,28 @@ const BTP_INSTRUCTION =
 const PSF_INSTRUCTION =
   "As a result of this session... Please choose the answer that best describes you."
 
+const PC_PTSD5_INSTRUCTION =
+  "Please answer the following questions as honestly as you can."
+
+const PCL5_INSTRUCTION =
+  "Keep a specific stressful experience in mind. In the past month, how much were you bothered by:"
+
 export function questionnaireInstructionForCode(assessmentCode: string): string {
   if (assessmentCode === "BTP") {
     return BTP_INSTRUCTION
   }
   if (assessmentCode === "PSF") {
     return PSF_INSTRUCTION
+  }
+  if (assessmentCode === "PC_PTSD5") {
+    // No shared timeframe claim here on purpose — the gate question is a lifetime question and
+    // stands alone, while the 5 symptom items each now carry their own "In the past month..."
+    // wording directly (see db/fix-pcptsd5-item-wording.ts). A single banner above both can't
+    // correctly describe both timeframes at once.
+    return PC_PTSD5_INSTRUCTION
+  }
+  if (assessmentCode === "PCL5") {
+    return PCL5_INSTRUCTION
   }
 
   return PHQ9_STYLE_INSTRUCTION
@@ -51,6 +67,15 @@ export type QuestionnaireData = {
   // Selector), keyed by elementId. The corresponding question still renders normally and stays
   // fully editable — this only seeds the form's initial value, it's a default, not a lock.
   carriedResponses: Record<string, string>
+  // Small, explicit, scoped mechanism — NOT general-purpose conditional-question
+  // infrastructure. Currently only populated for PC_PTSD5: if the gate question is answered
+  // "No", the 5 symptom items are hidden and auto-defaulted to "No" so the submission still
+  // satisfies the backend's completeness check without the client ever seeing them.
+  conditionalSkip: {
+    triggerElementId: string
+    triggerValue: string
+    skippedDefaults: Record<string, string>
+  } | null
 }
 
 function isLinkUsable(
@@ -238,6 +263,23 @@ export async function loadQuestionnaireForToken(
     }
   }
 
+  let conditionalSkip: QuestionnaireData["conditionalSkip"] = null
+  if (definition.assessmentCode === "PC_PTSD5") {
+    const gateElement = elements.find((element) => element.elementKey === "pcptsd5_gate")
+    const symptomElements = elements.filter((element) =>
+      element.elementKey.startsWith("pcptsd5_q")
+    )
+    if (gateElement && symptomElements.length > 0) {
+      conditionalSkip = {
+        triggerElementId: gateElement.assessmentElementId,
+        triggerValue: "0", // "No"
+        skippedDefaults: Object.fromEntries(
+          symptomElements.map((element) => [element.assessmentElementId, "0"])
+        ),
+      }
+    }
+  }
+
   return {
     ok: true,
     data: {
@@ -245,6 +287,7 @@ export async function loadQuestionnaireForToken(
       instructionText: questionnaireInstructionForCode(definition.assessmentCode),
       questions,
       carriedResponses,
+      conditionalSkip,
     },
   }
 }

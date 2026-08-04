@@ -62,6 +62,7 @@ export function QuestionnaireForm({
   instructionText,
   questions,
   carriedResponses,
+  conditionalSkip,
   batteryNextToken,
   batteryNav,
 }: QuestionnaireData & {
@@ -88,6 +89,38 @@ export function QuestionnaireForm({
     setError(null)
     setConfirmationMessage(null)
   }, [token, carriedResponses])
+
+  const gateValue = conditionalSkip ? responses[conditionalSkip.triggerElementId] : undefined
+
+  useEffect(() => {
+    if (!conditionalSkip) return
+    const defaults = conditionalSkip.skippedDefaults
+
+    if (gateValue === conditionalSkip.triggerValue) {
+      // Force-default the skipped questions whenever the trigger answer is given, even if
+      // they already had values from an earlier pass through the form — a "No" here means
+      // those answers are no longer applicable, not that they should be preserved.
+      setResponses((prev) => {
+        const next = { ...prev, ...defaults }
+        writeStoredResponses(token, next)
+        return next
+      })
+    } else if (gateValue !== undefined) {
+      // Trigger answer changed away from the skip condition — clear any previously-set
+      // skip defaults so those questions are asked fresh, not left stale from a prior answer.
+      setResponses((prev) => {
+        const hasAnyDefaults = Object.keys(defaults).some((id) => prev[id] !== undefined)
+        if (!hasAnyDefaults) return prev
+        const next = { ...prev }
+        for (const id of Object.keys(defaults)) delete next[id]
+        writeStoredResponses(token, next)
+        return next
+      })
+    }
+    // Only re-run when the trigger question's own answer changes, not on every keystroke
+    // elsewhere in the form.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gateValue])
 
   function setAnswer(elementId: string, value: string) {
     setResponses((prev) => {
@@ -206,6 +239,11 @@ export function QuestionnaireForm({
     batteryNav.isBatteryStep && !batteryNav.isLastInBattery
   const submitLabel = showNext ? "Next Page →" : "Submit"
 
+  const visibleQuestions =
+    conditionalSkip && gateValue === conditionalSkip.triggerValue
+      ? questions.filter((q) => !(q.elementId in conditionalSkip.skippedDefaults))
+      : questions
+
   if (confirmationMessage) {
     return (
       <div className="flex min-h-full flex-1 items-center justify-center px-4 py-16">
@@ -229,7 +267,7 @@ export function QuestionnaireForm({
       </header>
 
       <form onSubmit={handleFormSubmit} className="space-y-8">
-        {questions.map((question, index) => (
+        {visibleQuestions.map((question, index) => (
           <QuestionBlock
             key={question.elementId}
             index={index + 1}

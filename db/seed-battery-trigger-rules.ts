@@ -104,6 +104,18 @@ const RULES = [
     targetTier: "tier_3",
   },
   {
+    // Optimally sensitive cutoff (minimizes false negatives), per the design's stated
+    // preference for sensitivity throughout this battery — matches the same choice already
+    // made for PC-PTSD-5's own threshold.
+    ruleCode: "pcptsd5_to_pcl5",
+    sourceAssessmentCode: "PC_PTSD5",
+    domainCode: null,
+    comparisonOperator: "gte",
+    thresholdValue: 3,
+    targetAssessmentCode: "PCL5",
+    targetTier: "tier_3",
+  },
+  {
     ruleCode: "level1xc_mania_to_asrm",
     sourceAssessmentCode: "LEVEL1_XC",
     domainCode: "mania",

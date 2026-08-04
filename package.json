@@ -30,6 +30,8 @@
     "seed:social-anxiety": "tsx db/seed-social-anxiety.ts",
     "seed:separation-anxiety": "tsx db/seed-separation-anxiety.ts",
     "seed:specific-phobia": "tsx db/seed-specific-phobia.ts",
+    "seed:pcl5": "tsx db/seed-pcl5.ts",
+    "db:fix-pcptsd5-wording": "tsx db/fix-pcptsd5-item-wording.ts",
     "seed:asrs": "tsx db/seed-asrs.ts",
     "cleanup:old-asrs": "tsx db/cleanup-old-asrs.ts",
     "seed:asrs-part-a": "tsx db/seed-asrs-part-a.ts",

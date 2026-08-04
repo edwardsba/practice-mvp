@@ -12,6 +12,14 @@ export const assessmentInstances = pgTable('assessment_instances', {
   sessionNoteId: uuid('session_note_id'),
   status: text('status').notNull().default('assigned'),
   instanceElementsJson: jsonb('instance_elements_json'),
+  // Pre-filled answers carried forward from an earlier instrument (currently just the
+  // Specific Disorder Selector -> Panic/Agoraphobia/Social/Separation severity scales' item 1).
+  // Keyed by elementKey (not assessmentElementId) so it's readable and stable across the write
+  // (at trigger time, before this instance's elements exist to query) and the read (at load
+  // time). Client can still edit the pre-filled answer normally — this is a default, not a
+  // lock — so it's never written directly into assessment_responses; only load-questionnaire.ts
+  // reads it, to seed the form's initial state.
+  carriedResponsesJson: jsonb('carried_responses_json'),
   assignedAt: timestamp('assigned_at', { withTimezone: true }).notNull().defaultNow(),
   submittedAt: timestamp('submitted_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),

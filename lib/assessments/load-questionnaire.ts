@@ -47,6 +47,10 @@ export type QuestionnaireData = {
   assessmentName: string
   instructionText: string
   questions: QuestionnaireQuestion[]
+  // Pre-filled defaults carried forward from an earlier instrument (e.g. the Specific Disorder
+  // Selector), keyed by elementId. The corresponding question still renders normally and stays
+  // fully editable — this only seeds the form's initial value, it's a default, not a lock.
+  carriedResponses: Record<string, string>
 }
 
 function isLinkUsable(
@@ -74,6 +78,7 @@ async function loadElementsForInstance(
     return db
       .select({
         assessmentElementId: assessmentElements.assessmentElementId,
+        elementKey: assessmentElements.elementKey,
         questionText: assessmentElements.questionText,
         isRequired: assessmentElements.isRequired,
         displayOrder: assessmentElements.displayOrder,
@@ -91,6 +96,7 @@ async function loadElementsForInstance(
   return db
     .select({
       assessmentElementId: assessmentElements.assessmentElementId,
+      elementKey: assessmentElements.elementKey,
       questionText: assessmentElements.questionText,
       isRequired: assessmentElements.isRequired,
       displayOrder: assessmentElements.displayOrder,
@@ -152,6 +158,7 @@ export async function loadQuestionnaireForToken(
     .select({
       assessmentInstanceId: assessmentInstances.assessmentInstanceId,
       assessmentDefinitionId: assessmentInstances.assessmentDefinitionId,
+      carriedResponsesJson: assessmentInstances.carriedResponsesJson,
     })
     .from(assessmentInstances)
     .where(
@@ -218,12 +225,26 @@ export async function loadQuestionnaireForToken(
     return { ok: false }
   }
 
+  // carriedResponsesJson is keyed by elementKey (stable, human-readable) since it's written at
+  // trigger time before this instance's own elements are queried. Resolve to elementId here so
+  // the frontend can match it against QuestionnaireQuestion.elementId directly.
+  const carriedResponsesByKey =
+    (instance.carriedResponsesJson as Record<string, string> | null) ?? {}
+  const carriedResponses: Record<string, string> = {}
+  for (const element of elements) {
+    const carriedValue = carriedResponsesByKey[element.elementKey]
+    if (carriedValue !== undefined) {
+      carriedResponses[element.assessmentElementId] = carriedValue
+    }
+  }
+
   return {
     ok: true,
     data: {
       assessmentName: definition.assessmentName,
       instructionText: questionnaireInstructionForCode(definition.assessmentCode),
       questions,
+      carriedResponses,
     },
   }
 }

@@ -73,6 +73,7 @@
     "db:letter-body": "tsx db/apply-letter-body-migration.ts",
     "db:report-versioning": "tsx db/apply-report-versioning-migration.ts",
     "db:session-note-versioning": "tsx db/apply-session-note-versioning-migration.ts",
+    "db:carried-responses": "tsx db/apply-assessment-instance-carried-responses-migration.ts",
     "db:seed-email-templates": "tsx db/seed-email-templates.ts",
     "db:seed-psf": "npx tsx db/seed-psf.ts"
   },

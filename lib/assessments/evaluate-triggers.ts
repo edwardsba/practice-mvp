@@ -6,6 +6,26 @@ import { batteryInstanceModules } from "@/db/schema/17-diagnostic-battery"
 import { batteryTriggerRules } from "@/db/schema/17-diagnostic-battery"
 import { appendTriggeredModule } from "@/lib/assessments/append-triggered-module"
 
+// Explicit, scoped carry-forward map — NOT general-purpose infrastructure. Currently only the
+// Specific Disorder Selector's 4 straightforward subtypes carry an answer forward, since their
+// selector question uses the exact same 0-4 scale as the target's own item 1. Specific Phobia
+// is deliberately excluded (its selector question is a cluster picker, structurally different
+// from its severity scale's item 1 — see specific-disorder-selector.ts).
+const CARRY_FORWARD_MAP: Record<
+  string,
+  Record<string, { sourceField: string; targetElementKey: string }>
+> = {
+  SPECIFIC_DISORDER_SELECTOR: {
+    PANIC_DISORDER: { sourceField: "panic", targetElementKey: "panic_disorder_q1" },
+    AGORAPHOBIA: { sourceField: "agoraphobia", targetElementKey: "agoraphobia_q1" },
+    SOCIAL_ANXIETY: { sourceField: "social_anxiety", targetElementKey: "social_anxiety_q1" },
+    SEPARATION_ANXIETY: {
+      sourceField: "separation_anxiety",
+      targetElementKey: "separation_anxiety_q1",
+    },
+  },
+}
+
 export type EvaluateTriggersParams = {
   assessmentInstanceId: string
   assessmentCode: string
@@ -111,6 +131,17 @@ export async function evaluateAndAppendTriggers(
 
     if (alreadyQueued) continue
 
+    const carryForwardRule =
+      CARRY_FORWARD_MAP[params.assessmentCode]?.[rule.targetAssessmentCode]
+    const carryForwardResponses: Record<string, string> | undefined = carryForwardRule
+      ? (() => {
+          const value = params.structuredScore?.[carryForwardRule.sourceField]
+          return typeof value === "number"
+            ? { [carryForwardRule.targetElementKey]: String(value) }
+            : undefined
+        })()
+      : undefined
+
     const result = await appendTriggeredModule({
       diagnosticBatteryInstanceId: module.diagnosticBatteryInstanceId,
       previousAccessLinkId: tailAccessLinkId,
@@ -120,6 +151,7 @@ export async function evaluateAndAppendTriggers(
       clientId: params.clientId,
       practiceId: params.practiceId,
       practitionerProfileId: params.practitionerProfileId,
+      carryForwardResponses,
     })
 
     if (result.ok) {

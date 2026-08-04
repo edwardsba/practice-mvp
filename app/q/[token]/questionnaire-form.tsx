@@ -61,6 +61,7 @@ export function QuestionnaireForm({
   assessmentName,
   instructionText,
   questions,
+  carriedResponses,
   batteryNextToken,
   batteryNav,
 }: QuestionnaireData & {
@@ -79,11 +80,14 @@ export function QuestionnaireForm({
   const [unansweredIds, setUnansweredIds] = useState<Set<string>>(new Set())
 
   useEffect(() => {
-    setResponses(readStoredResponses(token))
+    // Carried-forward defaults apply first, then session storage on top — if the client
+    // already interacted with this exact page this session (e.g. navigated back to it), their
+    // own in-progress edits take precedence over the original carried-forward default.
+    setResponses({ ...carriedResponses, ...readStoredResponses(token) })
     setPreviousUrl(readBatteryPreviousUrl(token))
     setError(null)
     setConfirmationMessage(null)
-  }, [token])
+  }, [token, carriedResponses])
 
   function setAnswer(elementId: string, value: string) {
     setResponses((prev) => {
@@ -233,6 +237,7 @@ export function QuestionnaireForm({
             value={responses[question.elementId]}
             onValueChange={(value) => setAnswer(question.elementId, value)}
             hasError={unansweredIds.has(question.elementId)}
+            isCarriedForward={Boolean(carriedResponses[question.elementId])}
           />
         ))}
 
@@ -279,12 +284,14 @@ function QuestionBlock({
   value,
   onValueChange,
   hasError,
+  isCarriedForward,
 }: {
   index: number
   question: QuestionnaireQuestion
   value?: string
   onValueChange: (value: string) => void
   hasError: boolean
+  isCarriedForward: boolean
 }) {
   return (
     <fieldset
@@ -301,6 +308,11 @@ function QuestionBlock({
           <span className="text-destructive"> *</span>
         ) : null}
       </legend>
+      {isCarriedForward ? (
+        <p className="text-sm text-muted-foreground italic">
+          You already told us this — feel free to update it if anything&apos;s changed.
+        </p>
+      ) : null}
       <RadioGroup
         value={value}
         onValueChange={onValueChange}

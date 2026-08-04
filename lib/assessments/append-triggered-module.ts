@@ -20,6 +20,12 @@ export type AppendTriggeredModuleParams = {
   clientId: string
   practiceId: string
   practitionerProfileId: string
+  // Pre-fill values for the new instance, keyed by elementKey — e.g. carrying the Specific
+  // Disorder Selector's answer forward as item 1's default on a triggered severity scale.
+  // Written to assessmentInstances.carriedResponsesJson, NOT assessment_responses — the real
+  // response row only gets created when the client actually submits, same as any other item,
+  // so this can never collide with the submit route's own insert logic.
+  carryForwardResponses?: Record<string, string>
 }
 
 export type AppendTriggeredModuleResult =
@@ -87,6 +93,10 @@ export async function appendTriggeredModule(
           practiceId: params.practiceId,
           practitionerProfileId: params.practitionerProfileId,
           status: "assigned",
+          carriedResponsesJson:
+            params.carryForwardResponses && Object.keys(params.carryForwardResponses).length > 0
+              ? params.carryForwardResponses
+              : null,
         })
         .returning({
           assessmentInstanceId: assessmentInstances.assessmentInstanceId,

@@ -52,6 +52,46 @@ const RULES = [
     targetTier: "tier_2",
   },
   {
+    // Threshold of 2 ("Half of the time" or higher) matches the convention used everywhere
+    // else in this battery for "moderate" domain flags (Level 1 XC's own depression/anxiety/
+    // mania/etc. rules all use >= 2). Specific Phobia's rule is deliberately NOT included yet
+    // — its target (the 10-item severity scale) doesn't exist until that pass ships.
+    ruleCode: "specific_disorder_selector_panic_to_panic_disorder",
+    sourceAssessmentCode: "SPECIFIC_DISORDER_SELECTOR",
+    domainCode: "panic",
+    comparisonOperator: "gte",
+    thresholdValue: 2,
+    targetAssessmentCode: "PANIC_DISORDER",
+    targetTier: "tier_3",
+  },
+  {
+    ruleCode: "specific_disorder_selector_agoraphobia_to_agoraphobia",
+    sourceAssessmentCode: "SPECIFIC_DISORDER_SELECTOR",
+    domainCode: "agoraphobia",
+    comparisonOperator: "gte",
+    thresholdValue: 2,
+    targetAssessmentCode: "AGORAPHOBIA",
+    targetTier: "tier_3",
+  },
+  {
+    ruleCode: "specific_disorder_selector_social_anxiety_to_social_anxiety",
+    sourceAssessmentCode: "SPECIFIC_DISORDER_SELECTOR",
+    domainCode: "social_anxiety",
+    comparisonOperator: "gte",
+    thresholdValue: 2,
+    targetAssessmentCode: "SOCIAL_ANXIETY",
+    targetTier: "tier_3",
+  },
+  {
+    ruleCode: "specific_disorder_selector_separation_anxiety_to_separation_anxiety",
+    sourceAssessmentCode: "SPECIFIC_DISORDER_SELECTOR",
+    domainCode: "separation_anxiety",
+    comparisonOperator: "gte",
+    thresholdValue: 2,
+    targetAssessmentCode: "SEPARATION_ANXIETY",
+    targetTier: "tier_3",
+  },
+  {
     ruleCode: "level1xc_mania_to_asrm",
     sourceAssessmentCode: "LEVEL1_XC",
     domainCode: "mania",

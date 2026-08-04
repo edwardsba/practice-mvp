@@ -38,6 +38,18 @@ export function asrmSeverityFromScore(score: number): string {
   return "Less likely to be associated with significant symptoms of mania"
 }
 
+// Shared by all 5 anxiety subtype severity scales (Panic, Agoraphobia, Social Anxiety, Specific
+// Phobia, Separation Anxiety) — same 10-item, 0-4 scale, same bands. The reference doc defines
+// bands only at whole-number anchors (0=None, 1=Mild, 2=Moderate, 3=Severe, 4=Extreme) on the
+// AVERAGE score (raw / 10), not the raw sum — so this divides by 10 first, then rounds to the
+// nearest anchor. No official guidance on which side of a .5 boundary falls where; standard
+// round-to-nearest is used here.
+export function anxietySubtypeSeverityFromScore(score: number): string {
+  const bands = ["None", "Mild", "Moderate", "Severe", "Extreme"]
+  const rounded = Math.min(Math.max(Math.round(score / 10), 0), 4)
+  return bands[rounded]
+}
+
 export function severityFromAssessmentCode(
   assessmentCode: string,
   score: number

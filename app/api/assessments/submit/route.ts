@@ -30,7 +30,11 @@ import { calculateSciScore } from "@/lib/assessments/sci"
 import { calculateSubstanceUseL2Scores } from "@/lib/assessments/substance-use-l2"
 import { calculatePid5FbfScores } from "@/lib/assessments/pid5-fbf"
 import { calculateSpecificDisorderSelectorScores } from "@/lib/assessments/specific-disorder-selector"
-import { asrmSeverityFromScore, phq15SeverityFromScore, sciSeverityFromScore, severityFromAssessmentCode } from "@/lib/assessments/severity"
+import { calculatePanicDisorderScore } from "@/lib/assessments/panic-disorder"
+import { calculateAgoraphobiaScore } from "@/lib/assessments/agoraphobia"
+import { calculateSocialAnxietyScore } from "@/lib/assessments/social-anxiety"
+import { calculateSeparationAnxietyScore } from "@/lib/assessments/separation-anxiety"
+import { anxietySubtypeSeverityFromScore, asrmSeverityFromScore, phq15SeverityFromScore, sciSeverityFromScore, severityFromAssessmentCode } from "@/lib/assessments/severity"
 import { hashAssessmentToken } from "@/lib/assessments/token"
 import { db } from "@/lib/db"
 
@@ -144,6 +148,10 @@ export async function POST(request: Request) {
   const isAsrm = definition.assessmentCode === "ASRM"
   const isPid5Fbf = definition.assessmentCode === "PID5_FBF"
   const isSpecificDisorderSelector = definition.assessmentCode === "SPECIFIC_DISORDER_SELECTOR"
+  const isPanicDisorder = definition.assessmentCode === "PANIC_DISORDER"
+  const isAgoraphobia = definition.assessmentCode === "AGORAPHOBIA"
+  const isSocialAnxiety = definition.assessmentCode === "SOCIAL_ANXIETY"
+  const isSeparationAnxiety = definition.assessmentCode === "SEPARATION_ANXIETY"
 
   const elementIds = Object.keys(responses)
   if (elementIds.length === 0) {
@@ -262,6 +270,10 @@ export async function POST(request: Request) {
       !isAsrm &&
       !isPid5Fbf &&
       !isSpecificDisorderSelector &&
+      !isPanicDisorder &&
+      !isAgoraphobia &&
+      !isSocialAnxiety &&
+      !isSeparationAnxiety &&
       dataTypeByElementId.get(elementId) === "integer"
     ) {
       totalScore += scoreValue
@@ -361,6 +373,18 @@ export async function POST(request: Request) {
     resultScore = null
     severity = null
     structuredScore = calculateSpecificDisorderSelectorScores(scoredResponses)
+  } else if (isPanicDisorder) {
+    resultScore = calculatePanicDisorderScore(scoredResponses)
+    severity = resultScore === null ? null : anxietySubtypeSeverityFromScore(resultScore)
+  } else if (isAgoraphobia) {
+    resultScore = calculateAgoraphobiaScore(scoredResponses)
+    severity = resultScore === null ? null : anxietySubtypeSeverityFromScore(resultScore)
+  } else if (isSocialAnxiety) {
+    resultScore = calculateSocialAnxietyScore(scoredResponses)
+    severity = resultScore === null ? null : anxietySubtypeSeverityFromScore(resultScore)
+  } else if (isSeparationAnxiety) {
+    resultScore = calculateSeparationAnxietyScore(scoredResponses)
+    severity = resultScore === null ? null : anxietySubtypeSeverityFromScore(resultScore)
   } else {
     resultScore = totalScore
     severity = severityFromAssessmentCode(definition.assessmentCode, totalScore)

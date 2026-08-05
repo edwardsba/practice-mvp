@@ -19,6 +19,10 @@ import {
   DEFAULT_REPORT_MESSAGE,
   DEFAULT_REPORT_SUBJECT,
 } from "../lib/email/report-templates"
+import {
+  DEFAULT_DIAGNOSTIC_BATTERY_MESSAGE,
+  DEFAULT_DIAGNOSTIC_BATTERY_SUBJECT,
+} from "../lib/email/diagnostic-battery-templates"
 import { emailTemplates, practices } from "./schema"
 
 config({ path: ".env.local" })
@@ -68,6 +72,16 @@ This is a reminder that you have an appointment on {appointment_date} at {appoin
     defaultBcc: null as string | null,
     hasActionButton: true,
     actionButtonLabel: "Complete Questionnaire",
+  },
+  {
+    templateKey: "diagnostic_battery",
+    name: "Diagnostic Assessment",
+    subject: DEFAULT_DIAGNOSTIC_BATTERY_SUBJECT,
+    message: DEFAULT_DIAGNOSTIC_BATTERY_MESSAGE,
+    defaultCc: null as string | null,
+    defaultBcc: null as string | null,
+    hasActionButton: true,
+    actionButtonLabel: "Complete Diagnostic Assessment",
   },
   {
     templateKey: "post_session",

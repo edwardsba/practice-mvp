@@ -4,6 +4,7 @@ export const SYSTEM_LINK_TEMPLATE_KEYS: string[] = [
   "send_assessment",
   "pre_session_questionnaire",
   "post_session",
+  "diagnostic_battery",
 ]
 
 export const NO_ACTION_BUTTON_TEMPLATE_KEYS: string[] = [
@@ -16,6 +17,7 @@ export const PROTECTED_TEMPLATE_KEYS: string[] = [
   "appointment_reminder",
   "pre_session_questionnaire",
   "post_session",
+  "diagnostic_battery",
 ]
 
 export const EXCLUDED_FROM_MANUAL_SEND_TEMPLATE_KEYS: string[] = [

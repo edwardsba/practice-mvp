@@ -11,6 +11,11 @@ import { getPractitionerContext } from "@/lib/auth"
 import { db } from "@/lib/db"
 import { sendQuestionnaireEmail } from "@/lib/email/send-questionnaire-link"
 
+// Template types whose send flow is backed by an assessment_access_links row
+// (a single assessment or a full battery) rather than a plain client-scoped
+// message. These get the access-link communications record + audit event.
+const ASSESSMENT_LINK_TEMPLATE_TYPES = ["send_assessment", "diagnostic_battery"]
+
 type SendEmailBody = {
   to?: string
   cc?: string
@@ -105,14 +110,19 @@ export async function POST(request: Request) {
     )
   }
 
-  if (templateType === "send_assessment" && !assessmentAccessLinkId) {
+  if (
+    ASSESSMENT_LINK_TEMPLATE_TYPES.includes(templateType) &&
+    !assessmentAccessLinkId
+  ) {
     return NextResponse.json(
-      { error: "assessmentAccessLinkId is required for send_assessment emails." },
+      {
+        error: `assessmentAccessLinkId is required for ${templateType} emails.`,
+      },
       { status: 400 }
     )
   }
 
-  if (templateType !== "send_assessment" && !clientIdParam) {
+  if (!ASSESSMENT_LINK_TEMPLATE_TYPES.includes(templateType) && !clientIdParam) {
     return NextResponse.json(
       { error: "clientId is required for this email template." },
       { status: 400 }
@@ -122,7 +132,7 @@ export async function POST(request: Request) {
   let resolvedClientId: string | null = null
   let resolvedAssessmentAccessLinkId: string | null = null
 
-  if (templateType === "send_assessment") {
+  if (ASSESSMENT_LINK_TEMPLATE_TYPES.includes(templateType)) {
     const [accessLink] = await db
       .select({
         assessmentAccessLinkId: assessmentAccessLinks.assessmentAccessLinkId,
@@ -215,7 +225,7 @@ export async function POST(request: Request) {
     status: "sent",
   })
 
-  if (templateType === "send_assessment") {
+  if (ASSESSMENT_LINK_TEMPLATE_TYPES.includes(templateType)) {
     await db.insert(auditEvents).values({
       practiceId: context.practiceId,
       userId: context.userId,

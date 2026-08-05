@@ -162,7 +162,10 @@ export function SendCommunicationModal({
       actionButtonLabel: template.actionButtonLabel,
     })
 
-    if (template.templateKey === "send_assessment") {
+    if (
+      template.templateKey === "send_assessment" ||
+      template.templateKey === "diagnostic_battery"
+    ) {
       setSubject(
         resolveTemplate(template.subject, {
           ...templateVariables,
@@ -255,6 +258,26 @@ export function SendCommunicationModal({
     return data
   }
 
+  async function createDiagnosticBatteryLink(): Promise<QuestionnaireLinkApiResponse> {
+    const response = await fetch("/api/assessments/create-diagnostic-battery", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        client_id: clientId,
+        practitioner_profile_id: practitionerProfileId,
+      }),
+    })
+    const data = (await response.json()) as QuestionnaireLinkApiResponse & {
+      error?: string
+    }
+    if (!response.ok) {
+      throw new Error(
+        data.error ?? "Unable to create diagnostic assessment link."
+      )
+    }
+    return data
+  }
+
   async function handleSend() {
     if (!hasEmail || !loadedTemplate) return
 
@@ -314,9 +337,61 @@ export function SendCommunicationModal({
           onSendComplete({ sent: false, email: toEmail })
           return
         }
+      } else if (templateKey === "diagnostic_battery") {
+        const linkData = await createDiagnosticBatteryLink()
+        const resolvedVariables: QuestionnaireEmailTemplateVariables = {
+          ...linkData.templateVariables,
+          expiry_date: formatQuestionnaireExpiryDate(
+            new Date(linkData.expires_at)
+          ),
+        }
+
+        const buttonLabel =
+          loadedTemplate.actionButtonLabel?.trim() ||
+          "Complete Diagnostic Assessment"
+
+        const {
+          subject: resolvedSubject,
+          htmlBody,
+          textBody,
+        } = buildResolvedEmailBodies(
+          message,
+          subject,
+          linkData.link,
+          resolvedVariables,
+          buttonLabel
+        )
+
+        const response = await fetch("/api/email/send", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            to: toEmail,
+            cc: cc.trim() || undefined,
+            bcc: bcc.trim() || undefined,
+            subject: resolvedSubject,
+            htmlBody,
+            textBody,
+            messageText: message,
+            templateType,
+            assessmentAccessLinkId: linkData.assessmentAccessLinkId,
+          }),
+        })
+
+        const data = (await response.json()) as {
+          sent?: boolean
+          error?: string
+        }
+
+        if (!response.ok || !data.sent) {
+          setSendError(data.error ?? "Unable to send email.")
+          onSendComplete({ sent: false, email: toEmail })
+          return
+        }
       } else if (
         loadedTemplate.hasActionButton &&
-        templateKey !== "send_assessment"
+        templateKey !== "send_assessment" &&
+        templateKey !== "diagnostic_battery"
       ) {
         // TODO: Generic action-button templates need a link source wired in code.
         const resolvedSubject = resolveTemplate(subject, {

@@ -62,6 +62,7 @@ export function QuestionnaireForm({
   instructionText,
   questions,
   carriedResponses,
+  contextNote,
   conditionalSkip,
   batteryNextToken,
   batteryNav,
@@ -264,6 +265,12 @@ export function QuestionnaireForm({
         <p className="text-base leading-relaxed text-muted-foreground">
           {instructionText}
         </p>
+        {contextNote ? (
+          <div className="rounded-lg border border-primary/20 bg-primary/5 px-4 py-3 text-sm leading-snug">
+            <span className="font-medium">Based on your earlier answers, </span>
+            this section is about: {contextNote}
+          </div>
+        ) : null}
       </header>
 
       <form onSubmit={handleFormSubmit} className="space-y-8">
@@ -331,21 +338,25 @@ function QuestionBlock({
   hasError: boolean
   isCarriedForward: boolean
 }) {
+  const labelId = `question-label-${question.elementId}`
+
   return (
-    <fieldset
+    <div
       id={`question-${question.elementId}`}
+      role="group"
+      aria-labelledby={labelId}
       className={cn(
         "space-y-3 rounded-xl border bg-card p-4 shadow-sm",
         hasError ? "border-destructive" : ""
       )}
     >
-      <legend className="text-base leading-snug font-medium">
+      <p id={labelId} className="text-base leading-snug font-medium">
         <span className="text-muted-foreground">{index}. </span>
         {question.questionText}
         {question.isRequired ? (
           <span className="text-destructive"> *</span>
         ) : null}
-      </legend>
+      </p>
       {isCarriedForward ? (
         <p className="text-sm text-muted-foreground italic">
           You already told us this — feel free to update it if anything&apos;s changed.
@@ -375,6 +386,6 @@ function QuestionBlock({
       {hasError ? (
         <p className="text-sm text-destructive">This question is required</p>
       ) : null}
-    </fieldset>
+    </div>
   )
 }

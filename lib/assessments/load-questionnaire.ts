@@ -67,6 +67,10 @@ export type QuestionnaireData = {
   // Selector), keyed by elementId. The corresponding question still renders normally and stays
   // fully editable — this only seeds the form's initial value, it's a default, not a lock.
   carriedResponses: Record<string, string>
+  // Display-only context carried forward from an earlier instrument — e.g. Specific Phobia
+  // showing which cluster the Specific Disorder Selector identified. Never a form field, never
+  // written to assessment_responses; rendered as a banner above the questions if present.
+  contextNote: string | null
   // Small, explicit, scoped mechanism — NOT general-purpose conditional-question
   // infrastructure. Currently only populated for PC_PTSD5: if the gate question is answered
   // "No", the 5 symptom items are hidden and auto-defaulted to "No" so the submission still
@@ -262,6 +266,12 @@ export async function loadQuestionnaireForToken(
       carriedResponses[element.assessmentElementId] = carriedValue
     }
   }
+  // "__context_note" is a reserved key, never a real elementKey — it never matches the loop
+  // above, so it's read out separately here rather than risking collision with a real question.
+  const contextNote =
+    typeof carriedResponsesByKey.__context_note === "string"
+      ? carriedResponsesByKey.__context_note
+      : null
 
   let conditionalSkip: QuestionnaireData["conditionalSkip"] = null
   if (definition.assessmentCode === "PC_PTSD5") {
@@ -287,6 +297,7 @@ export async function loadQuestionnaireForToken(
       instructionText: questionnaireInstructionForCode(definition.assessmentCode),
       questions,
       carriedResponses,
+      contextNote,
       conditionalSkip,
     },
   }

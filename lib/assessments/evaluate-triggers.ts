@@ -26,6 +26,19 @@ const CARRY_FORWARD_MAP: Record<
   },
 }
 
+// Separate, equally scoped map for a *display-only* context note rather than a pre-filled
+// answer — Specific Phobia's own item 1 is asked fresh (see comment above), but without
+// surfacing which cluster the selector identified, "these situations" in every question is
+// meaningless. The resolved value is written into carriedResponsesJson under the reserved
+// "__context_note" key, which load-questionnaire.ts reads separately from real elementKey
+// carry-forwards and questionnaire-form.tsx renders as a banner, never as a form field.
+const CONTEXT_NOTE_KEY = "__context_note"
+const CONTEXT_NOTE_MAP: Record<string, Record<string, { sourceField: string }>> = {
+  SPECIFIC_DISORDER_SELECTOR: {
+    SPECIFIC_PHOBIA: { sourceField: "specific_phobia_cluster_label" },
+  },
+}
+
 export type EvaluateTriggersParams = {
   assessmentInstanceId: string
   assessmentCode: string
@@ -133,7 +146,7 @@ export async function evaluateAndAppendTriggers(
 
     const carryForwardRule =
       CARRY_FORWARD_MAP[params.assessmentCode]?.[rule.targetAssessmentCode]
-    const carryForwardResponses: Record<string, string> | undefined = carryForwardRule
+    let carryForwardResponses: Record<string, string> | undefined = carryForwardRule
       ? (() => {
           const value = params.structuredScore?.[carryForwardRule.sourceField]
           return typeof value === "number"
@@ -141,6 +154,18 @@ export async function evaluateAndAppendTriggers(
             : undefined
         })()
       : undefined
+
+    const contextNoteRule =
+      CONTEXT_NOTE_MAP[params.assessmentCode]?.[rule.targetAssessmentCode]
+    if (contextNoteRule) {
+      const value = params.structuredScore?.[contextNoteRule.sourceField]
+      if (typeof value === "string" && value.trim()) {
+        carryForwardResponses = {
+          ...(carryForwardResponses ?? {}),
+          [CONTEXT_NOTE_KEY]: value,
+        }
+      }
+    }
 
     const result = await appendTriggeredModule({
       diagnosticBatteryInstanceId: module.diagnosticBatteryInstanceId,

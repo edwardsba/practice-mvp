@@ -23,6 +23,9 @@ export type QuestionnaireQuestion = {
   options: QuestionnaireOption[]
 }
 
+// Fallback only — used for instruments Ben hasn't specified a real instruction for yet
+// (see INSTRUCTION_BY_CODE below). Historically this was applied to nearly every instrument
+// by default, which was wrong for most of them; kept only as the true fallback now.
 const PHQ9_STYLE_INSTRUCTION =
   "Over the last 2 weeks, how often have you been bothered by any of the following problems?"
 
@@ -32,11 +35,42 @@ const BTP_INSTRUCTION =
 const PSF_INSTRUCTION =
   "As a result of this session... Please choose the answer that best describes you."
 
-const PC_PTSD5_INSTRUCTION =
-  "Please answer the following questions as honestly as you can."
-
-const PCL5_INSTRUCTION =
-  "Keep a specific stressful experience in mind. In the past month, how much were you bothered by:"
+// Audited per-instrument instruction text — sourced from Ben's review of the diagnostic battery
+// (Aug 2026), not written from memory. Codes intentionally left out here (SPECIFIC_DISORDER_SELECTOR,
+// PHQ9, GAD7, ASSIST, BTP, PSF) fall through to PHQ9_STYLE_INSTRUCTION or their own constant below —
+// Ben reviewed those and chose to leave them as-is rather than write new wording.
+const INSTRUCTION_BY_CODE: Record<string, string> = {
+  LEVEL1_XC:
+    "During the past 2 weeks, how often have you been bothered by any of the following problems?",
+  // No shared timeframe claim here on purpose — the gate question is a lifetime question and
+  // stands alone, while the 5 symptom items each carry their own "In the past month..." wording
+  // directly (see db/fix-pcptsd5-item-wording.ts). A single banner above both can't correctly
+  // describe both timeframes at once.
+  PC_PTSD5: "Please answer the following questions as honestly as you can.",
+  ASRS_PART_A:
+    "Please select the answer that best describes how you have felt and conducted yourself in the past 6 months.",
+  ASRS_PART_B:
+    "Please select the answer that best describes how you have felt and conducted yourself in the past 6 months.",
+  PID5_FBF:
+    "This is a list of things different people might say about themselves. We are interested in how you would describe yourself. There are no right or wrong answers, so you can describe yourself as honestly as possible. Please take your time and read each statement carefully, selecting the response that best describes you.",
+  DASS21: "Please select the statement that best applied to you over the past week.",
+  PHQ15:
+    "Please select how often you have been bothered by any of these symptoms during the past 7 days.",
+  SUBSTANCE_USE_L2:
+    "Please select how often you have used these medicines and/or substances during the past 2 weeks.",
+  DES_B:
+    "Please select how often any of these things were true for you in the past 7 days.",
+  SCI: "Thinking about a typical night in the last month …",
+  ASRM:
+    "Choose the one statement in each group that best describes the way you have been feeling for the past week.",
+  PANIC_DISORDER: "During the past 7 days, I have…",
+  AGORAPHOBIA: "During the past 7 days, I have…",
+  SOCIAL_ANXIETY: "During the past 7 days, I have…",
+  SEPARATION_ANXIETY: "During the past 7 days, I have…",
+  SPECIFIC_PHOBIA:
+    "Please select the statement that best applied to you over the past 7 days.",
+  PCL5: "Below is a list of problems that people sometimes have in response to a very stressful experience. In the past month, how much were you bothered by:",
+}
 
 export function questionnaireInstructionForCode(assessmentCode: string): string {
   if (assessmentCode === "BTP") {
@@ -45,15 +79,10 @@ export function questionnaireInstructionForCode(assessmentCode: string): string 
   if (assessmentCode === "PSF") {
     return PSF_INSTRUCTION
   }
-  if (assessmentCode === "PC_PTSD5") {
-    // No shared timeframe claim here on purpose — the gate question is a lifetime question and
-    // stands alone, while the 5 symptom items each now carry their own "In the past month..."
-    // wording directly (see db/fix-pcptsd5-item-wording.ts). A single banner above both can't
-    // correctly describe both timeframes at once.
-    return PC_PTSD5_INSTRUCTION
-  }
-  if (assessmentCode === "PCL5") {
-    return PCL5_INSTRUCTION
+
+  const audited = INSTRUCTION_BY_CODE[assessmentCode]
+  if (audited) {
+    return audited
   }
 
   return PHQ9_STYLE_INSTRUCTION
@@ -202,6 +231,7 @@ export async function loadQuestionnaireForToken(
   const [definition] = await db
     .select({
       assessmentName: assessmentDefinitions.assessmentName,
+      clientDisplayName: assessmentDefinitions.clientDisplayName,
       assessmentCode: assessmentDefinitions.assessmentCode,
     })
     .from(assessmentDefinitions)
@@ -293,7 +323,7 @@ export async function loadQuestionnaireForToken(
   return {
     ok: true,
     data: {
-      assessmentName: definition.assessmentName,
+      assessmentName: definition.clientDisplayName || definition.assessmentName,
       instructionText: questionnaireInstructionForCode(definition.assessmentCode),
       questions,
       carriedResponses,

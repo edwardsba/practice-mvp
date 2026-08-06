@@ -77,6 +77,8 @@
     "db:report-versioning": "tsx db/apply-report-versioning-migration.ts",
     "db:session-note-versioning": "tsx db/apply-session-note-versioning-migration.ts",
     "db:carried-responses": "tsx db/apply-assessment-instance-carried-responses-migration.ts",
+    "db:client-display-name": "tsx db/apply-assessment-definition-client-display-name-migration.ts",
+    "db:fix-client-display-names": "tsx db/fix-assessment-definition-client-display-names.ts",
     "db:seed-email-templates": "tsx db/seed-email-templates.ts",
     "db:seed-psf": "npx tsx db/seed-psf.ts"
   },

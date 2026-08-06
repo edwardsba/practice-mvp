@@ -4,6 +4,11 @@ export const assessmentDefinitions = pgTable('assessment_definitions', {
   assessmentDefinitionId: uuid('assessment_definition_id').primaryKey().defaultRandom(),
   assessmentCode: text('assessment_code').notNull().unique(),
   assessmentName: text('assessment_name').notNull(),
+  // Short, plain-language name shown to clients as the page title on /q/[token] — the
+  // full assessmentName above (e.g. "DSM-5-TR Severity Measure for Panic Disorder—Adult")
+  // stays as the admin/technical name everywhere else. Nullable: falls back to
+  // assessmentName if not yet set for a given instrument.
+  clientDisplayName: text('client_display_name'),
   assessmentType: text('assessment_type').notNull().default('psychometric_assessment'),
   description: text('description'),
   scoringEnabled: boolean('scoring_enabled').notNull().default(true),

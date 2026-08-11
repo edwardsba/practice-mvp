@@ -207,7 +207,13 @@ export function QuestionnaireForm({
           rememberBatteryNavigation(data.nextUrl)
         }
 
+        // router.refresh() forces Next.js to re-fetch this route from the server instead of
+        // reusing a client-side cached render from earlier in the session. Without it, going
+        // Previous then Forward again can re-serve the page exactly as it looked on the first
+        // visit — including a stale batteryNextToken — which then fails server-side validation
+        // against the access link's real current state ("This questionnaire link is not valid").
         router.push(navigateUrl)
+        router.refresh()
         return
       }
 
@@ -227,7 +233,9 @@ export function QuestionnaireForm({
 
     writeStoredResponses(token, responses)
     setError(null)
+    // See the comment in submitCurrentStep — same reasoning applies to Previous navigation.
     router.push(targetUrl)
+    router.refresh()
   }
 
   async function handleFormSubmit(event: React.FormEvent<HTMLFormElement>) {

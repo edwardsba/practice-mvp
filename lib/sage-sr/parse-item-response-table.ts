@@ -122,7 +122,18 @@ export function parseSageSrItemResponseTable(rows: SageSrTextRow[]): SageSrItemR
     // with the following unrelated question until this was added.
     const previousQuestionLooksComplete =
       pendingItemParts.length === 0 || (lastPendingFragment !== undefined && /[.?!)’'"]$/.test(lastPendingFragment))
-    const startsNewQuestion = itemPart.length > 0 && /^[A-Z]/.test(itemPart) && previousQuestionLooksComplete
+    // Second, independent signal: some items in the wild genuinely have no terminal
+    // punctuation at all (e.g. "I spent a lot of time thinking about whether I could
+    // trust my friends or colleagues", confirmed in the real Personality Response
+    // Report, causing the very next item to wrongly merge into it under the
+    // punctuation rule alone). If the item currently pending ALREADY has its own
+    // response, and THIS row is self-contained (carries both fresh item text and its
+    // own response on the same row), that's strong independent evidence of a genuinely
+    // new question — a mere continuation line essentially never carries a complete
+    // response value of its own while the item it's continuing already has one.
+    const rowIsSelfContainedNewQuestion = pendingResponseParts.length > 0 && responsePart.length > 0
+    const startsNewQuestion =
+      itemPart.length > 0 && /^[A-Z]/.test(itemPart) && (previousQuestionLooksComplete || rowIsSelfContainedNewQuestion)
 
     if (startsNewQuestion) {
       flush()

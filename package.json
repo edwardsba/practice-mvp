@@ -49,6 +49,10 @@
     "db:migrate-report-template-engine": "tsx db/apply-report-template-engine-migration.ts",
     "db:migrate-report-date": "tsx db/apply-report-date-migration.ts",
     "db:migrate-element-groups": "tsx db/apply-assessment-element-groups-migration.ts",
+    "db:sage-sr-diagnosis-reference": "tsx db/apply-sage-sr-diagnosis-reference-migration.ts",
+    "seed:sage-sr-diagnosis-reference": "tsx db/seed-sage-sr-diagnosis-reference.ts",
+    "seed:sage-sr-definitions": "tsx db/seed-sage-sr-assessment-definitions.ts",
+
     "db:migrate-option-defaults": "tsx db/apply-assessment-option-default-selection-migration.ts",
     "db:migrate-reporting-baseline": "tsx db/apply-assessment-option-reporting-baseline-migration.ts",
     "db:acute-risk": "tsx db/apply-acute-risk-migration.ts",

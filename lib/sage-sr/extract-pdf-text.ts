@@ -9,17 +9,33 @@ import { normalizeSageSrText } from "./normalize-text"
  *  is 140-220pt. 20pt leaves a wide, safe margin on both sides. */
 const COLUMN_GAP_THRESHOLD = 20
 
+/** A single word/phrase chunk on a row, with its exact horizontal position — used by
+ *  parsers that need a fixed column boundary (e.g. the Response Reports' Item/Response
+ *  table, where the Response column sits at a consistent x regardless of how long the
+ *  Item text is) rather than the generic gap-based `cells` splitting below, which can
+ *  misfire when a long Item value happens to leave a smaller-than-usual gap before the
+ *  Response column (confirmed against real data — see parse-core-response.ts). */
+export interface SageSrPositionedItem {
+  x: number
+  width: number
+  str: string
+}
+
 /** A single reconstructed text row on a page.
  *  `text` is every cell joined with a single space — convenient for substring matching
  *  (section headers, disclaimer text) but loses column boundaries.
- *  `cells` preserves those boundaries — required for genuinely two-column content like
- *  the endorsed-symptom checklists (e.g. "Sadness" / "Physically restless" as two
- *  separate cells, not one merged string) and the diagnosis-table's label/code pairs. */
+ *  `cells` preserves those boundaries using a generic gap threshold — required for
+ *  genuinely two-column content like the endorsed-symptom checklists (e.g. "Sadness" /
+ *  "Physically restless" as two separate cells) and the diagnosis-table's label/code
+ *  pairs, where column widths vary but the GAP between columns is always large.
+ *  `items` is the raw, unmerged, x-sorted chunk list for that same row — for tables
+ *  where columns sit at a known FIXED x position instead (see SageSrPositionedItem). */
 export interface SageSrTextRow {
   page: number
   y: number
   text: string
   cells: string[]
+  items: SageSrPositionedItem[]
 }
 
 export interface SageSrExtractedPdf {
@@ -91,7 +107,7 @@ export async function extractSageSrPdfText(buffer: Buffer): Promise<SageSrExtrac
 
       const nonEmptyCells = cells.filter(Boolean)
       const text = nonEmptyCells.join(" ").trim()
-      if (text) rows.push({ page: pageNum, y, text, cells: nonEmptyCells })
+      if (text) rows.push({ page: pageNum, y, text, cells: nonEmptyCells, items: sorted })
     }
   }
 

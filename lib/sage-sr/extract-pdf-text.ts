@@ -2,11 +2,24 @@ import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs"
 
 import { normalizeSageSrText } from "./normalize-text"
 
-/** A single reconstructed text row on a page, with its items sorted left-to-right. */
+/** Gap (in PDF points) between the end of one text chunk and the start of the next,
+ *  above which they're treated as separate columns rather than words in one phrase.
+ *  Confirmed against the real Core Clinician Report: normal word-to-word gaps within
+ *  a flowing sentence are 2-3pt; the gap between two-column symptom-checklist entries
+ *  is 140-220pt. 20pt leaves a wide, safe margin on both sides. */
+const COLUMN_GAP_THRESHOLD = 20
+
+/** A single reconstructed text row on a page.
+ *  `text` is every cell joined with a single space — convenient for substring matching
+ *  (section headers, disclaimer text) but loses column boundaries.
+ *  `cells` preserves those boundaries — required for genuinely two-column content like
+ *  the endorsed-symptom checklists (e.g. "Sadness" / "Physically restless" as two
+ *  separate cells, not one merged string) and the diagnosis-table's label/code pairs. */
 export interface SageSrTextRow {
   page: number
   y: number
   text: string
+  cells: string[]
 }
 
 export interface SageSrExtractedPdf {
@@ -40,7 +53,7 @@ export async function extractSageSrPdfText(buffer: Buffer): Promise<SageSrExtrac
     const page = await doc.getPage(pageNum)
     const content = await page.getTextContent()
 
-    const rowsByY = new Map<number, { x: number; str: string }[]>()
+    const rowsByY = new Map<number, { x: number; width: number; str: string }[]>()
 
     for (const item of content.items) {
       if (!("str" in item)) continue // skip TextMarkedContent items, only TextItem has str
@@ -51,18 +64,34 @@ export async function extractSageSrPdfText(buffer: Buffer): Promise<SageSrExtrac
 
       const y = Math.round(item.transform[5])
       const x = item.transform[4]
+      const width = "width" in item ? item.width : 0
       if (!rowsByY.has(y)) rowsByY.set(y, [])
-      rowsByY.get(y)!.push({ x, str: normalized })
+      rowsByY.get(y)!.push({ x, width, str: normalized })
     }
 
     for (const [y, items] of rowsByY) {
-      const text = items
-        .sort((a, b) => a.x - b.x)
-        .map((i) => i.str)
-        .join(" ")
-        .replace(/\s+/g, " ")
-        .trim()
-      if (text) rows.push({ page: pageNum, y, text })
+      const sorted = [...items].sort((a, b) => a.x - b.x)
+
+      const cells: string[] = []
+      let currentCell: string[] = []
+      let prevEnd: number | null = null
+
+      for (const item of sorted) {
+        const gap = prevEnd !== null ? item.x - prevEnd : 0
+        if (prevEnd !== null && gap > COLUMN_GAP_THRESHOLD) {
+          cells.push(currentCell.join(" ").replace(/\s+/g, " ").trim())
+          currentCell = []
+        }
+        currentCell.push(item.str)
+        prevEnd = item.x + item.width
+      }
+      if (currentCell.length > 0) {
+        cells.push(currentCell.join(" ").replace(/\s+/g, " ").trim())
+      }
+
+      const nonEmptyCells = cells.filter(Boolean)
+      const text = nonEmptyCells.join(" ").trim()
+      if (text) rows.push({ page: pageNum, y, text, cells: nonEmptyCells })
     }
   }
 

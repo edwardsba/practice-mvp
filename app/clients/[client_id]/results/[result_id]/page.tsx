@@ -5,6 +5,7 @@ import { and, asc, eq } from "drizzle-orm"
 import { MarkReviewedButton } from "@/app/clients/[client_id]/results/[result_id]/mark-reviewed-button"
 import { AppShell } from "@/components/app-shell"
 import { BackButton } from "@/components/ui/back-button"
+import { Badge } from "@/components/ui/badge"
 import { EntityPageHeader } from "@/components/ui/entity-page-header"
 import {
   Card,
@@ -39,6 +40,22 @@ import { calculatePsfScore } from "@/lib/assessments/psf"
 import { requirePractitionerContext } from "@/lib/auth"
 import { db } from "@/lib/db"
 import { appendReturnTo } from "@/lib/navigation/back"
+import type { SageSrCoreParsedResult } from "@/lib/sage-sr/parse-core-clinician"
+import type { SageSrCoreResponseParsedResult } from "@/lib/sage-sr/parse-core-response"
+import type { SageSrResolvedDiagnosis } from "@/lib/sage-sr/resolve-diagnosis-codes"
+
+/** Shape of assessmentResults.structuredScoreJson for a SAGE_SR_CORE instance, as
+ *  written by lib/sage-sr/import-sage-sr-report.ts. Either key may be absent if only
+ *  one of the two companion PDFs (Clinician Report / Response Report) has been
+ *  uploaded so far — the page renders whatever is present rather than assuming both. */
+interface SageSrCoreStructuredData {
+  clinician?: SageSrCoreParsedResult & {
+    furtherEvaluationDiagnosisCodes: SageSrResolvedDiagnosis[]
+    absentOrMinimalDiagnosisCodes: SageSrResolvedDiagnosis[]
+  }
+  response?: SageSrCoreResponseParsedResult
+  footerVersion?: string | null
+}
 
 function formatDate(value: Date | string | null) {
   if (!value) return "—"
@@ -90,6 +107,7 @@ export default async function AssessmentResultDetailPage({
       score: assessmentResults.score,
       severity: assessmentResults.severity,
       acuteRiskRating: assessmentResults.acuteRiskRating,
+      structuredScoreJson: assessmentResults.structuredScoreJson,
       assessmentDate: assessmentResults.assessmentDate,
       status: assessmentResults.status,
       assessmentName: assessmentDefinitions.assessmentName,
@@ -126,6 +144,7 @@ export default async function AssessmentResultDetailPage({
 
   const isAsq = result.assessmentCode === "ASQ"
   const isPsf = result.assessmentCode === "PSF"
+  const isSageSrCore = result.assessmentCode === "SAGE_SR_CORE"
 
   const responses = await db
     .select({
@@ -161,6 +180,237 @@ export default async function AssessmentResultDetailPage({
     .orderBy(asc(assessmentElements.displayOrder))
 
   const clientName = `${client.firstName} ${client.lastName}`
+
+  if (isSageSrCore) {
+    const sageSrData = (result.structuredScoreJson ?? {}) as SageSrCoreStructuredData
+    const clinician = sageSrData.clinician
+    const responseItems = sageSrData.response?.responses ?? []
+
+    return (
+      <AppShell>
+        <div className="mb-6">
+          <BackButton
+            fallbackHref={`/clients/${clientId}`}
+            label="← Back to client"
+          />
+        </div>
+        <EntityPageHeader
+          kicker={result.assessmentName}
+          name={clientName}
+          subheading={`Completed ${formatDate(result.assessmentDate)}`}
+          action={
+            <MarkReviewedButton
+              clientId={clientId}
+              resultId={resultId}
+              status={result.status}
+            />
+          }
+        />
+
+        {!clinician && !sageSrData.response ? (
+          <Card>
+            <CardContent className="py-10 text-center text-muted-foreground">
+              No SAGE-SR data has been imported for this instance yet.
+            </CardContent>
+          </Card>
+        ) : null}
+
+        {clinician && clinician.alerts.length > 0 ? (
+          <Card className="mb-6 border-red-200">
+            <CardHeader>
+              <CardTitle>Alerts</CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-wrap gap-2">
+              {clinician.alerts.map((alert, index) => (
+                <Badge key={index} variant="destructive">
+                  {alert}
+                </Badge>
+              ))}
+            </CardContent>
+          </Card>
+        ) : null}
+
+        {clinician ? (
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle>Possible diagnoses</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="rounded-lg border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Diagnosis</TableHead>
+                      <TableHead className="w-28">Concern</TableHead>
+                      <TableHead className="w-32">ICD-10 code</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {clinician.highConcernDiagnoses.map((diagnosis, index) => (
+                      <TableRow key={`high-${index}`}>
+                        <TableCell className="whitespace-normal font-medium">
+                          {diagnosis.label}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="destructive">High</Badge>
+                        </TableCell>
+                        <TableCell className="tabular-nums">
+                          {diagnosis.icd10Code ?? (
+                            <span className="text-muted-foreground">
+                              Requires clinical determination
+                            </span>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {Object.keys(clinician.furtherEvaluationSymptomsByDiagnosis).map(
+                      (label, index) => {
+                        const resolved =
+                          clinician.furtherEvaluationDiagnosisCodes[index]
+                        return (
+                          <TableRow key={`medium-${index}`}>
+                            <TableCell className="whitespace-normal font-medium">
+                              {label}
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="warning">Medium</Badge>
+                            </TableCell>
+                            <TableCell className="tabular-nums">
+                              {resolved?.icd10Code ?? (
+                                <span className="text-muted-foreground">—</span>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        )
+                      }
+                    )}
+                    {clinician.absentOrMinimalDiagnoses.map((label, index) => {
+                      const resolved = clinician.absentOrMinimalDiagnosisCodes[index]
+                      return (
+                        <TableRow key={`low-${index}`}>
+                          <TableCell className="whitespace-normal text-muted-foreground">
+                            {label}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="muted">Low</Badge>
+                          </TableCell>
+                          <TableCell className="tabular-nums text-muted-foreground">
+                            {resolved?.icd10Code ?? "—"}
+                          </TableCell>
+                        </TableRow>
+                      )
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+              <p className="mt-3 text-sm text-muted-foreground">
+                ICD-10 codes are provided as a starting reference only — a licensed
+                clinician determines the actual diagnosis. Codes marked &ldquo;Requires
+                clinical determination&rdquo; need a specifier (episode history,
+                severity, or subtype) that only clinical judgment can supply.
+              </p>
+            </CardContent>
+          </Card>
+        ) : null}
+
+        {clinician &&
+        Object.keys(clinician.endorsedSymptomsByDiagnosis).length > 0 ? (
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle>Endorsed symptoms by diagnosis</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {Object.entries(clinician.endorsedSymptomsByDiagnosis).map(
+                ([diagnosis, symptoms]) => (
+                  <div key={diagnosis}>
+                    <p className="mb-2 font-medium">{diagnosis}</p>
+                    <ul className="list-disc space-y-1 pl-5 text-sm text-muted-foreground">
+                      {symptoms.map((symptom, index) => (
+                        <li key={index}>{symptom}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )
+              )}
+            </CardContent>
+          </Card>
+        ) : null}
+
+        {clinician ? (
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle>Completion metrics</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <dl className="grid gap-3 sm:grid-cols-3">
+                <div>
+                  <dt className="text-sm text-muted-foreground">
+                    Reliability items correct
+                  </dt>
+                  <dd className="font-medium">
+                    {clinician.metrics.reliabilityItemsCorrect ?? "—"}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-sm text-muted-foreground">Duration</dt>
+                  <dd className="font-medium">
+                    {clinician.metrics.durationMinutes !== null
+                      ? `${clinician.metrics.durationMinutes} min`
+                      : "—"}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-sm text-muted-foreground">Items skipped</dt>
+                  <dd className="font-medium">
+                    {clinician.metrics.itemsSkipped ?? "—"}
+                  </dd>
+                </div>
+              </dl>
+            </CardContent>
+          </Card>
+        ) : null}
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Raw item responses</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="rounded-lg border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="min-w-[300px]">Item</TableHead>
+                    <TableHead>Response</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {responseItems.length === 0 ? (
+                    <TableRow>
+                      <TableCell
+                        colSpan={2}
+                        className="h-20 text-center text-muted-foreground"
+                      >
+                        No response data available.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    responseItems.map((row, index) => (
+                      <TableRow key={index}>
+                        <TableCell className="whitespace-normal">
+                          {row.item}
+                        </TableCell>
+                        <TableCell>{row.response}</TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+      </AppShell>
+    )
+  }
 
   if (isPsf) {
     const psfResult = calculatePsfScore(

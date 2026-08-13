@@ -41,7 +41,13 @@ import { requirePractitionerContext } from "@/lib/auth"
 import { db } from "@/lib/db"
 import { appendReturnTo } from "@/lib/navigation/back"
 import type { SageSrCoreResponseParsedResult } from "@/lib/sage-sr/parse-core-response"
-import type { SageSrCoreStoredClinicianData } from "@/lib/sage-sr/import-sage-sr-report"
+import type {
+  SageSrCoreStoredClinicianData,
+  SageSrPersonalityStoredData,
+} from "@/lib/sage-sr/import-sage-sr-report"
+import type { SageSrBackgroundParsedResult } from "@/lib/sage-sr/parse-background"
+import type { SageSrBackgroundResponseParsedResult } from "@/lib/sage-sr/parse-background-response"
+import type { SageSrPersonalityResponseParsedResult } from "@/lib/sage-sr/parse-personality-response"
 
 /** Shape of assessmentResults.structuredScoreJson for a SAGE_SR_CORE instance, as
  *  written by lib/sage-sr/import-sage-sr-report.ts. Either key may be absent if only
@@ -50,6 +56,23 @@ import type { SageSrCoreStoredClinicianData } from "@/lib/sage-sr/import-sage-sr
 interface SageSrCoreStructuredData {
   clinician?: SageSrCoreStoredClinicianData
   response?: SageSrCoreResponseParsedResult
+  footerVersion?: string | null
+}
+
+/** Shape of assessmentResults.structuredScoreJson for a SAGE_SR_BACKGROUND instance.
+ *  "interpreted" and "response" may each be absent independently, same reasoning as
+ *  SageSrCoreStructuredData above — only one of the two companion PDFs may have been
+ *  uploaded so far. */
+interface SageSrBackgroundStructuredData {
+  interpreted?: SageSrBackgroundParsedResult
+  response?: SageSrBackgroundResponseParsedResult
+  footerVersion?: string | null
+}
+
+/** Shape of assessmentResults.structuredScoreJson for a SAGE_SR_PERSONALITY instance. */
+interface SageSrPersonalityStructuredData {
+  interpreted?: SageSrPersonalityStoredData
+  response?: SageSrPersonalityResponseParsedResult
   footerVersion?: string | null
 }
 
@@ -154,6 +177,8 @@ export default async function AssessmentResultDetailPage({
   const isAsq = result.assessmentCode === "ASQ"
   const isPsf = result.assessmentCode === "PSF"
   const isSageSrCore = result.assessmentCode === "SAGE_SR_CORE"
+  const isSageSrBackground = result.assessmentCode === "SAGE_SR_BACKGROUND"
+  const isSageSrPersonality = result.assessmentCode === "SAGE_SR_PERSONALITY"
 
   const responses = await db
     .select({
@@ -362,6 +387,295 @@ export default async function AssessmentResultDetailPage({
             </CardContent>
           </Card>
         ) : null}
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Raw item responses</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="rounded-lg border">
+              <Table className="table-fixed">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[65%]">Item</TableHead>
+                    <TableHead className="w-[35%]">Response</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {responseItems.length === 0 ? (
+                    <TableRow>
+                      <TableCell
+                        colSpan={2}
+                        className="h-20 text-center text-muted-foreground"
+                      >
+                        No response data available.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    responseItems.map((row, index) => (
+                      <TableRow key={index}>
+                        <TableCell className="whitespace-normal">
+                          {row.item}
+                        </TableCell>
+                        <TableCell className="whitespace-normal">
+                          {row.response}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+      </AppShell>
+    )
+  }
+
+  if (isSageSrBackground) {
+    const sageSrData = (result.structuredScoreJson ?? {}) as SageSrBackgroundStructuredData
+    const sections = sageSrData.interpreted?.sections ?? []
+    const responseItems = sageSrData.response?.responses ?? []
+
+    return (
+      <AppShell>
+        <div className="mb-6">
+          <BackButton
+            fallbackHref={`/clients/${clientId}`}
+            label="← Back to client"
+          />
+        </div>
+        <EntityPageHeader
+          kicker={result.assessmentName}
+          name={clientName}
+          subheading={`Completed ${formatDate(result.assessmentDate)}`}
+          action={
+            <MarkReviewedButton
+              clientId={clientId}
+              resultId={resultId}
+              status={result.status}
+            />
+          }
+        />
+
+        {sections.length === 0 && responseItems.length === 0 ? (
+          <Card>
+            <CardContent className="py-10 text-center text-muted-foreground">
+              No SAGE-SR data has been imported for this instance yet.
+            </CardContent>
+          </Card>
+        ) : null}
+
+        {sections.length > 0 ? (
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle>Background information</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {sections.map((section, index) => (
+                <div key={index}>
+                  <p className="mb-2 font-medium">{section.section}</p>
+                  {section.lines.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">
+                      No content reported.
+                    </p>
+                  ) : (
+                    <ul className="list-disc space-y-1 pl-5 text-sm text-muted-foreground">
+                      {section.lines.map((line, lineIndex) => (
+                        <li key={lineIndex}>{line}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        ) : null}
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Raw item responses</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="rounded-lg border">
+              <Table className="table-fixed">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[65%]">Item</TableHead>
+                    <TableHead className="w-[35%]">Response</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {responseItems.length === 0 ? (
+                    <TableRow>
+                      <TableCell
+                        colSpan={2}
+                        className="h-20 text-center text-muted-foreground"
+                      >
+                        No response data available.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    responseItems.map((row, index) => (
+                      <TableRow key={index}>
+                        <TableCell className="whitespace-normal">
+                          {row.item}
+                        </TableCell>
+                        <TableCell className="whitespace-normal">
+                          {row.response}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+      </AppShell>
+    )
+  }
+
+  if (isSageSrPersonality) {
+    const sageSrData = (result.structuredScoreJson ?? {}) as SageSrPersonalityStructuredData
+    const traits = sageSrData.interpreted?.traits ?? []
+    const highConcernTraits = traits.filter((trait) => trait.concernTier === "high")
+    const mediumConcernTraits = traits.filter((trait) => trait.concernTier === "medium")
+    const responseItems = sageSrData.response?.responses ?? []
+
+    return (
+      <AppShell>
+        <div className="mb-6">
+          <BackButton
+            fallbackHref={`/clients/${clientId}`}
+            label="← Back to client"
+          />
+        </div>
+        <EntityPageHeader
+          kicker={result.assessmentName}
+          name={clientName}
+          subheading={`Completed ${formatDate(result.assessmentDate)}`}
+          action={
+            <MarkReviewedButton
+              clientId={clientId}
+              resultId={resultId}
+              status={result.status}
+            />
+          }
+        />
+
+        {traits.length === 0 && responseItems.length === 0 ? (
+          <Card>
+            <CardContent className="py-10 text-center text-muted-foreground">
+              No SAGE-SR data has been imported for this instance yet.
+            </CardContent>
+          </Card>
+        ) : null}
+
+        {traits.length > 0 ? (
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle>Trait concerns</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="rounded-lg border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Trait</TableHead>
+                      <TableHead className="w-28">Concern</TableHead>
+                      <TableHead className="w-40">ICD-10 code</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {highConcernTraits.map((trait, index) => (
+                      <TableRow key={`high-${index}`}>
+                        <TableCell className="whitespace-normal font-medium">
+                          {trait.trait}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="destructive">High</Badge>
+                        </TableCell>
+                        <TableCell className="tabular-nums">
+                          <IcdCodeCell icd10Code={trait.icd10Code} />
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {mediumConcernTraits.map((trait, index) => (
+                      <TableRow key={`medium-${index}`}>
+                        <TableCell className="whitespace-normal font-medium">
+                          {trait.trait}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="warning">Medium</Badge>
+                        </TableCell>
+                        <TableCell className="tabular-nums">
+                          <IcdCodeCell icd10Code={trait.icd10Code} />
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+              <p className="mt-3 text-sm text-muted-foreground">
+                ICD-10 codes are provided as a starting reference only — a licensed
+                clinician determines the actual diagnosis. Codes marked &ldquo;Requires
+                clinical determination&rdquo; need a specifier that only clinical
+                judgment can supply.
+              </p>
+            </CardContent>
+          </Card>
+        ) : null}
+
+        {traits.map((trait, traitIndex) => (
+          <Card className="mb-6" key={traitIndex}>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                {trait.trait}
+                <Badge variant={trait.concernTier === "high" ? "destructive" : "warning"}>
+                  {trait.concernTier === "high" ? "High" : "Medium"}
+                </Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="rounded-lg border">
+                <Table className="table-fixed">
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-[55%]">Item</TableHead>
+                      <TableHead className="w-[30%]">Response</TableHead>
+                      <TableHead className="w-[15%]">Before age 21</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {trait.items.length === 0 ? (
+                      <TableRow>
+                        <TableCell
+                          colSpan={3}
+                          className="h-20 text-center text-muted-foreground"
+                        >
+                          No item-level data available.
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      trait.items.map((item, itemIndex) => (
+                        <TableRow key={itemIndex}>
+                          <TableCell className="whitespace-normal">
+                            {item.item}
+                          </TableCell>
+                          <TableCell className="whitespace-normal">
+                            {item.response}
+                          </TableCell>
+                          <TableCell>{item.beforeAge21 ? "Yes" : "—"}</TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
 
         <Card>
           <CardHeader>

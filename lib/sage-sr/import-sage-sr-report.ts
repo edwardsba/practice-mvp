@@ -15,7 +15,7 @@ import { parseSageSrBackgroundReport } from "./parse-background"
 import { parseSageSrBackgroundResponseReport } from "./parse-background-response"
 import { parseSageSrCoreClinicianReport, type SageSrCoreDiagnosis } from "./parse-core-clinician"
 import { parseSageSrCoreResponseReport } from "./parse-core-response"
-import { parseSageSrPersonalityReport } from "./parse-personality"
+import { parseSageSrPersonalityReport, type SageSrPersonalityTraitItem } from "./parse-personality"
 import { parseSageSrPersonalityResponseReport } from "./parse-personality-response"
 import { resolveSageSrDiagnosisLabel, type SageSrResolvedDiagnosis } from "./resolve-diagnosis-codes"
 
@@ -54,6 +54,25 @@ export interface SageSrCoreStoredClinicianData {
     durationMinutes: number | null
     itemsSkipped: string | null
   }
+}
+
+/** A parsed Personality trait with its resolved ICD-10 code merged directly on, rather
+ *  than kept in a separate array matched by position — same reasoning as
+ *  SageSrFurtherEvaluationDiagnosis above. This is the shape the results page should
+ *  read; traits is an ordered array (not a Record<string, {...}>) for the same
+ *  jsonb-key-order reason documented on SageSrPersonalityParsedResult in
+ *  parse-personality.ts. */
+export interface SageSrPersonalityStoredTrait {
+  trait: string
+  concernTier: "high" | "medium"
+  items: SageSrPersonalityTraitItem[]
+  icd10Code: string | null
+  requiresClinicalSpecifier: boolean
+  codeNotes: string | null
+}
+
+export interface SageSrPersonalityStoredData {
+  traits: SageSrPersonalityStoredTrait[]
 }
 
 type SageSrModule = "core" | "background" | "personality"
@@ -235,12 +254,21 @@ export async function importSageSrReport(params: {
       break
     case "personality": {
       const parsed = parseSageSrPersonalityReport(rows)
-      const traitsWithCodes: Record<string, unknown> = {}
-      for (const [traitName, traitData] of Object.entries(parsed.traits)) {
-        const resolved = await resolveSageSrDiagnosisLabel(traitName)
-        traitsWithCodes[traitName] = { ...traitData, ...resolved }
-      }
-      parsedData = { traits: traitsWithCodes }
+      const traits: SageSrPersonalityStoredTrait[] = await Promise.all(
+        parsed.traits.map(async (traitData) => {
+          const resolved = await resolveSageSrDiagnosisLabel(traitData.trait)
+          return {
+            trait: traitData.trait,
+            concernTier: traitData.concernTier,
+            items: traitData.items,
+            icd10Code: resolved.icd10Code,
+            requiresClinicalSpecifier: resolved.requiresClinicalSpecifier,
+            codeNotes: resolved.codeNotes,
+          }
+        })
+      )
+      const stored: SageSrPersonalityStoredData = { traits }
+      parsedData = stored
       break
     }
     case "personality_response":

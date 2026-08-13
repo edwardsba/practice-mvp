@@ -12,13 +12,25 @@ export interface SageSrPersonalityTraitItem {
   beforeAge21: boolean
 }
 
+export interface SageSrPersonalityTrait {
+  trait: string
+  concernTier: "high" | "medium"
+  items: SageSrPersonalityTraitItem[]
+}
+
 export interface SageSrPersonalityParsedResult {
-  /** Trait name -> concern tier ('high' | 'medium') and its items. Low-concern traits
-   *  (per the Report Key's third tier) never get an item-level breakdown anywhere in
-   *  this report — same pattern as Core Clinician's "Areas with Absent or Minimal
-   *  Symptoms" list — so they simply don't appear here at all; a trait's absence from
-   *  this result means low concern, not a parsing gap. */
-  traits: Record<string, { concernTier: "high" | "medium"; items: SageSrPersonalityTraitItem[] }>
+  /** One entry per trait that appears under either concern tier, in the order
+   *  encountered in the report (High Concern traits first, then Medium Concern) — an
+   *  ordered array rather than a Record<string, {...}>, because Postgres's jsonb column
+   *  type does not guarantee object key order survives a round trip through the
+   *  database (same jsonb key-order bug already found and fixed for Core Clinician's
+   *  endorsedSymptomsByDiagnosis/furtherEvaluationSymptomsByDiagnosis and Background's
+   *  sections — deliberately deferred here until this results view got built, per the
+   *  SAGE-SR handover). Low-concern traits (per the Report Key's third tier) never get
+   *  an item-level breakdown anywhere in this report — same pattern as Core Clinician's
+   *  "Areas with Absent or Minimal Symptoms" list — so they simply don't appear here at
+   *  all; a trait's absence from this result means low concern, not a parsing gap. */
+  traits: SageSrPersonalityTrait[]
 }
 
 /** All 10 DSM-5-TR personality disorders this report screens, matching the "X Traits"
@@ -82,7 +94,8 @@ function isTraitHeading(text: string): string | null {
  * can't be read this way at all).
  */
 export function parseSageSrPersonalityReport(rows: SageSrTextRow[]): SageSrPersonalityParsedResult {
-  const traits: SageSrPersonalityParsedResult["traits"] = {}
+  const traits: SageSrPersonalityTrait[] = []
+  const traitByName = new Map<string, SageSrPersonalityTrait>()
 
   let currentTier: "high" | "medium" | null = null
   let currentTrait: string | null = null
@@ -98,7 +111,7 @@ export function parseSageSrPersonalityReport(rows: SageSrTextRow[]): SageSrPerso
       return
     }
     if (pendingItemParts.length === 0 || pendingResponseParts.length === 0) return
-    traits[currentTrait].items.push({
+    traitByName.get(currentTrait)?.items.push({
       item: pendingItemParts.join(" ").replace(/\s+/g, " ").trim(),
       response: pendingResponseParts.join(" ").replace(/\s+/g, " ").trim(),
       beforeAge21: pendingBeforeAge21,
@@ -148,8 +161,10 @@ export function parseSageSrPersonalityReport(rows: SageSrTextRow[]): SageSrPerso
     if (traitHeading) {
       flush()
       currentTrait = traitHeading
-      if (currentTier && !traits[currentTrait]) {
-        traits[currentTrait] = { concernTier: currentTier, items: [] }
+      if (currentTier && !traitByName.has(currentTrait)) {
+        const entry: SageSrPersonalityTrait = { trait: currentTrait, concernTier: currentTier, items: [] }
+        traits.push(entry)
+        traitByName.set(currentTrait, entry)
       }
       continue
     }

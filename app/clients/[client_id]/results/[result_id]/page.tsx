@@ -40,19 +40,15 @@ import { calculatePsfScore } from "@/lib/assessments/psf"
 import { requirePractitionerContext } from "@/lib/auth"
 import { db } from "@/lib/db"
 import { appendReturnTo } from "@/lib/navigation/back"
-import type { SageSrCoreParsedResult } from "@/lib/sage-sr/parse-core-clinician"
 import type { SageSrCoreResponseParsedResult } from "@/lib/sage-sr/parse-core-response"
-import type { SageSrResolvedDiagnosis } from "@/lib/sage-sr/resolve-diagnosis-codes"
+import type { SageSrCoreStoredClinicianData } from "@/lib/sage-sr/import-sage-sr-report"
 
 /** Shape of assessmentResults.structuredScoreJson for a SAGE_SR_CORE instance, as
  *  written by lib/sage-sr/import-sage-sr-report.ts. Either key may be absent if only
  *  one of the two companion PDFs (Clinician Report / Response Report) has been
  *  uploaded so far — the page renders whatever is present rather than assuming both. */
 interface SageSrCoreStructuredData {
-  clinician?: SageSrCoreParsedResult & {
-    furtherEvaluationDiagnosisCodes: SageSrResolvedDiagnosis[]
-    absentOrMinimalDiagnosisCodes: SageSrResolvedDiagnosis[]
-  }
+  clinician?: SageSrCoreStoredClinicianData
   response?: SageSrCoreResponseParsedResult
   footerVersion?: string | null
 }
@@ -67,6 +63,19 @@ function formatDate(value: Date | string | null) {
     month: "long",
     year: "numeric",
   })
+}
+
+/** Renders an ICD-10 code cell consistently across all three concern tiers — a real
+ *  code if one exists, or "Requires clinical determination" if not, regardless of
+ *  which tier the diagnosis sits in. Previously the low-concern tier showed a bare
+ *  "—" for the same underlying situation (no code, needs a clinical specifier) that
+ *  the high-concern tier explained properly — same cause, should read the same way
+ *  no matter which table row it lands in. */
+function IcdCodeCell({ icd10Code }: { icd10Code: string | null }) {
+  if (icd10Code) return <>{icd10Code}</>
+  return (
+    <span className="text-muted-foreground">Requires clinical determination</span>
+  )
 }
 
 export default async function AssessmentResultDetailPage({
@@ -242,7 +251,7 @@ export default async function AssessmentResultDetailPage({
                     <TableRow>
                       <TableHead>Diagnosis</TableHead>
                       <TableHead className="w-28">Concern</TableHead>
-                      <TableHead className="w-32">ICD-10 code</TableHead>
+                      <TableHead className="w-40">ICD-10 code</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -255,51 +264,38 @@ export default async function AssessmentResultDetailPage({
                           <Badge variant="destructive">High</Badge>
                         </TableCell>
                         <TableCell className="tabular-nums">
-                          {diagnosis.icd10Code ?? (
-                            <span className="text-muted-foreground">
-                              Requires clinical determination
-                            </span>
-                          )}
+                          <IcdCodeCell icd10Code={diagnosis.icd10Code} />
                         </TableCell>
                       </TableRow>
                     ))}
-                    {Object.keys(clinician.furtherEvaluationSymptomsByDiagnosis).map(
-                      (label, index) => {
-                        const resolved =
-                          clinician.furtherEvaluationDiagnosisCodes[index]
-                        return (
-                          <TableRow key={`medium-${index}`}>
-                            <TableCell className="whitespace-normal font-medium">
-                              {label}
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant="warning">Medium</Badge>
-                            </TableCell>
-                            <TableCell className="tabular-nums">
-                              {resolved?.icd10Code ?? (
-                                <span className="text-muted-foreground">—</span>
-                              )}
-                            </TableCell>
-                          </TableRow>
-                        )
-                      }
-                    )}
-                    {clinician.absentOrMinimalDiagnoses.map((label, index) => {
-                      const resolved = clinician.absentOrMinimalDiagnosisCodes[index]
-                      return (
-                        <TableRow key={`low-${index}`}>
-                          <TableCell className="whitespace-normal text-muted-foreground">
-                            {label}
+                    {clinician.furtherEvaluationSymptomsByDiagnosis.map(
+                      (entry, index) => (
+                        <TableRow key={`medium-${index}`}>
+                          <TableCell className="whitespace-normal font-medium">
+                            {entry.diagnosis}
                           </TableCell>
                           <TableCell>
-                            <Badge variant="muted">Low</Badge>
+                            <Badge variant="warning">Medium</Badge>
                           </TableCell>
-                          <TableCell className="tabular-nums text-muted-foreground">
-                            {resolved?.icd10Code ?? "—"}
+                          <TableCell className="tabular-nums">
+                            <IcdCodeCell icd10Code={entry.icd10Code} />
                           </TableCell>
                         </TableRow>
                       )
-                    })}
+                    )}
+                    {clinician.absentOrMinimalDiagnoses.map((entry, index) => (
+                      <TableRow key={`low-${index}`}>
+                        <TableCell className="whitespace-normal text-muted-foreground">
+                          {entry.label}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="muted">Low</Badge>
+                        </TableCell>
+                        <TableCell className="tabular-nums text-muted-foreground">
+                          <IcdCodeCell icd10Code={entry.icd10Code} />
+                        </TableCell>
+                      </TableRow>
+                    ))}
                   </TableBody>
                 </Table>
               </div>
@@ -313,25 +309,22 @@ export default async function AssessmentResultDetailPage({
           </Card>
         ) : null}
 
-        {clinician &&
-        Object.keys(clinician.endorsedSymptomsByDiagnosis).length > 0 ? (
+        {clinician && clinician.endorsedSymptomsByDiagnosis.length > 0 ? (
           <Card className="mb-6">
             <CardHeader>
               <CardTitle>Endorsed symptoms by diagnosis</CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
-              {Object.entries(clinician.endorsedSymptomsByDiagnosis).map(
-                ([diagnosis, symptoms]) => (
-                  <div key={diagnosis}>
-                    <p className="mb-2 font-medium">{diagnosis}</p>
-                    <ul className="list-disc space-y-1 pl-5 text-sm text-muted-foreground">
-                      {symptoms.map((symptom, index) => (
-                        <li key={index}>{symptom}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )
-              )}
+              {clinician.endorsedSymptomsByDiagnosis.map((entry, index) => (
+                <div key={index}>
+                  <p className="mb-2 font-medium">{entry.diagnosis}</p>
+                  <ul className="list-disc space-y-1 pl-5 text-sm text-muted-foreground">
+                    {entry.symptoms.map((symptom, symptomIndex) => (
+                      <li key={symptomIndex}>{symptom}</li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
             </CardContent>
           </Card>
         ) : null}
@@ -376,11 +369,11 @@ export default async function AssessmentResultDetailPage({
           </CardHeader>
           <CardContent>
             <div className="rounded-lg border">
-              <Table>
+              <Table className="table-fixed">
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="min-w-[300px]">Item</TableHead>
-                    <TableHead>Response</TableHead>
+                    <TableHead className="w-[65%]">Item</TableHead>
+                    <TableHead className="w-[35%]">Response</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -399,7 +392,9 @@ export default async function AssessmentResultDetailPage({
                         <TableCell className="whitespace-normal">
                           {row.item}
                         </TableCell>
-                        <TableCell>{row.response}</TableCell>
+                        <TableCell className="whitespace-normal">
+                          {row.response}
+                        </TableCell>
                       </TableRow>
                     ))
                   )}

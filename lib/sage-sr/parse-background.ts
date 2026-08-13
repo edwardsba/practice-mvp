@@ -1,14 +1,25 @@
 import type { SageSrTextRow } from "./extract-pdf-text"
 
+export interface SageSrBackgroundSection {
+  section: string
+  lines: string[]
+}
+
 export interface SageSrBackgroundParsedResult {
-  /** Section name (TeleSage's own heading text) -> raw content lines under it, kept
-   *  faithful to the source rather than deeply typed into per-field key/value pairs.
+  /** Section name (TeleSage's own heading text) with its raw content lines, kept
+   *  faithful to the source rather than deeply typed into per-field key/value pairs —
+   *  an ordered array rather than a Record<string, string[]>, because Postgres's jsonb
+   *  column type does not guarantee object key order survives a round trip through the
+   *  database (confirmed on this exact pattern in parse-core-clinician.ts: sections
+   *  rendered in a different order after being written to and read back from
+   *  structuredScoreJson than the order they were parsed in). Arrays don't have this
+   *  problem — jsonb preserves array element order faithfully.
    *  Most lines are naturally "Label: Value" text as TeleSage printed them (e.g. "Was
    *  physically abused: Never") — left as single strings rather than further split,
    *  consistent with how endorsed-symptom lists were kept in parse-core-clinician.ts;
    *  splitting into a stricter {label, value} shape is a reasonable follow-up once
    *  there's a concrete need for it, not assumed necessary up front. */
-  sections: Record<string, string[]>
+  sections: SageSrBackgroundSection[]
 }
 
 /** The x-position where the report's right-hand column of boxes begins. Section
@@ -105,18 +116,25 @@ export function parseSageSrBackgroundReport(rows: SageSrTextRow[]): SageSrBackgr
     if (rightText) rightLines.push(rightText)
   }
 
-  const sections: Record<string, string[]> = {}
+  const sections: SageSrBackgroundSection[] = []
+  const sectionByName = new Map<string, SageSrBackgroundSection>()
 
   function walkColumn(lines: string[]) {
-    let currentSection: string | null = null
+    let currentSection: SageSrBackgroundSection | null = null
     for (const line of lines) {
       const matchedHeader = matchesSectionHeader(line)
       if (matchedHeader) {
-        currentSection = matchedHeader
-        if (!sections[currentSection]) sections[currentSection] = []
+        const existing = sectionByName.get(matchedHeader)
+        if (existing) {
+          currentSection = existing
+        } else {
+          currentSection = { section: matchedHeader, lines: [] }
+          sections.push(currentSection)
+          sectionByName.set(matchedHeader, currentSection)
+        }
         continue
       }
-      if (currentSection) sections[currentSection].push(line)
+      if (currentSection) currentSection.lines.push(line)
     }
   }
 

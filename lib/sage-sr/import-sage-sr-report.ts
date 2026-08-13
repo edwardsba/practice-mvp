@@ -13,11 +13,48 @@ import { detectSageSrReport, type SageSrReportKind } from "./detect-report"
 import { extractSageSrPdfText } from "./extract-pdf-text"
 import { parseSageSrBackgroundReport } from "./parse-background"
 import { parseSageSrBackgroundResponseReport } from "./parse-background-response"
-import { parseSageSrCoreClinicianReport } from "./parse-core-clinician"
+import { parseSageSrCoreClinicianReport, type SageSrCoreDiagnosis } from "./parse-core-clinician"
 import { parseSageSrCoreResponseReport } from "./parse-core-response"
 import { parseSageSrPersonalityReport } from "./parse-personality"
 import { parseSageSrPersonalityResponseReport } from "./parse-personality-response"
-import { resolveSageSrDiagnosisLabel } from "./resolve-diagnosis-codes"
+import { resolveSageSrDiagnosisLabel, type SageSrResolvedDiagnosis } from "./resolve-diagnosis-codes"
+
+/** A furtherEvaluationSymptomsByDiagnosis entry with its resolved ICD-10 code merged
+ *  directly on, rather than kept in a separate array matched by position — a parallel
+ *  array indexed by position is exactly the kind of implicit-ordering assumption that
+ *  already caused a real bug once (see the endorsedSymptomsByDiagnosis Record->array
+ *  fix in parse-core-clinician.ts) and there's no reason to keep that same risk here
+ *  when it's just as easy to attach the code to the entry it belongs to. */
+export interface SageSrFurtherEvaluationDiagnosis {
+  diagnosis: string
+  symptoms: string[]
+  icd10Code: string | null
+  requiresClinicalSpecifier: boolean
+  codeNotes: string | null
+}
+
+/** An absent/minimal diagnosis label with its resolved code — same reasoning as
+ *  SageSrFurtherEvaluationDiagnosis above; replaces what used to be a bare string
+ *  paired with a same-index entry in a separate parallel array. */
+export type SageSrAbsentMinimalDiagnosis = SageSrResolvedDiagnosis
+
+/** The stored shape of assessmentResults.structuredScoreJson.clinician for a
+ *  SAGE_SR_CORE instance — the Core Clinician Report's parsed data, with ICD-10 codes
+ *  resolved and merged directly onto the entries that need them (medium-tier and
+ *  absent/minimal; high-concern diagnoses already carry TeleSage's own printed code
+ *  and pass through unchanged). This is the shape the results page should read. */
+export interface SageSrCoreStoredClinicianData {
+  alerts: string[]
+  highConcernDiagnoses: SageSrCoreDiagnosis[]
+  endorsedSymptomsByDiagnosis: { diagnosis: string; symptoms: string[] }[]
+  furtherEvaluationSymptomsByDiagnosis: SageSrFurtherEvaluationDiagnosis[]
+  absentOrMinimalDiagnoses: SageSrAbsentMinimalDiagnosis[]
+  metrics: {
+    reliabilityItemsCorrect: string | null
+    durationMinutes: number | null
+    itemsSkipped: string | null
+  }
+}
 
 type SageSrModule = "core" | "background" | "personality"
 
@@ -161,11 +198,30 @@ export async function importSageSrReport(params: {
   switch (detection.kind) {
     case "core_clinician": {
       const parsed = parseSageSrCoreClinicianReport(rows)
-      const furtherEvalResolved = await Promise.all(
-        Object.keys(parsed.furtherEvaluationSymptomsByDiagnosis).map((label) => resolveSageSrDiagnosisLabel(label))
+      const furtherEvaluationSymptomsByDiagnosis: SageSrFurtherEvaluationDiagnosis[] = await Promise.all(
+        parsed.furtherEvaluationSymptomsByDiagnosis.map(async (entry) => {
+          const resolved = await resolveSageSrDiagnosisLabel(entry.diagnosis)
+          return {
+            diagnosis: entry.diagnosis,
+            symptoms: entry.symptoms,
+            icd10Code: resolved.icd10Code,
+            requiresClinicalSpecifier: resolved.requiresClinicalSpecifier,
+            codeNotes: resolved.codeNotes,
+          }
+        })
       )
-      const absentMinimalResolved = await Promise.all(parsed.absentOrMinimalDiagnoses.map((label) => resolveSageSrDiagnosisLabel(label)))
-      parsedData = { ...parsed, furtherEvaluationDiagnosisCodes: furtherEvalResolved, absentOrMinimalDiagnosisCodes: absentMinimalResolved }
+      const absentOrMinimalDiagnoses: SageSrAbsentMinimalDiagnosis[] = await Promise.all(
+        parsed.absentOrMinimalDiagnoses.map((label) => resolveSageSrDiagnosisLabel(label))
+      )
+      const stored: SageSrCoreStoredClinicianData = {
+        alerts: parsed.alerts,
+        highConcernDiagnoses: parsed.highConcernDiagnoses,
+        endorsedSymptomsByDiagnosis: parsed.endorsedSymptomsByDiagnosis,
+        furtherEvaluationSymptomsByDiagnosis,
+        absentOrMinimalDiagnoses,
+        metrics: parsed.metrics,
+      }
+      parsedData = stored
       break
     }
     case "core_response":

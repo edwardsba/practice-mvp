@@ -8,21 +8,35 @@ export interface SageSrCoreDiagnosis {
   icd10Code: string | null
 }
 
+export interface SageSrDiagnosisSymptoms {
+  diagnosis: string
+  symptoms: string[]
+}
+
 export interface SageSrCoreParsedResult {
   alerts: string[]
   /** High-concern tier — the "Possible Diagnoses to Consider" table, with codes
    *  exactly as TeleSage printed them (no reference-table lookup needed here). */
   highConcernDiagnoses: SageSrCoreDiagnosis[]
   /** Endorsed symptoms per high-concern diagnosis, from the "Endorsed Symptoms by
-   *  Possible Diagnosis" section. Keyed by the heading AS PRINTED in that section —
-   *  which sometimes differs from the top-table label (e.g. "Current Major Depressive
-   *  Episode" vs. "Major Depressive Episode"). Reconciling that against
-   *  highConcernDiagnoses is a resolution-layer concern, not this parser's job — this
-   *  keeps the raw printed heading so nothing is silently normalized away. */
-  endorsedSymptomsByDiagnosis: Record<string, string[]>
-  /** Medium-concern tier — "Endorsed Symptoms for Further Evaluation". TeleSage prints
-   *  no ICD-10 code anywhere in this section. */
-  furtherEvaluationSymptomsByDiagnosis: Record<string, string[]>
+   *  Possible Diagnosis" section, IN THE ORDER PRINTED — an array, not a
+   *  Record<string, ...>, because Postgres's jsonb column type does not guarantee
+   *  object key order survives a round trip through the database (confirmed: this was
+   *  a Record originally, and after being written to and read back from
+   *  structuredScoreJson, diagnoses rendered in a different order than the source PDF
+   *  — e.g. Agoraphobia before Major Depressive Episode). Arrays don't have this
+   *  problem — jsonb preserves array element order faithfully, which is exactly why
+   *  highConcernDiagnoses above never showed this issue.
+   *  `diagnosis` is the heading AS PRINTED in this section — which sometimes differs
+   *  from the top-table label (e.g. "Current Major Depressive Episode" vs. "Major
+   *  Depressive Episode"). Reconciling that against highConcernDiagnoses is a
+   *  resolution-layer concern, not this parser's job — this keeps the raw printed
+   *  heading so nothing is silently normalized away. */
+  endorsedSymptomsByDiagnosis: SageSrDiagnosisSymptoms[]
+  /** Medium-concern tier — "Endorsed Symptoms for Further Evaluation", same
+   *  order-preserving array shape as endorsedSymptomsByDiagnosis above and for the
+   *  same reason. TeleSage prints no ICD-10 code anywhere in this section. */
+  furtherEvaluationSymptomsByDiagnosis: SageSrDiagnosisSymptoms[]
   /** Low-concern tier — "Areas with Absent or Minimal Symptoms". Bare labels only,
    *  no symptom detail, no code, printed by TeleSage in a multi-column layout. */
   absentOrMinimalDiagnoses: string[]
@@ -176,27 +190,27 @@ function matchesKnownDiagnosisLabel(text: string): boolean {
  *    spot-checking against a few more real client profiles as they come in, since this
  *    is inferring structure TeleSage's PDF doesn't mark explicitly.
  */
-function parseSymptomSections(rows: SageSrTextRow[], startMarker: string, endMarker: string | null): Record<string, string[]> {
+function parseSymptomSections(rows: SageSrTextRow[], startMarker: string, endMarker: string | null): SageSrDiagnosisSymptoms[] {
   const sectionRows = rowsBetween(rows, startMarker, endMarker)
-  const result: Record<string, string[]> = {}
-  let currentHeading: string | null = null
+  const result: SageSrDiagnosisSymptoms[] = []
+  let currentEntry: SageSrDiagnosisSymptoms | null = null
 
   for (const row of sectionRows) {
     if (row.cells.length === 0) continue
     if (FOOTER_ROW_PATTERN.test(row.cells[0])) continue
 
     if (row.cells.length === 1 && matchesKnownDiagnosisLabel(row.cells[0])) {
-      currentHeading = row.cells[0]
-      result[currentHeading] = []
+      currentEntry = { diagnosis: row.cells[0], symptoms: [] }
+      result.push(currentEntry)
       continue
     }
 
-    if (!currentHeading) continue
+    if (!currentEntry) continue
 
     if (row.cells.length === 1) {
       const cell = row.cells[0]
       const looksLikeContinuation = /^[a-z]/.test(cell)
-      const list = result[currentHeading]
+      const list = currentEntry.symptoms
       if (looksLikeContinuation && list.length > 0) {
         list[list.length - 1] = `${list[list.length - 1]} ${cell}`.trim()
       } else {
@@ -205,7 +219,7 @@ function parseSymptomSections(rows: SageSrTextRow[], startMarker: string, endMar
       continue
     }
 
-    result[currentHeading].push(...row.cells.filter(Boolean))
+    currentEntry.symptoms.push(...row.cells.filter(Boolean))
   }
 
   return result

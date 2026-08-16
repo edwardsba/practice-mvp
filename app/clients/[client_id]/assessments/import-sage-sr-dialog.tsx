@@ -102,28 +102,51 @@ export function ImportSageSrDialog({ clientId }: { clientId: string }) {
           method: "POST",
           body: formData,
         })
-        const data = (await res.json()) as
-          | ImportSuccessResponse
-          | ImportErrorResponse
 
-        if (res.ok && isSuccessResponse(data)) {
+        // Read as text first rather than res.json() directly — if something upstream
+        // (auth redirect, a platform-level error page, a crash before the route's own
+        // JSON.stringify) returns a non-JSON body, res.json() throws immediately and
+        // all we'd ever see is the generic network-error message below, with no way to
+        // tell that apart from an actual dropped connection. Reading as text first lets
+        // a bad body show up as its own distinct, diagnosable error state instead.
+        const rawText = await res.text()
+        let data: ImportSuccessResponse | ImportErrorResponse | null = null
+        try {
+          data = JSON.parse(rawText) as ImportSuccessResponse | ImportErrorResponse
+        } catch {
+          data = null
+        }
+
+        if (data && res.ok && isSuccessResponse(data)) {
           updateStatus(i, {
             state: "success",
             kind: data.kind,
             mergedIntoExisting: data.merged_into_existing,
           })
-        } else {
+        } else if (data && !isSuccessResponse(data)) {
           updateStatus(i, {
             state: "error",
-            message: !isSuccessResponse(data)
-              ? data.error
-              : "Import failed.",
+            message: `${data.error}${data.code ? ` (${data.code})` : ""}`,
+          })
+        } else {
+          // Response wasn't JSON at all, or was JSON but not in the expected shape —
+          // surface the status code and a snippet of the raw body so this is
+          // diagnosable from the dialog alone, without needing Vercel's function logs.
+          console.error("SAGE-SR import: unexpected response", {
+            status: res.status,
+            body: rawText,
+          })
+          updateStatus(i, {
+            state: "error",
+            message: `Unexpected response (HTTP ${res.status}): ${rawText.slice(0, 200) || "(empty body)"}`,
           })
         }
-      } catch {
+      } catch (err) {
+        console.error("SAGE-SR import: request failed", err)
         updateStatus(i, {
           state: "error",
-          message: "Upload failed — check your connection and try again.",
+          message:
+            "Request never reached the server — check your connection and try again.",
         })
       }
     }

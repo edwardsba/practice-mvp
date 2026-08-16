@@ -2,6 +2,7 @@ import { notFound } from "next/navigation"
 import { and, eq } from "drizzle-orm"
 
 import { AssessmentsTable } from "@/app/clients/[client_id]/assessments/assessments-table"
+import { ImportSageSrDialog } from "@/app/clients/[client_id]/assessments/import-sage-sr-dialog"
 import { AppShell } from "@/components/app-shell"
 import { BackButton } from "@/components/ui/back-button"
 import { EntityPageHeader } from "@/components/ui/entity-page-header"
@@ -55,6 +56,7 @@ export default async function ClientAssessmentsPage({
         kicker="Assessments"
         name={clientName}
         subheading={`${results.length} result${results.length === 1 ? "" : "s"}`}
+        action={<ImportSageSrDialog clientId={clientId} />}
       />
 
       <AssessmentsTable clientId={clientId} results={results} />

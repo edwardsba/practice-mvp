@@ -29,7 +29,13 @@ export async function proxy(request: NextRequest) {
     pathname.startsWith("/q/") ||
     pathname === "/api/assessments/submit" ||
     pathname.startsWith("/api/cron/")
+  const isApi = pathname.startsWith("/api/")
   if (!user && !isPublic) {
+    // API callers (fetch + FormData) cannot follow a login redirect — they'd get
+    // the HTML login page and fail to parse JSON. Let the route return 401 itself.
+    if (isApi) {
+      return supabaseResponse
+    }
     const url = request.nextUrl.clone()
     url.pathname = "/login"
     return NextResponse.redirect(url)

@@ -2,6 +2,24 @@ import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs"
 
 import { normalizeSageSrText } from "./normalize-text"
 
+let workerReady: Promise<unknown> | null = null
+
+function ensurePdfjsWorker() {
+  // pdfjs-dist's Node path loads a "fake worker" via dynamic import of
+  // pdf.worker.mjs. Under tsx that resolves next to the package; after Next.js
+  // bundles the Route Handler it doesn't, and getDocument() throws
+  // "Setting up fake worker failed". Importing the worker first (and leaving
+  // pdfjs-dist unbundled via serverExternalPackages) is the combination that
+  // works in a Next.js Route Handler. Cached so subsequent pages/files in the
+  // same isolate don't re-import.
+  workerReady ??= import(
+    // Worker bundle ships without a .d.ts
+    // @ts-expect-error -- pdf.worker.mjs has no declaration file
+    "pdfjs-dist/legacy/build/pdf.worker.mjs"
+  )
+  return workerReady
+}
+
 /** Gap (in PDF points) between the end of one text chunk and the start of the next,
  *  above which they're treated as separate columns rather than words in one phrase.
  *  Confirmed against the real Core Clinician Report: normal word-to-word gaps within
@@ -55,10 +73,10 @@ export interface SageSrExtractedPdf {
 /**
  * Extracts text from a SAGE-SR PDF buffer using pdfjs-dist's Node-compatible legacy
  * build (the standard client-facing build in this repo, used by pdf-viewer.tsx, is
- * browser/worker-only — this uses the separate legacy/build entry point instead,
- * which runs synchronously in Node without a worker).
+ * browser/worker-only — this uses the separate legacy/build entry point instead).
  */
 export async function extractSageSrPdfText(buffer: Buffer): Promise<SageSrExtractedPdf> {
+  await ensurePdfjsWorker()
   const data = new Uint8Array(buffer)
   const doc = await getDocument({ data }).promise
 

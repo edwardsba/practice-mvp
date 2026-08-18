@@ -1,13 +1,23 @@
-import { createRequire } from "node:module"
+import { join } from "node:path"
 import { pathToFileURL } from "node:url"
 
 import { normalizeSageSrText } from "./normalize-text"
 
 type PdfjsModule = typeof import("pdfjs-dist/legacy/build/pdf.mjs")
 
-const require = createRequire(import.meta.url)
-
 let pdfjsLoader: Promise<PdfjsModule> | null = null
+
+function pdfjsPackageRoot() {
+  // Must not use require.resolve("pdfjs-dist/...") — Next.js/webpack rewrites
+  // that call to a numeric module id (the "Received type number (65956)" error
+  // on Vercel). Resolve from process.cwd() so we always get a real filesystem path.
+  return join(process.cwd(), "node_modules", "pdfjs-dist")
+}
+
+function pdfjsDirUrl(relativeDir: string) {
+  const href = pathToFileURL(join(pdfjsPackageRoot(), relativeDir)).href
+  return href.endsWith("/") ? href : `${href}/`
+}
 
 function ensurePdfjsDomGlobals() {
   // pdfjs-dist evaluates `new DOMMatrix()` at module load (SCALE_MATRIX), even
@@ -76,9 +86,13 @@ async function loadPdfjs() {
     // file is not there, so getDocument() rejects with "Failed to load".
     // Resolve the real file from node_modules and import it via file:// so
     // webpack never tries to turn the worker into a missing chunk.
-    const workerHref = pathToFileURL(
-      require.resolve("pdfjs-dist/legacy/build/pdf.worker.mjs")
-    ).href
+    const workerPath = join(
+      pdfjsPackageRoot(),
+      "legacy",
+      "build",
+      "pdf.worker.mjs"
+    )
+    const workerHref = pathToFileURL(workerPath).href
     pdfjs.GlobalWorkerOptions.workerSrc = workerHref
     const worker = (await import(/* webpackIgnore: true */ workerHref)) as {
       WorkerMessageHandler: unknown
@@ -153,6 +167,9 @@ export async function extractSageSrPdfText(buffer: Buffer): Promise<SageSrExtrac
     // Text extraction does not need the wasm image decoder; skipping it avoids
     // a second "Failed to load" if the wasm files aren't in the serverless bundle.
     useWasm: false,
+    cMapUrl: pdfjsDirUrl("cmaps"),
+    cMapPacked: true,
+    standardFontDataUrl: pdfjsDirUrl("standard_fonts"),
   }).promise
 
   const flatItems: string[] = []

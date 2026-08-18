@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server"
 
 import { getPractitionerContext } from "@/lib/auth"
-import { importSageSrReport } from "@/lib/sage-sr/import-sage-sr-report"
 
 const MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024 // SAGE-SR Core Response runs ~16 pages; 20MB is a generous ceiling
 
@@ -41,6 +40,9 @@ export async function POST(request: Request) {
 
     const buffer = Buffer.from(await file.arrayBuffer())
 
+    // Dynamic so a pdfjs-dist load failure is caught below as JSON, not as the
+    // Next.js HTML error page from a failed Route Handler module evaluation.
+    const { importSageSrReport } = await import("@/lib/sage-sr/import-sage-sr-report")
     const result = await importSageSrReport({
       buffer,
       clientId,

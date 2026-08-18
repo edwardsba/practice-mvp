@@ -1,23 +1,24 @@
-import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs"
-
 import { normalizeSageSrText } from "./normalize-text"
 
-let workerReady: Promise<unknown> | null = null
+type PdfjsModule = typeof import("pdfjs-dist/legacy/build/pdf.mjs")
 
-function ensurePdfjsWorker() {
-  // pdfjs-dist's Node path loads a "fake worker" via dynamic import of
-  // pdf.worker.mjs. Under tsx that resolves next to the package; after Next.js
-  // bundles the Route Handler it doesn't, and getDocument() throws
-  // "Setting up fake worker failed". Importing the worker first (and leaving
-  // pdfjs-dist unbundled via serverExternalPackages) is the combination that
-  // works in a Next.js Route Handler. Cached so subsequent pages/files in the
-  // same isolate don't re-import.
-  workerReady ??= import(
-    // Worker bundle ships without a .d.ts
-    // @ts-expect-error -- pdf.worker.mjs has no declaration file
-    "pdfjs-dist/legacy/build/pdf.worker.mjs"
-  )
-  return workerReady
+let pdfjsLoader: Promise<PdfjsModule> | null = null
+
+async function loadPdfjs() {
+  // Must be a dynamic import, not a top-level `import { getDocument } from ...`.
+  // A static import of pdfjs-dist evaluates at Route Handler module load — before
+  // POST()'s try/catch — so a crash there becomes Next.js's HTML `__next_error__`
+  // page (HTTP 500) and the upload dialog can only show "Unexpected response".
+  pdfjsLoader ??= (async () => {
+    const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs")
+    await import(
+      // Worker bundle ships without a .d.ts
+      // @ts-expect-error -- pdf.worker.mjs has no declaration file
+      "pdfjs-dist/legacy/build/pdf.worker.mjs"
+    )
+    return pdfjs
+  })()
+  return pdfjsLoader
 }
 
 /** Gap (in PDF points) between the end of one text chunk and the start of the next,
@@ -76,7 +77,7 @@ export interface SageSrExtractedPdf {
  * browser/worker-only — this uses the separate legacy/build entry point instead).
  */
 export async function extractSageSrPdfText(buffer: Buffer): Promise<SageSrExtractedPdf> {
-  await ensurePdfjsWorker()
+  const { getDocument } = await loadPdfjs()
   const data = new Uint8Array(buffer)
   const doc = await getDocument({ data }).promise
 

@@ -48,6 +48,7 @@ import type {
 import type { SageSrBackgroundParsedResult } from "@/lib/sage-sr/parse-background"
 import type { SageSrBackgroundResponseParsedResult } from "@/lib/sage-sr/parse-background-response"
 import type { SageSrPersonalityResponseParsedResult } from "@/lib/sage-sr/parse-personality-response"
+import { scoreSageSrPersonalityCriteria } from "@/lib/sage-sr/score-personality-criteria"
 
 /** Shape of assessmentResults.structuredScoreJson for a SAGE_SR_CORE instance, as
  *  written by lib/sage-sr/import-sage-sr-report.ts. Either key may be absent if only
@@ -542,6 +543,17 @@ export default async function AssessmentResultDetailPage({
     const highConcernTraits = traits.filter((trait) => trait.concernTier === "high")
     const mediumConcernTraits = traits.filter((trait) => trait.concernTier === "medium")
     const responseItems = sageSrData.response?.responses ?? []
+    // Scoring only needs the Response Report's raw answers, not the interpreted Clinician
+    // Report — so this works even for a trait TeleSage's own report didn't surface at all
+    // (its "Traits of Concern" boxes only show high/medium concern; a trait it left out
+    // entirely as low concern can still independently satisfy our own DSM-5-TR threshold
+    // once every response level is counted per Ben's "we want to know the Sometimes
+    // answers" rule — that's real signal, not a display bug, if it ever shows up).
+    // Guarded on responseItems.length so an import with only the Clinician Report (no
+    // Response Report yet) shows nothing here rather than a misleading "0 met" for every
+    // disorder.
+    const criteriaScores =
+      responseItems.length > 0 ? await scoreSageSrPersonalityCriteria(responseItems) : []
 
     return (
       <AppShell>
@@ -622,6 +634,57 @@ export default async function AssessmentResultDetailPage({
                 clinician determines the actual diagnosis. Codes marked &ldquo;Requires
                 clinical determination&rdquo; need a specifier that only clinical
                 judgment can supply.
+              </p>
+            </CardContent>
+          </Card>
+        ) : null}
+
+        {criteriaScores.length > 0 ? (
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle>DSM-5-TR criteria</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="rounded-lg border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Disorder</TableHead>
+                      <TableHead className="w-32">Criteria met</TableHead>
+                      <TableHead className="w-28">Threshold</TableHead>
+                      <TableHead className="w-40">Meets threshold</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {criteriaScores.map((score) => (
+                      <TableRow key={score.disorder}>
+                        <TableCell className="whitespace-normal font-medium">
+                          {score.disorder}
+                        </TableCell>
+                        <TableCell className="tabular-nums">
+                          {score.criteriaMet} of {score.totalCriteria}
+                        </TableCell>
+                        <TableCell className="tabular-nums">
+                          ≥{score.thresholdRequired}
+                        </TableCell>
+                        <TableCell>
+                          {score.meetsThreshold ? (
+                            <Badge variant="destructive">Yes</Badge>
+                          ) : (
+                            <Badge variant="muted">No</Badge>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+              <p className="mt-3 text-sm text-muted-foreground">
+                Computed from every answer in the SAGE-SR Personality Response Report,
+                not only the items TeleSage&apos;s own diagnostic report chooses to
+                display — this can show a disorder meeting threshold that
+                doesn&apos;t appear in the Trait concerns table above. This is not a
+                diagnosis; only a licensed clinician can make one.
               </p>
             </CardContent>
           </Card>

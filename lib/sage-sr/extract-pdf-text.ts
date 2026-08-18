@@ -9,12 +9,65 @@ const require = createRequire(import.meta.url)
 
 let pdfjsLoader: Promise<PdfjsModule> | null = null
 
+function ensurePdfjsDomGlobals() {
+  // pdfjs-dist evaluates `new DOMMatrix()` at module load (SCALE_MATRIX), even
+  // for text-only getTextContent. Node has no DOMMatrix; pdfjs will polyfill it
+  // from @napi-rs/canvas only when it detects a Node environment — Next.js's
+  // external-module loader on Vercel does not, so the import throws
+  // "Failed to load external module ... ReferenceError: DOMMatrix is not defined".
+  // Stubs are enough: text extraction never uses canvas rendering.
+  const g = globalThis as Record<string, unknown>
+  if (typeof g.DOMMatrix === "undefined") {
+    g.DOMMatrix = class DOMMatrix {
+      is2D = true
+      isIdentity = true
+      constructor(_init?: unknown) {}
+      multiplySelf() {
+        return this
+      }
+      preMultiplySelf() {
+        return this
+      }
+      invertSelf() {
+        return this
+      }
+      translate() {
+        return this
+      }
+      scale() {
+        return this
+      }
+      transformPoint(point: unknown) {
+        return point
+      }
+    }
+  }
+  if (typeof g.Path2D === "undefined") {
+    g.Path2D = class Path2D {
+      addPath() {}
+    }
+  }
+  if (typeof g.ImageData === "undefined") {
+    g.ImageData = class ImageData {
+      width: number
+      height: number
+      data: Uint8ClampedArray
+      constructor(width: number, height: number) {
+        this.width = width
+        this.height = height
+        this.data = new Uint8ClampedArray(width * height * 4)
+      }
+    }
+  }
+}
+
 async function loadPdfjs() {
   // Must be a dynamic import, not a top-level `import { getDocument } from ...`.
   // A static import of pdfjs-dist evaluates at Route Handler module load — before
   // POST()'s try/catch — so a crash there becomes Next.js's HTML `__next_error__`
   // page (HTTP 500) and the upload dialog can only show "Unexpected response".
   pdfjsLoader ??= (async () => {
+    ensurePdfjsDomGlobals()
     const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs")
 
     // On Node, pdfjs disables real Workers and runs a "fake worker" on the main

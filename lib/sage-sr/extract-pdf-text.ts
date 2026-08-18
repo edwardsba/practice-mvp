@@ -154,6 +154,33 @@ export interface SageSrExtractedPdf {
   rows: SageSrTextRow[]
 }
 
+/** Splits a row's x-sorted positioned items into cells wherever the horizontal gap
+ *  between consecutive items exceeds COLUMN_GAP_THRESHOLD — the same logic the main
+ *  extraction loop below uses to compute each row's own `cells` field, factored out so
+ *  parsers needing to re-split an arbitrary item subset (e.g. one page-level column's
+ *  worth of items) can reuse it rather than reimplementing the threshold check
+ *  themselves. `items` must already be sorted by x (true of `row.items` per its own
+ *  docstring, and of any filtered subset of it that preserves order). */
+export function splitPositionedItemsIntoCells(items: SageSrPositionedItem[]): string[] {
+  const cells: string[] = []
+  let currentCell: string[] = []
+  let prevEnd: number | null = null
+
+  for (const item of items) {
+    const gap = prevEnd !== null ? item.x - prevEnd : 0
+    if (prevEnd !== null && gap > COLUMN_GAP_THRESHOLD) {
+      cells.push(currentCell.join(" ").replace(/\s+/g, " ").trim())
+      currentCell = []
+    }
+    currentCell.push(item.str)
+    prevEnd = item.x + item.width
+  }
+  if (currentCell.length > 0) {
+    cells.push(currentCell.join(" ").replace(/\s+/g, " ").trim())
+  }
+  return cells.filter(Boolean)
+}
+
 /**
  * Extracts text from a SAGE-SR PDF buffer using pdfjs-dist's Node-compatible legacy
  * build (the standard client-facing build in this repo, used by pdf-viewer.tsx, is
@@ -198,24 +225,7 @@ export async function extractSageSrPdfText(buffer: Buffer): Promise<SageSrExtrac
     for (const [y, items] of rowsByY) {
       const sorted = [...items].sort((a, b) => a.x - b.x)
 
-      const cells: string[] = []
-      let currentCell: string[] = []
-      let prevEnd: number | null = null
-
-      for (const item of sorted) {
-        const gap = prevEnd !== null ? item.x - prevEnd : 0
-        if (prevEnd !== null && gap > COLUMN_GAP_THRESHOLD) {
-          cells.push(currentCell.join(" ").replace(/\s+/g, " ").trim())
-          currentCell = []
-        }
-        currentCell.push(item.str)
-        prevEnd = item.x + item.width
-      }
-      if (currentCell.length > 0) {
-        cells.push(currentCell.join(" ").replace(/\s+/g, " ").trim())
-      }
-
-      const nonEmptyCells = cells.filter(Boolean)
+      const nonEmptyCells = splitPositionedItemsIntoCells(sorted)
       const text = nonEmptyCells.join(" ").trim()
       if (text) rows.push({ page: pageNum, y, text, cells: nonEmptyCells, items: sorted })
     }

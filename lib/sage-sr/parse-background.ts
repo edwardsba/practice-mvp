@@ -1,4 +1,5 @@
 import type { SageSrTextRow } from "./extract-pdf-text"
+import { splitPositionedItemsIntoCells } from "./extract-pdf-text"
 
 export interface SageSrBackgroundSection {
   section: string
@@ -76,6 +77,31 @@ function matchesSectionHeader(text: string): string | null {
   return SECTION_HEADER_PREFIXES.find((prefix) => text.startsWith(prefix)) ?? null
 }
 
+/** A cell that's just "Label:" with nothing after the final colon has its value on the
+ *  next line instead of the same one — confirmed against the real Background Report for
+ *  Adverse Childhood Events items whose label text is too long to fit alongside the
+ *  value on one row (e.g. "Lived with someone who had a serious mental health problem:"
+ *  with "Sometimes" as its own line immediately after). Merged before section-content
+ *  parsing ever sees these lines, so downstream code only ever deals with complete
+ *  "Label: Value" lines. Guarded against merging into a genuine section header — a
+ *  label-only line is never actually followed by a header in the real data, but nothing
+ *  stops that from changing, and swallowing a header into the previous section's content
+ *  would be a worse failure than leaving one line unmerged. */
+function mergeLabelOnlyLines(lines: string[]): string[] {
+  const merged: string[] = []
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]
+    const next = lines[i + 1]
+    if (/:\s*$/.test(line) && next !== undefined && !matchesSectionHeader(next)) {
+      merged.push(`${line} ${next}`)
+      i++ // consume next as this line's value
+      continue
+    }
+    merged.push(line)
+  }
+  return merged
+}
+
 /**
  * The Background Report renders as a genuine two-column dashboard grid — NOT a simple
  * aligned table like the Core Clinician diagnosis table or the Item/Response reports.
@@ -101,19 +127,18 @@ export function parseSageSrBackgroundReport(rows: SageSrTextRow[]): SageSrBackgr
     if (row.items.length === 0) continue
     if (FOOTER_ROW_PATTERN.test(row.items[0].str)) continue
 
-    const leftText = row.items
-      .filter((i) => i.x < COLUMN_BOUNDARY_X)
-      .map((i) => i.str)
-      .join(" ")
-      .trim()
-    const rightText = row.items
-      .filter((i) => i.x >= COLUMN_BOUNDARY_X)
-      .map((i) => i.str)
-      .join(" ")
-      .trim()
+    // Split each column's item subset into cells at the same gap threshold the raw
+    // extraction already uses, rather than joining every item on the row into one
+    // blob string — otherwise two side-by-side fields sharing a row (e.g. "Sex at
+    // Birth: Male" and "Ethnicity: Not Hispanic/Latino" in the Demographics box)
+    // collapse into a single unparseable line. Confirmed against the real report:
+    // this exact merge was happening for every side-by-side field pair in
+    // Demographics and Current Housing and Social Supports.
+    const leftItems = row.items.filter((i) => i.x < COLUMN_BOUNDARY_X)
+    const rightItems = row.items.filter((i) => i.x >= COLUMN_BOUNDARY_X)
 
-    if (leftText) leftLines.push(leftText)
-    if (rightText) rightLines.push(rightText)
+    leftLines.push(...splitPositionedItemsIntoCells(leftItems))
+    rightLines.push(...splitPositionedItemsIntoCells(rightItems))
   }
 
   const sections: SageSrBackgroundSection[] = []
@@ -138,8 +163,8 @@ export function parseSageSrBackgroundReport(rows: SageSrTextRow[]): SageSrBackgr
     }
   }
 
-  walkColumn(leftLines)
-  walkColumn(rightLines)
+  walkColumn(mergeLabelOnlyLines(leftLines))
+  walkColumn(mergeLabelOnlyLines(rightLines))
 
   return { sections }
 }

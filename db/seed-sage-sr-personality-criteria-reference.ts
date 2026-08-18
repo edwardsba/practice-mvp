@@ -10,17 +10,15 @@ config({ path: ".env.local" })
 // Source: manual mapping of every SAGE-SR Personality item (Response Report, not just what
 // TeleSage's own diagnostic report chooses to display) against DSM-5-TR personality disorder
 // criteria, built from the real Test01 item bank, reviewed by Ben, delivered as
-// dsm5tr-personality-criterion-mapping.xlsx. Criteria are paraphrased in our own words, not
-// quoted from the DSM-5-TR text.
+// dsm5tr-personality-criterion-mapping.xlsx, and independently verified criterion-by-criterion
+// against StatPearls' published DSM-5-TR text for all 10 disorders (every criterion's
+// wording, ordering, and threshold confirmed to match). Criteria are paraphrased in our own
+// words, not quoted from the DSM-5-TR text.
 //
-// Deliberately excluded from this seed data:
-//  - Criteria with no corresponding SAGE-SR item at all (e.g. Schizoid criterion 6
-//    "indifferent to praise/criticism", Schizotypal criterion 9 "excessive social anxiety
-//    with paranoid quality") — simply absent from this table for that disorder.
-//  - Obsessive-Compulsive criteria 4 and 7 — the real Test01 responses for the mapped items
-//    ("I had very high ethical standards...": Rarely; "I liked spending money on myself and
-//    other people": Often) didn't clearly fit either scoring direction. Left out rather than
-//    guessed at; revisit once Ben has a clinical read on these two.
+// Deliberately excluded from this seed data: criteria with no corresponding SAGE-SR item at
+// all (e.g. Schizoid criterion 6 "indifferent to praise/criticism", Schizotypal criterion 9
+// "excessive social anxiety with paranoid quality") — simply absent from this table for that
+// disorder.
 //
 // Some items are mapped under more than one disorder (noted inline) where DSM-5-TR criteria
 // genuinely overlap across disorders (e.g. lack of close friends appears in both Schizoid and
@@ -167,19 +165,25 @@ const ROWS: CriterionRow[] = [
   { disorder: "Dependent Personality Disorder", criterionNumber: 7, criterionText: "Urgently seeks another relationship as a source of care and support when a close relationship ends.", threshold: 5, total: 8, itemText: "If a close relationship had ended, I would have done everything I could to find someone to support or care for me.", notes: "Same item also mapped under Borderline criterion 1." },
   { disorder: "Dependent Personality Disorder", criterionNumber: 8, criterionText: "Is unrealistically preoccupied with fears of being left to take care of themselves.", threshold: 5, total: 8, itemText: "I worried a lot about being left alone to take care of myself.", notes: "Same item also mapped under Borderline criterion 1." },
 
-  // ---------- Obsessive-Compulsive Personality Disorder (≥4 of 8; criteria 4 and 7 deliberately excluded) ----------
+  // ---------- Obsessive-Compulsive Personality Disorder (≥4 of 8) ----------
   { disorder: "Obsessive-Compulsive Personality Disorder", criterionNumber: 1, criterionText: "Preoccupied with details, rules, lists, order, organization, or schedules to the extent that the major point of the activity is lost.", threshold: 4, total: 8, itemText: "It was so important to me to have everything in order and to follow rules, that I might have missed the overall purpose of the activity." },
   { disorder: "Obsessive-Compulsive Personality Disorder", criterionNumber: 2, criterionText: "Shows perfectionism that interferes with task completion.", threshold: 4, total: 8, itemText: "I was unable to complete tasks or projects on time because I thought that they needed to be perfect.", notes: UNSURFACED_NOTE },
   { disorder: "Obsessive-Compulsive Personality Disorder", criterionNumber: 3, criterionText: "Excessively devoted to work and productivity to the exclusion of leisure activities and friendships.", threshold: 4, total: 8, itemText: "Being productive was more important to me than taking time to have fun or having time to relax.", notes: UNSURFACED_NOTE },
   { disorder: "Obsessive-Compulsive Personality Disorder", criterionNumber: 3, criterionText: "Excessively devoted to work and productivity to the exclusion of leisure activities and friendships.", threshold: 4, total: 8, itemText: "My friends or family complained that I was too devoted to my work.", notes: UNSURFACED_NOTE },
+  { disorder: "Obsessive-Compulsive Personality Disorder", criterionNumber: 4, criterionText: "Overconscientious, scrupulous, and inflexible about matters of morality, ethics, or values.", threshold: 4, total: 8, itemText: "I had very high ethical standards for myself and others." },
   { disorder: "Obsessive-Compulsive Personality Disorder", criterionNumber: 5, criterionText: "Unable to discard worn-out or worthless objects even when they have no sentimental value.", threshold: 4, total: 8, itemText: "My home was so filled with objects that it was difficult for me to get around or find what I needed." },
   { disorder: "Obsessive-Compulsive Personality Disorder", criterionNumber: 5, criterionText: "Unable to discard worn-out or worthless objects even when they have no sentimental value.", threshold: 4, total: 8, itemText: "I kept worn-out items that lacked sentimental value because I might need them someday.", notes: UNSURFACED_NOTE },
   { disorder: "Obsessive-Compulsive Personality Disorder", criterionNumber: 6, criterionText: "Reluctant to delegate tasks or work with others unless they submit to exactly their way of doing things.", threshold: 4, total: 8, itemText: "I did things myself because no one else would do them correctly.", notes: UNSURFACED_NOTE },
   { disorder: "Obsessive-Compulsive Personality Disorder", criterionNumber: 6, criterionText: "Reluctant to delegate tasks or work with others unless they submit to exactly their way of doing things.", threshold: 4, total: 8, itemText: "When I asked people to do things, I expected them to be done exactly my way.", notes: UNSURFACED_NOTE },
+  { disorder: "Obsessive-Compulsive Personality Disorder", criterionNumber: 7, criterionText: "Adopts a miserly spending style toward both self and others; money is viewed as something to be hoarded for future catastrophes.", threshold: 4, total: 8, itemText: "I liked spending money on myself and other people.", reverseScored: true },
   { disorder: "Obsessive-Compulsive Personality Disorder", criterionNumber: 8, criterionText: "Shows rigidity and stubbornness.", threshold: 4, total: 8, itemText: "People might have thought I was stubborn.", notes: UNSURFACED_NOTE },
   { disorder: "Obsessive-Compulsive Personality Disorder", criterionNumber: 8, criterionText: "Shows rigidity and stubbornness.", threshold: 4, total: 8, itemText: "Once I made a decision, I was determined to follow it through no matter what.", notes: UNSURFACED_NOTE },
-  // criterion 4 ("overconscientious about ethics/morality/values") and criterion 7 ("miserly
-  // spending style") deliberately excluded — see file header comment
+  // Both previously-excluded criteria (4 and 7, above) were resolved by checking the real
+  // DSM-5-TR wording directly against StatPearls: criterion 4 is a standard (non-reverse)
+  // item — high conscientiousness about ethics is the pathological direction, so Test01's
+  // "Rarely" response simply means this criterion isn't met, not an unclear scoring
+  // direction. Criterion 7 is a clean reverse-scored item — disliking spending money
+  // indicates miserliness. Both now included above with the correct direction.
 ]
 
 async function main() {

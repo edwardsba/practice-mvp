@@ -24,20 +24,19 @@ export const sageSrDiagnosisReference = pgTable('sage_sr_diagnosis_reference', {
 // Static reference table — NOT client data. One row per SAGE-SR Personality item that maps
 // to a specific DSM-5-TR personality disorder criterion. Built once from a manual audit of
 // the real Test01 item bank against DSM-5-TR (criteria paraphrased in our own words, not
-// quoted from the DSM-5-TR text itself), reviewed and corrected by Ben, and re-seeded
-// whenever that review changes — see db/seed-sage-sr-personality-criteria-reference.ts for
-// the actual source data and how to re-run it after a correction.
+// quoted from the DSM-5-TR text itself), reviewed and corrected by Ben, independently
+// verified criterion-by-criterion against StatPearls' published DSM-5-TR text for all 10
+// disorders, and re-seeded whenever the review changes — see
+// db/seed-sage-sr-personality-criteria-reference.ts for the actual source data and how to
+// re-run it after a correction.
 //
 // A single DSM-5-TR criterion is often supported by more than one SAGE-SR item (multiple
 // rows sharing the same disorder + criterionNumber) — a criterion counts as satisfied for a
 // client if ANY of its mapped items are satisfied, not all of them.
 //
-// Deliberately excludes: (a) criteria for which no corresponding SAGE-SR item exists at all
-// (the criterion is simply absent from this table for that disorder — not an oversight, a
-// reflection of the instrument's actual coverage), and (b) two criteria (Obsessive-Compulsive
-// criterion 4 "overconscientious about ethics" and criterion 7 "miserly spending style") where
-// the real Test01 response didn't clearly fit either scoring direction — left out rather than
-// guessed at, pending Ben's clinical read.
+// Deliberately excludes criteria for which no corresponding SAGE-SR item exists at all (the
+// criterion is simply absent from this table for that disorder — not an oversight, a
+// reflection of the instrument's actual coverage).
 export const sageSrPersonalityCriteriaReference = pgTable('sage_sr_personality_criteria_reference', {
   sageSrPersonalityCriteriaReferenceId: uuid('sage_sr_personality_criteria_reference_id').primaryKey().defaultRandom(),
   disorder: text('disorder').notNull(), // e.g. "Paranoid Personality Disorder"

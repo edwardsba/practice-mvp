@@ -69,7 +69,11 @@ export async function POST(request: Request) {
     // "check your connection" message because res.json() couldn't parse it.
     console.error("SAGE-SR import failed", error)
     const message =
-      error instanceof Error ? error.message : "Import failed unexpectedly."
+      error instanceof Error
+        ? [error.message, error.cause instanceof Error ? error.cause.message : null]
+            .filter(Boolean)
+            .join(" — ")
+        : "Import failed unexpectedly."
     return NextResponse.json(
       { error: message, code: "internal_error" },
       { status: 500 }

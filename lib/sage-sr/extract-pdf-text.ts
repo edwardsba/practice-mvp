@@ -1,6 +1,11 @@
+import { createRequire } from "node:module"
+import { pathToFileURL } from "node:url"
+
 import { normalizeSageSrText } from "./normalize-text"
 
 type PdfjsModule = typeof import("pdfjs-dist/legacy/build/pdf.mjs")
+
+const require = createRequire(import.meta.url)
 
 let pdfjsLoader: Promise<PdfjsModule> | null = null
 
@@ -11,11 +16,22 @@ async function loadPdfjs() {
   // page (HTTP 500) and the upload dialog can only show "Unexpected response".
   pdfjsLoader ??= (async () => {
     const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs")
-    await import(
-      // Worker bundle ships without a .d.ts
-      // @ts-expect-error -- pdf.worker.mjs has no declaration file
-      "pdfjs-dist/legacy/build/pdf.worker.mjs"
-    )
+
+    // On Node, pdfjs disables real Workers and runs a "fake worker" on the main
+    // thread. That path does `import(GlobalWorkerOptions.workerSrc)`, which
+    // defaults to "./pdf.worker.mjs" relative to process cwd — on Vercel that
+    // file is not there, so getDocument() rejects with "Failed to load".
+    // Resolve the real file from node_modules and import it via file:// so
+    // webpack never tries to turn the worker into a missing chunk.
+    const workerHref = pathToFileURL(
+      require.resolve("pdfjs-dist/legacy/build/pdf.worker.mjs")
+    ).href
+    pdfjs.GlobalWorkerOptions.workerSrc = workerHref
+    const worker = (await import(/* webpackIgnore: true */ workerHref)) as {
+      WorkerMessageHandler: unknown
+    }
+    ;(globalThis as { pdfjsWorker?: unknown }).pdfjsWorker = worker
+
     return pdfjs
   })()
   return pdfjsLoader
@@ -79,7 +95,12 @@ export interface SageSrExtractedPdf {
 export async function extractSageSrPdfText(buffer: Buffer): Promise<SageSrExtractedPdf> {
   const { getDocument } = await loadPdfjs()
   const data = new Uint8Array(buffer)
-  const doc = await getDocument({ data }).promise
+  const doc = await getDocument({
+    data,
+    // Text extraction does not need the wasm image decoder; skipping it avoids
+    // a second "Failed to load" if the wasm files aren't in the serverless bundle.
+    useWasm: false,
+  }).promise
 
   const flatItems: string[] = []
   const rows: SageSrTextRow[] = []

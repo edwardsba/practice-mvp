@@ -152,13 +152,34 @@ export function ImportSageSrDialog({ clientId }: { clientId: string }) {
     }
 
     setImporting(false)
-    router.refresh()
+    // Don't router.refresh() here. Refreshing remounts this server-rendered page
+    // and Radix closes the dialog, which wipes the per-file errors before they
+    // can be read. Refresh on close instead, after the user has seen the results.
   }
 
   function handleOpenChange(nextOpen: boolean) {
     if (importing) return // don't let the dialog close mid-upload
-    setOpen(nextOpen)
-    if (!nextOpen) setEntries([])
+    if (!nextOpen) {
+      const shouldRefresh = entries.some(
+        (entry) =>
+          entry.status.state === "success" || entry.status.state === "error"
+      )
+      setOpen(false)
+      setEntries([])
+      if (shouldRefresh) router.refresh()
+      return
+    }
+    setOpen(true)
+  }
+
+  async function copyErrors() {
+    const lines = entries
+      .filter(
+        (entry): entry is FileEntry & { status: { state: "error"; message: string } } =>
+          entry.status.state === "error"
+      )
+      .map((entry) => `${entry.file.name}: ${entry.status.message}`)
+    await navigator.clipboard.writeText(lines.join("\n"))
   }
 
   const hasResults = entries.some((entry) => entry.status.state !== "pending")
@@ -174,7 +195,18 @@ export function ImportSageSrDialog({ clientId }: { clientId: string }) {
       <DialogTrigger asChild>
         <Button variant="outline">Import SAGE-SR report</Button>
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent
+        className="max-h-[90vh] overflow-y-auto"
+        onPointerDownOutside={(event) => {
+          // Keep results on screen until Done is clicked — a click-outside would
+          // otherwise close the dialog and lose the error text (which is what
+          // happened on the last failed upload).
+          if (importing || allDone) event.preventDefault()
+        }}
+        onEscapeKeyDown={(event) => {
+          if (importing) event.preventDefault()
+        }}
+      >
         <DialogHeader>
           <DialogTitle>Import SAGE-SR report</DialogTitle>
           <DialogDescription>
@@ -201,14 +233,11 @@ export function ImportSageSrDialog({ clientId }: { clientId: string }) {
           </div>
 
           {entries.length > 0 ? (
-            <ul className="space-y-2 rounded-lg border p-3">
+            <ul className="space-y-3 rounded-lg border p-3">
               {entries.map((entry, index) => (
-                <li
-                  key={`${entry.file.name}-${index}`}
-                  className="flex items-center justify-between gap-3 text-sm"
-                >
-                  <span className="truncate">{entry.file.name}</span>
-                  <span className="flex-shrink-0 text-right text-muted-foreground">
+                <li key={`${entry.file.name}-${index}`} className="space-y-1 text-sm">
+                  <div className="truncate font-medium">{entry.file.name}</div>
+                  <div className="text-muted-foreground">
                     {entry.status.state === "pending" ? "Ready to upload" : null}
                     {entry.status.state === "uploading" ? "Uploading…" : null}
                     {entry.status.state === "success" ? (
@@ -220,11 +249,11 @@ export function ImportSageSrDialog({ clientId }: { clientId: string }) {
                       </span>
                     ) : null}
                     {entry.status.state === "error" ? (
-                      <span className="text-destructive">
+                      <span className="block whitespace-pre-wrap break-words text-destructive">
                         {entry.status.message}
                       </span>
                     ) : null}
-                  </span>
+                  </div>
                 </li>
               ))}
             </ul>
@@ -233,9 +262,16 @@ export function ImportSageSrDialog({ clientId }: { clientId: string }) {
 
         <DialogFooter>
           {allDone ? (
-            <Button type="button" onClick={() => handleOpenChange(false)}>
-              Done
-            </Button>
+            <>
+              {entries.some((entry) => entry.status.state === "error") ? (
+                <Button type="button" variant="outline" onClick={copyErrors}>
+                  Copy errors
+                </Button>
+              ) : null}
+              <Button type="button" onClick={() => handleOpenChange(false)}>
+                Done
+              </Button>
+            </>
           ) : (
             <>
               <Button

@@ -55,6 +55,8 @@
     "db:sage-sr-diagnosis-reference": "tsx db/apply-sage-sr-diagnosis-reference-migration.ts",
     "seed:sage-sr-diagnosis-reference": "tsx db/seed-sage-sr-diagnosis-reference.ts",
     "seed:sage-sr-definitions": "tsx db/seed-sage-sr-assessment-definitions.ts",
+    "db:sage-sr-personality-criteria-reference": "tsx db/apply-sage-sr-personality-criteria-reference-migration.ts",
+    "seed:sage-sr-personality-criteria-reference": "tsx db/seed-sage-sr-personality-criteria-reference.ts",
 
     "db:migrate-option-defaults": "tsx db/apply-assessment-option-default-selection-migration.ts",
     "db:migrate-reporting-baseline": "tsx db/apply-assessment-option-reporting-baseline-migration.ts",

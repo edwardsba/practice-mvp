@@ -154,31 +154,57 @@ export interface SageSrExtractedPdf {
   rows: SageSrTextRow[]
 }
 
+/** A cell produced by splitting a row's positioned items by column gap, keeping the
+ *  cell's starting x position alongside its text — see splitPositionedItemsIntoCellsWithX. */
+export interface SageSrPositionedCell {
+  x: number
+  text: string
+}
+
 /** Splits a row's x-sorted positioned items into cells wherever the horizontal gap
  *  between consecutive items exceeds COLUMN_GAP_THRESHOLD — the same logic the main
  *  extraction loop below uses to compute each row's own `cells` field, factored out so
  *  parsers needing to re-split an arbitrary item subset (e.g. one page-level column's
  *  worth of items) can reuse it rather than reimplementing the threshold check
  *  themselves. `items` must already be sorted by x (true of `row.items` per its own
- *  docstring, and of any filtered subset of it that preserves order). */
-export function splitPositionedItemsIntoCells(items: SageSrPositionedItem[]): string[] {
-  const cells: string[] = []
-  let currentCell: string[] = []
+ *  docstring, and of any filtered subset of it that preserves order).
+ *
+ *  Unlike splitPositionedItemsIntoCells (a thin wrapper around this that drops the
+ *  position), this keeps each cell's starting x — needed by parsers reconstructing a
+ *  genuine multi-column grid across MULTIPLE rows (e.g. a wrapped label whose
+ *  continuation is a lone cell on the next row), where knowing which column a cell
+ *  belongs to can't be recovered from cell index alone once a row has fewer cells than
+ *  the grid has columns. See parse-core-clinician.ts's parseAbsentMinimal for the
+ *  motivating real case. */
+export function splitPositionedItemsIntoCellsWithX(items: SageSrPositionedItem[]): SageSrPositionedCell[] {
+  const cells: SageSrPositionedCell[] = []
+  let currentItems: SageSrPositionedItem[] = []
   let prevEnd: number | null = null
+
+  const flush = () => {
+    if (currentItems.length === 0) return
+    const text = currentItems.map((i) => i.str).join(" ").replace(/\s+/g, " ").trim()
+    if (text) cells.push({ x: currentItems[0].x, text })
+    currentItems = []
+  }
 
   for (const item of items) {
     const gap = prevEnd !== null ? item.x - prevEnd : 0
     if (prevEnd !== null && gap > COLUMN_GAP_THRESHOLD) {
-      cells.push(currentCell.join(" ").replace(/\s+/g, " ").trim())
-      currentCell = []
+      flush()
     }
-    currentCell.push(item.str)
+    currentItems.push(item)
     prevEnd = item.x + item.width
   }
-  if (currentCell.length > 0) {
-    cells.push(currentCell.join(" ").replace(/\s+/g, " ").trim())
-  }
-  return cells.filter(Boolean)
+  flush()
+
+  return cells
+}
+
+/** String-only convenience wrapper — see splitPositionedItemsIntoCellsWithX for the
+ *  position-preserving version most existing callers here don't need. */
+export function splitPositionedItemsIntoCells(items: SageSrPositionedItem[]): string[] {
+  return splitPositionedItemsIntoCellsWithX(items).map((c) => c.text)
 }
 
 /**

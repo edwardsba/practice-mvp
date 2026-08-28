@@ -67,10 +67,24 @@ function joinList(items: string[]): string {
  * it there directly, never re-derived from the reference table (see
  * resolve-diagnosis-codes.ts's own docstring on why tier 1 is excluded from that
  * lookup).
+ *
+ * `derivedFromDiagnosisName`: a small number of Core's top-table diagnoses are never
+ * separately detailed in "Endorsed Symptoms by Possible Diagnosis" at all — TeleSage
+ * only prints symptom detail under a different, clinically-prior diagnosis that
+ * establishes them (confirmed on the real Test01 report: "Bipolar I Disorder" has its
+ * own top-table row and code but no symptom heading of its own — only "Manic Episode"
+ * does, which is literally what DSM-5 requires to establish a Bipolar I diagnosis).
+ * When set, the paragraph names that diagnosis instead of falling back to "detailed
+ * symptom-level data was not available." Deliberately does NOT say "the symptoms
+ * above/below" — table order isn't guaranteed (on the real Test01 report, Bipolar I
+ * Disorder's own row actually prints BEFORE Manic Episode's, so "above" would have
+ * been wrong on this exact profile) — "detailed under X in this section" holds
+ * regardless of print order.
  */
 function buildTier1Paragraph(
   diagnosis: { label: string; icd10Code: string | null },
-  symptomEntry: SageSrDiagnosisSymptoms | undefined
+  symptomEntry: SageSrDiagnosisSymptoms | undefined,
+  derivedFromDiagnosisName?: string
 ): SageSrCoreDiagnosisParagraph {
   const name = symptomEntry?.diagnosis ?? diagnosis.label
   const codeSuffix = diagnosis.icd10Code ? ` (${diagnosis.icd10Code})` : ""
@@ -81,7 +95,9 @@ function buildTier1Paragraph(
       ? `The client reports having symptoms that meet full diagnostic criteria for: ${name}${codeSuffix}, including ${joinList(
           symptoms.map(lowercaseFirst)
         )}.`
-      : `The client reports having symptoms that meet full diagnostic criteria for: ${name}${codeSuffix}. Detailed symptom-level data was not available for this diagnosis.`
+      : derivedFromDiagnosisName
+        ? `The client reports having symptoms that meet full diagnostic criteria for: ${name}${codeSuffix}, established by the symptoms detailed under ${derivedFromDiagnosisName} in this section.`
+        : `The client reports having symptoms that meet full diagnostic criteria for: ${name}${codeSuffix}. Detailed symptom-level data was not available for this diagnosis.`
 
   return {
     diagnosis: diagnosis.label,
@@ -89,6 +105,18 @@ function buildTier1Paragraph(
     symptoms,
     paragraph,
   }
+}
+
+/**
+ * Explicit, narrow map of Core diagnoses that are structurally derived from another
+ * diagnosis's symptom detail rather than having their own — see buildTier1Paragraph's
+ * docstring for the confirmed real case (Bipolar I Disorder ← Manic Episode).
+ * Deliberately a small explicit map rather than a general "find a related label"
+ * heuristic: guessing a clinical derivation relationship for an arbitrary diagnosis
+ * pair would be a much bigger and riskier claim than this one confirmed case.
+ */
+const DERIVED_FROM_DIAGNOSIS: Record<string, string> = {
+  "Bipolar I Disorder": "Manic Episode",
 }
 
 /**
@@ -118,7 +146,15 @@ export function buildSageSrCoreSection(parsed: SageSrCoreParsedResult): SageSrCo
     const symptomEntry = parsed.endorsedSymptomsByDiagnosis.find((entry) =>
       diagnosisLabelsMatch(entry.diagnosis, diagnosis.label)
     )
-    return buildTier1Paragraph(diagnosis, symptomEntry)
+
+    // Only consult DERIVED_FROM_DIAGNOSIS when there's no direct match — a diagnosis
+    // with its own real symptom detail always uses that, never the derived-from name.
+    const derivedFromLabel = !symptomEntry ? DERIVED_FROM_DIAGNOSIS[diagnosis.label] : undefined
+    const derivedFromEntry = derivedFromLabel
+      ? parsed.endorsedSymptomsByDiagnosis.find((entry) => diagnosisLabelsMatch(entry.diagnosis, derivedFromLabel))
+      : undefined
+
+    return buildTier1Paragraph(diagnosis, symptomEntry, derivedFromEntry?.diagnosis)
   })
 
   const furtherEvaluationSentence =

@@ -85,7 +85,10 @@ assertEqual("alerts: none raised → null", buildSageSrCoreSection(baseParsed())
 
 // --- Tier 1: real Test01 case with no matching heading at all (Bipolar I Disorder —
 // TeleSage only prints symptom detail under "Manic Episode", never a separate
-// "Bipolar I Disorder" heading) ---
+// "Bipolar I Disorder" heading). Cross-references Manic Episode instead of falling
+// back to a no-detail sentence, per Ben's explicit call — wording deliberately avoids
+// "above"/"below" since table print order isn't guaranteed (confirmed: on the real
+// Test01 report, Bipolar I Disorder's row actually prints BEFORE Manic Episode's). ---
 
 {
   const section = buildSageSrCoreSection(
@@ -95,7 +98,30 @@ assertEqual("alerts: none raised → null", buildSageSrCoreSection(baseParsed())
     })
   )
   assertEqual(
-    "tier 1: unmatched diagnosis (Bipolar I Disorder) falls back to a no-detail sentence rather than guessing",
+    "tier 1: Bipolar I Disorder cross-references Manic Episode rather than a no-detail fallback",
+    section.paragraphs[0].paragraph,
+    "The client reports having symptoms that meet full diagnostic criteria for: Bipolar I Disorder (F31.x), established by the symptoms detailed under Manic Episode in this section."
+  )
+  assertEqual(
+    "tier 1: cross-referenced paragraph's own symptoms field stays empty (no duplication of Manic Episode's list)",
+    section.paragraphs[0].symptoms.length,
+    0
+  )
+}
+
+// --- Tier 1: Bipolar I Disorder with NO Manic Episode entry present either (should
+// fall back to the generic no-detail sentence, not crash or invent a cross-reference
+// to nothing) ---
+
+{
+  const section = buildSageSrCoreSection(
+    baseParsed({
+      highConcernDiagnoses: [{ label: "Bipolar I Disorder", icd10Code: "F31.x" }],
+      endorsedSymptomsByDiagnosis: [],
+    })
+  )
+  assertEqual(
+    "tier 1: Bipolar I Disorder with no Manic Episode entry either falls back to the generic no-detail sentence",
     section.paragraphs[0].paragraph,
     "The client reports having symptoms that meet full diagnostic criteria for: Bipolar I Disorder (F31.x). Detailed symptom-level data was not available for this diagnosis."
   )

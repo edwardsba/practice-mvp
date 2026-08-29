@@ -20,6 +20,11 @@ import {
   type PreviewReportState,
   type SaveReportDraftState,
 } from "@/app/clients/[client_id]/reports/report-form-actions"
+import {
+  fetchSageDiagnosticReportPreview,
+  saveSageDiagnosticReportDraftAction,
+  type SaveSageDiagnosticReportDraftState,
+} from "@/app/clients/[client_id]/reports/sage-sr-diagnostic-report-actions"
 import { DocumentPreviewModal } from "@/components/documents/document-preview-modal"
 import { AssessmentSummaryMethodologyNote } from "@/components/report/assessment-summary-methodology-note"
 import { ReportDocument } from "@/components/report/report-document"
@@ -41,6 +46,11 @@ import {
   formatAppointmentTime,
   todayDateString,
 } from "@/lib/appointments/format"
+import type { SageSrDiagnosticReportContent } from "@/lib/assessment-summary/load-sage-sr-diagnostic-report"
+import type {
+  SageSrDiagnosticReportInstanceOption,
+  SageSrDiagnosticReportInstanceOptions,
+} from "@/lib/assessment-summary/list-sage-sr-diagnostic-report-instance-options"
 import type { ReportRecipient, ReportSnapshot } from "@/lib/reports/snapshot"
 import type { LetterBodyDoc } from "@/lib/reports/letter-body-types"
 import { parseLetterBodyJson } from "@/lib/reports/letter-body-types"
@@ -62,6 +72,7 @@ export function ReportForm({
   clientId,
   fundingApprovals,
   reportTypes,
+  sageSrInstanceOptions = { core: [], background: [], personality: [] },
   initialFundingApprovalId = null,
   initialRequirementId = null,
   initialReportTypeId = null,
@@ -88,6 +99,7 @@ export function ReportForm({
     ReturnType<typeof getClientFundingApprovalsForReport>
   >
   reportTypes: Awaited<ReturnType<typeof getReportTypes>>
+  sageSrInstanceOptions?: SageSrDiagnosticReportInstanceOptions
   initialFundingApprovalId?: string | null
   initialRequirementId?: string | null
   initialReportTypeId?: string | null
@@ -242,6 +254,50 @@ export function ReportForm({
   const templateKey = resolveTemplateKey(selectedReportType?.templateKey)
   const reportTitle = selectedReportType?.name ?? "Progress Report"
   const isReferralAck = templateKey === "referral_acknowledgement"
+  const isSageDiagnostic = templateKey === "sage_sr_diagnostic"
+
+  // --- SAGE-SR Diagnostic Report composer state -------------------------------------
+  // Entirely separate from the simple_reports state above (funding/appointments/letter
+  // body/ReportSnapshot preview) — this report type writes to sage_sr_diagnostic_reports
+  // via its own actions (sage-sr-diagnostic-report-actions.ts), per the confirmed "own
+  // table, own renderer" design. Core is mandatory; Background/Personality are optional
+  // and start unselected — no "always most recent" default, matching the confirmed
+  // multi-round decision.
+  const [sageCoreInstanceId, setSageCoreInstanceId] = useState("")
+  const [sageBackgroundInstanceId, setSageBackgroundInstanceId] = useState("")
+  const [sagePersonalityInstanceId, setSagePersonalityInstanceId] = useState("")
+  const [sagePreviewContent, setSagePreviewContent] =
+    useState<SageSrDiagnosticReportContent | null>(null)
+  const [sagePreviewError, setSagePreviewError] = useState<string | null>(null)
+  const [isPendingSagePreview, startSagePreviewTransition] = useTransition()
+  const [sageSaveState, sageSaveFormAction, sageSavePending] = useActionState(
+    saveSageDiagnosticReportDraftAction.bind(null, clientId),
+    {} as SaveSageDiagnosticReportDraftState
+  )
+
+  useEffect(() => {
+    // No synchronous setState branch here for "core not selected yet" (unlike
+    // loadPreview's equivalent early-return below, which does clear state
+    // synchronously) — the JSX below instead gates on sageCoreInstanceId directly, so
+    // stale sagePreviewContent from an earlier selection is simply never rendered
+    // rather than needing to be nulled out on every keystroke.
+    if (!isSageDiagnostic || !sageCoreInstanceId) return
+    startSagePreviewTransition(async () => {
+      const { content, error } = await fetchSageDiagnosticReportPreview(clientId, {
+        core: sageCoreInstanceId,
+        background: sageBackgroundInstanceId || null,
+        personality: sagePersonalityInstanceId || null,
+      })
+      setSagePreviewContent(content)
+      setSagePreviewError(error ?? null)
+    })
+  }, [
+    isSageDiagnostic,
+    clientId,
+    sageCoreInstanceId,
+    sageBackgroundInstanceId,
+    sagePersonalityInstanceId,
+  ])
 
   const selectedAppointmentDates = selectedApproval
     ? selectedApproval.appointments
@@ -606,24 +662,27 @@ export function ReportForm({
             <CardTitle>Report details</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="funding_approval">Funding approval</Label>
-              <select
-                id="funding_approval"
-                className={selectClassName}
-                value={fundingApprovalId}
-                onChange={(e) => setFundingApprovalId(e.target.value)}
-              >
-                <option value="">No funding approval</option>
-                {fundingApprovals.map((fa) => (
-                  <option key={fa.fundingApprovalId} value={fa.fundingApprovalId}>
-                    {fa.label}
-                  </option>
-                ))}
-              </select>
-            </div>
+            {isSageDiagnostic ? null : (
+              <div className="space-y-2">
+                <Label htmlFor="funding_approval">Funding approval</Label>
+                <select
+                  id="funding_approval"
+                  className={selectClassName}
+                  value={fundingApprovalId}
+                  onChange={(e) => setFundingApprovalId(e.target.value)}
+                >
+                  <option value="">No funding approval</option>
+                  {fundingApprovals.map((fa) => (
+                    <option key={fa.fundingApprovalId} value={fa.fundingApprovalId}>
+                      {fa.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
 
-            {selectedApproval &&
+            {!isSageDiagnostic &&
+              selectedApproval &&
               (selectedApproval.requirements.length > 0 ? (
                 <div className="space-y-2">
                   <Label htmlFor="report_requirement">
@@ -672,23 +731,25 @@ export function ReportForm({
               </select>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="recipient_type">Address report to</Label>
-              <select
-                id="recipient_type"
-                className={selectClassName}
-                value={recipientType}
-                onChange={(e) => setRecipientType(e.target.value)}
-              >
-                {selectedApproval && (
-                  <option value="referrer">
-                    Referrer ({selectedApproval.referrerName ?? "—"})
-                  </option>
-                )}
-                <option value="client">Client</option>
-                <option value="none">No recipient</option>
-              </select>
-            </div>
+            {isSageDiagnostic ? null : (
+              <div className="space-y-2">
+                <Label htmlFor="recipient_type">Address report to</Label>
+                <select
+                  id="recipient_type"
+                  className={selectClassName}
+                  value={recipientType}
+                  onChange={(e) => setRecipientType(e.target.value)}
+                >
+                  {selectedApproval && (
+                    <option value="referrer">
+                      Referrer ({selectedApproval.referrerName ?? "—"})
+                    </option>
+                  )}
+                  <option value="client">Client</option>
+                  <option value="none">No recipient</option>
+                </select>
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label htmlFor="report_date">Report date</Label>
@@ -703,9 +764,44 @@ export function ReportForm({
           </CardContent>
         </Card>
 
-        <AssessmentSummaryMethodologyNote />
+        {isSageDiagnostic ? null : <AssessmentSummaryMethodologyNote />}
 
-        {isReferralAck ? null : (
+        {isSageDiagnostic ? (
+          <Card>
+            <CardHeader>
+              <CardTitle>SAGE-SR modules to include</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <SageSrModuleInstancePicker
+                label="Core (required)"
+                name="sage_core_instance_id"
+                options={sageSrInstanceOptions.core}
+                value={sageCoreInstanceId}
+                onChange={setSageCoreInstanceId}
+                allowNone={false}
+              />
+              <SageSrModuleInstancePicker
+                label="Background (optional)"
+                name="sage_background_instance_id"
+                options={sageSrInstanceOptions.background}
+                value={sageBackgroundInstanceId}
+                onChange={setSageBackgroundInstanceId}
+                allowNone
+              />
+              <SageSrModuleInstancePicker
+                label="Personality (optional)"
+                name="sage_personality_instance_id"
+                options={sageSrInstanceOptions.personality}
+                value={sagePersonalityInstanceId}
+                onChange={setSagePersonalityInstanceId}
+                allowNone
+              />
+              {sagePreviewError ? (
+                <p className="text-sm text-destructive">{sagePreviewError}</p>
+              ) : null}
+            </CardContent>
+          </Card>
+        ) : isReferralAck ? null : (
           <>
             {selectedApproval ? (
               <Card>
@@ -823,7 +919,129 @@ export function ReportForm({
         )}
       </div>
 
-      {isReferralAck ? (
+      {isSageDiagnostic ? (
+        <form action={sageSaveFormAction} className="mt-6 space-y-6">
+          <input type="hidden" name="sage_core_instance_id" value={sageCoreInstanceId} />
+          <input
+            type="hidden"
+            name="sage_background_instance_id"
+            value={sageBackgroundInstanceId}
+          />
+          <input
+            type="hidden"
+            name="sage_personality_instance_id"
+            value={sagePersonalityInstanceId}
+          />
+          <input type="hidden" name="report_date" value={reportDate} />
+
+          {!sageCoreInstanceId ? (
+            <Card>
+              <CardContent className="py-8 text-center text-sm text-muted-foreground">
+                Select a Core module import above to preview the report content.
+              </CardContent>
+            </Card>
+          ) : isPendingSagePreview ? (
+            <Card>
+              <CardContent className="py-8 text-center text-sm text-muted-foreground">
+                Loading preview…
+              </CardContent>
+            </Card>
+          ) : sagePreviewContent ? (
+            <div className="report-print-area space-y-6 rounded-xl border bg-white p-8 shadow-sm">
+              <h2 className="text-lg font-semibold">{reportTitle}</h2>
+              {sagePreviewContent.introduction ? (
+                <p className="text-sm">{sagePreviewContent.introduction}</p>
+              ) : null}
+              <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
+                {sagePreviewContent.exclusionClause}
+              </div>
+              {sagePreviewContent.background ? (
+                <div className="space-y-2">
+                  <h3 className="font-medium">Background</h3>
+                  {[
+                    sagePreviewContent.background.opening,
+                    sagePreviewContent.background.background,
+                    sagePreviewContent.background.adverseChildhoodEvents,
+                    sagePreviewContent.background.currentFunctioning,
+                    sagePreviewContent.background.safetyAndStability,
+                    sagePreviewContent.background.treatmentEngagement,
+                  ]
+                    .filter((text): text is string => Boolean(text))
+                    .map((text, i) => (
+                      <p key={i} className="text-sm text-muted-foreground">
+                        {text}
+                      </p>
+                    ))}
+                </div>
+              ) : null}
+              <div className="space-y-2">
+                <h3 className="font-medium">Core</h3>
+                {sagePreviewContent.core.alertsSentence ? (
+                  <p className="text-sm font-medium text-destructive">
+                    {sagePreviewContent.core.alertsSentence}
+                  </p>
+                ) : null}
+                {sagePreviewContent.core.paragraphs.map((p) => (
+                  <p key={p.diagnosis} className="text-sm text-muted-foreground">
+                    {p.paragraph}
+                  </p>
+                ))}
+                {sagePreviewContent.core.furtherEvaluationSentence ? (
+                  <p className="text-sm text-muted-foreground">
+                    {sagePreviewContent.core.furtherEvaluationSentence}
+                  </p>
+                ) : null}
+                {sagePreviewContent.core.absentOrMinimalSentence ? (
+                  <p className="text-sm text-muted-foreground">
+                    {sagePreviewContent.core.absentOrMinimalSentence}
+                  </p>
+                ) : null}
+              </div>
+              {sagePreviewContent.personality ? (
+                <div className="space-y-2">
+                  <h3 className="font-medium">Personality</h3>
+                  {sagePreviewContent.personality.paragraphs.map((p) => (
+                    <p key={p.disorder} className="text-sm text-muted-foreground">
+                      {p.paragraph}
+                    </p>
+                  ))}
+                  {sagePreviewContent.personality.belowThresholdSentence ? (
+                    <p className="text-sm text-muted-foreground">
+                      {sagePreviewContent.personality.belowThresholdSentence}
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
+              <p className="text-xs text-muted-foreground">
+                This is a plain-text content preview only — there is no formatted PDF
+                for the SAGE-SR Diagnostic Report yet.
+              </p>
+            </div>
+          ) : (
+            <Card>
+              <CardContent className="py-8 text-center text-sm text-muted-foreground">
+                {sagePreviewError ?? "Could not load a preview for the selected imports."}
+              </CardContent>
+            </Card>
+          )}
+
+          {sageSaveState.error ? (
+            <p className="no-print text-sm text-destructive">{sageSaveState.error}</p>
+          ) : null}
+
+          <div className="no-print flex flex-wrap gap-3">
+            <Button type="button" variant="outline" asChild>
+              <Link href={cancelHref}>Cancel</Link>
+            </Button>
+            <Button
+              type="submit"
+              disabled={sageSavePending || !reportTypeId || !sageCoreInstanceId}
+            >
+              {sageSavePending ? "Saving…" : "Save Draft"}
+            </Button>
+          </div>
+        </form>
+      ) : isReferralAck ? (
         <form action={boundSaveAction} className="mt-6 space-y-6">
           {hiddenFormInputs}
 
@@ -996,5 +1214,82 @@ export function ReportForm({
         </p>
       ) : null}
     </>
+  )
+}
+
+/**
+ * A single module's row of import-round options in the SAGE-SR Diagnostic Report
+ * composer — a plain radio group (not checkboxes, despite selectedInstancesJson's
+ * design being described as "mirroring the appointment checkbox pattern"): each module
+ * resolves to exactly one instanceId in the stored shape
+ * (SageSrDiagnosticReportSelectedInstances), so the UI has to enforce a single
+ * selection per module even though the underlying idea — surface every real import
+ * round and let the practitioner choose, never silently default to "most recent" — is
+ * the same one that pattern established. An option whose import is missing the data
+ * this module's generator needs (e.g. Personality's interpreted report without its
+ * Response Report companion) is still listed, so a half-imported round isn't just
+ * invisible, but disabled — selecting it would only produce a server-side error from
+ * loadSageSrDiagnosticReportContentForClient.
+ */
+function SageSrModuleInstancePicker({
+  label,
+  name,
+  options,
+  value,
+  onChange,
+  allowNone,
+}: {
+  label: string
+  name: string
+  options: SageSrDiagnosticReportInstanceOption[]
+  value: string
+  onChange: (value: string) => void
+  allowNone: boolean
+}) {
+  return (
+    <div className="space-y-2">
+      <Label>{label}</Label>
+      {options.length === 0 ? (
+        <p className="text-sm text-muted-foreground">
+          No imports on file for this module.
+        </p>
+      ) : (
+        <div className="space-y-1">
+          {allowNone ? (
+            <label className="flex cursor-pointer items-center gap-2 text-sm">
+              <input
+                type="radio"
+                name={name}
+                checked={value === ""}
+                onChange={() => onChange("")}
+                className="h-4 w-4"
+              />
+              <span className="text-muted-foreground">None</span>
+            </label>
+          ) : null}
+          {options.map((option) => (
+            <label
+              key={option.assessmentInstanceId}
+              className="flex cursor-pointer items-center gap-2 text-sm"
+            >
+              <input
+                type="radio"
+                name={name}
+                checked={value === option.assessmentInstanceId}
+                disabled={!option.hasRequiredData}
+                onChange={() => onChange(option.assessmentInstanceId)}
+                className="h-4 w-4"
+              />
+              <span>{formatAppointmentDate(option.evaluationDate)}</span>
+              {!option.hasRequiredData ? (
+                <span className="text-xs text-muted-foreground">
+                  (incomplete import — missing required data)
+                </span>
+              ) : null}
+            </label>
+          ))}
+        </div>
+      )}
+    </div>
   )
 }

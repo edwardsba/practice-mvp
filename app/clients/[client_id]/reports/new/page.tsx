@@ -10,6 +10,7 @@ import { clients, practitionerProfiles, practices, treatmentPlans } from "@/db/s
 import { getClientFundingApprovalsForReport } from "@/lib/actions/funding"
 import { loadActiveCrisisPlanSummary } from "@/lib/crisis-plans/load"
 import { getReportTypes } from "@/lib/actions/report-types"
+import { listSageSrDiagnosticReportInstanceOptions } from "@/lib/assessment-summary/list-sage-sr-diagnostic-report-instance-options"
 import {
   formatPractitionerFormalName,
   formatPractitionerName,
@@ -88,9 +89,10 @@ export default async function NewReportPage({
     notFound()
   }
 
-  const [fundingApprovals, reportTypes] = await Promise.all([
+  const [fundingApprovals, reportTypes, sageSrInstanceOptions] = await Promise.all([
     getClientFundingApprovalsForReport(clientId, context.practiceId),
     getReportTypes(context.practiceId),
+    listSageSrDiagnosticReportInstanceOptions(clientId, context.practiceId),
   ])
 
   const signatureDataUrl = practitioner.signatureImagePath
@@ -149,6 +151,7 @@ export default async function NewReportPage({
         clientId={clientId}
         fundingApprovals={fundingApprovals}
         reportTypes={reportTypes}
+        sageSrInstanceOptions={sageSrInstanceOptions}
         initialFundingApprovalId={initialFundingApprovalId ?? null}
         initialRequirementId={initialRequirementId ?? null}
         initialSnapshot={{

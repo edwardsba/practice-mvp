@@ -26,10 +26,9 @@ import {
  * report type yet (a separate follow-up), so there is no "Finalise" / download / send
  * step here to mirror report-form-actions.ts's finaliseReportAction family — Save
  * Draft is the only action, and it always creates a new row (no edit-existing-draft
- * flow yet either, since there's no "open a saved SAGE-SR report" page yet — that
- * page is also follow-up work). generatedContentJson is still populated in full on
- * every save (not deferred to some later "generate" step) so the row is immediately
- * useful once a renderer exists to read it.
+ * flow yet). generatedContentJson is populated in full on every save so the
+ * saved-report view at /clients/[client_id]/reports/sage-sr/[report_id] can render
+ * the frozen snapshot immediately.
  */
 
 async function verifyClient(clientId: string, practiceId: string) {
@@ -129,20 +128,24 @@ export async function saveSageDiagnosticReportDraftAction(
     return { error: result.error }
   }
 
-  await db.insert(sageSrDiagnosticReports).values({
-    clientId,
-    practiceId: context.practiceId,
-    practitionerProfileId: context.practitionerProfileId,
-    reportDate,
-    selectedInstancesJson: parsed.values,
-    generatedContentJson: result.content,
-    reportStatus: "draft",
-  })
+  const [inserted] = await db
+    .insert(sageSrDiagnosticReports)
+    .values({
+      clientId,
+      practiceId: context.practiceId,
+      practitionerProfileId: context.practitionerProfileId,
+      reportDate,
+      selectedInstancesJson: parsed.values,
+      generatedContentJson: result.content,
+      reportStatus: "draft",
+    })
+    .returning({
+      sageSrDiagnosticReportId: sageSrDiagnosticReports.sageSrDiagnosticReportId,
+    })
 
-  // NOT /clients/${clientId}/reports — that list page only queries simple_reports
-  // (app/clients/[client_id]/reports/page.tsx), so a freshly saved SAGE-SR row
-  // wouldn't appear there yet. Showing SAGE-SR Diagnostic Reports in that list (and a
-  // dedicated "view saved report" page) is explicit follow-up work, not done here.
   revalidatePath(`/clients/${clientId}`)
-  redirect(`/clients/${clientId}`)
+  revalidatePath(`/clients/${clientId}/reports`)
+  redirect(
+    `/clients/${clientId}/reports/sage-sr/${inserted.sageSrDiagnosticReportId}`
+  )
 }

@@ -28,6 +28,7 @@ import {
 import { DocumentPreviewModal } from "@/components/documents/document-preview-modal"
 import { AssessmentSummaryMethodologyNote } from "@/components/report/assessment-summary-methodology-note"
 import { ReportDocument } from "@/components/report/report-document"
+import { SageSrDiagnosticReportContentView } from "@/components/report/sage-sr-diagnostic-report-content-view"
 import { AsqStatusBadge } from "@/components/session-notes/asq-status-badge"
 import { PsqStatusBadge } from "@/components/session-notes/psq-status-badge"
 import { Button } from "@/components/ui/button"
@@ -947,75 +948,11 @@ export function ReportForm({
               </CardContent>
             </Card>
           ) : sagePreviewContent ? (
-            <div className="report-print-area space-y-6 rounded-xl border bg-white p-8 shadow-sm">
-              <h2 className="text-lg font-semibold">{reportTitle}</h2>
-              {sagePreviewContent.introduction ? (
-                <p className="text-sm">{sagePreviewContent.introduction}</p>
-              ) : null}
-              <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
-                {sagePreviewContent.exclusionClause}
-              </div>
-              {sagePreviewContent.background ? (
-                <div className="space-y-2">
-                  <h3 className="font-medium">Background</h3>
-                  {[
-                    sagePreviewContent.background.opening,
-                    sagePreviewContent.background.background,
-                    sagePreviewContent.background.adverseChildhoodEvents,
-                    sagePreviewContent.background.currentFunctioning,
-                    sagePreviewContent.background.safetyAndStability,
-                    sagePreviewContent.background.treatmentEngagement,
-                  ]
-                    .filter((text): text is string => Boolean(text))
-                    .map((text, i) => (
-                      <p key={i} className="text-sm text-muted-foreground">
-                        {text}
-                      </p>
-                    ))}
-                </div>
-              ) : null}
-              <div className="space-y-2">
-                <h3 className="font-medium">Core</h3>
-                {sagePreviewContent.core.alertsSentence ? (
-                  <p className="text-sm font-medium text-destructive">
-                    {sagePreviewContent.core.alertsSentence}
-                  </p>
-                ) : null}
-                {sagePreviewContent.core.paragraphs.map((p) => (
-                  <p key={p.diagnosis} className="text-sm text-muted-foreground">
-                    {p.paragraph}
-                  </p>
-                ))}
-                {sagePreviewContent.core.furtherEvaluationSentence ? (
-                  <p className="text-sm text-muted-foreground">
-                    {sagePreviewContent.core.furtherEvaluationSentence}
-                  </p>
-                ) : null}
-                {sagePreviewContent.core.absentOrMinimalSentence ? (
-                  <p className="text-sm text-muted-foreground">
-                    {sagePreviewContent.core.absentOrMinimalSentence}
-                  </p>
-                ) : null}
-              </div>
-              {sagePreviewContent.personality ? (
-                <div className="space-y-2">
-                  <h3 className="font-medium">Personality</h3>
-                  {sagePreviewContent.personality.paragraphs.map((p) => (
-                    <p key={p.disorder} className="text-sm text-muted-foreground">
-                      {p.paragraph}
-                    </p>
-                  ))}
-                  {sagePreviewContent.personality.belowThresholdSentence ? (
-                    <p className="text-sm text-muted-foreground">
-                      {sagePreviewContent.personality.belowThresholdSentence}
-                    </p>
-                  ) : null}
-                </div>
-              ) : null}
-              <p className="text-xs text-muted-foreground">
-                This is a plain-text content preview only — there is no formatted PDF
-                for the SAGE-SR Diagnostic Report yet.
-              </p>
+            <div className="report-print-area rounded-xl border bg-white p-8 shadow-sm">
+              <SageSrDiagnosticReportContentView
+                title={reportTitle}
+                content={sagePreviewContent}
+              />
             </div>
           ) : (
             <Card>

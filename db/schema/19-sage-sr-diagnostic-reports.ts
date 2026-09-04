@@ -10,7 +10,7 @@ import { clients, practices, practitionerProfiles } from './01-core'
 // simple_reports row: that table's dateRangeStart/dateRangeEnd are NOT NULL and it also carries
 // letterBodyJson/recipientType/fundingApprovalId — none of which apply to a 5-section diagnostic
 // synthesis document with no date range, no letter body, and no recipient. Confirmed with Ben:
-// own table, own (future) PDFKit renderer — reusing simple_reports' versioning conventions
+// own table, own PDFKit renderer — reusing simple_reports' versioning conventions
 // (versionNumber/isCurrentVersion/previousVersionId, matching both simple_reports and
 // treatment_plans) without touching a pipeline that's live in production for other report types.
 //
@@ -34,6 +34,10 @@ export const sageSrDiagnosticReports = pgTable('sage_sr_diagnostic_reports', {
   // principle as simple_reports' valuesSnapshotJson / ReportSnapshot, so a later correction to
   // parsing/reference data doesn't silently change what an already-finalised report says.
   generatedContentJson: jsonb('generated_content_json'),
+  // Practitioner's editable working copy, seeded from generatedContentJson at draft-create
+  // time. This is the source of truth for the PDF renderer and the finalised view —
+  // generatedContentJson itself is never touched after the initial save.
+  editedContentJson: jsonb('edited_content_json'),
   reportStatus: text('report_status').notNull().default('draft'),
   versionNumber: integer('version_number').notNull().default(1),
   isCurrentVersion: boolean('is_current_version').notNull().default(true),

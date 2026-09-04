@@ -4,7 +4,7 @@ import { and, eq } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
 
-import { clients, sageSrDiagnosticReports } from "@/db/schema"
+import { auditEvents, clients, sageSrDiagnosticReports } from "@/db/schema"
 import { requirePractitionerContext } from "@/lib/auth"
 import { db } from "@/lib/db"
 import { todayDateString } from "@/lib/appointments/format"
@@ -13,22 +13,18 @@ import {
   type SageSrDiagnosticReportContent,
   type SageSrDiagnosticReportSelectedInstances,
 } from "@/lib/assessment-summary/load-sage-sr-diagnostic-report"
+import { resolveSageSrDiagnosticReportContent } from "@/lib/reports/generate-sage-sr-diagnostic-pdf"
 
 /**
  * Server actions for the SAGE-SR Diagnostic Report composer (report-form.tsx's
- * isSageDiagnostic branch). Deliberately separate from report-form-actions.ts, which
- * is entirely simple_reports/ReportSnapshot-shaped (funding approvals, letter body,
- * PDFKit rendering via generateReportPdf) — none of which applies here. This report
- * type writes to sage_sr_diagnostic_reports instead, per the confirmed "own table, own
- * renderer" design decision (db/schema/19-sage-sr-diagnostic-reports.ts).
+ * isSageDiagnostic branch) and the saved-report editor. Deliberately separate from
+ * report-form-actions.ts, which is entirely simple_reports/ReportSnapshot-shaped.
+ * This report type writes to sage_sr_diagnostic_reports instead, per the confirmed
+ * "own table, own renderer" design (db/schema/19-sage-sr-diagnostic-reports.ts).
  *
- * Scope of this slice: draft creation only. There is no PDFKit renderer for this
- * report type yet (a separate follow-up), so there is no "Finalise" / download / send
- * step here to mirror report-form-actions.ts's finaliseReportAction family — Save
- * Draft is the only action, and it always creates a new row (no edit-existing-draft
- * flow yet). generatedContentJson is populated in full on every save so the
- * saved-report view at /clients/[client_id]/reports/sage-sr/[report_id] can render
- * the frozen snapshot immediately.
+ * Save Draft creates the row (generated + edited content). Save as PDF on the
+ * draft view finalises and locks it. PDF bytes are generated lazily on first
+ * download or send, matching simple_reports.
  */
 
 async function verifyClient(clientId: string, practiceId: string) {
@@ -60,6 +56,16 @@ function parseSelectedInstances(
   }
 
   return { values: { core, background, personality } }
+}
+
+function parseEditedContent(
+  raw: string
+): SageSrDiagnosticReportContent | null {
+  try {
+    return resolveSageSrDiagnosticReportContent(JSON.parse(raw), null)
+  } catch {
+    return null
+  }
 }
 
 /**
@@ -128,24 +134,127 @@ export async function saveSageDiagnosticReportDraftAction(
     return { error: result.error }
   }
 
-  const [inserted] = await db
-    .insert(sageSrDiagnosticReports)
-    .values({
-      clientId,
+  const editedContent = JSON.parse(
+    JSON.stringify(result.content)
+  ) as SageSrDiagnosticReportContent
+
+  const inserted = await db.transaction(async (tx) => {
+    const [row] = await tx
+      .insert(sageSrDiagnosticReports)
+      .values({
+        clientId,
+        practiceId: context.practiceId,
+        practitionerProfileId: context.practitionerProfileId,
+        reportDate,
+        selectedInstancesJson: parsed.values,
+        generatedContentJson: result.content,
+        editedContentJson: editedContent,
+        reportStatus: "draft",
+      })
+      .returning({
+        sageSrDiagnosticReportId: sageSrDiagnosticReports.sageSrDiagnosticReportId,
+      })
+
+    if (!row) {
+      throw new Error("Failed to create SAGE-SR Diagnostic Report.")
+    }
+
+    await tx.insert(auditEvents).values({
       practiceId: context.practiceId,
-      practitionerProfileId: context.practitionerProfileId,
-      reportDate,
-      selectedInstancesJson: parsed.values,
-      generatedContentJson: result.content,
-      reportStatus: "draft",
+      userId: context.userId,
+      clientId,
+      eventType: "report.created",
+      entityType: "sage_sr_diagnostic_report",
+      entityId: row.sageSrDiagnosticReportId,
     })
-    .returning({
-      sageSrDiagnosticReportId: sageSrDiagnosticReports.sageSrDiagnosticReportId,
-    })
+
+    return row
+  })
 
   revalidatePath(`/clients/${clientId}`)
   revalidatePath(`/clients/${clientId}/reports`)
   redirect(
     `/clients/${clientId}/reports/sage-sr/${inserted.sageSrDiagnosticReportId}`
   )
+}
+
+export interface FinaliseSageDiagnosticReportState {
+  error?: string
+}
+
+export async function finaliseSageDiagnosticReportAction(
+  clientId: string,
+  reportId: string,
+  _prevState: FinaliseSageDiagnosticReportState,
+  formData: FormData
+): Promise<FinaliseSageDiagnosticReportState> {
+  const context = await requirePractitionerContext()
+
+  const client = await verifyClient(clientId, context.practiceId)
+  if (!client) {
+    return { error: "Client not found." }
+  }
+
+  const [report] = await db
+    .select({
+      sageSrDiagnosticReportId: sageSrDiagnosticReports.sageSrDiagnosticReportId,
+      reportStatus: sageSrDiagnosticReports.reportStatus,
+    })
+    .from(sageSrDiagnosticReports)
+    .where(
+      and(
+        eq(sageSrDiagnosticReports.sageSrDiagnosticReportId, reportId),
+        eq(sageSrDiagnosticReports.clientId, clientId),
+        eq(sageSrDiagnosticReports.practiceId, context.practiceId)
+      )
+    )
+    .limit(1)
+
+  if (!report) {
+    return { error: "Report not found." }
+  }
+
+  if (report.reportStatus === "finalised") {
+    return { error: "This report has already been finalised." }
+  }
+
+  const edited = parseEditedContent(
+    String(formData.get("edited_content_json") ?? "")
+  )
+  if (!edited) {
+    return { error: "Could not read the edited report content." }
+  }
+
+  const now = new Date()
+
+  await db.transaction(async (tx) => {
+    await tx
+      .update(sageSrDiagnosticReports)
+      .set({
+        editedContentJson: edited,
+        reportStatus: "finalised",
+        finalisedAt: now,
+        updatedAt: now,
+      })
+      .where(
+        and(
+          eq(sageSrDiagnosticReports.sageSrDiagnosticReportId, reportId),
+          eq(sageSrDiagnosticReports.practiceId, context.practiceId)
+        )
+      )
+
+    await tx.insert(auditEvents).values({
+      practiceId: context.practiceId,
+      userId: context.userId,
+      clientId,
+      eventType: "report.finalised",
+      entityType: "sage_sr_diagnostic_report",
+      entityId: reportId,
+    })
+  })
+
+  revalidatePath(`/clients/${clientId}`)
+  revalidatePath(`/clients/${clientId}/reports`)
+  revalidatePath(`/clients/${clientId}/reports/sage-sr/${reportId}`)
+  redirect(`/clients/${clientId}/reports/sage-sr/${reportId}`)
 }

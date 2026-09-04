@@ -34,6 +34,7 @@ export function SendReportEmailModal({
   defaultTo,
   addressOptions,
   templateVariables,
+  sendEndpoint,
   onSendComplete,
 }: {
   open: boolean
@@ -42,6 +43,7 @@ export function SendReportEmailModal({
   defaultTo: string
   addressOptions: ReferrerEmailAddressOption[]
   templateVariables: ReportEmailVariables
+  sendEndpoint?: string
   onSendComplete: (result: { sent: boolean }) => void
 }) {
   const [to, setTo] = useState(defaultTo)
@@ -78,11 +80,14 @@ export function SendReportEmailModal({
     setSendError(null)
 
     try {
-      const response = await fetch(`/api/reports/${reportId}/send-email`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ to, subject, message }),
-      })
+      const response = await fetch(
+        sendEndpoint ?? `/api/reports/${reportId}/send-email`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ to, subject, message }),
+        }
+      )
 
       const data = (await response.json()) as { sent?: boolean; error?: string }
 

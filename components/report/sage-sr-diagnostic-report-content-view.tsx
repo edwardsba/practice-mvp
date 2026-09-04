@@ -12,16 +12,17 @@ import type { SageSrDiagnosticReportContent } from "@/lib/assessment-summary/loa
  * content-only — it does not own the composer's loading/empty/error gating states,
  * which stay in report-form.tsx since they don't apply to a saved report.
  *
- * There is still no PDFKit renderer for this report type (see
- * db/schema/19-sage-sr-diagnostic-reports.ts's docstring), so this plain-text rendering
- * is also what a saved report currently looks like — not just a composer preview.
+ * Finalised reports pass showNoPdfCaveat={false} because a real PDF exists then;
+ * the composer preview still uses the default (true) since nothing has been saved.
  */
 export function SageSrDiagnosticReportContentView({
   title,
   content,
+  showNoPdfCaveat = true,
 }: {
   title: string
   content: SageSrDiagnosticReportContent
+  showNoPdfCaveat?: boolean
 }) {
   return (
     <article className="report-document mx-auto max-w-3xl space-y-6 bg-white text-foreground">
@@ -89,10 +90,12 @@ export function SageSrDiagnosticReportContentView({
           ) : null}
         </div>
       ) : null}
-      <p className="text-xs text-muted-foreground">
-        This is a plain-text content preview only — there is no formatted PDF for the
-        SAGE-SR Diagnostic Report yet.
-      </p>
+      {showNoPdfCaveat ? (
+        <p className="text-xs text-muted-foreground">
+          This is a plain-text content preview only — there is no formatted PDF for the
+          SAGE-SR Diagnostic Report yet.
+        </p>
+      ) : null}
     </article>
   )
 }

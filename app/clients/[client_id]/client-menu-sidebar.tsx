@@ -11,6 +11,7 @@ type MenuItem =
 
 const MENU_ITEMS = (clientId: string): MenuItem[] => [
   { label: "Appointments", href: `/clients/${clientId}/appointments` },
+  { label: "Feedback", href: `/clients/${clientId}/assessments/feedback` },
   { label: "Session Notes", href: `/clients/${clientId}/session-notes` },
   { label: "Assessments", href: `/clients/${clientId}/assessments` },
   { label: "Communications", href: `/clients/${clientId}/communications` },

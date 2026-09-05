@@ -15,7 +15,6 @@ import { formatClientNameLastFirst } from "@/lib/appointments/format"
 import { requirePractitionerContext } from "@/lib/auth"
 import { formatDisplayDate } from "@/lib/funding/format"
 import { loadReportsForPractice } from "@/lib/reports/load"
-import { formatReportType } from "@/lib/reports/snapshot"
 
 export default async function AllReportsPage() {
   const context = await requirePractitionerContext()
@@ -52,18 +51,14 @@ export default async function AllReportsPage() {
                   report.clientFirstName,
                   report.clientLastName
                 )
-                const href = `/clients/${report.clientId}/reports/${report.simpleReportId}`
-                const fundingApprovalLabel = report.fundingApprovalTypeName
-                  ? `${report.fundingApprovalTypeName} - ${
-                      report.fundingApprovalStartDate
-                        ? formatDisplayDate(report.fundingApprovalStartDate)
-                        : "—"
-                    }`
-                  : "—"
+                const href =
+                  report.kind === "sage_sr"
+                    ? `/clients/${report.clientId}/reports/sage-sr/${report.id}`
+                    : `/clients/${report.clientId}/reports/${report.id}`
 
                 return (
                   <TableRow
-                    key={report.simpleReportId}
+                    key={`${report.kind}-${report.id}`}
                     className="cursor-pointer hover:bg-muted/50"
                   >
                     <TableCell>
@@ -74,13 +69,13 @@ export default async function AllReportsPage() {
                     <TableCell>
                       <Link href={href} className="block text-sm">
                         {report.reportDate
-                          ? formatDisplayDate(String(report.reportDate))
+                          ? formatDisplayDate(report.reportDate)
                           : "—"}
                       </Link>
                     </TableCell>
                     <TableCell>
                       <Link href={href} className="block">
-                        {formatReportType(report.reportTypeName)}
+                        {report.reportTypeLabel}
                       </Link>
                     </TableCell>
                     <TableCell>
@@ -100,7 +95,7 @@ export default async function AllReportsPage() {
                     </TableCell>
                     <TableCell>
                       <Link href={href} className="block text-sm">
-                        {fundingApprovalLabel}
+                        {report.fundingApprovalLabel}
                       </Link>
                     </TableCell>
                   </TableRow>

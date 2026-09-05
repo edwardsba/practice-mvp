@@ -7,6 +7,7 @@ import {
   CASE_FORMULATION_OPTIONS,
   ALTERNATE_RESPONSES_OPTIONS,
   QUALITY_OF_LIFE_OPTIONS,
+  TREATMENT_MODALITY_OPTIONS,
 } from "@/lib/treatment-plans/fields"
 import type {
   BehaviouralTargetsJson,
@@ -98,9 +99,15 @@ export function parseTreatmentPlanFormData(
   return {
     startDate: parseDateField(formData.get("start_date")),
     endDate: parseDateField(formData.get("end_date")),
+    diagnosis: String(formData.get("diagnosis") ?? "").trim() || null,
     therapeuticTarget:
       String(formData.get("therapeutic_target") ?? "").trim() || null,
     behaviouralTargets: parseBehaviouralTargets(formData),
+    treatmentModalities: parseMultiSection(
+      formData,
+      "modality",
+      TREATMENT_MODALITY_OPTIONS
+    ),
     suicideAttempts: parseSuicideAttempts(formData),
     ongoingAssessments: parseOngoingAssessments(formData),
     riskManagement: parseMultiSection(
@@ -140,8 +147,10 @@ export function formValuesToDbColumns(values: TreatmentPlanFormValues) {
   return {
     startDate: values.startDate,
     endDate: values.endDate,
+    diagnosis: values.diagnosis,
     therapeuticTarget: values.therapeuticTarget,
     behaviouralTargetsJson: values.behaviouralTargets,
+    treatmentModalitiesJson: values.treatmentModalities,
     suicideAttemptsJson: values.suicideAttempts,
     ongoingAssessmentsJson: values.ongoingAssessments,
     riskManagementJson: values.riskManagement,

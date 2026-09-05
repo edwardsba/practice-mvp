@@ -85,6 +85,7 @@
     "db:session-note-pdf-storage-path": "tsx db/apply-session-note-pdf-storage-path-migration.ts",
     "db:treatment-plan-pdf-storage-path": "tsx db/apply-treatment-plan-pdf-storage-path-migration.ts",
     "db:suicide-attempts": "tsx db/apply-suicide-attempts-migration.ts",
+    "db:treatment-plan-diagnosis-modalities": "tsx db/apply-treatment-plan-diagnosis-and-modalities-migration.ts",
     "db:letter-body": "tsx db/apply-letter-body-migration.ts",
     "db:report-versioning": "tsx db/apply-report-versioning-migration.ts",
     "db:session-note-versioning": "tsx db/apply-session-note-versioning-migration.ts",

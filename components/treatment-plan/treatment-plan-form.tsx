@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
 import {
   ALTERNATE_RESPONSES_OPTIONS,
   CASE_FORMULATION_OPTIONS,
@@ -36,6 +37,7 @@ import {
   QUALITY_OF_LIFE_OPTIONS,
   RISK_MANAGEMENT_OPTIONS,
   SUPPORT_SERVICES_OPTIONS,
+  TREATMENT_MODALITY_OPTIONS,
 } from "@/lib/treatment-plans/fields"
 import { formatDateForInput, todayDateInput } from "@/lib/dates/practice-time"
 import type { TreatmentPlanRow } from "@/lib/treatment-plans/types"
@@ -161,7 +163,28 @@ export function TreatmentPlanForm({
 
         <Card>
           <CardHeader>
-            <CardTitle>Therapeutic targets</CardTitle>
+            <CardTitle>Diagnosis</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <Label htmlFor="diagnosis">Diagnosis</Label>
+            <p className="text-xs text-muted-foreground">
+              Entered manually for now. Once the diagnostic assessment feature is
+              built, this will be autofilled from the client&apos;s finalised
+              diagnosis.
+            </p>
+            <Textarea
+              id="diagnosis"
+              name="diagnosis"
+              defaultValue={plan?.diagnosis ?? ""}
+              placeholder="e.g. Major Depressive Disorder, moderate, recurrent"
+              rows={3}
+            />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Treatment targets</CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="space-y-2">
@@ -182,7 +205,34 @@ export function TreatmentPlanForm({
 
         <Card>
           <CardHeader>
-            <CardTitle>Ongoing assessments</CardTitle>
+            <CardTitle>Treatment modalities</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <MultiSelectSectionFields
+              prefix="modality"
+              options={TREATMENT_MODALITY_OPTIONS}
+              value={plan?.treatmentModalitiesJson ?? emptyMulti}
+            />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Case formulation model</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <MultiSelectSectionFields
+              prefix="case"
+              options={CASE_FORMULATION_OPTIONS}
+              value={plan?.caseFormulationJson ?? emptyMulti}
+              allowOther={false}
+            />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Ongoing assessment tools</CardTitle>
           </CardHeader>
           <CardContent>
             <OngoingAssessmentsFields value={ongoing} />
@@ -191,7 +241,7 @@ export function TreatmentPlanForm({
 
         <Card>
           <CardHeader>
-            <CardTitle>Risk management</CardTitle>
+            <CardTitle>Risk</CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="space-y-2">
@@ -233,19 +283,6 @@ export function TreatmentPlanForm({
               prefix="psycho"
               options={PSYCHOEDUCATION_OPTIONS}
               value={plan?.psychoeducationJson ?? emptyMulti}
-            />
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Case formulation</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <MultiSelectSectionFields
-              prefix="case"
-              options={CASE_FORMULATION_OPTIONS}
-              value={plan?.caseFormulationJson ?? emptyMulti}
             />
           </CardContent>
         </Card>

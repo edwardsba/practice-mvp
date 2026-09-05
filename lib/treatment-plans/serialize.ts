@@ -88,8 +88,10 @@ export function rowToTreatmentPlan(row: {
   isActive: boolean
   startDate: string | null
   endDate: string | null
+  diagnosis: string | null
   therapeuticTarget: string | null
   behaviouralTargetsJson: unknown
+  treatmentModalitiesJson: unknown
   suicideAttemptsJson: unknown
   ongoingAssessmentsJson: unknown
   riskManagementJson: unknown
@@ -110,8 +112,10 @@ export function rowToTreatmentPlan(row: {
     isActive: row.isActive,
     startDate: row.startDate,
     endDate: row.endDate,
+    diagnosis: row.diagnosis,
     therapeuticTarget: row.therapeuticTarget,
     behaviouralTargetsJson: parseBehaviouralTargets(row.behaviouralTargetsJson),
+    treatmentModalitiesJson: parseMultiSection(row.treatmentModalitiesJson),
     suicideAttemptsJson: parseSuicideAttempts(row.suicideAttemptsJson),
     ongoingAssessmentsJson: parseOngoingAssessments(row.ongoingAssessmentsJson),
     riskManagementJson: parseMultiSection(row.riskManagementJson),

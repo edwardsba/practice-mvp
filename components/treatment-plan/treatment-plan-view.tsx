@@ -12,6 +12,7 @@ import {
   QUALITY_OF_LIFE_OPTIONS,
   RISK_MANAGEMENT_OPTIONS,
   SUPPORT_SERVICES_OPTIONS,
+  TREATMENT_MODALITY_OPTIONS,
   optionLabel,
 } from "@/lib/treatment-plans/fields"
 import type { TreatmentPlanRow } from "@/lib/treatment-plans/types"
@@ -96,7 +97,18 @@ export function TreatmentPlanView({ plan }: { plan: TreatmentPlanRow }) {
 
       <Card>
         <CardHeader>
-          <CardTitle>Therapeutic targets</CardTitle>
+          <CardTitle>Diagnosis</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="whitespace-pre-wrap text-sm font-medium">
+            {plan.diagnosis?.trim() || "—"}
+          </p>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Treatment targets</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div>
@@ -105,7 +117,7 @@ export function TreatmentPlanView({ plan }: { plan: TreatmentPlanRow }) {
               {plan.therapeuticTarget?.trim() || "—"}
             </p>
           </div>
-          <div>
+          <div id="behavioural-targets" className="scroll-mt-24">
             <p className="text-sm text-muted-foreground">Behavioural targets</p>
             <div className="mt-2">
               <ViewList items={behaviouralItems} />
@@ -116,7 +128,31 @@ export function TreatmentPlanView({ plan }: { plan: TreatmentPlanRow }) {
 
       <Card>
         <CardHeader>
-          <CardTitle>Ongoing assessments</CardTitle>
+          <CardTitle>Treatment modalities</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ViewMultiSection
+            options={TREATMENT_MODALITY_OPTIONS}
+            section={plan.treatmentModalitiesJson ?? emptyMulti}
+          />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Case formulation model</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ViewMultiSection
+            options={CASE_FORMULATION_OPTIONS}
+            section={plan.caseFormulationJson ?? emptyMulti}
+          />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Ongoing assessment tools</CardTitle>
         </CardHeader>
         <CardContent>
           <ViewList items={ongoingLabels} />
@@ -125,7 +161,7 @@ export function TreatmentPlanView({ plan }: { plan: TreatmentPlanRow }) {
 
       <Card>
         <CardHeader>
-          <CardTitle>Risk management</CardTitle>
+          <CardTitle>Risk</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div>
@@ -181,18 +217,6 @@ export function TreatmentPlanView({ plan }: { plan: TreatmentPlanRow }) {
           <ViewMultiSection
             options={PSYCHOEDUCATION_OPTIONS}
             section={plan.psychoeducationJson ?? emptyMulti}
-          />
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Case formulation</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ViewMultiSection
-            options={CASE_FORMULATION_OPTIONS}
-            section={plan.caseFormulationJson ?? emptyMulti}
           />
         </CardContent>
       </Card>

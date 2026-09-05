@@ -9,6 +9,11 @@ export const ONGOING_ASSESSMENT_OPTIONS: CheckboxOption[] = [
   { key: "assist", label: "ASSIST" },
 ]
 
+export const TREATMENT_MODALITY_OPTIONS: CheckboxOption[] = [
+  { key: "cbt", label: "Cognitive Behaviour Therapy (CBT)" },
+  { key: "dbt", label: "Dialectical Behaviour Therapy (DBT)" },
+]
+
 export const RISK_MANAGEMENT_OPTIONS: CheckboxOption[] = [
   { key: "support_team", label: "Support team in place" },
   { key: "medication_supervision", label: "Medication supervision" },
@@ -60,22 +65,20 @@ export const PSYCHOEDUCATION_OPTIONS: CheckboxOption[] = [
   { key: "principles_ta", label: "Principles of TA" },
 ]
 
+// Case Formulation Model options: a curated list of specific, cited published models
+// the treatment plan is formulated against — not a technique checklist (that's the
+// prior content of this list, replaced per Ben's instruction). Deliberately no
+// "Other" free-text option anywhere this list is used, since an entry here needs to
+// be an accurate citation, not something typed ad hoc. This list is expected to grow
+// (Ben will supply more models); a full model-library feature — its own page,
+// populated by its own collection of assessments — is planned separately and
+// deliberately out of scope for now, so this stays a small, code-maintained list.
 export const CASE_FORMULATION_OPTIONS: CheckboxOption[] = [
-  { key: "behavioural_chain_analysis", label: "Behavioural chain analysis" },
   {
-    key: "transactional_analysis_game",
-    label: "Transactional analysis and game formula",
+    key: "beck_bredemeier_2016_unified_depression",
+    label:
+      "Beck, A. T., & Bredemeier, K. (2016). A unified model of depression: Integrating clinical, cognitive, biological, and evolutionary perspectives. Clinical Psychological Science, 4(4), 596–619.",
   },
-  {
-    key: "primary_secondary_processes",
-    label: "Primary and secondary processes",
-  },
-  {
-    key: "classical_operant_conditioning",
-    label: "Classical conditioning and operant conditioning",
-  },
-  { key: "biopsychosocial_analysis", label: "BiopsychoSocial analysis" },
-  { key: "schemas", label: "Schemas" },
 ]
 
 export const ALTERNATE_RESPONSES_OPTIONS: CheckboxOption[] = [
@@ -109,8 +112,25 @@ export const QUALITY_OF_LIFE_OPTIONS: CheckboxOption[] = [
   },
 ]
 
+// Reference list of every { selected, other } checklist section on the treatment plan
+// (Ongoing Assessment Tools isn't here — it's a fixed set of boolean flags, a
+// different shape), in current page order, for anything that wants to iterate rather
+// than hardcode each section (nothing does yet — the form/view/PDF each render their
+// own sections directly). Keep this in sync with treatment-plan-form.tsx when sections
+// are added, renamed, or reordered.
 export const MULTI_SELECT_SECTIONS = [
-  { id: "risk_management", title: "Risk Management", options: RISK_MANAGEMENT_OPTIONS },
+  {
+    id: "treatment_modalities",
+    title: "Treatment Modalities",
+    options: TREATMENT_MODALITY_OPTIONS,
+  },
+  {
+    id: "case_formulation",
+    title: "Case Formulation Model",
+    options: CASE_FORMULATION_OPTIONS,
+    allowOther: false,
+  },
+  { id: "risk", title: "Risk", options: RISK_MANAGEMENT_OPTIONS },
   {
     id: "support_services",
     title: "Support Services",
@@ -120,11 +140,6 @@ export const MULTI_SELECT_SECTIONS = [
     id: "psychoeducation",
     title: "Psychoeducation",
     options: PSYCHOEDUCATION_OPTIONS,
-  },
-  {
-    id: "case_formulation",
-    title: "Case Formulation",
-    options: CASE_FORMULATION_OPTIONS,
   },
   {
     id: "alternate_responses",

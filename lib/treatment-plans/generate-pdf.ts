@@ -8,6 +8,7 @@ import {
   QUALITY_OF_LIFE_OPTIONS,
   RISK_MANAGEMENT_OPTIONS,
   SUPPORT_SERVICES_OPTIONS,
+  TREATMENT_MODALITY_OPTIONS,
   optionLabel,
 } from "@/lib/treatment-plans/fields"
 import type { TreatmentPlanRow } from "@/lib/treatment-plans/types"
@@ -130,13 +131,28 @@ export function generateTreatmentPlanPdf(
 
     doc.y = doc.y + SECTION_GAP
 
+    heading(doc, "Diagnosis")
+    bodyText(doc, plan.diagnosis?.trim() || "—")
+
     heading(doc, "Therapeutic target")
     bodyText(doc, plan.therapeuticTarget?.trim() || "—")
 
     heading(doc, "Behavioural targets")
     bulletList(doc, plan.behaviouralTargetsJson?.items ?? [])
 
-    heading(doc, "Ongoing assessments")
+    heading(doc, "Treatment modalities")
+    bulletList(
+      doc,
+      multiSectionLabels(TREATMENT_MODALITY_OPTIONS, plan.treatmentModalitiesJson)
+    )
+
+    heading(doc, "Case formulation model")
+    bulletList(
+      doc,
+      multiSectionLabels(CASE_FORMULATION_OPTIONS, plan.caseFormulationJson)
+    )
+
+    heading(doc, "Ongoing assessment tools")
     const ongoing = plan.ongoingAssessmentsJson ?? {
       phq9: false,
       gad7: false,
@@ -149,7 +165,7 @@ export function generateTreatmentPlanPdf(
       ).map((option) => option.label)
     )
 
-    heading(doc, "Risk management")
+    heading(doc, "Risk")
 
     const suicideAttempts = sortAttemptsChronologically(
       plan.suicideAttemptsJson?.items ?? []
@@ -192,12 +208,6 @@ export function generateTreatmentPlanPdf(
     bulletList(
       doc,
       multiSectionLabels(PSYCHOEDUCATION_OPTIONS, plan.psychoeducationJson)
-    )
-
-    heading(doc, "Case formulation")
-    bulletList(
-      doc,
-      multiSectionLabels(CASE_FORMULATION_OPTIONS, plan.caseFormulationJson)
     )
 
     heading(doc, "Alternate responses")

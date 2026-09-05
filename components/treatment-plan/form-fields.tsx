@@ -74,10 +74,14 @@ export function MultiSelectSectionFields({
   prefix,
   options,
   value,
+  allowOther = true,
 }: {
   prefix: string
   options: CheckboxOption[]
   value: MultiSelectSectionJson
+  /** Set false for lists that must stay exact/curated (e.g. cited published models),
+   * where a free-text entry wouldn't make sense. */
+  allowOther?: boolean
 }) {
   const [otherItems, setOtherItems] = useState<string[]>(
     value.other.length > 0 ? value.other : []
@@ -97,7 +101,9 @@ export function MultiSelectSectionFields({
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div
+        className={`grid gap-3 ${allowOther ? "sm:grid-cols-2" : "grid-cols-1"}`}
+      >
         {options.map((option) => (
           <FormCheckboxField
             key={option.key}
@@ -109,30 +115,32 @@ export function MultiSelectSectionFields({
         ))}
       </div>
 
-      <div className="space-y-3 border-t pt-4">
-        <p className="text-sm font-medium">Other</p>
-        {otherItems.map((item, index) => (
-          <div key={index} className="flex gap-2">
-            <Input
-              name={`${prefix}_other`}
-              value={item}
-              onChange={(e) => updateOtherRow(index, e.target.value)}
-              placeholder="Custom item"
-            />
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => removeOtherRow(index)}
-            >
-              Remove
-            </Button>
-          </div>
-        ))}
-        <Button type="button" variant="outline" size="sm" onClick={addOtherRow}>
-          Add other
-        </Button>
-      </div>
+      {allowOther ? (
+        <div className="space-y-3 border-t pt-4">
+          <p className="text-sm font-medium">Other</p>
+          {otherItems.map((item, index) => (
+            <div key={index} className="flex gap-2">
+              <Input
+                name={`${prefix}_other`}
+                value={item}
+                onChange={(e) => updateOtherRow(index, e.target.value)}
+                placeholder="Custom item"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => removeOtherRow(index)}
+              >
+                Remove
+              </Button>
+            </div>
+          ))}
+          <Button type="button" variant="outline" size="sm" onClick={addOtherRow}>
+            Add other
+          </Button>
+        </div>
+      ) : null}
     </div>
   )
 }

@@ -13,13 +13,21 @@ export const treatmentPlans = pgTable('treatment_plans', {
   isActive: boolean('is_active').notNull().default(true),
   startDate: date('start_date'),
   endDate: date('end_date'),
+  // Manually entered for now — a plain synthesis statement the practitioner types in.
+  // Once the standalone diagnostic-assessment feature exists, this field will be
+  // autofilled from it instead (see PROJECT_MAP.md Clinical Process #8).
+  diagnosis: text('diagnosis'),
   therapeuticTarget: text('therapeutic_target'),
   behaviouralTargetsJson: jsonb('behavioural_targets_json'),
+  treatmentModalitiesJson: jsonb('treatment_modalities_json'),
   ongoingAssessmentsJson: jsonb('ongoing_assessments_json'),
   riskManagementJson: jsonb('risk_management_json'),
   suicideAttemptsJson: jsonb('suicide_attempts_json'),
   supportServicesJson: jsonb('support_services_json'),
   psychoeducationJson: jsonb('psychoeducation_json'),
+  // Content changed from a technique checklist to a curated list of cited published
+  // case-formulation models (starting with one entry) — same MultiSelectSectionJson
+  // shape, no "Other" free-text option since these need to be exact citations.
   caseFormulationJson: jsonb('case_formulation_json'),
   alternateResponsesJson: jsonb('alternate_responses_json'),
   qualityOfLifeJson: jsonb('quality_of_life_json'),

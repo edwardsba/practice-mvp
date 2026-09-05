@@ -28,8 +28,12 @@ export type MultiSelectSectionJson = {
 export type TreatmentPlanFormValues = {
   startDate: string | null
   endDate: string | null
+  // Manually entered for now; will be autofilled once the standalone diagnostic
+  // feature exists (see the comment on the schema column).
+  diagnosis: string | null
   therapeuticTarget: string | null
   behaviouralTargets: BehaviouralTargetsJson
+  treatmentModalities: MultiSelectSectionJson
   suicideAttempts: SuicideAttemptsJson
   ongoingAssessments: OngoingAssessmentsJson
   riskManagement: MultiSelectSectionJson
@@ -49,8 +53,10 @@ export type TreatmentPlanRow = {
   isActive: boolean
   startDate: string | null
   endDate: string | null
+  diagnosis: string | null
   therapeuticTarget: string | null
   behaviouralTargetsJson: BehaviouralTargetsJson | null
+  treatmentModalitiesJson: MultiSelectSectionJson | null
   suicideAttemptsJson: SuicideAttemptsJson | null
   ongoingAssessmentsJson: OngoingAssessmentsJson | null
   riskManagementJson: MultiSelectSectionJson | null

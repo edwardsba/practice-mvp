@@ -19,6 +19,10 @@ Australian mental-health **clinical practice management** app for practitioners:
 appointments, psychometric assessments, session notes, treatment/crisis plans, reports,
 funding (Medicare/NDIS/insurer), contacts, and communications.
 
+Feature status lives in [`PROJECT_MAP.md`](./PROJECT_MAP.md): what's built, partial,
+deferred, or a known limitation. Keep that map current when you add, change, or
+deliberately defer a feature.
+
 Treat all client and clinical data as sensitive health information.
 
 ## Stack

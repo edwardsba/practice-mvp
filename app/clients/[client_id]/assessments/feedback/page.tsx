@@ -58,6 +58,7 @@ export default async function ClientFeedbackPage({
       />
 
       <FeedbackOverTimeTable
+        clientId={clientId}
         sessions={sessions}
         completedAppointments={completedAppointments}
       />

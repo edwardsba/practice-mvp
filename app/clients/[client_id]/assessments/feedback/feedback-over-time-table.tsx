@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import { useMemo, useState } from "react"
 
 import {
@@ -40,9 +41,11 @@ function formatTrend(trend: number | null) {
 }
 
 export function FeedbackOverTimeTable({
+  clientId,
   sessions,
   completedAppointments,
 }: {
+  clientId: string
   sessions: PsfFeedbackSession[]
   completedAppointments: CompletedAppointment[]
 }) {
@@ -155,28 +158,43 @@ export function FeedbackOverTimeTable({
                 </TableCell>
               </TableRow>
             ) : (
-              sortedSessions.map((session) => (
-                <TableRow
-                  key={session.assessmentResultId}
-                  className={cn(
-                    session.negativeFeedback > 0 && "bg-destructive/10"
-                  )}
-                >
-                  <TableCell>{formatDate(session.date)}</TableCell>
-                  <TableCell className="tabular-nums">
-                    {session.positiveFeedback}/10
-                  </TableCell>
-                  <TableCell
+              sortedSessions.map((session) => {
+                const resultHref = `/clients/${clientId}/results/${session.assessmentResultId}`
+                return (
+                  <TableRow
+                    key={session.assessmentResultId}
                     className={cn(
-                      "tabular-nums",
-                      session.negativeFeedback > 0 &&
-                        "font-medium text-destructive"
+                      "cursor-pointer hover:bg-muted/50",
+                      session.negativeFeedback > 0 && "bg-destructive/10"
                     )}
                   >
-                    {session.negativeFeedback}/10
-                  </TableCell>
-                </TableRow>
-              ))
+                    <TableCell>
+                      <Link
+                        href={resultHref}
+                        className="block font-medium text-primary hover:underline"
+                      >
+                        {formatDate(session.date)}
+                      </Link>
+                    </TableCell>
+                    <TableCell className="tabular-nums">
+                      <Link href={resultHref} className="block hover:underline">
+                        {session.positiveFeedback}/10
+                      </Link>
+                    </TableCell>
+                    <TableCell
+                      className={cn(
+                        "tabular-nums",
+                        session.negativeFeedback > 0 &&
+                          "font-medium text-destructive"
+                      )}
+                    >
+                      <Link href={resultHref} className="block hover:underline">
+                        {session.negativeFeedback}/10
+                      </Link>
+                    </TableCell>
+                  </TableRow>
+                )
+              })
             )}
           </TableBody>
         </Table>

@@ -1,12 +1,18 @@
+import type { OngoingAssessmentsJson } from "@/lib/treatment-plans/types"
+
 export type CheckboxOption = {
   key: string
   label: string
 }
 
 export type SupportServiceOption = CheckboxOption & {
-  /** Sub-items shown only once this parent option is checked. */
-  children?: CheckboxOption[]
-  defaultChecked?: boolean
+  /** Indented descriptive sub-lines shown under this option, elaborating what
+   * checking it covers. Not independently selectable — no separate stored keys;
+   * checking the parent box is understood to cover everything listed here.
+   * (2026-09-10 correction: these were briefly separate reveal-on-check child
+   * checkboxes — Ben's feedback was that they should be one tick box with
+   * descriptive sub-lines, not several tick boxes.) */
+  sublines?: string[]
 }
 
 export const ONGOING_ASSESSMENT_OPTIONS: CheckboxOption[] = [
@@ -14,6 +20,17 @@ export const ONGOING_ASSESSMENT_OPTIONS: CheckboxOption[] = [
   { key: "gad7", label: "GAD-7" },
   { key: "assist", label: "ASSIST" },
 ]
+
+// New-plan defaults (2026-09-10 correction, confirmed with Ben): CBT pre-checked on
+// Treatment Modalities, PHQ-9 + GAD-7 pre-checked on Ongoing Assessment Tools. Only
+// applied on a brand-new plan (see isFreshPlan in treatment-plan-form.tsx) — never
+// forced onto an existing saved plan's actual selections.
+export const DEFAULT_NEW_PLAN_MODALITY_KEYS: string[] = ["cbt"]
+export const DEFAULT_NEW_PLAN_ONGOING_ASSESSMENTS: OngoingAssessmentsJson = {
+  phq9: true,
+  gad7: true,
+  assist: false,
+}
 
 export const TREATMENT_MODALITY_OPTIONS: CheckboxOption[] = [
   { key: "cbt", label: "Cognitive Behaviour Therapy (CBT)" },
@@ -35,67 +52,35 @@ export const TREATMENT_MODEL_OPTIONS: CheckboxOption[] = [
   },
 ]
 
-// Support Services (2026-09 layout update): simplified to six top-level items.
-// 12-Step Program and SMART Recovery each reveal their own sub-checklist only once
-// selected — the parent key and any checked children all live together as flat
-// entries in the same MultiSelectSectionJson.selected array; flattenSupportServiceOptions()
-// below is what parsing/rendering-as-a-flat-list use.
+// Support Services (2026-09 layout update, corrected 2026-09-10): six flat,
+// independently-checkable items. 12-Step Program and SMART Recovery each carry
+// descriptive sublines (shown indented under the one checkbox) rather than
+// separate sub-checkboxes — ticking the parent is understood to cover everything
+// listed under it, and no sub-item has its own stored value. No item is
+// pre-checked by default on a new plan.
 export const SUPPORT_SERVICES_OPTIONS: SupportServiceOption[] = [
   {
     key: "twelve_step_program",
     label: "12-Step Program",
-    children: [
-      {
-        key: "twelve_step_meeting_attendance",
-        label: "12-step meeting attendance and volunteering",
-      },
-      { key: "twelve_step_sponsor", label: "Work with a 12-step sponsor" },
-      {
-        key: "twelve_step_complete_program",
-        label: "Complete the 12-step program",
-      },
+    sublines: [
+      "12-step meeting attendance and volunteering",
+      "Work with a 12-step sponsor",
+      "Complete the 12-step program",
     ],
   },
   {
     key: "smart_recovery",
     label: "SMART Recovery",
-    children: [
-      { key: "smart_meeting_attendance", label: "SMART meeting attendance" },
-      {
-        key: "smart_online_training",
-        label: "SMART online training participation",
-      },
+    sublines: [
+      "SMART meeting attendance",
+      "SMART online training participation",
     ],
   },
-  {
-    key: "rehab_psychiatric_instay",
-    label: "Rehabilitation / Psychiatric Instay",
-    defaultChecked: true,
-  },
-  {
-    key: "outpatient_group_membership",
-    label: "Outpatient Group Membership",
-    defaultChecked: true,
-  },
+  { key: "rehab_psychiatric_instay", label: "Rehabilitation / Psychiatric Instay" },
+  { key: "outpatient_group_membership", label: "Outpatient Group Membership" },
   { key: "case_worker_support_person", label: "Case Worker / Support Person" },
   { key: "couples_counselling", label: "Couples Counselling" },
 ]
-
-/** Flat list of every Support Services option (parents and children together), for
- * parsing form data and rendering labels — anything that doesn't need the parent/
- * child grouping itself. */
-export function flattenSupportServiceOptions(): CheckboxOption[] {
-  return SUPPORT_SERVICES_OPTIONS.flatMap((option) => [
-    { key: option.key, label: option.label },
-    ...(option.children ?? []),
-  ])
-}
-
-export function defaultSupportServiceKeys(): string[] {
-  return SUPPORT_SERVICES_OPTIONS.filter((o) => o.defaultChecked).map(
-    (o) => o.key
-  )
-}
 
 // Treatment Summary (2026-09 layout update): replaces the old Psychoeducation,
 // Alternate Responses, and Quality of Life sections. This is a fixed, static recap
@@ -128,7 +113,7 @@ export const MULTI_SELECT_SECTIONS = [
   {
     id: "support_services",
     title: "Support Services",
-    options: flattenSupportServiceOptions(),
+    options: SUPPORT_SERVICES_OPTIONS,
   },
 ] as const
 

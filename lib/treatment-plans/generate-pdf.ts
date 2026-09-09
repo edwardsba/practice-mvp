@@ -2,10 +2,10 @@ import PDFDocument from "pdfkit"
 
 import {
   ONGOING_ASSESSMENT_OPTIONS,
+  SUPPORT_SERVICES_OPTIONS,
   TREATMENT_MODALITY_OPTIONS,
   TREATMENT_MODEL_OPTIONS,
   TREATMENT_SUMMARY_ITEMS,
-  flattenSupportServiceOptions,
   optionLabel,
 } from "@/lib/treatment-plans/fields"
 import type { TreatmentPlanRow } from "@/lib/treatment-plans/types"
@@ -246,10 +246,50 @@ export async function generateTreatmentPlanPdf(
       )
 
     heading(doc, "Other Support Services")
-    bulletList(
-      doc,
-      multiSectionLabels(flattenSupportServiceOptions(), plan.supportServicesJson)
+    const supportSection = plan.supportServicesJson
+    const checkedSupportOptions = SUPPORT_SERVICES_OPTIONS.filter((option) =>
+      supportSection?.selected.includes(option.key)
     )
+    const otherSupportItems = supportSection?.other ?? []
+    if (checkedSupportOptions.length === 0 && otherSupportItems.length === 0) {
+      doc
+        .font("Helvetica")
+        .fontSize(BASE_FONT_SIZE)
+        .fillColor(MUTED_COLOR)
+        .text("None selected", { lineGap: LINE_GAP })
+    } else {
+      for (const option of checkedSupportOptions) {
+        doc
+          .font("Helvetica")
+          .fontSize(BASE_FONT_SIZE)
+          .fillColor(TEXT_COLOR)
+          .text(`•  ${option.label}`, {
+            lineGap: LINE_GAP,
+            width: CONTENT_WIDTH,
+            indent: 4,
+          })
+        if (option.sublines) {
+          doc.font("Helvetica").fontSize(BASE_FONT_SIZE - 1).fillColor(MUTED_COLOR)
+          for (const line of option.sublines) {
+            doc.text(`–  ${line}`, {
+              lineGap: LINE_GAP,
+              width: CONTENT_WIDTH,
+              indent: 14,
+            })
+          }
+        }
+      }
+      if (otherSupportItems.length > 0) {
+        doc.font("Helvetica").fontSize(BASE_FONT_SIZE).fillColor(TEXT_COLOR)
+        for (const item of otherSupportItems) {
+          doc.text(`•  ${item}`, {
+            lineGap: LINE_GAP,
+            width: CONTENT_WIDTH,
+            indent: 4,
+          })
+        }
+      }
+    }
 
     heading(doc, "Treatment Summary")
     bulletList(doc, TREATMENT_SUMMARY_ITEMS)

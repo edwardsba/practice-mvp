@@ -35,11 +35,12 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import {
+  DEFAULT_NEW_PLAN_MODALITY_KEYS,
+  DEFAULT_NEW_PLAN_ONGOING_ASSESSMENTS,
   SUPPORT_SERVICES_OPTIONS,
   TREATMENT_MODALITY_OPTIONS,
   TREATMENT_MODEL_OPTIONS,
   TREATMENT_SUMMARY_ITEMS,
-  defaultSupportServiceKeys,
 } from "@/lib/treatment-plans/fields"
 import { formatDateForInput, todayDateInput } from "@/lib/dates/practice-time"
 import type { TreatmentPlanRow } from "@/lib/treatment-plans/types"
@@ -158,18 +159,23 @@ export function TreatmentPlanForm({
   }, [saveAndDownloadState, clientId])
 
   const plan = initialPlan
+  // A brand-new plan (no prior version, or explicitly starting a new one) gets a
+  // few sensible pre-fills; an existing plan's actual saved selections are never
+  // overridden by these (the `??` only kicks in when the column was never set).
+  const isFreshPlan = isNewVersion || !plan
   const smartGoalItems = plan?.smartGoalsJson?.items ?? []
   const suicideAttemptItems = plan?.suicideAttemptsJson?.items ?? []
-  const ongoing = plan?.ongoingAssessmentsJson ?? {
-    phq9: false,
-    gad7: false,
-    assist: false,
-  }
+  const ongoing =
+    plan?.ongoingAssessmentsJson ??
+    (isFreshPlan
+      ? DEFAULT_NEW_PLAN_ONGOING_ASSESSMENTS
+      : { phq9: false, gad7: false, assist: false })
   const emptyMulti = { selected: [], other: [] }
-  const supportServicesValue = plan?.supportServicesJson ?? {
-    selected: isNewVersion || !plan ? defaultSupportServiceKeys() : [],
+  const treatmentModalitiesValue = plan?.treatmentModalitiesJson ?? {
+    selected: isFreshPlan ? DEFAULT_NEW_PLAN_MODALITY_KEYS : [],
     other: [],
   }
+  const supportServicesValue = plan?.supportServicesJson ?? emptyMulti
   const treatmentModelValue = plan?.treatmentModelJson ?? { selected: null }
   const medicationSupervisionValue = plan?.medicationSupervisionJson ?? {
     supervised: false,
@@ -277,7 +283,7 @@ export function TreatmentPlanForm({
             <MultiSelectSectionFields
               prefix="modality"
               options={TREATMENT_MODALITY_OPTIONS}
-              value={plan?.treatmentModalitiesJson ?? emptyMulti}
+              value={treatmentModalitiesValue}
             />
           </CardContent>
         </Card>

@@ -197,10 +197,11 @@ export function SingleSelectSectionFields({
   )
 }
 
-/** Support Services: parent items, two of which (12-Step Program, SMART Recovery)
- * reveal their own sub-checklist only once the parent is checked. Parent and child
- * keys all live together as flat entries in the same MultiSelectSectionJson.selected
- * array — flattenSupportServiceOptions() is what parsing reads back against. */
+/** Support Services: six flat, independently-checkable items. 12-Step Program and
+ * SMART Recovery each carry descriptive sublines, shown indented under the one
+ * checkbox at all times — they're not separate tick boxes and have no stored
+ * value of their own; checking the parent is understood to cover everything
+ * listed under it. */
 export function SupportServicesFields({
   prefix,
   options,
@@ -210,45 +211,22 @@ export function SupportServicesFields({
   options: SupportServiceOption[]
   value: MultiSelectSectionJson
 }) {
-  const [checkedParents, setCheckedParents] = useState<Set<string>>(
-    new Set(
-      options
-        .filter((o) => value.selected.includes(o.key))
-        .map((o) => o.key)
-    )
-  )
-
   return (
     <div className="space-y-4">
       {options.map((option) => (
-        <div key={option.key} className="space-y-3">
+        <div key={option.key} className="space-y-1.5">
           <FormCheckboxField
             id={`${prefix}_${option.key}`}
             name={`${prefix}_${option.key}`}
             label={option.label}
             defaultChecked={value.selected.includes(option.key)}
-            onCheckedChangeExtra={(checked) => {
-              if (!option.children) return
-              setCheckedParents((prev) => {
-                const next = new Set(prev)
-                if (checked) next.add(option.key)
-                else next.delete(option.key)
-                return next
-              })
-            }}
           />
-          {option.children && checkedParents.has(option.key) ? (
-            <div className="ml-7 space-y-2 border-l pl-4">
-              {option.children.map((child) => (
-                <FormCheckboxField
-                  key={child.key}
-                  id={`${prefix}_${child.key}`}
-                  name={`${prefix}_${child.key}`}
-                  label={child.label}
-                  defaultChecked={value.selected.includes(child.key)}
-                />
+          {option.sublines ? (
+            <ul className="ml-7 list-inside list-disc space-y-0.5 text-xs text-muted-foreground">
+              {option.sublines.map((line) => (
+                <li key={line}>{line}</li>
               ))}
-            </div>
+            </ul>
           ) : null}
         </div>
       ))}

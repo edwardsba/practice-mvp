@@ -251,15 +251,11 @@ export function TreatmentPlanView({
           ).map((option) => (
             <div key={option.key}>
               <p className="text-sm font-medium">{option.label}</p>
-              {option.children ? (
+              {option.sublines ? (
                 <ul className="ml-4 mt-1 list-inside list-disc space-y-1 text-sm text-muted-foreground">
-                  {option.children
-                    .filter((child) =>
-                      supportServicesSection.selected.includes(child.key)
-                    )
-                    .map((child) => (
-                      <li key={child.key}>{child.label}</li>
-                    ))}
+                  {option.sublines.map((line) => (
+                    <li key={line}>{line}</li>
+                  ))}
                 </ul>
               ) : null}
             </div>

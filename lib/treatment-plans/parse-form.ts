@@ -1,9 +1,9 @@
 import type { CheckboxOption } from "@/lib/treatment-plans/fields"
 import {
   ONGOING_ASSESSMENT_OPTIONS,
+  SUPPORT_SERVICES_OPTIONS,
   TREATMENT_MODALITY_OPTIONS,
   TREATMENT_MODEL_OPTIONS,
-  flattenSupportServiceOptions,
 } from "@/lib/treatment-plans/fields"
 import type {
   MedicationSupervisionJson,
@@ -135,7 +135,7 @@ export function parseTreatmentPlanFormData(
     supportServices: parseMultiSection(
       formData,
       "support",
-      flattenSupportServiceOptions()
+      SUPPORT_SERVICES_OPTIONS
     ),
     treatmentModel: parseSingleSection(
       formData,

@@ -143,7 +143,7 @@ export default async function EditReportPage({
     db
       .select({
         therapeuticTarget: treatmentPlans.therapeuticTarget,
-        behaviouralTargetsJson: treatmentPlans.behaviouralTargetsJson,
+        smartGoalsJson: treatmentPlans.smartGoalsJson,
         ongoingAssessmentsJson: treatmentPlans.ongoingAssessmentsJson,
         suicideAttemptsJson: treatmentPlans.suicideAttemptsJson,
       })
@@ -162,8 +162,11 @@ export default async function EditReportPage({
   ])
 
   const therapeuticTarget = activePlan?.therapeuticTarget ?? null
+  // Report's own internal field name (behaviouralTargets) is unchanged — this just
+  // fixes the read from the treatment plan, which renamed its column to
+  // smartGoalsJson (2026-09 layout update).
   const behaviouralTargets =
-    (activePlan?.behaviouralTargetsJson as { items?: string[] } | null)?.items ?? []
+    (activePlan?.smartGoalsJson as { items?: string[] } | null)?.items ?? []
   const assistEnabled =
     (activePlan?.ongoingAssessmentsJson as { assist?: boolean } | null)?.assist ?? false
   const suicideAttempts = suicideAttemptItemsFromJson(activePlan?.suicideAttemptsJson)

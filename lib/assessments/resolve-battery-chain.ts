@@ -5,7 +5,7 @@ import {
 } from "@/lib/assessments/battery-codes"
 import { loadActiveTreatmentPlanSummary } from "@/lib/treatment-plans/load"
 
-function parseBehaviouralTargetItems(value: unknown): string[] {
+function parseSmartGoalItems(value: unknown): string[] {
   if (!value || typeof value !== "object") return []
   const items = (value as { items?: unknown }).items
   if (!Array.isArray(items)) return []
@@ -18,18 +18,16 @@ export async function resolveBatteryChainCodes(
   requestedCodes: string[]
 ): Promise<{
   codes: BatteryAssessmentCode[]
-  behaviouralTargets: string[]
+  smartGoals: string[]
 }> {
   const normalized = orderBatteryCodes(normalizeBatteryCodes(requestedCodes))
   const treatmentPlan = await loadActiveTreatmentPlanSummary(clientId, practiceId)
-  const behaviouralTargets = parseBehaviouralTargetItems(
-    treatmentPlan?.behaviouralTargetsJson
-  )
+  const smartGoals = parseSmartGoalItems(treatmentPlan?.smartGoalsJson)
 
   const codes = normalized.filter((code) => {
     if (code !== "BTP") return true
-    return behaviouralTargets.length > 0
+    return smartGoals.length > 0
   })
 
-  return { codes, behaviouralTargets }
+  return { codes, smartGoals }
 }

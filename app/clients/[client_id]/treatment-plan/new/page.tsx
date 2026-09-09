@@ -6,6 +6,7 @@ import { AppShell } from "@/components/app-shell"
 import { BackButton } from "@/components/ui/back-button"
 import { EntityPageHeader } from "@/components/ui/entity-page-header"
 import { verifyClientInPractice } from "@/lib/treatment-plans/load"
+import { loadActiveCrisisPlanSummary } from "@/lib/crisis-plans/load"
 import { requirePractitionerContext } from "@/lib/auth"
 
 export default async function NewTreatmentPlanPage({
@@ -20,6 +21,11 @@ export default async function NewTreatmentPlanPage({
   if (!client) {
     notFound()
   }
+
+  const crisisPlanSummary = await loadActiveCrisisPlanSummary(
+    clientId,
+    context.practiceId
+  )
 
   const clientName = `${client.firstName} ${client.lastName}`
 
@@ -41,6 +47,7 @@ export default async function NewTreatmentPlanPage({
         clientId={clientId}
         sourcePlanId={null}
         cancelHref={`/clients/${clientId}`}
+        crisisPlanSummary={crisisPlanSummary}
       />
     </AppShell>
   )

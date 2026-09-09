@@ -680,7 +680,7 @@ export async function buildSnapshot(
     db
       .select({
         therapeuticTarget: treatmentPlans.therapeuticTarget,
-        behaviouralTargetsJson: treatmentPlans.behaviouralTargetsJson,
+        smartGoalsJson: treatmentPlans.smartGoalsJson,
         ongoingAssessmentsJson: treatmentPlans.ongoingAssessmentsJson,
         suicideAttemptsJson: treatmentPlans.suicideAttemptsJson,
       })
@@ -699,8 +699,11 @@ export async function buildSnapshot(
   ])
 
   const therapeuticTarget = activeTreatmentPlan?.therapeuticTarget ?? null
+  // Report's own internal field name (behaviouralTargets) is unchanged — this just
+  // fixes the read from the treatment plan, which renamed its column to
+  // smartGoalsJson (2026-09 layout update). See Cursor handoff for scope note.
   const behaviouralTargets =
-    (activeTreatmentPlan?.behaviouralTargetsJson as { items?: string[] } | null)
+    (activeTreatmentPlan?.smartGoalsJson as { items?: string[] } | null)
       ?.items ?? []
   const assistEnabled =
     (activeTreatmentPlan?.ongoingAssessmentsJson as { assist?: boolean } | null)

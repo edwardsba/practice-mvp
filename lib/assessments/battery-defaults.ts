@@ -14,11 +14,11 @@ export type BatteryAssessmentChip = {
 
 export function getDefaultBatteryAssessments(
   ongoingAssessments: OngoingAssessmentsJson | null | undefined,
-  behaviouralTargetItems: string[] = []
+  smartGoalItems: string[] = []
 ): BatteryAssessmentChip[] {
-  const hasBehaviouralTargets = behaviouralTargetItems.length > 0
+  const hasSmartGoals = smartGoalItems.length > 0
   const availableCodes = BATTERY_ASSESSMENT_CODES.filter(
-    (code) => code !== "BTP" || hasBehaviouralTargets
+    (code) => code !== "BTP" || hasSmartGoals
   )
 
   if (!ongoingAssessments) {
@@ -27,7 +27,7 @@ export function getDefaultBatteryAssessments(
       label: BATTERY_ASSESSMENT_LABELS[code],
       selected:
         code === "BTP"
-          ? hasBehaviouralTargets
+          ? hasSmartGoals
           : DEFAULT_BATTERY_CODES.includes(code),
     }))
   }
@@ -41,7 +41,7 @@ export function getDefaultBatteryAssessments(
   return availableCodes.map((code) => {
     let selected = false
     if (code === "BTP") {
-      selected = hasBehaviouralTargets
+      selected = hasSmartGoals
     } else if (!usePlanSelections) {
       selected = DEFAULT_BATTERY_CODES.includes(code)
     } else if (code === "PHQ9") {
@@ -68,9 +68,9 @@ export function selectedBatteryCodes(
 
 export function batteryCodesFromTreatmentPlan(
   ongoingAssessments: OngoingAssessmentsJson | null | undefined,
-  behaviouralTargetItems: string[] = []
+  smartGoalItems: string[] = []
 ): BatteryAssessmentCode[] {
   return selectedBatteryCodes(
-    getDefaultBatteryAssessments(ongoingAssessments, behaviouralTargetItems)
+    getDefaultBatteryAssessments(ongoingAssessments, smartGoalItems)
   )
 }

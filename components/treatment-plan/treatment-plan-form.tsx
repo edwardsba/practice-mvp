@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
+import Link from "next/link"
 
 import {
   previewTreatmentPlan,
@@ -14,10 +15,13 @@ import {
   type SaveTreatmentPlanState,
 } from "@/app/clients/[client_id]/treatment-plan/actions"
 import {
-  BehaviouralTargetsFields,
+  MedicationSupervisionFields,
   MultiSelectSectionFields,
   OngoingAssessmentsFields,
+  SingleSelectSectionFields,
+  SmartGoalsFields,
   SuicideAttemptsFields,
+  SupportServicesFields,
 } from "@/components/treatment-plan/form-fields"
 import { DocumentPreviewModal } from "@/components/documents/document-preview-modal"
 import { Button } from "@/components/ui/button"
@@ -31,13 +35,11 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import {
-  ALTERNATE_RESPONSES_OPTIONS,
-  CASE_FORMULATION_OPTIONS,
-  PSYCHOEDUCATION_OPTIONS,
-  QUALITY_OF_LIFE_OPTIONS,
-  RISK_MANAGEMENT_OPTIONS,
   SUPPORT_SERVICES_OPTIONS,
   TREATMENT_MODALITY_OPTIONS,
+  TREATMENT_MODEL_OPTIONS,
+  TREATMENT_SUMMARY_ITEMS,
+  defaultSupportServiceKeys,
 } from "@/lib/treatment-plans/fields"
 import { formatDateForInput, todayDateInput } from "@/lib/dates/practice-time"
 import type { TreatmentPlanRow } from "@/lib/treatment-plans/types"
@@ -61,18 +63,60 @@ function downloadBase64Pdf(pdfBase64: string, filename: string) {
   URL.revokeObjectURL(url)
 }
 
+function CrisisPlanSummaryLine({
+  clientId,
+  crisisPlanSummary,
+}: {
+  clientId: string
+  crisisPlanSummary: {
+    crisisPlanId: string
+    versionNumber: number
+    dateOfPlan: string
+  } | null
+}) {
+  if (!crisisPlanSummary) {
+    return <p className="text-sm text-muted-foreground">No current crisis plan</p>
+  }
+  const date = new Date(
+    crisisPlanSummary.dateOfPlan.includes("T")
+      ? crisisPlanSummary.dateOfPlan
+      : `${crisisPlanSummary.dateOfPlan}T00:00:00`
+  )
+  const dateLabel = Number.isNaN(date.getTime())
+    ? crisisPlanSummary.dateOfPlan
+    : date.toLocaleDateString("en-AU", {
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+      })
+  return (
+    <Link
+      href={`/clients/${clientId}/crisis-plan/${crisisPlanSummary.crisisPlanId}`}
+      className="text-sm text-primary hover:underline"
+    >
+      Version {crisisPlanSummary.versionNumber} — {dateLabel}
+    </Link>
+  )
+}
+
 export function TreatmentPlanForm({
   clientId,
   sourcePlanId,
   initialPlan,
   isNewVersion = false,
   cancelHref,
+  crisisPlanSummary = null,
 }: {
   clientId: string
   sourcePlanId: string | null
   initialPlan?: TreatmentPlanRow
   isNewVersion?: boolean
   cancelHref: string
+  crisisPlanSummary?: {
+    crisisPlanId: string
+    versionNumber: number
+    dateOfPlan: string
+  } | null
 }) {
   const router = useRouter()
 
@@ -114,7 +158,7 @@ export function TreatmentPlanForm({
   }, [saveAndDownloadState, clientId])
 
   const plan = initialPlan
-  const behaviouralItems = plan?.behaviouralTargetsJson?.items ?? []
+  const smartGoalItems = plan?.smartGoalsJson?.items ?? []
   const suicideAttemptItems = plan?.suicideAttemptsJson?.items ?? []
   const ongoing = plan?.ongoingAssessmentsJson ?? {
     phq9: false,
@@ -122,6 +166,15 @@ export function TreatmentPlanForm({
     assist: false,
   }
   const emptyMulti = { selected: [], other: [] }
+  const supportServicesValue = plan?.supportServicesJson ?? {
+    selected: isNewVersion || !plan ? defaultSupportServiceKeys() : [],
+    other: [],
+  }
+  const treatmentModelValue = plan?.treatmentModelJson ?? { selected: null }
+  const medicationSupervisionValue = plan?.medicationSupervisionJson ?? {
+    supervised: false,
+    supervisorName: null,
+  }
 
   return (
     <>
@@ -165,26 +218,39 @@ export function TreatmentPlanForm({
           <CardHeader>
             <CardTitle>Diagnosis</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-2">
-            <Label htmlFor="diagnosis">Diagnosis</Label>
-            <p className="text-xs text-muted-foreground">
-              Entered manually for now. Once the diagnostic assessment feature is
-              built, this will be autofilled from the client&apos;s finalised
-              diagnosis.
-            </p>
-            <Textarea
-              id="diagnosis"
-              name="diagnosis"
-              defaultValue={plan?.diagnosis ?? ""}
-              placeholder="e.g. Major Depressive Disorder, moderate, recurrent"
-              rows={3}
-            />
+          <CardContent className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2 sm:col-span-2">
+              <Label htmlFor="diagnosis">Diagnosis</Label>
+              <p className="text-xs text-muted-foreground">
+                Entered manually for now. Once the diagnostic assessment feature is
+                built, this will be autofilled from the client&apos;s finalised
+                diagnosis.
+              </p>
+              <Textarea
+                id="diagnosis"
+                name="diagnosis"
+                defaultValue={plan?.diagnosis ?? ""}
+                placeholder="e.g. Major Depressive Disorder, moderate, recurrent"
+                rows={3}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="diagnosis_report_date">Report date</Label>
+              <Input
+                id="diagnosis_report_date"
+                name="diagnosis_report_date"
+                type="date"
+                defaultValue={formatDateForInput(
+                  plan?.diagnosisReportDate ?? null
+                )}
+              />
+            </div>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle>Treatment targets</CardTitle>
+            <CardTitle>Therapeutic Target and Goals</CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="space-y-2">
@@ -197,8 +263,8 @@ export function TreatmentPlanForm({
               />
             </div>
             <div className="space-y-2">
-              <Label>Behavioural targets</Label>
-              <BehaviouralTargetsFields initialItems={behaviouralItems} />
+              <Label>SMART Goals</Label>
+              <SmartGoalsFields initialItems={smartGoalItems} />
             </div>
           </CardContent>
         </Card>
@@ -218,14 +284,13 @@ export function TreatmentPlanForm({
 
         <Card>
           <CardHeader>
-            <CardTitle>Case formulation model</CardTitle>
+            <CardTitle>Treatment Model</CardTitle>
           </CardHeader>
           <CardContent>
-            <MultiSelectSectionFields
-              prefix="case"
-              options={CASE_FORMULATION_OPTIONS}
-              value={plan?.caseFormulationJson ?? emptyMulti}
-              allowOther={false}
+            <SingleSelectSectionFields
+              name="treatment_model"
+              options={TREATMENT_MODEL_OPTIONS}
+              value={treatmentModelValue}
             />
           </CardContent>
         </Card>
@@ -253,63 +318,43 @@ export function TreatmentPlanForm({
               </p>
               <SuicideAttemptsFields initialItems={suicideAttemptItems} />
             </div>
-            <MultiSelectSectionFields
-              prefix="risk"
-              options={RISK_MANAGEMENT_OPTIONS}
-              value={plan?.riskManagementJson ?? emptyMulti}
-            />
+            <div className="space-y-2">
+              <Label>Medication supervision</Label>
+              <MedicationSupervisionFields value={medicationSupervisionValue} />
+            </div>
+            <div className="space-y-2">
+              <Label>Crisis plan</Label>
+              <CrisisPlanSummaryLine
+                clientId={clientId}
+                crisisPlanSummary={crisisPlanSummary}
+              />
+            </div>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle>Support services</CardTitle>
+            <CardTitle>Other Support Services</CardTitle>
           </CardHeader>
           <CardContent>
-            <MultiSelectSectionFields
+            <SupportServicesFields
               prefix="support"
               options={SUPPORT_SERVICES_OPTIONS}
-              value={plan?.supportServicesJson ?? emptyMulti}
+              value={supportServicesValue}
             />
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle>Psychoeducation</CardTitle>
+            <CardTitle>Treatment Summary</CardTitle>
           </CardHeader>
           <CardContent>
-            <MultiSelectSectionFields
-              prefix="psycho"
-              options={PSYCHOEDUCATION_OPTIONS}
-              value={plan?.psychoeducationJson ?? emptyMulti}
-            />
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Alternate responses</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <MultiSelectSectionFields
-              prefix="alternate"
-              options={ALTERNATE_RESPONSES_OPTIONS}
-              value={plan?.alternateResponsesJson ?? emptyMulti}
-            />
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Quality of life</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <MultiSelectSectionFields
-              prefix="qol"
-              options={QUALITY_OF_LIFE_OPTIONS}
-              value={plan?.qualityOfLifeJson ?? emptyMulti}
-            />
+            <ul className="list-inside list-disc space-y-1 text-sm">
+              {TREATMENT_SUMMARY_ITEMS.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
           </CardContent>
         </Card>
 

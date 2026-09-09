@@ -220,7 +220,7 @@ export async function sendBatteryEmailWithDraft(
     )
     const assessmentCodes = batteryCodesFromTreatmentPlan(
       treatmentPlan?.ongoingAssessmentsJson,
-      treatmentPlan?.behaviouralTargetItems ?? []
+      treatmentPlan?.smartGoalItems ?? []
     )
 
     const batteryResult = await createBatteryInstance({

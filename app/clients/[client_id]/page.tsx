@@ -124,7 +124,7 @@ export default async function ClientDetailPage({
 
   const defaultBatteryAssessments = getDefaultBatteryAssessments(
     activeTreatmentPlan?.ongoingAssessmentsJson,
-    activeTreatmentPlan?.behaviouralTargetItems ?? []
+    activeTreatmentPlan?.smartGoalItems ?? []
   )
 
   let emergencyContacts: Awaited<ReturnType<typeof loadEmergencyContacts>> = []
@@ -438,10 +438,10 @@ export default async function ClientDetailPage({
 
               {activeTreatmentPlan ? (
                 <div className="border-t pt-4">
-                  <p className="mb-2 text-sm font-medium">Behavioural targets</p>
-                  {activeTreatmentPlan.behaviouralTargetItems.length > 0 ? (
+                  <p className="mb-2 text-sm font-medium">SMART Goals</p>
+                  {activeTreatmentPlan.smartGoalItems.length > 0 ? (
                     <ul className="list-inside list-disc space-y-1 text-sm">
-                      {activeTreatmentPlan.behaviouralTargetItems.map(
+                      {activeTreatmentPlan.smartGoalItems.map(
                         (target, index) => (
                           <li key={`${index}-${target}`}>{target}</li>
                         )
@@ -449,7 +449,7 @@ export default async function ClientDetailPage({
                     </ul>
                   ) : (
                     <p className="text-sm text-muted-foreground">
-                      No behavioural targets set
+                      No SMART goals set
                     </p>
                   )}
                 </div>

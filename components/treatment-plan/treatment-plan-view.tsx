@@ -1,3 +1,5 @@
+import Link from "next/link"
+
 import {
   Card,
   CardContent,
@@ -5,14 +7,11 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import {
-  ALTERNATE_RESPONSES_OPTIONS,
-  CASE_FORMULATION_OPTIONS,
   ONGOING_ASSESSMENT_OPTIONS,
-  PSYCHOEDUCATION_OPTIONS,
-  QUALITY_OF_LIFE_OPTIONS,
-  RISK_MANAGEMENT_OPTIONS,
   SUPPORT_SERVICES_OPTIONS,
   TREATMENT_MODALITY_OPTIONS,
+  TREATMENT_MODEL_OPTIONS,
+  TREATMENT_SUMMARY_ITEMS,
   optionLabel,
 } from "@/lib/treatment-plans/fields"
 import type { TreatmentPlanRow } from "@/lib/treatment-plans/types"
@@ -59,7 +58,19 @@ function ViewMultiSection({
   return <ViewList items={labels} />
 }
 
-export function TreatmentPlanView({ plan }: { plan: TreatmentPlanRow }) {
+export function TreatmentPlanView({
+  plan,
+  clientId,
+  crisisPlanSummary = null,
+}: {
+  plan: TreatmentPlanRow
+  clientId: string
+  crisisPlanSummary?: {
+    crisisPlanId: string
+    versionNumber: number
+    dateOfPlan: string
+  } | null
+}) {
   const ongoing = plan.ongoingAssessmentsJson ?? {
     phq9: false,
     gad7: false,
@@ -69,11 +80,19 @@ export function TreatmentPlanView({ plan }: { plan: TreatmentPlanRow }) {
     (option) => ongoing[option.key as keyof typeof ongoing]
   ).map((option) => option.label)
 
-  const behaviouralItems = plan.behaviouralTargetsJson?.items ?? []
+  const smartGoalItems = plan.smartGoalsJson?.items ?? []
   const suicideAttempts = sortAttemptsChronologically(
     plan.suicideAttemptsJson?.items ?? []
   )
   const emptyMulti = { selected: [], other: [] }
+  const supportServicesSection = plan.supportServicesJson ?? emptyMulti
+  const medicationSupervision = plan.medicationSupervisionJson ?? {
+    supervised: false,
+    supervisorName: null,
+  }
+  const treatmentModelLabel = plan.treatmentModelJson?.selected
+    ? optionLabel(TREATMENT_MODEL_OPTIONS, plan.treatmentModelJson.selected)
+    : null
 
   return (
     <div className="space-y-6">
@@ -99,16 +118,22 @@ export function TreatmentPlanView({ plan }: { plan: TreatmentPlanRow }) {
         <CardHeader>
           <CardTitle>Diagnosis</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
           <p className="whitespace-pre-wrap text-sm font-medium">
             {plan.diagnosis?.trim() || "—"}
           </p>
+          <div>
+            <p className="text-sm text-muted-foreground">Report date</p>
+            <p className="mt-1 font-medium">
+              {formatDisplayDate(plan.diagnosisReportDate)}
+            </p>
+          </div>
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle>Treatment targets</CardTitle>
+          <CardTitle>Therapeutic Target and Goals</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div>
@@ -117,10 +142,10 @@ export function TreatmentPlanView({ plan }: { plan: TreatmentPlanRow }) {
               {plan.therapeuticTarget?.trim() || "—"}
             </p>
           </div>
-          <div id="behavioural-targets" className="scroll-mt-24">
-            <p className="text-sm text-muted-foreground">Behavioural targets</p>
+          <div id="smart-goals" className="scroll-mt-24">
+            <p className="text-sm text-muted-foreground">SMART Goals</p>
             <div className="mt-2">
-              <ViewList items={behaviouralItems} />
+              <ViewList items={smartGoalItems} />
             </div>
           </div>
         </CardContent>
@@ -140,13 +165,10 @@ export function TreatmentPlanView({ plan }: { plan: TreatmentPlanRow }) {
 
       <Card>
         <CardHeader>
-          <CardTitle>Case formulation model</CardTitle>
+          <CardTitle>Treatment Model</CardTitle>
         </CardHeader>
         <CardContent>
-          <ViewMultiSection
-            options={CASE_FORMULATION_OPTIONS}
-            section={plan.caseFormulationJson ?? emptyMulti}
-          />
+          <p className="text-sm">{treatmentModelLabel ?? "None selected"}</p>
         </CardContent>
       </Card>
 
@@ -190,58 +212,79 @@ export function TreatmentPlanView({ plan }: { plan: TreatmentPlanRow }) {
               </ul>
             )}
           </div>
-          <ViewMultiSection
-            options={RISK_MANAGEMENT_OPTIONS}
-            section={plan.riskManagementJson ?? emptyMulti}
-          />
+          <div>
+            <p className="text-sm text-muted-foreground">Medication supervision</p>
+            <p className="mt-1 text-sm">
+              {medicationSupervision.supervised
+                ? `Yes — supervised by ${medicationSupervision.supervisorName ?? "—"}`
+                : "No"}
+            </p>
+          </div>
+          <div>
+            <p className="text-sm text-muted-foreground">Crisis plan</p>
+            <div className="mt-1">
+              {crisisPlanSummary ? (
+                <Link
+                  href={`/clients/${clientId}/crisis-plan/${crisisPlanSummary.crisisPlanId}`}
+                  className="text-sm text-primary hover:underline"
+                >
+                  Version {crisisPlanSummary.versionNumber} —{" "}
+                  {formatDisplayDate(crisisPlanSummary.dateOfPlan)}
+                </Link>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  No current crisis plan
+                </p>
+              )}
+            </div>
+          </div>
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle>Support services</CardTitle>
+          <CardTitle>Other Support Services</CardTitle>
         </CardHeader>
-        <CardContent>
-          <ViewMultiSection
-            options={SUPPORT_SERVICES_OPTIONS}
-            section={plan.supportServicesJson ?? emptyMulti}
-          />
+        <CardContent className="space-y-3">
+          {SUPPORT_SERVICES_OPTIONS.filter((option) =>
+            supportServicesSection.selected.includes(option.key)
+          ).map((option) => (
+            <div key={option.key}>
+              <p className="text-sm font-medium">{option.label}</p>
+              {option.children ? (
+                <ul className="ml-4 mt-1 list-inside list-disc space-y-1 text-sm text-muted-foreground">
+                  {option.children
+                    .filter((child) =>
+                      supportServicesSection.selected.includes(child.key)
+                    )
+                    .map((child) => (
+                      <li key={child.key}>{child.label}</li>
+                    ))}
+                </ul>
+              ) : null}
+            </div>
+          ))}
+          {SUPPORT_SERVICES_OPTIONS.every(
+            (option) => !supportServicesSection.selected.includes(option.key)
+          ) && supportServicesSection.other.length === 0 ? (
+            <p className="text-sm text-muted-foreground">None selected</p>
+          ) : null}
+          {supportServicesSection.other.length > 0 ? (
+            <ViewList items={supportServicesSection.other} />
+          ) : null}
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle>Psychoeducation</CardTitle>
+          <CardTitle>Treatment Summary</CardTitle>
         </CardHeader>
         <CardContent>
-          <ViewMultiSection
-            options={PSYCHOEDUCATION_OPTIONS}
-            section={plan.psychoeducationJson ?? emptyMulti}
-          />
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Alternate responses</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ViewMultiSection
-            options={ALTERNATE_RESPONSES_OPTIONS}
-            section={plan.alternateResponsesJson ?? emptyMulti}
-          />
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Quality of life</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ViewMultiSection
-            options={QUALITY_OF_LIFE_OPTIONS}
-            section={plan.qualityOfLifeJson ?? emptyMulti}
-          />
+          <ul className="list-inside list-disc space-y-1 text-sm">
+            {TREATMENT_SUMMARY_ITEMS.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
         </CardContent>
       </Card>
     </div>

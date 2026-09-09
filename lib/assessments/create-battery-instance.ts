@@ -54,7 +54,7 @@ export async function createBatteryInstance(
     return { ok: false, error: "client_id and practitioner_profile_id are required." }
   }
 
-  const { codes: requestedCodes, behaviouralTargets } =
+  const { codes: requestedCodes, smartGoals } =
     await resolveBatteryChainCodes(
       clientId,
       practiceId,
@@ -158,7 +158,7 @@ export async function createBatteryInstance(
         if (item.code === "BTP") {
           await createBtpInstanceElements(
             instance.assessmentInstanceId,
-            behaviouralTargets,
+            smartGoals,
             definition.assessmentDefinitionId,
             tx
           )

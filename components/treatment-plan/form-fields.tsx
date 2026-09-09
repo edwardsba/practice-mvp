@@ -6,10 +6,16 @@ import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import type { CheckboxOption } from "@/lib/treatment-plans/fields"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import type {
+  CheckboxOption,
+  SupportServiceOption,
+} from "@/lib/treatment-plans/fields"
+import type {
+  MedicationSupervisionJson,
   MultiSelectSectionJson,
   OngoingAssessmentsJson,
+  SingleSelectSectionJson,
   SuicideAttemptRecord,
 } from "@/lib/treatment-plans/types"
 
@@ -18,11 +24,13 @@ export function FormCheckboxField({
   name,
   label,
   defaultChecked = false,
+  onCheckedChangeExtra,
 }: {
   id: string
   name: string
   label: string
   defaultChecked?: boolean
+  onCheckedChangeExtra?: (checked: boolean) => void
 }) {
   const [checked, setChecked] = useState(defaultChecked)
 
@@ -31,7 +39,11 @@ export function FormCheckboxField({
       <Checkbox
         id={id}
         checked={checked}
-        onCheckedChange={(value) => setChecked(value === true)}
+        onCheckedChange={(value) => {
+          const next = value === true
+          setChecked(next)
+          onCheckedChangeExtra?.(next)
+        }}
       />
       <input type="hidden" name={name} value={checked ? "on" : ""} />
       <Label htmlFor={id} className="cursor-pointer font-normal leading-snug">
@@ -145,7 +157,142 @@ export function MultiSelectSectionFields({
   )
 }
 
-export function BehaviouralTargetsFields({
+/** Single-select (radio) equivalent of MultiSelectSectionFields, for Treatment
+ * Model — exactly one (or no) option applies, and there's no "Other" free text
+ * since entries need to be exact citations. */
+export function SingleSelectSectionFields({
+  name,
+  options,
+  value,
+}: {
+  name: string
+  options: CheckboxOption[]
+  value: SingleSelectSectionJson
+}) {
+  const [selected, setSelected] = useState<string>(value.selected ?? "")
+
+  return (
+    <RadioGroup
+      name={name}
+      value={selected}
+      onValueChange={setSelected}
+      className="space-y-3"
+    >
+      {options.map((option) => (
+        <div key={option.key} className="flex items-start gap-3">
+          <RadioGroupItem
+            value={option.key}
+            id={`${name}_${option.key}`}
+            className="mt-0.5"
+          />
+          <Label
+            htmlFor={`${name}_${option.key}`}
+            className="cursor-pointer font-normal leading-snug"
+          >
+            {option.label}
+          </Label>
+        </div>
+      ))}
+    </RadioGroup>
+  )
+}
+
+/** Support Services: parent items, two of which (12-Step Program, SMART Recovery)
+ * reveal their own sub-checklist only once the parent is checked. Parent and child
+ * keys all live together as flat entries in the same MultiSelectSectionJson.selected
+ * array — flattenSupportServiceOptions() is what parsing reads back against. */
+export function SupportServicesFields({
+  prefix,
+  options,
+  value,
+}: {
+  prefix: string
+  options: SupportServiceOption[]
+  value: MultiSelectSectionJson
+}) {
+  const [checkedParents, setCheckedParents] = useState<Set<string>>(
+    new Set(
+      options
+        .filter((o) => value.selected.includes(o.key))
+        .map((o) => o.key)
+    )
+  )
+
+  return (
+    <div className="space-y-4">
+      {options.map((option) => (
+        <div key={option.key} className="space-y-3">
+          <FormCheckboxField
+            id={`${prefix}_${option.key}`}
+            name={`${prefix}_${option.key}`}
+            label={option.label}
+            defaultChecked={value.selected.includes(option.key)}
+            onCheckedChangeExtra={(checked) => {
+              if (!option.children) return
+              setCheckedParents((prev) => {
+                const next = new Set(prev)
+                if (checked) next.add(option.key)
+                else next.delete(option.key)
+                return next
+              })
+            }}
+          />
+          {option.children && checkedParents.has(option.key) ? (
+            <div className="ml-7 space-y-2 border-l pl-4">
+              {option.children.map((child) => (
+                <FormCheckboxField
+                  key={child.key}
+                  id={`${prefix}_${child.key}`}
+                  name={`${prefix}_${child.key}`}
+                  label={child.label}
+                  defaultChecked={value.selected.includes(child.key)}
+                />
+              ))}
+            </div>
+          ) : null}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+/** Medication Supervision: a checkbox for whether medication is currently being
+ * supervised, revealing a text field for the supervising doctor/psychiatrist's
+ * name once checked. */
+export function MedicationSupervisionFields({
+  value,
+}: {
+  value: MedicationSupervisionJson
+}) {
+  const [supervised, setSupervised] = useState(value.supervised)
+
+  return (
+    <div className="space-y-3">
+      <FormCheckboxField
+        id="medication_supervised"
+        name="medication_supervised"
+        label="Medication is being supervised"
+        defaultChecked={value.supervised}
+        onCheckedChangeExtra={setSupervised}
+      />
+      {supervised ? (
+        <div className="ml-7 max-w-sm space-y-2">
+          <Label htmlFor="medication_supervisor_name" className="text-xs">
+            Supervising doctor / psychiatrist
+          </Label>
+          <Input
+            id="medication_supervisor_name"
+            name="medication_supervisor_name"
+            defaultValue={value.supervisorName ?? ""}
+            placeholder="Name"
+          />
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
+export function SmartGoalsFields({
   initialItems,
 }: {
   initialItems: string[]
@@ -171,10 +318,10 @@ export function BehaviouralTargetsFields({
       {items.map((item, index) => (
         <div key={index} className="flex gap-2">
           <Input
-            name="behavioural_targets"
+            name="smart_goals"
             value={item}
             onChange={(e) => updateRow(index, e.target.value)}
-            placeholder="Behavioural target"
+            placeholder="SMART goal"
           />
           <Button
             type="button"
@@ -187,7 +334,7 @@ export function BehaviouralTargetsFields({
         </div>
       ))}
       <Button type="button" variant="outline" size="sm" onClick={addRow}>
-        Add behavioural target
+        Add SMART goal
       </Button>
     </div>
   )

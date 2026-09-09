@@ -17,20 +17,28 @@ export const treatmentPlans = pgTable('treatment_plans', {
   // Once the standalone diagnostic-assessment feature exists, this field will be
   // autofilled from it instead (see PROJECT_MAP.md Clinical Process #8).
   diagnosis: text('diagnosis'),
+  // Date of the report/assessment the diagnosis above is based on — separate from
+  // the plan's own createdAt/startDate.
+  diagnosisReportDate: date('diagnosis_report_date'),
   therapeuticTarget: text('therapeutic_target'),
-  behaviouralTargetsJson: jsonb('behavioural_targets_json'),
+  // Renamed from behaviouralTargetsJson (2026-09 layout update) — same
+  // { items: string[] } shape, product concept renamed to "SMART Goals".
+  smartGoalsJson: jsonb('smart_goals_json'),
   treatmentModalitiesJson: jsonb('treatment_modalities_json'),
   ongoingAssessmentsJson: jsonb('ongoing_assessments_json'),
-  riskManagementJson: jsonb('risk_management_json'),
   suicideAttemptsJson: jsonb('suicide_attempts_json'),
+  // Medication supervision is its own compound field (not a plain checkbox item):
+  // whether medication is currently being supervised, and by whom.
+  medicationSupervisionJson: jsonb('medication_supervision_json'),
   supportServicesJson: jsonb('support_services_json'),
-  psychoeducationJson: jsonb('psychoeducation_json'),
-  // Content changed from a technique checklist to a curated list of cited published
-  // case-formulation models (starting with one entry) — same MultiSelectSectionJson
-  // shape, no "Other" free-text option since these need to be exact citations.
-  caseFormulationJson: jsonb('case_formulation_json'),
-  alternateResponsesJson: jsonb('alternate_responses_json'),
-  qualityOfLifeJson: jsonb('quality_of_life_json'),
+  // Renamed from caseFormulationJson (2026-09 layout update) and changed from a
+  // multi-select list to a single-select: exactly one named, cited treatment model
+  // per plan, shape { selected: string | null }. No "Other" free-text — these need
+  // to be exact citations. Section title in the UI is "Treatment Model".
+  treatmentModelJson: jsonb('treatment_model_json'),
+  // Psychoeducation / Alternate Responses / Quality of Life removed (2026-09 layout
+  // update) — replaced by the static "Treatment Summary" block, which has no
+  // per-client selectable state and so needs no column.
   pdfStoragePath: text('pdf_storage_path'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),

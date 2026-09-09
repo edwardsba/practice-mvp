@@ -1,14 +1,11 @@
 import PDFDocument from "pdfkit"
 
 import {
-  ALTERNATE_RESPONSES_OPTIONS,
-  CASE_FORMULATION_OPTIONS,
   ONGOING_ASSESSMENT_OPTIONS,
-  PSYCHOEDUCATION_OPTIONS,
-  QUALITY_OF_LIFE_OPTIONS,
-  RISK_MANAGEMENT_OPTIONS,
-  SUPPORT_SERVICES_OPTIONS,
   TREATMENT_MODALITY_OPTIONS,
+  TREATMENT_MODEL_OPTIONS,
+  TREATMENT_SUMMARY_ITEMS,
+  flattenSupportServiceOptions,
   optionLabel,
 } from "@/lib/treatment-plans/fields"
 import type { TreatmentPlanRow } from "@/lib/treatment-plans/types"
@@ -16,6 +13,7 @@ import {
   formatAttemptDate,
   sortAttemptsChronologically,
 } from "@/lib/treatment-plans/format-attempt-date"
+import { loadActiveCrisisPlanSummary } from "@/lib/crisis-plans/load"
 
 const PAGE_MARGIN = 50
 const PAGE_WIDTH = 595.28
@@ -90,10 +88,15 @@ function multiSectionLabels(
   ]
 }
 
-export function generateTreatmentPlanPdf(
+export async function generateTreatmentPlanPdf(
   plan: TreatmentPlanRow,
   client: TreatmentPlanPdfClient
 ): Promise<Buffer> {
+  const crisisPlanSummary = await loadActiveCrisisPlanSummary(
+    plan.clientId,
+    plan.practiceId
+  )
+
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ size: "A4", margin: PAGE_MARGIN })
     const chunks: Buffer[] = []
@@ -133,12 +136,20 @@ export function generateTreatmentPlanPdf(
 
     heading(doc, "Diagnosis")
     bodyText(doc, plan.diagnosis?.trim() || "—")
+    doc.moveDown(0.15)
+    doc
+      .font("Helvetica")
+      .fontSize(BASE_FONT_SIZE)
+      .fillColor(MUTED_COLOR)
+      .text(`Report date: ${formatDisplayDate(plan.diagnosisReportDate)}`, {
+        lineGap: LINE_GAP,
+      })
 
     heading(doc, "Therapeutic target")
     bodyText(doc, plan.therapeuticTarget?.trim() || "—")
 
-    heading(doc, "Behavioural targets")
-    bulletList(doc, plan.behaviouralTargetsJson?.items ?? [])
+    heading(doc, "SMART Goals")
+    bulletList(doc, plan.smartGoalsJson?.items ?? [])
 
     heading(doc, "Treatment modalities")
     bulletList(
@@ -146,10 +157,12 @@ export function generateTreatmentPlanPdf(
       multiSectionLabels(TREATMENT_MODALITY_OPTIONS, plan.treatmentModalitiesJson)
     )
 
-    heading(doc, "Case formulation model")
-    bulletList(
+    heading(doc, "Treatment Model")
+    bodyText(
       doc,
-      multiSectionLabels(CASE_FORMULATION_OPTIONS, plan.caseFormulationJson)
+      plan.treatmentModelJson?.selected
+        ? optionLabel(TREATMENT_MODEL_OPTIONS, plan.treatmentModelJson.selected)
+        : "None selected"
     )
 
     heading(doc, "Ongoing assessment tools")
@@ -193,37 +206,53 @@ export function generateTreatmentPlanPdf(
     }
     doc.moveDown(0.35)
 
-    bulletList(
-      doc,
-      multiSectionLabels(RISK_MANAGEMENT_OPTIONS, plan.riskManagementJson)
-    )
-
-    heading(doc, "Support services")
-    bulletList(
-      doc,
-      multiSectionLabels(SUPPORT_SERVICES_OPTIONS, plan.supportServicesJson)
-    )
-
-    heading(doc, "Psychoeducation")
-    bulletList(
-      doc,
-      multiSectionLabels(PSYCHOEDUCATION_OPTIONS, plan.psychoeducationJson)
-    )
-
-    heading(doc, "Alternate responses")
-    bulletList(
-      doc,
-      multiSectionLabels(
-        ALTERNATE_RESPONSES_OPTIONS,
-        plan.alternateResponsesJson
+    const medicationSupervision = plan.medicationSupervisionJson ?? {
+      supervised: false,
+      supervisorName: null,
+    }
+    doc
+      .font("Helvetica-Bold")
+      .fontSize(BASE_FONT_SIZE)
+      .fillColor(TEXT_COLOR)
+      .text("Medication supervision", { lineGap: LINE_GAP })
+    doc.moveDown(0.15)
+    doc
+      .font("Helvetica")
+      .fontSize(BASE_FONT_SIZE)
+      .fillColor(TEXT_COLOR)
+      .text(
+        medicationSupervision.supervised
+          ? `Yes — supervised by ${medicationSupervision.supervisorName ?? "—"}`
+          : "No",
+        { lineGap: LINE_GAP }
       )
-    )
+    doc.moveDown(0.35)
 
-    heading(doc, "Quality of life")
+    doc
+      .font("Helvetica-Bold")
+      .fontSize(BASE_FONT_SIZE)
+      .fillColor(TEXT_COLOR)
+      .text("Crisis plan", { lineGap: LINE_GAP })
+    doc.moveDown(0.15)
+    doc
+      .font("Helvetica")
+      .fontSize(BASE_FONT_SIZE)
+      .fillColor(crisisPlanSummary ? TEXT_COLOR : MUTED_COLOR)
+      .text(
+        crisisPlanSummary
+          ? `Version ${crisisPlanSummary.versionNumber} — ${formatDisplayDate(crisisPlanSummary.dateOfPlan)}`
+          : "No current crisis plan",
+        { lineGap: LINE_GAP }
+      )
+
+    heading(doc, "Other Support Services")
     bulletList(
       doc,
-      multiSectionLabels(QUALITY_OF_LIFE_OPTIONS, plan.qualityOfLifeJson)
+      multiSectionLabels(flattenSupportServiceOptions(), plan.supportServicesJson)
     )
+
+    heading(doc, "Treatment Summary")
+    bulletList(doc, TREATMENT_SUMMARY_ITEMS)
 
     doc.end()
   })

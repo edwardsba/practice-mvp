@@ -3,6 +3,12 @@ export type CheckboxOption = {
   label: string
 }
 
+export type SupportServiceOption = CheckboxOption & {
+  /** Sub-items shown only once this parent option is checked. */
+  children?: CheckboxOption[]
+  defaultChecked?: boolean
+}
+
 export const ONGOING_ASSESSMENT_OPTIONS: CheckboxOption[] = [
   { key: "phq9", label: "PHQ-9" },
   { key: "gad7", label: "GAD-7" },
@@ -14,110 +20,105 @@ export const TREATMENT_MODALITY_OPTIONS: CheckboxOption[] = [
   { key: "dbt", label: "Dialectical Behaviour Therapy (DBT)" },
 ]
 
-export const RISK_MANAGEMENT_OPTIONS: CheckboxOption[] = [
-  { key: "support_team", label: "Support team in place" },
-  { key: "medication_supervision", label: "Medication supervision" },
-  { key: "medication_adherence", label: "Medication adherence" },
-  { key: "crisis_plan", label: "Crisis plan" },
-]
-
-export const SUPPORT_SERVICES_OPTIONS: CheckboxOption[] = [
-  { key: "twelve_step_membership", label: "12 step group membership" },
-  { key: "twelve_step_sponsor", label: "12 step sponsor and program" },
-  { key: "smart_membership", label: "SMART recovery group membership" },
-  { key: "smart_online_training", label: "SMART recovery online training" },
-  { key: "private_rehab_instay", label: "Private Rehab instay" },
-  { key: "private_psychiatric_instay", label: "Private Psychiatric instay" },
+// Treatment Model: single-select (radio), replacing the old multi-select "Case
+// Formulation Model" list (2026-09 layout update). Deliberately no "Other"
+// free-text — entries need to be exact citations. Expected to grow; Ben supplies
+// new models as they're added.
+export const TREATMENT_MODEL_OPTIONS: CheckboxOption[] = [
   {
-    key: "private_outpatient_group",
-    label: "Private outpatient group membership",
-  },
-  { key: "er_hospital_attendance", label: "ER hospital attendance" },
-  { key: "public_hospital_instay", label: "Public hospital instay" },
-  {
-    key: "public_hospital_outpatient_group",
-    label: "Public hospital outpatient group membership",
-  },
-  { key: "charity_instay", label: "Charity organisation instay" },
-  {
-    key: "charity_outpatient_group",
-    label: "Charity organisation outpatient group membership",
+    key: "unified_depression_beck_bredemeier_2016",
+    label: "Unified Model of Depression (Beck and Bredemeier 2016)",
   },
   {
-    key: "charity_counselling_case_worker",
-    label: "Charity organisation counselling and case worker",
+    key: "cognitive_anxiety_clark_beck_2010",
+    label: "Cognitive Model of Anxiety (Clark and Beck 2010)",
   },
 ]
 
-export const PSYCHOEDUCATION_OPTIONS: CheckboxOption[] = [
+// Support Services (2026-09 layout update): simplified to six top-level items.
+// 12-Step Program and SMART Recovery each reveal their own sub-checklist only once
+// selected — the parent key and any checked children all live together as flat
+// entries in the same MultiSelectSectionJson.selected array; flattenSupportServiceOptions()
+// below is what parsing/rendering-as-a-flat-list use.
+export const SUPPORT_SERVICES_OPTIONS: SupportServiceOption[] = [
   {
-    key: "cognitive_model_target",
-    label: "Cognitive model of therapeutic target",
+    key: "twelve_step_program",
+    label: "12-Step Program",
+    children: [
+      {
+        key: "twelve_step_meeting_attendance",
+        label: "12-step meeting attendance and volunteering",
+      },
+      { key: "twelve_step_sponsor", label: "Work with a 12-step sponsor" },
+      {
+        key: "twelve_step_complete_program",
+        label: "Complete the 12-step program",
+      },
+    ],
   },
-  { key: "principles_cbt", label: "Principles of CBT" },
-  { key: "principles_dbt", label: "Principles of DBT" },
-  { key: "principles_schema", label: "Principles of Schema" },
-  { key: "principles_mi", label: "Principles of MI" },
   {
-    key: "principles_biopsychosocial",
-    label: "Principles of Biopsychosocial",
+    key: "smart_recovery",
+    label: "SMART Recovery",
+    children: [
+      { key: "smart_meeting_attendance", label: "SMART meeting attendance" },
+      {
+        key: "smart_online_training",
+        label: "SMART online training participation",
+      },
+    ],
   },
-  { key: "principles_ta", label: "Principles of TA" },
+  {
+    key: "rehab_psychiatric_instay",
+    label: "Rehabilitation / Psychiatric Instay",
+    defaultChecked: true,
+  },
+  {
+    key: "outpatient_group_membership",
+    label: "Outpatient Group Membership",
+    defaultChecked: true,
+  },
+  { key: "case_worker_support_person", label: "Case Worker / Support Person" },
+  { key: "couples_counselling", label: "Couples Counselling" },
 ]
 
-// Case Formulation Model options: a curated list of specific, cited published models
-// the treatment plan is formulated against — not a technique checklist (that's the
-// prior content of this list, replaced per Ben's instruction). Deliberately no
-// "Other" free-text option anywhere this list is used, since an entry here needs to
-// be an accurate citation, not something typed ad hoc. This list is expected to grow
-// (Ben will supply more models); a full model-library feature — its own page,
-// populated by its own collection of assessments — is planned separately and
-// deliberately out of scope for now, so this stays a small, code-maintained list.
-export const CASE_FORMULATION_OPTIONS: CheckboxOption[] = [
-  {
-    key: "beck_bredemeier_2016_unified_depression",
-    label:
-      "Beck, A. T., & Bredemeier, K. (2016). A unified model of depression: Integrating clinical, cognitive, biological, and evolutionary perspectives. Clinical Psychological Science, 4(4), 596–619.",
-  },
+/** Flat list of every Support Services option (parents and children together), for
+ * parsing form data and rendering labels — anything that doesn't need the parent/
+ * child grouping itself. */
+export function flattenSupportServiceOptions(): CheckboxOption[] {
+  return SUPPORT_SERVICES_OPTIONS.flatMap((option) => [
+    { key: option.key, label: option.label },
+    ...(option.children ?? []),
+  ])
+}
+
+export function defaultSupportServiceKeys(): string[] {
+  return SUPPORT_SERVICES_OPTIONS.filter((o) => o.defaultChecked).map(
+    (o) => o.key
+  )
+}
+
+// Treatment Summary (2026-09 layout update): replaces the old Psychoeducation,
+// Alternate Responses, and Quality of Life sections. This is a fixed, static recap
+// of what every treatment plan covers — not per-client selectable state, so there's
+// no JSON column backing it. Keep this list in sync with the source template if it
+// changes; it's rendered identically on every plan.
+export const TREATMENT_SUMMARY_ITEMS: string[] = [
+  "Manage risk",
+  "Utilise other support services",
+  "Understand the treatment model",
+  "Complete the case formulation per the treatment model",
+  "Practice SMART goals",
+  "Develop effective strategies — cognitive, emotional, behavioural",
+  "Build quality of life — work/study, relationships, activities, spiritual",
 ]
 
-export const ALTERNATE_RESPONSES_OPTIONS: CheckboxOption[] = [
-  { key: "behavioural_targets", label: "Behavioural targets" },
-  { key: "cognitive_restructuring", label: "Cognitive restructuring" },
-  {
-    key: "behavioural_skills_training",
-    label: "Behavioural skills training",
-  },
-  { key: "gradual_exposure", label: "Gradual exposure" },
-  { key: "behavioural_activation", label: "Behavioural activation" },
-  {
-    key: "alternate_behavioural_strategies",
-    label: "Alternate behavioural strategies",
-  },
-]
-
-export const QUALITY_OF_LIFE_OPTIONS: CheckboxOption[] = [
-  {
-    key: "identify_values_domains",
-    label: "Identify values in various life domains",
-  },
-  {
-    key: "behavioural_goals_domains",
-    label: "Behavioural goals for each domain",
-  },
-  { key: "repair_relationships", label: "Repair relationships" },
-  {
-    key: "prevent_relapse_vulnerability",
-    label: "Prevent relapse by reducing vulnerability",
-  },
-]
-
-// Reference list of every { selected, other } checklist section on the treatment plan
-// (Ongoing Assessment Tools isn't here — it's a fixed set of boolean flags, a
-// different shape), in current page order, for anything that wants to iterate rather
-// than hardcode each section (nothing does yet — the form/view/PDF each render their
-// own sections directly). Keep this in sync with treatment-plan-form.tsx when sections
-// are added, renamed, or reordered.
+// Reference list of every generic { selected, other } multi-select checklist section
+// on the treatment plan (Ongoing Assessment Tools isn't here — it's a fixed set of
+// boolean flags; Treatment Model isn't here — it's single-select; Risk isn't here —
+// every item in it has bespoke handling now), for anything that wants to iterate
+// rather than hardcode each section (nothing does yet — the form/view/PDF each
+// render their own sections directly). Keep this in sync with treatment-plan-form.tsx
+// when sections are added, renamed, or reordered.
 export const MULTI_SELECT_SECTIONS = [
   {
     id: "treatment_modalities",
@@ -125,31 +126,9 @@ export const MULTI_SELECT_SECTIONS = [
     options: TREATMENT_MODALITY_OPTIONS,
   },
   {
-    id: "case_formulation",
-    title: "Case Formulation Model",
-    options: CASE_FORMULATION_OPTIONS,
-    allowOther: false,
-  },
-  { id: "risk", title: "Risk", options: RISK_MANAGEMENT_OPTIONS },
-  {
     id: "support_services",
     title: "Support Services",
-    options: SUPPORT_SERVICES_OPTIONS,
-  },
-  {
-    id: "psychoeducation",
-    title: "Psychoeducation",
-    options: PSYCHOEDUCATION_OPTIONS,
-  },
-  {
-    id: "alternate_responses",
-    title: "Alternate Responses",
-    options: ALTERNATE_RESPONSES_OPTIONS,
-  },
-  {
-    id: "quality_of_life",
-    title: "Quality of Life",
-    options: QUALITY_OF_LIFE_OPTIONS,
+    options: flattenSupportServiceOptions(),
   },
 ] as const
 

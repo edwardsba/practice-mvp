@@ -54,7 +54,7 @@ export async function loadTreatmentPlanVersions(
   return rows
 }
 
-function parseBehaviouralTargetItems(value: unknown): string[] {
+function parseSmartGoalItems(value: unknown): string[] {
   if (!value || typeof value !== "object") return []
   const items = (value as { items?: unknown }).items
   if (!Array.isArray(items)) return []
@@ -83,7 +83,7 @@ export async function loadActiveTreatmentPlanSummary(
       versionNumber: treatmentPlans.versionNumber,
       startDate: treatmentPlans.startDate,
       therapeuticTarget: treatmentPlans.therapeuticTarget,
-      behaviouralTargetsJson: treatmentPlans.behaviouralTargetsJson,
+      smartGoalsJson: treatmentPlans.smartGoalsJson,
       ongoingAssessmentsJson: treatmentPlans.ongoingAssessmentsJson,
     })
     .from(treatmentPlans)
@@ -100,9 +100,7 @@ export async function loadActiveTreatmentPlanSummary(
 
   return {
     ...row,
-    behaviouralTargetItems: parseBehaviouralTargetItems(
-      row.behaviouralTargetsJson
-    ),
+    smartGoalItems: parseSmartGoalItems(row.smartGoalsJson),
     ongoingAssessmentsJson: parseOngoingAssessments(row.ongoingAssessmentsJson),
   }
 }

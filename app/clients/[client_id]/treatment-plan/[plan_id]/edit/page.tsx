@@ -12,6 +12,7 @@ import {
   loadTreatmentPlanForPractice,
   verifyClientInPractice,
 } from "@/lib/treatment-plans/load"
+import { loadActiveCrisisPlanSummary } from "@/lib/crisis-plans/load"
 import { requirePractitionerContext } from "@/lib/auth"
 
 export default async function EditTreatmentPlanPage({
@@ -40,6 +41,11 @@ export default async function EditTreatmentPlanPage({
     notFound()
   }
 
+  const crisisPlanSummary = await loadActiveCrisisPlanSummary(
+    clientId,
+    context.practiceId
+  )
+
   const clientName = `${client.firstName} ${client.lastName}`
 
   return (
@@ -63,6 +69,7 @@ export default async function EditTreatmentPlanPage({
         initialPlan={plan}
         isNewVersion
         cancelHref={`/clients/${clientId}/treatment-plan/${planId}`}
+        crisisPlanSummary={crisisPlanSummary}
       />
 
       <EntityDeleteSection

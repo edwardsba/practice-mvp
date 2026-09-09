@@ -19,6 +19,7 @@ import {
   loadTreatmentPlanVersions,
   verifyClientInPractice,
 } from "@/lib/treatment-plans/load"
+import { loadActiveCrisisPlanSummary } from "@/lib/crisis-plans/load"
 import { requirePractitionerContext } from "@/lib/auth"
 import { getQuestionnaireEmailContext } from "@/lib/email/practitioner-context"
 
@@ -55,12 +56,13 @@ export default async function TreatmentPlanViewPage({
     notFound()
   }
 
-  const [versions, emailContext] = await Promise.all([
+  const [versions, emailContext, crisisPlanSummary] = await Promise.all([
     loadTreatmentPlanVersions(clientId, context.practiceId),
     getQuestionnaireEmailContext(
       context.practiceId,
       context.practitionerProfileId
     ),
+    loadActiveCrisisPlanSummary(clientId, context.practiceId),
   ])
 
   const clientName = `${client.firstName} ${client.lastName}`
@@ -111,7 +113,11 @@ export default async function TreatmentPlanViewPage({
         }
       />
 
-      <TreatmentPlanView plan={plan} />
+      <TreatmentPlanView
+        plan={plan}
+        clientId={clientId}
+        crisisPlanSummary={crisisPlanSummary}
+      />
 
       <Card className="mt-6">
         <CardHeader>

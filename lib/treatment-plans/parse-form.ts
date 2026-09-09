@@ -1,18 +1,16 @@
 import type { CheckboxOption } from "@/lib/treatment-plans/fields"
 import {
   ONGOING_ASSESSMENT_OPTIONS,
-  RISK_MANAGEMENT_OPTIONS,
-  SUPPORT_SERVICES_OPTIONS,
-  PSYCHOEDUCATION_OPTIONS,
-  CASE_FORMULATION_OPTIONS,
-  ALTERNATE_RESPONSES_OPTIONS,
-  QUALITY_OF_LIFE_OPTIONS,
   TREATMENT_MODALITY_OPTIONS,
+  TREATMENT_MODEL_OPTIONS,
+  flattenSupportServiceOptions,
 } from "@/lib/treatment-plans/fields"
 import type {
-  BehaviouralTargetsJson,
+  MedicationSupervisionJson,
   MultiSelectSectionJson,
   OngoingAssessmentsJson,
+  SingleSelectSectionJson,
+  SmartGoalsJson,
   SuicideAttemptRecord,
   SuicideAttemptsJson,
   TreatmentPlanFormValues,
@@ -40,6 +38,16 @@ function parseMultiSection(
   return { selected, other }
 }
 
+function parseSingleSection(
+  formData: FormData,
+  name: string,
+  options: CheckboxOption[]
+): SingleSelectSectionJson {
+  const raw = String(formData.get(name) ?? "").trim()
+  const selected = options.some((option) => option.key === raw) ? raw : null
+  return { selected: selected || null }
+}
+
 function parseOngoingAssessments(formData: FormData): OngoingAssessmentsJson {
   const result: OngoingAssessmentsJson = {
     phq9: false,
@@ -56,13 +64,25 @@ function parseOngoingAssessments(formData: FormData): OngoingAssessmentsJson {
   return result
 }
 
-function parseBehaviouralTargets(formData: FormData): BehaviouralTargetsJson {
+function parseSmartGoals(formData: FormData): SmartGoalsJson {
   const items = formData
-    .getAll("behavioural_targets")
+    .getAll("smart_goals")
     .map((value) => String(value).trim())
     .filter(Boolean)
 
   return { items }
+}
+
+function parseMedicationSupervision(formData: FormData): MedicationSupervisionJson {
+  const supervised = formData.get("medication_supervised") === "on"
+  const supervisorName = String(
+    formData.get("medication_supervisor_name") ?? ""
+  ).trim()
+
+  return {
+    supervised,
+    supervisorName: supervised && supervisorName ? supervisorName : null,
+  }
 }
 
 function parseSuicideAttempts(formData: FormData): SuicideAttemptsJson {
@@ -100,9 +120,10 @@ export function parseTreatmentPlanFormData(
     startDate: parseDateField(formData.get("start_date")),
     endDate: parseDateField(formData.get("end_date")),
     diagnosis: String(formData.get("diagnosis") ?? "").trim() || null,
+    diagnosisReportDate: parseDateField(formData.get("diagnosis_report_date")),
     therapeuticTarget:
       String(formData.get("therapeutic_target") ?? "").trim() || null,
-    behaviouralTargets: parseBehaviouralTargets(formData),
+    smartGoals: parseSmartGoals(formData),
     treatmentModalities: parseMultiSection(
       formData,
       "modality",
@@ -110,35 +131,16 @@ export function parseTreatmentPlanFormData(
     ),
     suicideAttempts: parseSuicideAttempts(formData),
     ongoingAssessments: parseOngoingAssessments(formData),
-    riskManagement: parseMultiSection(
-      formData,
-      "risk",
-      RISK_MANAGEMENT_OPTIONS
-    ),
+    medicationSupervision: parseMedicationSupervision(formData),
     supportServices: parseMultiSection(
       formData,
       "support",
-      SUPPORT_SERVICES_OPTIONS
+      flattenSupportServiceOptions()
     ),
-    psychoeducation: parseMultiSection(
+    treatmentModel: parseSingleSection(
       formData,
-      "psycho",
-      PSYCHOEDUCATION_OPTIONS
-    ),
-    caseFormulation: parseMultiSection(
-      formData,
-      "case",
-      CASE_FORMULATION_OPTIONS
-    ),
-    alternateResponses: parseMultiSection(
-      formData,
-      "alternate",
-      ALTERNATE_RESPONSES_OPTIONS
-    ),
-    qualityOfLife: parseMultiSection(
-      formData,
-      "qol",
-      QUALITY_OF_LIFE_OPTIONS
+      "treatment_model",
+      TREATMENT_MODEL_OPTIONS
     ),
   }
 }
@@ -148,16 +150,14 @@ export function formValuesToDbColumns(values: TreatmentPlanFormValues) {
     startDate: values.startDate,
     endDate: values.endDate,
     diagnosis: values.diagnosis,
+    diagnosisReportDate: values.diagnosisReportDate,
     therapeuticTarget: values.therapeuticTarget,
-    behaviouralTargetsJson: values.behaviouralTargets,
+    smartGoalsJson: values.smartGoals,
     treatmentModalitiesJson: values.treatmentModalities,
     suicideAttemptsJson: values.suicideAttempts,
     ongoingAssessmentsJson: values.ongoingAssessments,
-    riskManagementJson: values.riskManagement,
+    medicationSupervisionJson: values.medicationSupervision,
     supportServicesJson: values.supportServices,
-    psychoeducationJson: values.psychoeducation,
-    caseFormulationJson: values.caseFormulation,
-    alternateResponsesJson: values.alternateResponses,
-    qualityOfLifeJson: values.qualityOfLife,
+    treatmentModelJson: values.treatmentModel,
   }
 }

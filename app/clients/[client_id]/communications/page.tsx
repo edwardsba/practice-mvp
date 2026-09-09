@@ -67,7 +67,7 @@ export default async function ClientCommunicationsPage({
     : null
   const defaultBatteryAssessments = getDefaultBatteryAssessments(
     activeTreatmentPlan?.ongoingAssessmentsJson,
-    activeTreatmentPlan?.behaviouralTargetItems ?? []
+    activeTreatmentPlan?.smartGoalItems ?? []
   )
   const clientName = `${client.firstName} ${client.lastName}`
   const preferences = {

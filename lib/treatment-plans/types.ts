@@ -1,4 +1,4 @@
-export type BehaviouralTargetsJson = {
+export type SmartGoalsJson = {
   items: string[]
 }
 
@@ -25,23 +25,32 @@ export type MultiSelectSectionJson = {
   other: string[]
 }
 
+// Single-select equivalent of MultiSelectSectionJson, for fields where exactly one
+// (or zero) option applies — e.g. Treatment Model.
+export type SingleSelectSectionJson = {
+  selected: string | null
+}
+
+export type MedicationSupervisionJson = {
+  supervised: boolean
+  supervisorName: string | null
+}
+
 export type TreatmentPlanFormValues = {
   startDate: string | null
   endDate: string | null
   // Manually entered for now; will be autofilled once the standalone diagnostic
   // feature exists (see the comment on the schema column).
   diagnosis: string | null
+  diagnosisReportDate: string | null
   therapeuticTarget: string | null
-  behaviouralTargets: BehaviouralTargetsJson
+  smartGoals: SmartGoalsJson
   treatmentModalities: MultiSelectSectionJson
   suicideAttempts: SuicideAttemptsJson
   ongoingAssessments: OngoingAssessmentsJson
-  riskManagement: MultiSelectSectionJson
+  medicationSupervision: MedicationSupervisionJson
   supportServices: MultiSelectSectionJson
-  psychoeducation: MultiSelectSectionJson
-  caseFormulation: MultiSelectSectionJson
-  alternateResponses: MultiSelectSectionJson
-  qualityOfLife: MultiSelectSectionJson
+  treatmentModel: SingleSelectSectionJson
 }
 
 export type TreatmentPlanRow = {
@@ -54,17 +63,15 @@ export type TreatmentPlanRow = {
   startDate: string | null
   endDate: string | null
   diagnosis: string | null
+  diagnosisReportDate: string | null
   therapeuticTarget: string | null
-  behaviouralTargetsJson: BehaviouralTargetsJson | null
+  smartGoalsJson: SmartGoalsJson | null
   treatmentModalitiesJson: MultiSelectSectionJson | null
   suicideAttemptsJson: SuicideAttemptsJson | null
   ongoingAssessmentsJson: OngoingAssessmentsJson | null
-  riskManagementJson: MultiSelectSectionJson | null
+  medicationSupervisionJson: MedicationSupervisionJson | null
   supportServicesJson: MultiSelectSectionJson | null
-  psychoeducationJson: MultiSelectSectionJson | null
-  caseFormulationJson: MultiSelectSectionJson | null
-  alternateResponsesJson: MultiSelectSectionJson | null
-  qualityOfLifeJson: MultiSelectSectionJson | null
+  treatmentModelJson: SingleSelectSectionJson | null
   createdAt: Date
   updatedAt: Date
 }

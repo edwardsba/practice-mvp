@@ -324,7 +324,7 @@ export async function sendPreSessionBatteryForAppointment(
     )
     const assessmentCodes = batteryCodesFromTreatmentPlan(
       treatmentPlan?.ongoingAssessmentsJson,
-      treatmentPlan?.behaviouralTargetItems ?? []
+      treatmentPlan?.smartGoalItems ?? []
     )
 
     const batteryResult = await createBatteryInstance({

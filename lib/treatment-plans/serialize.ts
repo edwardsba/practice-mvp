@@ -1,17 +1,17 @@
 import type { TreatmentPlanRow } from "@/lib/treatment-plans/types"
 import type {
-  BehaviouralTargetsJson,
+  MedicationSupervisionJson,
   MultiSelectSectionJson,
   OngoingAssessmentsJson,
+  SingleSelectSectionJson,
+  SmartGoalsJson,
   SuicideAttemptRecord,
   SuicideAttemptsJson,
 } from "@/lib/treatment-plans/types"
 
-function parseBehaviouralTargets(
-  value: unknown
-): BehaviouralTargetsJson {
+function parseSmartGoals(value: unknown): SmartGoalsJson {
   if (!value || typeof value !== "object") return { items: [] }
-  const items = (value as BehaviouralTargetsJson).items
+  const items = (value as SmartGoalsJson).items
   return {
     items: Array.isArray(items)
       ? items.map((item) => String(item).trim()).filter(Boolean)
@@ -79,6 +79,26 @@ function parseMultiSection(value: unknown): MultiSelectSectionJson {
   }
 }
 
+function parseSingleSection(value: unknown): SingleSelectSectionJson {
+  if (!value || typeof value !== "object") return { selected: null }
+  const data = value as SingleSelectSectionJson
+  return { selected: typeof data.selected === "string" ? data.selected : null }
+}
+
+function parseMedicationSupervision(value: unknown): MedicationSupervisionJson {
+  if (!value || typeof value !== "object") {
+    return { supervised: false, supervisorName: null }
+  }
+  const data = value as MedicationSupervisionJson
+  return {
+    supervised: Boolean(data.supervised),
+    supervisorName:
+      typeof data.supervisorName === "string" && data.supervisorName.trim()
+        ? data.supervisorName.trim()
+        : null,
+  }
+}
+
 export function rowToTreatmentPlan(row: {
   treatmentPlanId: string
   clientId: string
@@ -89,17 +109,15 @@ export function rowToTreatmentPlan(row: {
   startDate: string | null
   endDate: string | null
   diagnosis: string | null
+  diagnosisReportDate: string | null
   therapeuticTarget: string | null
-  behaviouralTargetsJson: unknown
+  smartGoalsJson: unknown
   treatmentModalitiesJson: unknown
   suicideAttemptsJson: unknown
   ongoingAssessmentsJson: unknown
-  riskManagementJson: unknown
+  medicationSupervisionJson: unknown
   supportServicesJson: unknown
-  psychoeducationJson: unknown
-  caseFormulationJson: unknown
-  alternateResponsesJson: unknown
-  qualityOfLifeJson: unknown
+  treatmentModelJson: unknown
   createdAt: Date
   updatedAt: Date
 }): TreatmentPlanRow {
@@ -113,17 +131,17 @@ export function rowToTreatmentPlan(row: {
     startDate: row.startDate,
     endDate: row.endDate,
     diagnosis: row.diagnosis,
+    diagnosisReportDate: row.diagnosisReportDate,
     therapeuticTarget: row.therapeuticTarget,
-    behaviouralTargetsJson: parseBehaviouralTargets(row.behaviouralTargetsJson),
+    smartGoalsJson: parseSmartGoals(row.smartGoalsJson),
     treatmentModalitiesJson: parseMultiSection(row.treatmentModalitiesJson),
     suicideAttemptsJson: parseSuicideAttempts(row.suicideAttemptsJson),
     ongoingAssessmentsJson: parseOngoingAssessments(row.ongoingAssessmentsJson),
-    riskManagementJson: parseMultiSection(row.riskManagementJson),
+    medicationSupervisionJson: parseMedicationSupervision(
+      row.medicationSupervisionJson
+    ),
     supportServicesJson: parseMultiSection(row.supportServicesJson),
-    psychoeducationJson: parseMultiSection(row.psychoeducationJson),
-    caseFormulationJson: parseMultiSection(row.caseFormulationJson),
-    alternateResponsesJson: parseMultiSection(row.alternateResponsesJson),
-    qualityOfLifeJson: parseMultiSection(row.qualityOfLifeJson),
+    treatmentModelJson: parseSingleSection(row.treatmentModelJson),
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   }

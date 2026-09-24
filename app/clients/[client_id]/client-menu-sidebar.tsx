@@ -13,6 +13,7 @@ const MENU_ITEMS = (clientId: string): MenuItem[] => [
   { label: "Appointments", href: `/clients/${clientId}/appointments` },
   { label: "Feedback", href: `/clients/${clientId}/assessments/feedback` },
   { label: "Session Notes", href: `/clients/${clientId}/session-notes` },
+  { label: "Intake Interview", href: `/clients/${clientId}/intake-interview` },
   { label: "Assessments", href: `/clients/${clientId}/assessments` },
   { label: "Communications", href: `/clients/${clientId}/communications` },
   { label: "Reports", href: `/clients/${clientId}/reports` },
@@ -43,7 +44,10 @@ export function ClientMenuSidebar({ clientId }: { clientId: string }) {
           )
         }
 
-        const isActive = pathname === item.href
+        const isActive =
+          pathname === item.href ||
+          (item.href.endsWith("/intake-interview") &&
+            pathname.includes(`/clients/${clientId}/intake-interview`))
 
         return (
           <Link

@@ -59,6 +59,11 @@ export const CLIENT_STATUS_TRANSITIONS: Record<string, string[]> = {
   inactive: ["active"],
 }
 
+export const INTAKE_INTERVIEW_STATUS_CONFIG: Record<string, StatusConfig> = {
+  draft: { label: "Draft", variant: "warning" },
+  finalised: { label: "Finalised", variant: "success" },
+}
+
 export const ATTENDANCE_RISK_CONFIG: Record<string, StatusConfig> = {
   low: { label: "Reliable", variant: "success" },
   moderate: { label: "Some risk", variant: "warning" },

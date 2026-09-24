@@ -46,7 +46,8 @@ import { REPORTING_REQUIREMENT_STATUS_CONFIG } from "@/lib/funding/reporting-sta
 import { buildTemplateVariablesFromLinkResponse } from "@/lib/email/link-response"
 import { getQuestionnaireEmailContext } from "@/lib/email/practitioner-context"
 import { loadActiveTreatmentPlanSummary } from "@/lib/treatment-plans/load"
-import { ATTENDANCE_RISK_CONFIG, CLIENT_STATUS_CONFIG } from "@/lib/status"
+import { loadCurrentIntakeInterviewSummary } from "@/lib/intake-interview/load"
+import { ATTENDANCE_RISK_CONFIG, CLIENT_STATUS_CONFIG, INTAKE_INTERVIEW_STATUS_CONFIG } from "@/lib/status"
 
 function formatDate(value: Date | string | null) {
   if (!value) return "—"
@@ -105,6 +106,18 @@ export default async function ClientDetailPage({
     loadLatestAssessmentResultForClient(clientId, context.practiceId, "ASQ"),
     loadLatestAssessmentResultForClient(clientId, context.practiceId, "PSF"),
   ])
+
+  let currentIntakeInterview: Awaited<
+    ReturnType<typeof loadCurrentIntakeInterviewSummary>
+  > = null
+  try {
+    currentIntakeInterview = await loadCurrentIntakeInterviewSummary(
+      clientId,
+      context.practiceId
+    )
+  } catch {
+    currentIntakeInterview = null
+  }
 
   const maxReportCount =
     fundingPanelRows.length > 0
@@ -398,6 +411,45 @@ export default async function ClientDetailPage({
                   </TableBody>
                 </Table>
               </div>
+            </CardContent>
+          </Card>
+
+          <Card className="mb-6">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle>Diagnostic intake interview</CardTitle>
+              {!currentIntakeInterview ? (
+                <Button asChild size="sm">
+                  <Link href={`/clients/${clientId}/intake-interview/new`}>
+                    Start interview
+                  </Link>
+                </Button>
+              ) : (
+                <Button asChild variant="outline" size="sm">
+                  <Link
+                    href={`/clients/${clientId}/intake-interview/${currentIntakeInterview.intakeInterviewId}`}
+                  >
+                    View / Edit
+                  </Link>
+                </Button>
+              )}
+            </CardHeader>
+            <CardContent>
+              {!currentIntakeInterview ? (
+                <p className="text-sm text-muted-foreground">
+                  No intake interview
+                </p>
+              ) : (
+                <p className="text-sm font-medium">
+                  v{currentIntakeInterview.versionNumber} (
+                  {formatDate(currentIntakeInterview.interviewDate)})
+                  <span className="ml-2">
+                    <StatusBadge
+                      status={currentIntakeInterview.status}
+                      statusMap={INTAKE_INTERVIEW_STATUS_CONFIG}
+                    />
+                  </span>
+                </p>
+              )}
             </CardContent>
           </Card>
 

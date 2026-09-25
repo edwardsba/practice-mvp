@@ -71,6 +71,8 @@ export const clients = pgTable('clients', {
   postSessionOptOut: boolean('post_session_opt_out').notNull().default(false),
   adminCommsOptOut: boolean('admin_comms_opt_out').notNull().default(false),
   onlineBookingPermitted: boolean('online_booking_permitted').notNull().default(false),
+  /** Set when an intake interview questionnaire is completed. The questionnaire is not a document; client background data lives elsewhere. */
+  backgroundCapturedAt: timestamp('background_captured_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 })

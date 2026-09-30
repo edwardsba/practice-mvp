@@ -1,7 +1,12 @@
 import assert from "node:assert/strict"
 
-import { clientAgeAtStart, lifeStageAtStart } from "@/lib/client-background/age"
-import { buildRelationshipTree } from "@/lib/client-background/tree"
+import { clientAgeAtStart, compareEventsChronologically, lifeStageAtStart } from "@/lib/client-background/age"
+import {
+  buildRelationshipTree,
+  canonicalParentsLink,
+  parentsRelationshipLabel,
+  relationshipLineLabel,
+} from "@/lib/client-background/tree"
 import type { PartnershipRecord, RelationshipRecord } from "@/lib/client-background/types"
 
 function person(partial: Partial<RelationshipRecord> & Pick<RelationshipRecord, "relationshipRecordId" | "relationshipToClient">): RelationshipRecord {
@@ -10,6 +15,7 @@ function person(partial: Partial<RelationshipRecord> & Pick<RelationshipRecord, 
     givenName: "",
     displayOrder: 0,
     age: null,
+    healthStatus: "",
     deceased: false,
     ageAtDeath: null,
     healthOrCauseOfDeath: "",
@@ -91,5 +97,23 @@ assert.equal(clientAgeAtStart(null, "date", "2018-06-15"), null)
 assert.equal(lifeStageAtStart("2000-06-15", "date", "2018-06-14"), "childhood")
 assert.equal(lifeStageAtStart("2000-06-15", "date", "2018-06-15"), "adulthood")
 assert.equal(lifeStageAtStart(null, "year", "2018"), null)
+
+const link = canonicalParentsLink(
+  [mother, father],
+  [partnership({ partnershipRecordId: "parents", partnerAId: "mother", partnerBId: "father", relationshipStatus: "married" })]
+)
+assert.equal(link.partnership?.partnershipRecordId, "parents")
+assert.equal(parentsRelationshipLabel(link.partnership!), "Parents' relationship – Married")
+assert.equal(relationshipLineLabel(mother), "Mother – Jane")
+assert.equal(relationshipLineLabel({ ...mother, age: 62 }), "Mother – Jane – 62")
+assert.equal(relationshipLineLabel(stepParent, "De facto"), "Step-parent – Alex – De facto")
+assert.equal(relationshipLineLabel(fullSibling), "Full sibling – Sam")
+
+const undated = { startPrecision: "" as const, startValue: "", displayOrder: 2 }
+const earlier = { startPrecision: "year" as const, startValue: "1990", displayOrder: 1 }
+const later = { startPrecision: "year" as const, startValue: "2010", displayOrder: 0 }
+assert.ok(compareEventsChronologically(undated, earlier, null) < 0)
+assert.ok(compareEventsChronologically(earlier, later, null) < 0)
+assert.ok(compareEventsChronologically(later, undated, "1980-01-01") > 0)
 
 console.log("client background tree and age selftest passed")

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, type ReactNode } from "react"
 
 import {
   createEventAction,
@@ -9,13 +9,21 @@ import {
 } from "@/app/clients/[client_id]/background/actions"
 import {
   PartialDateField,
+  ReadOnlyField,
   SaveRow,
   SelectField,
   TextAreaField,
   TextField,
 } from "@/components/client-background/fields"
 import { Button } from "@/components/ui/button"
-import { clientAgeAtStart, formatPartialWhen, lifeStageAtStart } from "@/lib/client-background/age"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { clientAgeAtStart, compareEventsChronologically, formatPartialWhen, lifeStageAtStart } from "@/lib/client-background/age"
 import { personName } from "@/lib/client-background/tree"
 import {
   EVENT_TYPES,
@@ -36,6 +44,8 @@ import {
 } from "@/lib/client-background/types"
 import { cn } from "@/lib/utils"
 
+type HistoryView = "chronological" | "by_type"
+
 export function HistorySection({
   clientId,
   dateOfBirth,
@@ -48,18 +58,23 @@ export function HistorySection({
   relationships: RelationshipRecord[]
 }) {
   const [entries, setEntries] = useState(events)
+  const [view, setView] = useState<HistoryView>("chronological")
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [draft, setDraft] = useState<EventRecord | null>(null)
+  const [editing, setEditing] = useState(false)
+  const [pickerOpen, setPickerOpen] = useState(false)
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  function select(entry: EventRecord) {
+  function select(entry: EventRecord, startEditing = false) {
     setSelectedId(entry.eventRecordId)
     setDraft({ ...entry })
+    setEditing(startEditing)
     setError(null)
   }
 
   async function add(eventType: EventType) {
+    setPickerOpen(false)
     setPending(true)
     setError(null)
     const result = await createEventAction(clientId, eventType)
@@ -69,7 +84,7 @@ export function HistorySection({
       return
     }
     setEntries((current) => [...current, result.event!])
-    select(result.event)
+    select(result.event, true)
   }
 
   async function save() {
@@ -86,6 +101,14 @@ export function HistorySection({
       current.map((entry) => (entry.eventRecordId === result.event!.eventRecordId ? result.event! : entry))
     )
     setDraft(result.event)
+    setEditing(false)
+  }
+
+  function cancel() {
+    const saved = entries.find((entry) => entry.eventRecordId === draft?.eventRecordId)
+    if (saved) setDraft({ ...saved })
+    setEditing(false)
+    setError(null)
   }
 
   async function remove() {
@@ -102,97 +125,309 @@ export function HistorySection({
     setEntries((current) => current.filter((entry) => entry.eventRecordId !== draft.eventRecordId))
     setSelectedId(null)
     setDraft(null)
+    setEditing(false)
+  }
+
+  const chronological = [...entries].sort((a, b) => compareEventsChronologically(a, b, dateOfBirth))
+
+  function renderPanel() {
+    return (
+      <HistoryPanel
+        draft={draft}
+        editing={editing}
+        pending={pending}
+        error={error}
+        dateOfBirth={dateOfBirth}
+        relationships={relationships}
+        onEdit={() => setEditing(true)}
+        onCancel={cancel}
+        onChange={setDraft}
+        onSave={() => void save()}
+        onRemove={() => void remove()}
+      />
+    )
   }
 
   return (
-    <div className="grid gap-4 lg:grid-cols-2">
-      <div className="max-h-[75vh] space-y-5 overflow-y-auto pr-1">
-        {error && !draft ? <p className="text-sm text-destructive">{error}</p> : null}
-        {EVENT_TYPES.map((eventType) => {
-          const rows = entries.filter((entry) => entry.eventType === eventType)
-          return (
-            <section key={eventType} className="space-y-2">
-              <h2 className="text-sm font-semibold">{EVENT_TYPE_LABELS[eventType]}</h2>
-              {rows.length === 0 ? (
+    <div className="space-y-4">
+      <div className="flex flex-wrap gap-2">
+        <Button type="button" size="sm" variant={view === "chronological" ? "secondary" : "outline"} onClick={() => setView("chronological")}>
+          Chronological
+        </Button>
+        <Button type="button" size="sm" variant={view === "by_type" ? "secondary" : "outline"} onClick={() => setView("by_type")}>
+          Sort by event type
+        </Button>
+      </div>
+      <div className="grid gap-4 lg:grid-cols-2">
+        <div className="max-h-[75vh] space-y-5 overflow-y-auto pr-1">
+          {error && !draft ? <p className="text-sm text-destructive">{error}</p> : null}
+          {view === "chronological" ? (
+            <section className="space-y-2">
+              <Button type="button" variant="outline" size="sm" disabled={pending} onClick={() => setPickerOpen(true)}>
+                + Add entry
+              </Button>
+              {chronological.length === 0 ? (
                 <p className="text-sm text-muted-foreground">Nothing recorded</p>
               ) : (
                 <ul className="space-y-1">
-                  {rows.map((entry) => {
-                    const active = entry.eventRecordId === selectedId
-                    return (
-                      <li key={entry.eventRecordId}>
-                        <button
-                          type="button"
-                          className={cn(
-                            "w-full rounded-md px-2 py-1.5 text-left text-sm hover:bg-muted",
-                            active && "bg-muted font-medium"
-                          )}
-                          onClick={() => select(entry)}
-                        >
-                          <span className="block truncate">{entry.description.trim() || "No description"}</span>
-                          <span className="block text-xs text-muted-foreground">
-                            {formatPartialWhen(entry.startPrecision, entry.startValue) || "Start not recorded"}
-                            {entry.endOngoing ? " · Ongoing" : ""}
-                          </span>
-                        </button>
-                        {active && draft ? (
-                          <div className="mt-2 rounded-md border p-3 lg:hidden">
-                            <EventEditor
-                              draft={draft}
-                              dateOfBirth={dateOfBirth}
-                              relationships={relationships}
-                              onChange={setDraft}
-                            />
-                            <SaveRow
-                              pending={pending}
-                              error={error}
-                              onSave={() => void save()}
-                              extra={
-                                <Button type="button" variant="ghost" size="sm" disabled={pending} onClick={() => void remove()}>
-                                  Remove
-                                </Button>
-                              }
-                            />
-                          </div>
-                        ) : null}
-                      </li>
-                    )
-                  })}
+                  {chronological.map((entry) => (
+                    <HistoryRow
+                      key={entry.eventRecordId}
+                      entry={entry}
+                      active={entry.eventRecordId === selectedId}
+                      dateOfBirth={dateOfBirth}
+                      relationships={relationships}
+                      onSelect={() => select(entry)}
+                          mobile={entry.eventRecordId === selectedId ? renderPanel() : null}
+                    />
+                  ))}
                 </ul>
               )}
-              <Button type="button" variant="outline" size="sm" disabled={pending} onClick={() => void add(eventType)}>
-                + Add entry
-              </Button>
             </section>
-          )
-        })}
+          ) : (
+            EVENT_TYPES.map((eventType) => {
+              const rows = entries.filter((entry) => entry.eventType === eventType)
+              return (
+                <section key={eventType} className="space-y-2">
+                  <h2 className="text-sm font-semibold">{EVENT_TYPE_LABELS[eventType]}</h2>
+                  {rows.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">Nothing recorded</p>
+                  ) : (
+                    <ul className="space-y-1">
+                      {rows.map((entry) => (
+                        <HistoryRow
+                          key={entry.eventRecordId}
+                          entry={entry}
+                          active={entry.eventRecordId === selectedId}
+                          dateOfBirth={dateOfBirth}
+                          relationships={relationships}
+                          onSelect={() => select(entry)}
+                          mobile={entry.eventRecordId === selectedId ? renderPanel() : null}
+                        />
+                      ))}
+                    </ul>
+                  )}
+                  <Button type="button" variant="outline" size="sm" disabled={pending} onClick={() => void add(eventType)}>
+                    + Add entry
+                  </Button>
+                </section>
+              )
+            })
+          )}
+        </div>
+        <div className="hidden lg:block">{renderPanel()}</div>
       </div>
-      <div className="hidden lg:block">
-        {draft ? (
-          <div className="space-y-4 rounded-md border p-4">
-            <EventEditor
-              draft={draft}
-              dateOfBirth={dateOfBirth}
-              relationships={relationships}
-              onChange={setDraft}
-            />
-            <SaveRow
-              pending={pending}
-              error={error}
-              onSave={() => void save()}
-              extra={
-                <Button type="button" variant="ghost" size="sm" disabled={pending} onClick={() => void remove()}>
-                  Remove
-                </Button>
-              }
-            />
+      <Dialog open={pickerOpen} onOpenChange={setPickerOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add entry</DialogTitle>
+            <DialogDescription>Choose the event type for this entry.</DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-2">
+            {EVENT_TYPES.map((eventType) => (
+              <Button key={eventType} type="button" variant="outline" disabled={pending} onClick={() => void add(eventType)}>
+                {EVENT_TYPE_LABELS[eventType]}
+              </Button>
+            ))}
           </div>
-        ) : (
-          <div className="flex min-h-48 items-center justify-center rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
-            Select an entry from the list, or add a new one
-          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  )
+}
+
+function HistoryRow({
+  entry,
+  active,
+  dateOfBirth,
+  relationships,
+  onSelect,
+  mobile,
+}: {
+  entry: EventRecord
+  active: boolean
+  dateOfBirth: string | null
+  relationships: RelationshipRecord[]
+  onSelect: () => void
+  mobile: ReactNode
+}) {
+  return (
+    <li>
+      <button
+        type="button"
+        className={cn("w-full rounded-md px-2 py-1.5 text-left text-sm hover:bg-muted", active && "bg-muted font-medium")}
+        onClick={onSelect}
+      >
+        <span className="block truncate">{entry.title.trim() || "Untitled"}</span>
+        <span className="block text-xs text-muted-foreground">
+          {rowWhen(entry, dateOfBirth)} · {attributionLabel(entry, relationships)}
+        </span>
+      </button>
+      {mobile ? <div className="mt-2 rounded-md border p-3 lg:hidden">{mobile}</div> : null}
+    </li>
+  )
+}
+
+function HistoryPanel({
+  draft,
+  editing,
+  pending,
+  error,
+  dateOfBirth,
+  relationships,
+  onEdit,
+  onCancel,
+  onChange,
+  onSave,
+  onRemove,
+}: {
+  draft: EventRecord | null
+  editing: boolean
+  pending: boolean
+  error: string | null
+  dateOfBirth: string | null
+  relationships: RelationshipRecord[]
+  onEdit: () => void
+  onCancel: () => void
+  onChange: (event: EventRecord) => void
+  onSave: () => void
+  onRemove: () => void
+}) {
+  if (!draft) {
+    return (
+      <div className="flex min-h-48 items-center justify-center rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
+        Select an entry from the list, or add a new one
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-4 rounded-md border p-4">
+      <div className="flex items-start justify-between gap-3">
+        <p className="font-medium">{draft.title.trim() || "Untitled"}</p>
+        {editing ? null : (
+          <Button type="button" variant="outline" size="sm" onClick={onEdit}>
+            Edit
+          </Button>
         )}
       </div>
+      {editing ? (
+        <>
+          <EventEditor draft={draft} dateOfBirth={dateOfBirth} relationships={relationships} onChange={onChange} />
+          <SaveRow
+            pending={pending}
+            error={error}
+            onSave={onSave}
+            extra={
+              <>
+                <Button type="button" variant="ghost" size="sm" disabled={pending} onClick={onCancel}>
+                  Cancel
+                </Button>
+                <Button type="button" variant="ghost" size="sm" disabled={pending} onClick={onRemove}>
+                  Remove
+                </Button>
+              </>
+            }
+          />
+        </>
+      ) : (
+        <EventReadOnly draft={draft} dateOfBirth={dateOfBirth} relationships={relationships} />
+      )}
+    </div>
+  )
+}
+
+function rowWhen(entry: EventRecord, dateOfBirth: string | null) {
+  const formatted = formatPartialWhen(entry.startPrecision, entry.startValue)
+  const age = clientAgeAtStart(dateOfBirth, entry.startPrecision, entry.startValue)
+  if (!formatted && age == null) return "Date not recorded"
+  if (entry.startPrecision === "age") return formatted || "Date not recorded"
+  if (age != null && formatted) return `Age ${age} · ${formatted}`
+  if (age != null) return `Age ${age}`
+  return formatted
+}
+
+function attributionLabel(entry: EventRecord, relationships: RelationshipRecord[]) {
+  if (entry.attribution === "family") {
+    const relation = entry.familyRelation.trim()
+    const side = entry.familySide ? FAMILY_SIDE_LABELS[entry.familySide] : ""
+    const who = [relation, side].filter(Boolean).join(", ")
+    return who ? `Family · ${who}` : "Family member"
+  }
+  if (entry.attribution === "self_linked") {
+    const person = relationships.find((item) => item.relationshipRecordId === entry.relationshipRecordId)
+    return person ? personName(person) : "Linked person"
+  }
+  return "Self"
+}
+
+function yesNoLabel(value: boolean | null) {
+  if (value == null) return ""
+  return value ? "Yes" : "No"
+}
+
+function EventReadOnly({
+  draft,
+  dateOfBirth,
+  relationships,
+}: {
+  draft: EventRecord
+  dateOfBirth: string | null
+  relationships: RelationshipRecord[]
+}) {
+  const age = clientAgeAtStart(dateOfBirth, draft.startPrecision, draft.startValue)
+  const stage = lifeStageAtStart(dateOfBirth, draft.startPrecision, draft.startValue)
+  const linked = relationships.find((person) => person.relationshipRecordId === draft.relationshipRecordId)
+
+  return (
+    <div className="space-y-3">
+      <ReadOnlyField label="Title" value={draft.title} />
+      <ReadOnlyField label="Description" value={draft.description} />
+      <ReadOnlyField label="Event type" value={EVENT_TYPE_LABELS[draft.eventType]} />
+      <ReadOnlyField label="Start" value={formatPartialWhen(draft.startPrecision, draft.startValue)} />
+      <ReadOnlyField
+        label="End"
+        value={draft.resolvedOrOngoing === "ongoing" ? "Left blank — ongoing" : formatPartialWhen(draft.endPrecision, draft.endValue)}
+      />
+      {age != null ? <ReadOnlyField label="Client's age at the time" value={String(age)} /> : null}
+      {stage ? <ReadOnlyField label="Category" value={stage === "childhood" ? "Childhood" : "Adulthood"} /> : null}
+      <ReadOnlyField
+        label="Resolved / Ongoing"
+        value={draft.resolvedOrOngoing === "ongoing" ? "Ongoing" : draft.resolvedOrOngoing === "resolved" ? "Resolved" : ""}
+      />
+      <ReadOnlyField label="Severity / Impact" value={draft.severityImpact ? SEVERITY_LABELS[draft.severityImpact] : ""} />
+      <ReadOnlyField label="Treated" value={yesNoLabel(draft.treated)} />
+      {draft.treated === true ? (
+        <>
+          <ReadOnlyField label="Treatment type" value={draft.treatmentType} />
+          <ReadOnlyField label="Treatment detail" value={draft.treatmentDetail} />
+          <ReadOnlyField label="Outcome" value={draft.outcome} />
+        </>
+      ) : null}
+      {draft.eventType === "family_events" ? (
+        <ReadOnlyField label="Linked person" value={linked ? personName(linked) : ""} />
+      ) : (
+        <ReadOnlyField label="Attribution" value={attributionLabel(draft, relationships)} />
+      )}
+      {draft.eventType === "self_harm" ? (
+        <>
+          <ReadOnlyField label="Type of self-harm behaviour" value={draft.selfHarmType ? SELF_HARM_TYPE_LABELS[draft.selfHarmType] : ""} />
+          <ReadOnlyField label="Substance involvement at the time" value={yesNoLabel(draft.substanceInvolvement)} />
+          <ReadOnlyField label="Required medical attention" value={yesNoLabel(draft.requiredMedicalAttention)} />
+          <ReadOnlyField label="Required hospitalisation" value={yesNoLabel(draft.requiredHospitalisation)} />
+        </>
+      ) : null}
+      {draft.eventType === "substance_use" ? (
+        <>
+          <ReadOnlyField label="Status" value={draft.substanceStatus ? SUBSTANCE_STATUS_LABELS[draft.substanceStatus] : ""} />
+          {draft.substanceStatus === "abstinent" ? (
+            <ReadOnlyField
+              label="Abstinent since"
+              value={formatPartialWhen(draft.abstinentSincePrecision, draft.abstinentSinceValue)}
+            />
+          ) : null}
+        </>
+      ) : null}
     </div>
   )
 }
@@ -252,11 +487,24 @@ function EventEditor({
       next.treatmentDetail = ""
       next.outcome = ""
     }
+    if (next.resolvedOrOngoing === "ongoing") {
+      next.endPrecision = ""
+      next.endValue = ""
+      next.endOngoing = true
+    } else {
+      next.endOngoing = false
+    }
     onChange(next)
   }
 
   return (
     <div className="space-y-4">
+      <TextField
+        id={`${draft.eventRecordId}_title`}
+        label="Title"
+        value={draft.title}
+        onChange={(title) => patch({ title })}
+      />
       <TextAreaField
         id={`${draft.eventRecordId}_description`}
         label="Description"
@@ -283,30 +531,18 @@ function EventEditor({
         allowAge={draft.eventType !== "substance_use"}
         onChange={(startPrecision, startValue) => patch({ startPrecision, startValue })}
       />
-      <div className="space-y-2">
+      {draft.resolvedOrOngoing === "ongoing" ? (
+        <p className="text-xs text-muted-foreground">End date stays blank while this is ongoing.</p>
+      ) : (
         <PartialDateField
           id={`${draft.eventRecordId}_end`}
           label="End"
-          precision={draft.endOngoing ? "" : draft.endPrecision}
-          value={draft.endOngoing ? "" : draft.endValue}
+          precision={draft.endPrecision}
+          value={draft.endValue}
           allowAge={draft.eventType !== "substance_use"}
-          onChange={(endPrecision, endValue) => patch({ endPrecision, endValue, endOngoing: false })}
+          onChange={(endPrecision, endValue) => patch({ endPrecision, endValue })}
         />
-        <label className="flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            checked={draft.endOngoing}
-            onChange={(event) =>
-              patch({
-                endOngoing: event.target.checked,
-                endPrecision: event.target.checked ? "" : draft.endPrecision,
-                endValue: event.target.checked ? "" : draft.endValue,
-              })
-            }
-          />
-          Ongoing
-        </label>
-      </div>
+      )}
       {age != null ? (
         <div className="space-y-1 text-sm text-muted-foreground">
           <p>Client&apos;s age at the time: {age}</p>
@@ -317,7 +553,9 @@ function EventEditor({
         id={`${draft.eventRecordId}_resolved`}
         label="Resolved / Ongoing"
         value={draft.resolvedOrOngoing}
-        onChange={(resolvedOrOngoing) => patch({ resolvedOrOngoing: resolvedOrOngoing as EventRecord["resolvedOrOngoing"] })}
+        onChange={(resolvedOrOngoing) =>
+          patch({ resolvedOrOngoing: resolvedOrOngoing as EventRecord["resolvedOrOngoing"] })
+        }
       >
         <option value="">Not recorded</option>
         {RESOLVED_OR_ONGOING.map((option) => (
@@ -351,7 +589,12 @@ function EventEditor({
       </SelectField>
       {draft.treated === true ? (
         <>
-          <TextField id={`${draft.eventRecordId}_tx_type`} label="Treatment type" value={draft.treatmentType} onChange={(treatmentType) => patch({ treatmentType })} />
+          <TextField
+            id={`${draft.eventRecordId}_tx_type`}
+            label="Treatment type"
+            value={draft.treatmentType}
+            onChange={(treatmentType) => patch({ treatmentType })}
+          />
           <TextAreaField
             id={`${draft.eventRecordId}_tx_detail`}
             label="Treatment detail"
@@ -366,13 +609,14 @@ function EventEditor({
           />
         </>
       ) : null}
-
       {familyEvent ? (
         <SelectField
           id={`${draft.eventRecordId}_person`}
           label="Linked person"
           value={draft.relationshipRecordId ?? ""}
-          onChange={(relationshipRecordId) => patch({ relationshipRecordId: relationshipRecordId || null, attribution: "self_linked" })}
+          onChange={(relationshipRecordId) =>
+            patch({ relationshipRecordId: relationshipRecordId || null, attribution: "self_linked" })
+          }
         >
           <option value="">Select someone from Relationships</option>
           {relationships.map((person) => (
@@ -431,7 +675,6 @@ function EventEditor({
           ) : null}
         </>
       )}
-
       {draft.eventType === "self_harm" ? (
         <>
           <SelectField
@@ -447,12 +690,26 @@ function EventEditor({
               </option>
             ))}
           </SelectField>
-          <YesNo id={`${draft.eventRecordId}_substance`} label="Substance involvement at the time" value={draft.substanceInvolvement} onChange={(substanceInvolvement) => patch({ substanceInvolvement })} />
-          <YesNo id={`${draft.eventRecordId}_medical`} label="Required medical attention" value={draft.requiredMedicalAttention} onChange={(requiredMedicalAttention) => patch({ requiredMedicalAttention })} />
-          <YesNo id={`${draft.eventRecordId}_hospital`} label="Required hospitalisation" value={draft.requiredHospitalisation} onChange={(requiredHospitalisation) => patch({ requiredHospitalisation })} />
+          <YesNo
+            id={`${draft.eventRecordId}_substance`}
+            label="Substance involvement at the time"
+            value={draft.substanceInvolvement}
+            onChange={(substanceInvolvement) => patch({ substanceInvolvement })}
+          />
+          <YesNo
+            id={`${draft.eventRecordId}_medical`}
+            label="Required medical attention"
+            value={draft.requiredMedicalAttention}
+            onChange={(requiredMedicalAttention) => patch({ requiredMedicalAttention })}
+          />
+          <YesNo
+            id={`${draft.eventRecordId}_hospital`}
+            label="Required hospitalisation"
+            value={draft.requiredHospitalisation}
+            onChange={(requiredHospitalisation) => patch({ requiredHospitalisation })}
+          />
         </>
       ) : null}
-
       {draft.eventType === "substance_use" ? (
         <>
           <SelectField

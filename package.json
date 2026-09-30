@@ -88,6 +88,7 @@
     "db:treatment-plan-diagnosis-modalities": "tsx db/apply-treatment-plan-diagnosis-and-modalities-migration.ts",
     "db:treatment-plan-layout-update": "tsx db/apply-treatment-plan-layout-update-migration.ts",
     "db:client-background": "tsx db/apply-client-background-migration.ts",
+    "db:client-background-display": "tsx db/apply-client-background-display-migration.ts",
     "db:letter-body": "tsx db/apply-letter-body-migration.ts",
     "db:report-versioning": "tsx db/apply-report-versioning-migration.ts",
     "db:session-note-versioning": "tsx db/apply-session-note-versioning-migration.ts",

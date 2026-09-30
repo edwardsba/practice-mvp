@@ -80,6 +80,58 @@ export function lifeStageAtStart(
   return age < 18 ? "childhood" : "adulthood"
 }
 
+/**
+ * Smaller numbers are earlier. Null means no start was recorded.
+ * Year-only dates anchor to 1 January, and year-month dates to the 1st.
+ * An age with a date of birth is placed on the birthday of that year of life.
+ */
+export function eventStartSortKey(
+  dateOfBirth: string | null | undefined,
+  precision: StartPrecision | "",
+  value: string
+): number | null {
+  const trimmed = value.trim()
+  if (!precision || !trimmed) return null
+
+  if (precision === "year" && /^\d{4}$/.test(trimmed)) return Number(trimmed) * 10000
+
+  if (precision === "year_month") {
+    const match = /^(\d{4})-(\d{2})$/.exec(trimmed)
+    if (!match) return null
+    return Number(match[1]) * 10000 + Number(match[2]) * 100
+  }
+
+  if (precision === "date") {
+    const event = parseDob(trimmed)
+    if (!event) return null
+    return event.year * 10000 + event.month * 100 + event.day
+  }
+
+  if (precision === "age" && /^\d{1,3}$/.test(trimmed)) {
+    const age = Number(trimmed)
+    if (age < 0 || age > 130) return null
+    const birth = dateOfBirth ? parseDob(dateOfBirth) : null
+    if (!birth) return age
+    return (birth.year + age) * 10000 + birth.month * 100 + birth.day
+  }
+
+  return null
+}
+
+export function compareEventsChronologically(
+  a: { startPrecision: StartPrecision | ""; startValue: string; displayOrder: number },
+  b: { startPrecision: StartPrecision | ""; startValue: string; displayOrder: number },
+  dateOfBirth: string | null | undefined
+): number {
+  const aKey = eventStartSortKey(dateOfBirth, a.startPrecision, a.startValue)
+  const bKey = eventStartSortKey(dateOfBirth, b.startPrecision, b.startValue)
+  if (aKey == null && bKey == null) return a.displayOrder - b.displayOrder
+  if (aKey == null) return -1
+  if (bKey == null) return 1
+  if (aKey !== bKey) return aKey - bKey
+  return a.displayOrder - b.displayOrder
+}
+
 export function formatPartialWhen(
   precision: StartPrecision | "",
   value: string,

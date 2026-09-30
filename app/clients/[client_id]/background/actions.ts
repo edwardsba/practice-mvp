@@ -8,12 +8,14 @@ import {
   createRelationship,
   deleteEvent,
   deleteRelationship,
+  saveDemographics,
   saveEducation,
   saveIdentity,
   saveLivingSituation,
   saveOccupation,
   saveRisk,
   updateEvent,
+  updatePartnership,
   updateRelationshipDetail,
 } from "@/lib/client-background/mutations"
 import type { CreateRelationshipInput, EventType } from "@/lib/client-background/types"
@@ -71,6 +73,25 @@ export async function saveOccupationAction(clientId: string, occupation: unknown
   return result
 }
 
+export async function saveDemographicsAction(clientId: string, demographics: unknown) {
+  const context = await requirePractitionerContext()
+  const raw =
+    demographics && typeof demographics === "object"
+      ? (demographics as Record<string, unknown>)
+      : {}
+  const result = await saveDemographics({
+    clientId,
+    practiceId: context.practiceId,
+    userId: context.userId,
+    identity: raw.identity,
+    livingSituation: raw.livingSituation,
+    education: raw.education,
+    occupation: raw.occupation,
+  })
+  if (!result.error) refresh(clientId)
+  return result
+}
+
 export async function saveRiskAction(clientId: string, risk: unknown) {
   const context = await requirePractitionerContext()
   const result = await saveRisk({
@@ -107,6 +128,18 @@ export async function updateRelationshipAction(
     userId: context.userId,
     relationship,
     partnerships,
+  })
+  if (!result.error) refresh(clientId)
+  return result
+}
+
+export async function updatePartnershipAction(clientId: string, partnership: unknown) {
+  const context = await requirePractitionerContext()
+  const result = await updatePartnership({
+    clientId,
+    practiceId: context.practiceId,
+    userId: context.userId,
+    partnership,
   })
   if (!result.error) refresh(clientId)
   return result

@@ -37,15 +37,17 @@ export function TextField({
   value,
   onChange,
   placeholder,
+  hint,
 }: {
   id: string
   label: string
   value: string
   onChange: (value: string) => void
   placeholder?: string
+  hint?: string
 }) {
   return (
-    <Field label={label} htmlFor={id}>
+    <Field label={label} htmlFor={id} hint={hint}>
       <Input id={id} value={value} placeholder={placeholder} onChange={(event) => onChange(event.target.value)} />
     </Field>
   )
@@ -77,19 +79,31 @@ export function SelectField({
   value,
   onChange,
   children,
+  hint,
 }: {
   id: string
   label: string
   value: string
   onChange: (value: string) => void
   children: ReactNode
+  hint?: string
 }) {
   return (
-    <Field label={label} htmlFor={id}>
+    <Field label={label} htmlFor={id} hint={hint}>
       <select id={id} className={selectClassName} value={value} onChange={(event) => onChange(event.target.value)}>
         {children}
       </select>
     </Field>
+  )
+}
+
+export function ReadOnlyField({ label, value }: { label: string; value: string }) {
+  const text = value.trim()
+  return (
+    <div className="space-y-0.5">
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className="text-sm whitespace-pre-wrap">{text || "Not recorded"}</p>
+    </div>
   )
 }
 

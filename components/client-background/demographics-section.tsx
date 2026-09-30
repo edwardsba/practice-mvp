@@ -2,21 +2,14 @@
 
 import { useState, type ReactNode } from "react"
 
-import {
-  saveEducationAction,
-  saveIdentityAction,
-  saveLivingSituationAction,
-  saveOccupationAction,
-} from "@/app/clients/[client_id]/background/actions"
-import { SaveRow, SelectField, TextAreaField, TextField, YesNoDetail } from "@/components/client-background/fields"
+import { saveDemographicsAction } from "@/app/clients/[client_id]/background/actions"
+import { ReadOnlyField, SaveRow, SelectField, TextAreaField, TextField, YesNoDetail } from "@/components/client-background/fields"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import {
   EDUCATION_LEVEL_OPTIONS,
   HOUSING_STABILITY_OPTIONS,
-  HOUSING_TYPE_OPTIONS,
   NECESSITY_KEYS,
   NECESSITY_LABELS,
   PRONOUN_OPTIONS,
@@ -28,6 +21,7 @@ import {
   type OccupationFields,
   type PreviousJob,
 } from "@/lib/client-background/types"
+import { cn } from "@/lib/utils"
 
 export function DemographicsSection({
   clientId,
@@ -36,47 +30,207 @@ export function DemographicsSection({
   clientId: string
   demographics: Demographics
 }) {
-  return (
-    <div className="columns-1 gap-4 md:columns-2">
-      <IdentityCard clientId={clientId} initial={demographics.identity} />
-      <LivingCard clientId={clientId} initial={demographics.livingSituation} />
-      <EducationCard clientId={clientId} initial={demographics.education} />
-      <OccupationCard clientId={clientId} initial={demographics.occupation} />
-    </div>
-  )
-}
-
-function CardShell({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <Card className="mb-4 break-inside-avoid">
-      <CardHeader>
-        <CardTitle>{title}</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">{children}</CardContent>
-    </Card>
-  )
-}
-
-function IdentityCard({ clientId, initial }: { clientId: string; initial: IdentityFields }) {
-  const [value, setValue] = useState(initial)
+  const [saved, setSaved] = useState(demographics)
+  const [draft, setDraft] = useState(demographics)
+  const [editing, setEditing] = useState(false)
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  function updateIdentity(identity: IdentityFields) {
+    setDraft({ ...draft, identity })
+  }
+  function updateLiving(livingSituation: LivingSituationFields) {
+    setDraft({ ...draft, livingSituation })
+  }
+  function updateEducation(education: EducationFields) {
+    setDraft({ ...draft, education })
+  }
+  function updateOccupation(occupation: OccupationFields) {
+    setDraft({ ...draft, occupation })
+  }
 
   async function save() {
     setPending(true)
     setError(null)
-    const result = await saveIdentityAction(clientId, value)
+    const result = await saveDemographicsAction(clientId, draft)
     setPending(false)
-    if (result.error || !("identity" in result)) {
-      setError(result.error ?? "Could not save identity.")
+    if (result.error || !("demographics" in result) || !result.demographics) {
+      setError(result.error ?? "Could not save demographics.")
       return
     }
-    setValue(result.identity)
+    setSaved(result.demographics)
+    setDraft(result.demographics)
+    setEditing(false)
   }
 
   return (
-    <CardShell title="Identity">
-      <SelectField id="sex" label="Sex" value={value.sex} onChange={(sex) => setValue({ ...value, sex })}>
+    <div className="space-y-4">
+      <div className="flex justify-end">
+        {editing ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            disabled={pending}
+            onClick={() => {
+              setDraft(saved)
+              setError(null)
+              setEditing(false)
+            }}
+          >
+            Cancel
+          </Button>
+        ) : (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setDraft(saved)
+              setError(null)
+              setEditing(true)
+            }}
+          >
+            Edit
+          </Button>
+        )}
+      </div>
+      {editing ? (
+        <form
+          className="max-w-xl space-y-6"
+          onSubmit={(event) => {
+            event.preventDefault()
+            void save()
+          }}
+        >
+          <Subsection title="Identity">
+            <IdentityFieldsEditor value={draft.identity} onChange={updateIdentity} />
+          </Subsection>
+          <Subsection title="Living Situation" divided>
+            <LivingFieldsEditor value={draft.livingSituation} onChange={updateLiving} />
+          </Subsection>
+          <Subsection title="Education" divided>
+            <EducationFieldsEditor value={draft.education} onChange={updateEducation} />
+          </Subsection>
+          <Subsection title="Occupation & Financial Concerns" divided>
+            <OccupationFieldsEditor value={draft.occupation} onChange={updateOccupation} />
+          </Subsection>
+          <SaveRow pending={pending} error={error} onSave={() => void save()} />
+        </form>
+      ) : (
+        <DemographicsReadOnly value={saved} />
+      )}
+    </div>
+  )
+}
+
+function Subsection({
+  title,
+  divided,
+  children,
+}: {
+  title: string
+  divided?: boolean
+  children: ReactNode
+}) {
+  return (
+    <section className={cn("space-y-4", divided && "border-t pt-6")}>
+      <h3 className="text-sm font-semibold">{title}</h3>
+      {children}
+    </section>
+  )
+}
+
+function DemographicsReadOnly({ value }: { value: Demographics }) {
+  const pronouns =
+    value.identity.pronouns === "Other"
+      ? value.identity.pronounsOther || "Other"
+      : value.identity.pronouns
+  const limited = NECESSITY_KEYS.filter((key) => value.occupation.necessities[key])
+
+  return (
+    <div className="max-w-xl space-y-6">
+      <Subsection title="Identity">
+        <ReadOnlyField label="Sex" value={value.identity.sex} />
+        <ReadOnlyField label="Gender identity" value={value.identity.genderIdentity} />
+        <ReadOnlyField label="Pronouns" value={pronouns} />
+        <ReadOnlyField label="Race/Ethnicity" value={value.identity.raceEthnicity} />
+        <ReadOnlyField label="Religion" value={value.identity.religion} />
+        <ReadOnlyField label="Primary language" value={value.identity.primaryLanguage} />
+        <ReadOnlyField label="Disability" value={value.identity.disability} />
+        <ReadOnlyField label="Accessibility needs" value={value.identity.accessibilityNeeds} />
+      </Subsection>
+      <Subsection title="Living Situation" divided>
+        <ReadOnlyField label="Living arrangement" value={value.livingSituation.livingArrangement} />
+        <ReadOnlyField
+          label="Client depends on others in the household"
+          value={yesNoText(value.livingSituation.clientDependsOnOthers, value.livingSituation.clientDependsOnOthersDetail)}
+        />
+        <ReadOnlyField
+          label="Others in the household depend on the client"
+          value={yesNoText(value.livingSituation.othersDependOnClient, value.livingSituation.othersDependOnClientDetail)}
+        />
+        <ReadOnlyField label="Household composition" value={value.livingSituation.householdComposition} />
+        <ReadOnlyField label="Housing stability" value={value.livingSituation.housingStability} />
+      </Subsection>
+      <Subsection title="Education" divided>
+        <ReadOnlyField label="Level of education" value={value.education.level} />
+        <ReadOnlyField label="Field of study" value={value.education.fieldOfStudy} />
+        <ReadOnlyField
+          label="Currently studying"
+          value={yesNoText(value.education.currentlyStudying, value.education.currentlyStudyingDetail)}
+        />
+        <ReadOnlyField
+          label="Disruption to education"
+          value={yesNoText(value.education.disruption, value.education.disruptionDetail)}
+        />
+      </Subsection>
+      <Subsection title="Occupation & Financial Concerns" divided>
+        <ReadOnlyField
+          label="Currently employed"
+          value={yesNoText(value.occupation.currentlyEmployed, value.occupation.currentlyEmployedDetail)}
+        />
+        <div className="space-y-1">
+          <p className="text-xs text-muted-foreground">Previous jobs</p>
+          {value.occupation.previousJobs.length === 0 ? (
+            <p className="text-sm">Not recorded</p>
+          ) : (
+            value.occupation.previousJobs.map((job) => (
+              <p key={job.id} className="text-sm">
+                {[job.role, job.employer, job.dates].filter(Boolean).join(" · ") || "Not recorded"}
+              </p>
+            ))
+          )}
+        </div>
+        <ReadOnlyField
+          label="Financial concerns"
+          value={yesNoText(value.occupation.financialConcerns, value.occupation.financialConcernsDetail)}
+        />
+        <ReadOnlyField
+          label="Access to necessities"
+          value={limited.length ? `Limited: ${limited.map((key) => NECESSITY_LABELS[key]).join(", ")}` : "No limits recorded"}
+        />
+      </Subsection>
+    </div>
+  )
+}
+
+function yesNoText(value: boolean | null, detail: string) {
+  if (value == null) return ""
+  if (!value) return "No"
+  return detail.trim() ? `Yes — ${detail.trim()}` : "Yes"
+}
+
+function IdentityFieldsEditor({
+  value,
+  onChange,
+}: {
+  value: IdentityFields
+  onChange: (value: IdentityFields) => void
+}) {
+  return (
+    <>
+      <SelectField id="sex" label="Sex" value={value.sex} onChange={(sex) => onChange({ ...value, sex })}>
         <option value="">Not recorded</option>
         {SEX_OPTIONS.map((option) => (
           <option key={option} value={option}>
@@ -84,35 +238,18 @@ function IdentityCard({ clientId, initial }: { clientId: string; initial: Identi
           </option>
         ))}
       </SelectField>
-      <div className="flex items-start gap-3">
-        <Checkbox
-          id="gender_differs"
-          checked={value.genderDiffersFromSex}
-          onCheckedChange={(checked) =>
-            setValue({
-              ...value,
-              genderDiffersFromSex: checked === true,
-              genderIdentity: checked === true ? value.genderIdentity : "",
-            })
-          }
-        />
-        <Label htmlFor="gender_differs" className="cursor-pointer font-normal">
-          Gender identity differs from sex
-        </Label>
-      </div>
-      {value.genderDiffersFromSex ? (
-        <TextField
-          id="gender_identity"
-          label="Gender identity"
-          value={value.genderIdentity}
-          onChange={(genderIdentity) => setValue({ ...value, genderIdentity })}
-        />
-      ) : null}
+      <TextField
+        id="gender_identity"
+        label="Gender identity"
+        value={value.genderIdentity}
+        placeholder="if relevant"
+        onChange={(genderIdentity) => onChange({ ...value, genderIdentity })}
+      />
       <SelectField
         id="pronouns"
         label="Pronouns"
         value={value.pronouns}
-        onChange={(pronouns) => setValue({ ...value, pronouns, pronounsOther: pronouns === "Other" ? value.pronounsOther : "" })}
+        onChange={(pronouns) => onChange({ ...value, pronouns, pronounsOther: pronouns === "Other" ? value.pronounsOther : "" })}
       >
         <option value="">Not recorded</option>
         {PRONOUN_OPTIONS.map((option) => (
@@ -126,82 +263,81 @@ function IdentityCard({ clientId, initial }: { clientId: string; initial: Identi
           id="pronouns_other"
           label="Pronouns detail"
           value={value.pronounsOther}
-          onChange={(pronounsOther) => setValue({ ...value, pronounsOther })}
+          onChange={(pronounsOther) => onChange({ ...value, pronounsOther })}
         />
       ) : null}
       <TextField
         id="race_ethnicity"
         label="Race/Ethnicity"
         value={value.raceEthnicity}
-        onChange={(raceEthnicity) => setValue({ ...value, raceEthnicity })}
+        onChange={(raceEthnicity) => onChange({ ...value, raceEthnicity })}
       />
-      <TextField id="religion" label="Religion" value={value.religion} onChange={(religion) => setValue({ ...value, religion })} />
+      <TextField id="religion" label="Religion" value={value.religion} onChange={(religion) => onChange({ ...value, religion })} />
       <TextField
         id="primary_language"
         label="Primary language"
         value={value.primaryLanguage}
-        onChange={(primaryLanguage) => setValue({ ...value, primaryLanguage })}
+        onChange={(primaryLanguage) => onChange({ ...value, primaryLanguage })}
       />
-      <TextAreaField
+      <TextField
         id="disability"
         label="Disability"
         value={value.disability}
-        onChange={(disability) => setValue({ ...value, disability })}
+        onChange={(disability) => onChange({ ...value, disability })}
       />
-      <TextAreaField
+      <TextField
         id="accessibility"
         label="Accessibility needs"
         value={value.accessibilityNeeds}
-        onChange={(accessibilityNeeds) => setValue({ ...value, accessibilityNeeds })}
+        onChange={(accessibilityNeeds) => onChange({ ...value, accessibilityNeeds })}
       />
-      <SaveRow pending={pending} error={error} onSave={() => void save()} />
-    </CardShell>
+    </>
   )
 }
 
-function LivingCard({ clientId, initial }: { clientId: string; initial: LivingSituationFields }) {
-  const [value, setValue] = useState(initial)
-  const [pending, setPending] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  async function save() {
-    setPending(true)
-    setError(null)
-    const result = await saveLivingSituationAction(clientId, value)
-    setPending(false)
-    if (result.error || !("livingSituation" in result)) {
-      setError(result.error ?? "Could not save living situation.")
-      return
-    }
-    setValue(result.livingSituation)
-  }
-
+function LivingFieldsEditor({
+  value,
+  onChange,
+}: {
+  value: LivingSituationFields
+  onChange: (value: LivingSituationFields) => void
+}) {
   return (
-    <CardShell title="Living Situation">
-      <SelectField
-        id="housing_type"
-        label="Housing type"
-        value={value.housingType}
-        onChange={(housingType) => setValue({ ...value, housingType })}
-      >
-        <option value="">Not recorded</option>
-        {HOUSING_TYPE_OPTIONS.map((option) => (
-          <option key={option} value={option}>
-            {option}
-          </option>
-        ))}
-      </SelectField>
+    <>
+      <TextField
+        id="living_arrangement"
+        label="Living arrangement"
+        value={value.livingArrangement}
+        hint="Where the client lives — for example own home, renting, a parent's home, supported accommodation, or residential care."
+        onChange={(livingArrangement) => onChange({ ...value, livingArrangement })}
+      />
+      <YesNoDetail
+        id="client_depends"
+        label="Client depends on others in the household"
+        value={value.clientDependsOnOthers}
+        detail={value.clientDependsOnOthersDetail}
+        onChange={(clientDependsOnOthers) => onChange({ ...value, clientDependsOnOthers })}
+        onDetail={(clientDependsOnOthersDetail) => onChange({ ...value, clientDependsOnOthersDetail })}
+      />
+      <YesNoDetail
+        id="others_depend"
+        label="Others in the household depend on the client"
+        value={value.othersDependOnClient}
+        detail={value.othersDependOnClientDetail}
+        onChange={(othersDependOnClient) => onChange({ ...value, othersDependOnClient })}
+        onDetail={(othersDependOnClientDetail) => onChange({ ...value, othersDependOnClientDetail })}
+      />
       <TextAreaField
         id="household"
         label="Household composition"
         value={value.householdComposition}
-        onChange={(householdComposition) => setValue({ ...value, householdComposition })}
+        onChange={(householdComposition) => onChange({ ...value, householdComposition })}
       />
       <SelectField
         id="housing_stability"
         label="Housing stability"
         value={value.housingStability}
-        onChange={(housingStability) => setValue({ ...value, housingStability })}
+        onChange={(housingStability) => onChange({ ...value, housingStability })}
       >
         <option value="">Not recorded</option>
         {HOUSING_STABILITY_OPTIONS.map((option) => (
@@ -210,31 +346,25 @@ function LivingCard({ clientId, initial }: { clientId: string; initial: LivingSi
           </option>
         ))}
       </SelectField>
-      <SaveRow pending={pending} error={error} onSave={() => void save()} />
-    </CardShell>
+    </>
   )
 }
 
-function EducationCard({ clientId, initial }: { clientId: string; initial: EducationFields }) {
-  const [value, setValue] = useState(initial)
-  const [pending, setPending] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  async function save() {
-    setPending(true)
-    setError(null)
-    const result = await saveEducationAction(clientId, value)
-    setPending(false)
-    if (result.error || !("education" in result)) {
-      setError(result.error ?? "Could not save education.")
-      return
-    }
-    setValue(result.education)
-  }
-
+function EducationFieldsEditor({
+  value,
+  onChange,
+}: {
+  value: EducationFields
+  onChange: (value: EducationFields) => void
+}) {
   return (
-    <CardShell title="Education">
-      <SelectField id="education_level" label="Level of education" value={value.level} onChange={(level) => setValue({ ...value, level })}>
+    <>
+      <SelectField
+        id="education_level"
+        label="Level of education"
+        value={value.level}
+        onChange={(level) => onChange({ ...value, level })}
+      >
         <option value="">Not recorded</option>
         {EDUCATION_LEVEL_OPTIONS.map((option) => (
           <option key={option} value={option}>
@@ -246,62 +376,51 @@ function EducationCard({ clientId, initial }: { clientId: string; initial: Educa
         id="field_of_study"
         label="Field of study"
         value={value.fieldOfStudy}
-        onChange={(fieldOfStudy) => setValue({ ...value, fieldOfStudy })}
+        onChange={(fieldOfStudy) => onChange({ ...value, fieldOfStudy })}
       />
       <YesNoDetail
         id="currently_studying"
         label="Currently studying"
         value={value.currentlyStudying}
         detail={value.currentlyStudyingDetail}
-        onChange={(currentlyStudying) => setValue({ ...value, currentlyStudying })}
-        onDetail={(currentlyStudyingDetail) => setValue({ ...value, currentlyStudyingDetail })}
+        onChange={(currentlyStudying) => onChange({ ...value, currentlyStudying })}
+        onDetail={(currentlyStudyingDetail) => onChange({ ...value, currentlyStudyingDetail })}
       />
       <YesNoDetail
         id="disruption"
         label="Disruption to education"
         value={value.disruption}
         detail={value.disruptionDetail}
-        onChange={(disruption) => setValue({ ...value, disruption })}
-        onDetail={(disruptionDetail) => setValue({ ...value, disruptionDetail })}
+        onChange={(disruption) => onChange({ ...value, disruption })}
+        onDetail={(disruptionDetail) => onChange({ ...value, disruptionDetail })}
       />
-      <SaveRow pending={pending} error={error} onSave={() => void save()} />
-    </CardShell>
+    </>
   )
 }
 
-function OccupationCard({ clientId, initial }: { clientId: string; initial: OccupationFields }) {
-  const [value, setValue] = useState(initial)
-  const [pending, setPending] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
+function OccupationFieldsEditor({
+  value,
+  onChange,
+}: {
+  value: OccupationFields
+  onChange: (value: OccupationFields) => void
+}) {
   function updateJob(id: string, patch: Partial<PreviousJob>) {
-    setValue({
+    onChange({
       ...value,
       previousJobs: value.previousJobs.map((job) => (job.id === id ? { ...job, ...patch } : job)),
     })
   }
 
-  async function save() {
-    setPending(true)
-    setError(null)
-    const result = await saveOccupationAction(clientId, value)
-    setPending(false)
-    if (result.error || !("occupation" in result)) {
-      setError(result.error ?? "Could not save occupation and financial concerns.")
-      return
-    }
-    setValue(result.occupation)
-  }
-
   return (
-    <CardShell title="Occupation & Financial Concerns">
+    <>
       <YesNoDetail
         id="currently_employed"
         label="Currently employed"
         value={value.currentlyEmployed}
         detail={value.currentlyEmployedDetail}
-        onChange={(currentlyEmployed) => setValue({ ...value, currentlyEmployed })}
-        onDetail={(currentlyEmployedDetail) => setValue({ ...value, currentlyEmployedDetail })}
+        onChange={(currentlyEmployed) => onChange({ ...value, currentlyEmployed })}
+        onDetail={(currentlyEmployedDetail) => onChange({ ...value, currentlyEmployedDetail })}
       />
       <div className="space-y-3">
         <p className="text-sm font-medium">Previous jobs</p>
@@ -325,9 +444,7 @@ function OccupationCard({ clientId, initial }: { clientId: string; initial: Occu
               type="button"
               variant="ghost"
               size="sm"
-              onClick={() =>
-                setValue({ ...value, previousJobs: value.previousJobs.filter((item) => item.id !== job.id) })
-              }
+              onClick={() => onChange({ ...value, previousJobs: value.previousJobs.filter((item) => item.id !== job.id) })}
             >
               Remove job {index + 1}
             </Button>
@@ -338,12 +455,9 @@ function OccupationCard({ clientId, initial }: { clientId: string; initial: Occu
           variant="outline"
           size="sm"
           onClick={() =>
-            setValue({
+            onChange({
               ...value,
-              previousJobs: [
-                ...value.previousJobs,
-                { id: crypto.randomUUID(), role: "", employer: "", dates: "" },
-              ],
+              previousJobs: [...value.previousJobs, { id: crypto.randomUUID(), role: "", employer: "", dates: "" }],
             })
           }
         >
@@ -355,8 +469,8 @@ function OccupationCard({ clientId, initial }: { clientId: string; initial: Occu
         label="Financial concerns"
         value={value.financialConcerns}
         detail={value.financialConcernsDetail}
-        onChange={(financialConcerns) => setValue({ ...value, financialConcerns })}
-        onDetail={(financialConcernsDetail) => setValue({ ...value, financialConcernsDetail })}
+        onChange={(financialConcerns) => onChange({ ...value, financialConcerns })}
+        onDetail={(financialConcernsDetail) => onChange({ ...value, financialConcernsDetail })}
       />
       <div className="space-y-2">
         <p className="text-sm font-medium">Access to necessities</p>
@@ -367,7 +481,7 @@ function OccupationCard({ clientId, initial }: { clientId: string; initial: Occu
               id={`necessity_${key}`}
               checked={value.necessities[key]}
               onCheckedChange={(checked) =>
-                setValue({
+                onChange({
                   ...value,
                   necessities: { ...value.necessities, [key]: checked === true },
                 })
@@ -379,7 +493,6 @@ function OccupationCard({ clientId, initial }: { clientId: string; initial: Occu
           </div>
         ))}
       </div>
-      <SaveRow pending={pending} error={error} onSave={() => void save()} />
-    </CardShell>
+    </>
   )
 }

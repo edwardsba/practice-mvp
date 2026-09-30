@@ -113,6 +113,16 @@ export const PARTNERSHIP_STATUS_LABELS: Record<PartnershipStatus, string> = {
   never_formalised: "Never formalised",
 }
 
+export const HEALTH_STATUSES = ["good", "fair", "poor", "deceased"] as const
+export type HealthStatus = (typeof HEALTH_STATUSES)[number]
+
+export const HEALTH_STATUS_LABELS: Record<HealthStatus, string> = {
+  good: "Good",
+  fair: "Fair",
+  poor: "Poor",
+  deceased: "Deceased",
+}
+
 export const EVENT_TYPE_LABELS: Record<EventType, string> = {
   self_harm: "Self-harm",
   illness_injury: "Illness / injury",
@@ -245,7 +255,11 @@ export type IdentityFields = {
 }
 
 export type LivingSituationFields = {
-  housingType: string
+  livingArrangement: string
+  clientDependsOnOthers: boolean | null
+  clientDependsOnOthersDetail: string
+  othersDependOnClient: boolean | null
+  othersDependOnClientDetail: string
   householdComposition: string
   housingStability: string
 }
@@ -291,6 +305,7 @@ export type RelationshipRecord = {
   givenName: string
   displayOrder: number
   age: number | null
+  healthStatus: HealthStatus | ""
   deceased: boolean
   ageAtDeath: number | null
   healthOrCauseOfDeath: string
@@ -317,6 +332,7 @@ export type PartnershipRecord = {
 export type EventRecord = {
   eventRecordId: string
   eventType: EventType
+  title: string
   description: string
   startPrecision: StartPrecision | ""
   startValue: string
@@ -382,7 +398,11 @@ export function emptyIdentity(): IdentityFields {
 
 export function emptyLivingSituation(): LivingSituationFields {
   return {
-    housingType: "",
+    livingArrangement: "",
+    clientDependsOnOthers: null,
+    clientDependsOnOthersDetail: "",
+    othersDependOnClient: null,
+    othersDependOnClientDetail: "",
     householdComposition: "",
     housingStability: "",
   }
@@ -432,6 +452,7 @@ export function emptyDemographics(): Demographics {
 export function emptyEvent(eventType: EventType, displayOrder: number): Omit<EventRecord, "eventRecordId"> {
   return {
     eventType,
+    title: "",
     description: "",
     startPrecision: "",
     startValue: "",

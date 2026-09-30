@@ -100,7 +100,8 @@ function relationshipColumns(record: RelationshipRecord) {
     givenName: record.givenName || null,
     displayOrder: record.displayOrder,
     age: record.age,
-    deceased: record.deceased,
+    deceased: record.healthStatus === "deceased",
+    healthStatus: record.healthStatus || null,
     ageAtDeath: record.ageAtDeath,
     healthOrCauseOfDeath: record.healthOrCauseOfDeath || null,
     lengthOfRelationship: record.lengthOfRelationship || null,
@@ -200,6 +201,109 @@ async function ensureOriginPartnership(tx: Tx, clientId: string, practiceId: str
     entityId: created.partnershipRecordId,
   })
   return toPartnership(created)
+}
+
+export async function ensureFamilyOfOrigin(input: {
+  clientId: string
+  practiceId: string
+  userId: string
+}): Promise<{ error?: string }> {
+  const client = await assertClient(input.clientId, input.practiceId)
+  if (!client) return { error: "Client was not found." }
+
+  try {
+    await db.transaction(async (tx) => {
+      const parents = await tx
+        .select()
+        .from(clientRelationshipRecords)
+        .where(
+          and(
+            eq(clientRelationshipRecords.clientId, input.clientId),
+            eq(clientRelationshipRecords.practiceId, input.practiceId),
+            inArray(clientRelationshipRecords.relationshipToClient, ["mother", "father"])
+          )
+        )
+
+      const earliest = (role: "mother" | "father") =>
+        parents
+          .filter((row) => row.relationshipToClient === role)
+          .sort(
+            (a, b) =>
+              a.displayOrder - b.displayOrder || a.relationshipRecordId.localeCompare(b.relationshipRecordId)
+          )[0]
+
+      let mother = earliest("mother")
+      let father = earliest("father")
+
+      async function insertOrigin(role: "mother" | "father") {
+        const displayOrder = await nextRelationshipOrder(tx, input.clientId, input.practiceId)
+        const [created] = await tx
+          .insert(clientRelationshipRecords)
+          .values({
+            clientId: input.clientId,
+            practiceId: input.practiceId,
+            relationshipToClient: role,
+            displayOrder,
+          })
+          .returning()
+        await writeAudit(tx, {
+          practiceId: input.practiceId,
+          userId: input.userId,
+          clientId: input.clientId,
+          eventType: "client_relationship.created",
+          entityType: "client_relationship",
+          entityId: created.relationshipRecordId,
+        })
+        return created
+      }
+
+      if (!mother) mother = await insertOrigin("mother")
+      if (!father) father = await insertOrigin("father")
+
+      const [existing] = await tx
+        .select()
+        .from(clientPartnershipRecords)
+        .where(
+          and(
+            eq(clientPartnershipRecords.clientId, input.clientId),
+            eq(clientPartnershipRecords.practiceId, input.practiceId),
+            or(
+              and(
+                eq(clientPartnershipRecords.partnerAId, mother.relationshipRecordId),
+                eq(clientPartnershipRecords.partnerBId, father.relationshipRecordId)
+              ),
+              and(
+                eq(clientPartnershipRecords.partnerAId, father.relationshipRecordId),
+                eq(clientPartnershipRecords.partnerBId, mother.relationshipRecordId)
+              )
+            )
+          )
+        )
+        .limit(1)
+      if (existing) return
+
+      const [created] = await tx
+        .insert(clientPartnershipRecords)
+        .values({
+          clientId: input.clientId,
+          practiceId: input.practiceId,
+          partnerAId: mother.relationshipRecordId,
+          partnerBId: father.relationshipRecordId,
+        })
+        .returning()
+      await writeAudit(tx, {
+        practiceId: input.practiceId,
+        userId: input.userId,
+        clientId: input.clientId,
+        eventType: "client_partnership.created",
+        entityType: "client_partnership",
+        entityId: created.partnershipRecordId,
+      })
+    })
+    return {}
+  } catch {
+    return { error: "Could not prepare family of origin." }
+  }
 }
 
 async function upsertBackgroundColumn(
@@ -305,6 +409,35 @@ export async function saveEducation(
     return { ...result, education }
   } catch {
     return { error: "Could not save education." }
+  }
+}
+
+export async function saveDemographics(input: {
+  clientId: string
+  practiceId: string
+  userId: string
+  identity: unknown
+  livingSituation: unknown
+  education: unknown
+  occupation: unknown
+}) {
+  const identity = sanitizeIdentity(input.identity)
+  const livingSituation = sanitizeLivingSituation(input.livingSituation)
+  const education = sanitizeEducation(input.education)
+  const occupation = sanitizeOccupation(input.occupation)
+  try {
+    const result = await upsertBackgroundColumn(input.clientId, input.practiceId, input.userId, {
+      identityJson: identity,
+      livingSituationJson: livingSituation,
+      educationJson: education,
+      occupationJson: occupation,
+    })
+    return {
+      ...result,
+      demographics: { identity, livingSituation, education, occupation },
+    }
+  } catch {
+    return { error: "Could not save demographics." }
   }
 }
 
@@ -606,6 +739,60 @@ export async function updateRelationshipDetail(input: {
   }
 }
 
+export async function updatePartnership(input: {
+  clientId: string
+  practiceId: string
+  userId: string
+  partnership: unknown
+}): Promise<MutationResult<{ partnership?: PartnershipRecord }>> {
+  const client = await assertClient(input.clientId, input.practiceId)
+  if (!client) return { error: "Client was not found." }
+  const draft = sanitizePartnership(input.partnership)
+  if (!draft.partnershipRecordId) return { error: "That relationship was not found." }
+
+  try {
+    return await db.transaction(async (tx) => {
+      const [owned] = await tx
+        .select()
+        .from(clientPartnershipRecords)
+        .where(
+          and(
+            eq(clientPartnershipRecords.partnershipRecordId, draft.partnershipRecordId),
+            eq(clientPartnershipRecords.clientId, input.clientId),
+            eq(clientPartnershipRecords.practiceId, input.practiceId)
+          )
+        )
+        .limit(1)
+      if (!owned) return { error: "That relationship was not found." }
+
+      const [saved] = await tx
+        .update(clientPartnershipRecords)
+        .set({
+          relationshipStatus: draft.relationshipStatus || null,
+          started: draft.started || null,
+          ended: draft.ended || null,
+          qualityOfRelationship: draft.qualityOfRelationship || null,
+          updatedAt: new Date(),
+        })
+        .where(eq(clientPartnershipRecords.partnershipRecordId, owned.partnershipRecordId))
+        .returning()
+
+      await writeAudit(tx, {
+        practiceId: input.practiceId,
+        userId: input.userId,
+        clientId: input.clientId,
+        eventType: "client_partnership.updated",
+        entityType: "client_partnership",
+        entityId: saved.partnershipRecordId,
+      })
+
+      return { partnership: toPartnership(saved) }
+    })
+  } catch {
+    return { error: "Could not save this relationship." }
+  }
+}
+
 export async function deleteRelationship(input: {
   clientId: string
   practiceId: string
@@ -624,6 +811,22 @@ export async function deleteRelationship(input: {
         input.practiceId
       )
       if (!existing) return { error: "That person was not found." }
+
+      if (existing.relationshipToClient === "mother" || existing.relationshipToClient === "father") {
+        const sameRole = await tx
+          .select({ relationshipRecordId: clientRelationshipRecords.relationshipRecordId })
+          .from(clientRelationshipRecords)
+          .where(
+            and(
+              eq(clientRelationshipRecords.clientId, input.clientId),
+              eq(clientRelationshipRecords.practiceId, input.practiceId),
+              eq(clientRelationshipRecords.relationshipToClient, existing.relationshipToClient)
+            )
+          )
+        if (sameRole.length <= 1) {
+          return { error: "Mother and father stay on every client. Clear their details instead of removing them." }
+        }
+      }
 
       await writeAudit(tx, {
         practiceId: input.practiceId,
@@ -648,6 +851,7 @@ export async function deleteRelationship(input: {
 function eventColumns(event: EventRecord) {
   return {
     eventType: event.eventType,
+    title: event.title || null,
     description: event.description || null,
     startPrecision: event.startPrecision || null,
     startValue: event.startValue || null,

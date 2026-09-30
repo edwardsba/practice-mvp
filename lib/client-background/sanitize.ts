@@ -3,6 +3,7 @@ import {
   DEPENDENCY_VALUES,
   EVENT_TYPES,
   FAMILY_SIDES,
+  HEALTH_STATUSES,
   isOneOf,
   NECESSITY_KEYS,
   PARTNERSHIP_STATUSES,
@@ -29,6 +30,7 @@ import {
   type EventRecord,
   type EventType,
   type FamilySide,
+  type HealthStatus,
   type IdentityFields,
   type LivingSituationFields,
   type OccupationFields,
@@ -78,11 +80,11 @@ function oneOf<T extends string>(value: unknown, options: readonly T[]): T | "" 
 
 export function sanitizeIdentity(value: unknown): IdentityFields {
   const raw = isRecord(value) ? value : {}
-  const genderDiffersFromSex = bool(raw.genderDiffersFromSex)
+  const genderIdentity = str(raw.genderIdentity)
   return {
     sex: str(raw.sex),
-    genderDiffersFromSex,
-    genderIdentity: genderDiffersFromSex ? str(raw.genderIdentity) : "",
+    genderDiffersFromSex: genderIdentity.length > 0,
+    genderIdentity,
     pronouns: str(raw.pronouns),
     pronounsOther: str(raw.pronouns) === "Other" ? str(raw.pronounsOther) : "",
     raceEthnicity: str(raw.raceEthnicity),
@@ -95,8 +97,15 @@ export function sanitizeIdentity(value: unknown): IdentityFields {
 
 export function sanitizeLivingSituation(value: unknown): LivingSituationFields {
   const raw = isRecord(value) ? value : {}
+  const clientDependsOnOthers = boolOrNull(raw.clientDependsOnOthers)
+  const othersDependOnClient = boolOrNull(raw.othersDependOnClient)
   return {
-    housingType: str(raw.housingType),
+    livingArrangement: str(raw.livingArrangement) || str(raw.housingType),
+    clientDependsOnOthers,
+    clientDependsOnOthersDetail:
+      clientDependsOnOthers === true ? str(raw.clientDependsOnOthersDetail) : "",
+    othersDependOnClient,
+    othersDependOnClientDetail: othersDependOnClient === true ? str(raw.othersDependOnClientDetail) : "",
     householdComposition: str(raw.householdComposition),
     housingStability: str(raw.housingStability),
   }
@@ -199,6 +208,9 @@ export function sanitizeRelationship(value: unknown, fallbackId = ""): Relations
   const role = oneOf<RelationshipToClient>(raw.relationshipToClient, RELATIONSHIP_TO_CLIENT)
   const dependency = oneOf<DependencyValue>(raw.dependency, DEPENDENCY_VALUES)
   const age = intOrNull(raw.age)
+  const explicitHealth = oneOf<HealthStatus>(raw.healthStatus, HEALTH_STATUSES)
+  const healthStatus = explicitHealth || (bool(raw.deceased) ? "deceased" : "")
+  const deceased = healthStatus === "deceased"
   const record: RelationshipRecord = {
     relationshipRecordId: str(raw.relationshipRecordId) || fallbackId,
     relationshipToClient: role || "parent",
@@ -206,9 +218,10 @@ export function sanitizeRelationship(value: unknown, fallbackId = ""): Relations
     givenName: str(raw.givenName),
     displayOrder: intOrNull(raw.displayOrder) ?? 0,
     age: age != null && age >= 0 && age <= 130 ? age : null,
-    deceased: bool(raw.deceased),
-    ageAtDeath: bool(raw.deceased) ? intOrNull(raw.ageAtDeath) : null,
-    healthOrCauseOfDeath: bool(raw.deceased) ? str(raw.healthOrCauseOfDeath) : "",
+    healthStatus,
+    deceased,
+    ageAtDeath: deceased ? intOrNull(raw.ageAtDeath) : null,
+    healthOrCauseOfDeath: deceased ? str(raw.healthOrCauseOfDeath) : "",
     lengthOfRelationship: str(raw.lengthOfRelationship),
     relationshipStatus: str(raw.relationshipStatus),
     timeSinceEnded: str(raw.timeSinceEnded),
@@ -247,7 +260,9 @@ export function sanitizeEvent(value: unknown, fallbackId = ""): EventRecord {
   const eventType = oneOf<EventType>(raw.eventType, EVENT_TYPES) || "significant_history"
   const base = emptyEvent(eventType, intOrNull(raw.displayOrder) ?? 0)
   const treated = boolOrNull(raw.treated)
-  const endOngoing = bool(raw.endOngoing)
+  let resolvedOrOngoing = oneOf<ResolvedOrOngoing>(raw.resolvedOrOngoing, RESOLVED_OR_ONGOING)
+  if (!resolvedOrOngoing && bool(raw.endOngoing)) resolvedOrOngoing = "ongoing"
+  const ongoing = resolvedOrOngoing === "ongoing"
   const attribution: Attribution =
     eventType === "family_events"
       ? "self_linked"
@@ -258,13 +273,14 @@ export function sanitizeEvent(value: unknown, fallbackId = ""): EventRecord {
   const event: EventRecord = {
     ...base,
     eventRecordId: str(raw.eventRecordId) || fallbackId,
+    title: str(raw.title),
     description: str(raw.description),
     startPrecision: sanitizePrecision(raw.startPrecision),
     startValue: str(raw.startValue),
-    endPrecision: endOngoing ? "" : sanitizePrecision(raw.endPrecision),
-    endValue: endOngoing ? "" : str(raw.endValue),
-    endOngoing,
-    resolvedOrOngoing: oneOf<ResolvedOrOngoing>(raw.resolvedOrOngoing, RESOLVED_OR_ONGOING),
+    endPrecision: ongoing ? "" : sanitizePrecision(raw.endPrecision),
+    endValue: ongoing ? "" : str(raw.endValue),
+    endOngoing: ongoing,
+    resolvedOrOngoing,
     severityImpact: oneOf<SeverityImpact>(raw.severityImpact, SEVERITY_IMPACT),
     treated,
     treatmentType: treated === true ? str(raw.treatmentType) : "",

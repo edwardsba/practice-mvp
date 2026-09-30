@@ -8,6 +8,7 @@ import { EntityPageHeader } from "@/components/ui/entity-page-header"
 import { clients } from "@/db/schema"
 import { requirePractitionerContext } from "@/lib/auth"
 import { loadClientBackground } from "@/lib/client-background/load"
+import { ensureFamilyOfOrigin } from "@/lib/client-background/mutations"
 import { db } from "@/lib/db"
 
 export default async function ClientBackgroundRoute({
@@ -34,6 +35,12 @@ export default async function ClientBackgroundRoute({
     .limit(1)
 
   if (!client) notFound()
+
+  await ensureFamilyOfOrigin({
+    clientId,
+    practiceId: context.practiceId,
+    userId: context.userId,
+  })
 
   const data = await loadClientBackground(clientId, context.practiceId)
   if (!data) notFound()

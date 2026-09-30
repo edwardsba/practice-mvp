@@ -1,5 +1,6 @@
 import {
   ORIGIN_PARENT_ROLES,
+  PARTNERSHIP_STATUS_LABELS,
   RELATIONSHIP_TO_CLIENT_LABELS,
   type PartnershipRecord,
   type RelationshipRecord,
@@ -49,6 +50,69 @@ function originRank(role: RelationshipToClient): number {
 
 export function personRoleLabel(record: Pick<RelationshipRecord, "relationshipToClient">): string {
   return RELATIONSHIP_TO_CLIENT_LABELS[record.relationshipToClient]
+}
+
+export function relationshipLineLabel(
+  person: Pick<RelationshipRecord, "relationshipToClient" | "givenName" | "age">,
+  status?: string | null
+): string {
+  const parts = [personRoleLabel(person)]
+  const name = person.givenName.trim()
+  if (name) parts.push(name)
+  if (person.age != null) parts.push(String(person.age))
+  const statusText = status?.trim()
+  if (statusText) parts.push(statusText)
+  return parts.join(" – ")
+}
+
+export function parentsRelationshipLabel(partnership: Pick<PartnershipRecord, "relationshipStatus">): string {
+  const status = partnership.relationshipStatus
+    ? PARTNERSHIP_STATUS_LABELS[partnership.relationshipStatus]
+    : ""
+  return status ? `Parents' relationship – ${status}` : "Parents' relationship"
+}
+
+/** Status shown on a tree row. Quality of relationship is never included. */
+export function treeLineStatus(
+  person: RelationshipRecord,
+  partnerships: PartnershipRecord[]
+): string | null {
+  if (person.relationshipToClient === "step_parent") {
+    const partnership = partnerships.find(
+      (item) => item.partnerAId === person.relationshipRecordId || item.partnerBId === person.relationshipRecordId
+    )
+    return partnership?.relationshipStatus ? PARTNERSHIP_STATUS_LABELS[partnership.relationshipStatus] : null
+  }
+  if (person.relationshipToClient === "current_partner" || person.relationshipToClient === "prior_partner") {
+    return person.relationshipStatus.trim() || null
+  }
+  return null
+}
+
+export function canonicalParentsLink(
+  people: RelationshipRecord[],
+  partnerships: PartnershipRecord[]
+): {
+  mother: RelationshipRecord | null
+  father: RelationshipRecord | null
+  partnership: PartnershipRecord | null
+} {
+  const mothers = people
+    .filter((person) => person.relationshipToClient === "mother")
+    .sort(byOrder)
+  const fathers = people
+    .filter((person) => person.relationshipToClient === "father")
+    .sort(byOrder)
+  const mother = mothers[0] ?? null
+  const father = fathers[0] ?? null
+  if (!mother || !father) return { mother, father, partnership: null }
+  const partnership =
+    partnerships.find(
+      (item) =>
+        (item.partnerAId === mother.relationshipRecordId && item.partnerBId === father.relationshipRecordId) ||
+        (item.partnerBId === mother.relationshipRecordId && item.partnerAId === father.relationshipRecordId)
+    ) ?? null
+  return { mother, father, partnership }
 }
 
 export function personName(record: Pick<RelationshipRecord, "givenName" | "relationshipToClient">): string {

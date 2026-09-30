@@ -16,6 +16,7 @@ export function toRelationship(row: {
   givenName: string | null
   displayOrder: number
   age: number | null
+  healthStatus: string | null
   deceased: boolean
   ageAtDeath: number | null
   healthOrCauseOfDeath: string | null
@@ -67,6 +68,7 @@ export function toPartnership(row: {
 export function toEvent(row: {
   eventRecordId: string
   eventType: string
+  title: string | null
   description: string | null
   startPrecision: string | null
   startValue: string | null
@@ -95,6 +97,7 @@ export function toEvent(row: {
   return sanitizeEvent({
     ...row,
     eventType: row.eventType as EventType,
+    title: row.title ?? "",
     description: row.description ?? "",
     startPrecision: row.startPrecision ?? "",
     startValue: row.startValue ?? "",

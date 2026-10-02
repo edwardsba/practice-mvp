@@ -666,7 +666,7 @@ function BirthEditor({
 
   if (approximate) {
     return (
-      <div className="space-y-3">
+      <div className="min-w-0 space-y-3">
         <div className="space-y-1.5">
           <Label htmlFor="rel_approx_age">Approximate age</Label>
           <Input
@@ -706,7 +706,7 @@ function BirthEditor({
   }
 
   return (
-    <div className="space-y-2">
+    <div className="min-w-0 space-y-2">
       <div className="space-y-1.5">
         <Label htmlFor="rel_dob">Date of birth</Label>
         <DateInput

@@ -1,6 +1,7 @@
 "use client"
 
-import type { ComponentProps, ReactNode } from "react"
+import type { ComponentProps, CSSProperties, ReactNode } from "react"
+import { Calendar } from "lucide-react"
 
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -159,19 +160,33 @@ export function YesNoDetail({
   )
 }
 
-export function DateInput({ className, type = "date", ...props }: ComponentProps<typeof Input>) {
+const dateInputStyle: CSSProperties = {
+  WebkitAppearance: "none",
+  appearance: "none",
+  display: "block",
+  width: "100%",
+  maxWidth: "100%",
+  minWidth: 0,
+  boxSizing: "border-box",
+}
+
+export function DateInput({ className, style, type = "date", ...props }: ComponentProps<typeof Input>) {
   return (
-    <div className="grid w-full min-w-0 max-w-full grid-cols-[minmax(0,1fr)] overflow-hidden">
+    <div className="relative w-full min-w-0 max-w-full overflow-hidden">
       <Input
         type={type}
+        style={{ ...dateInputStyle, ...style }}
         className={cn(
           mobileControlClassName,
-          "box-border block w-full max-w-full min-w-0 overflow-hidden [min-inline-size:0]",
-          "[&::-webkit-date-and-time-value]:min-w-0 [&::-webkit-date-and-time-value]:text-left",
-          "[&::-webkit-datetime-edit]:block [&::-webkit-datetime-edit]:min-w-0 [&::-webkit-datetime-edit]:overflow-hidden [&::-webkit-datetime-edit]:p-0",
+          "h-9 pr-8",
+          "[&::-webkit-date-and-time-value]:m-0 [&::-webkit-date-and-time-value]:block [&::-webkit-date-and-time-value]:min-w-0 [&::-webkit-date-and-time-value]:text-left",
           className
         )}
         {...props}
+      />
+      <Calendar
+        aria-hidden
+        className="pointer-events-none absolute top-1/2 right-2.5 size-4 -translate-y-1/2 text-muted-foreground"
       />
     </div>
   )

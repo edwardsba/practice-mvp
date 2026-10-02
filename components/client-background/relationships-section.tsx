@@ -8,7 +8,15 @@ import {
   updatePartnershipAction,
   updateRelationshipAction,
 } from "@/app/clients/[client_id]/background/actions"
-import { ReadOnlyField, SaveRow, SelectField, TextAreaField, TextField } from "@/components/client-background/fields"
+import {
+  DateInput,
+  mobileControlClassName,
+  ReadOnlyField,
+  SaveRow,
+  SelectField,
+  TextAreaField,
+  TextField,
+} from "@/components/client-background/fields"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -19,6 +27,7 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { completedYearsBetween, formatPartialWhen } from "@/lib/client-background/age"
 import {
   DEPENDENCY_LABELS,
   DEPENDENCY_VALUES,
@@ -26,11 +35,15 @@ import {
   HEALTH_STATUS_LABELS,
   PARTNERSHIP_STATUSES,
   PARTNERSHIP_STATUS_LABELS,
+  RELATIONSHIP_LIVING_SITUATIONS,
+  RELATIONSHIP_LIVING_SITUATION_LABELS,
   RELATIONSHIP_TO_CLIENT_LABELS,
+  SEX_OPTIONS,
   type PartnershipRecord,
   type RelationshipRecord,
   type RelationshipToClient,
 } from "@/lib/client-background/types"
+import { todayDateString } from "@/lib/dates/practice-time"
 import type { CreateRelationshipInput } from "@/lib/client-background/types"
 import {
   buildRelationshipTree,
@@ -74,7 +87,7 @@ export function RelationshipsSection({
   const [people, setPeople] = useState(relationships)
   const [pairs, setPairs] = useState(partnerships)
   const [selection, setSelection] = useState<Selection>(null)
-  const [mobileDetail, setMobileDetail] = useState(false)
+  const [mobileScreen, setMobileScreen] = useState<"list" | "detail" | "edit">("list")
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState<RelationshipRecord | null>(null)
   const [draftPairs, setDraftPairs] = useState<PartnershipRecord[]>([])
@@ -101,7 +114,7 @@ export function RelationshipsSection({
 
   function openPerson(person: RelationshipRecord, partnershipList: PartnershipRecord[], startEditing = false) {
     setSelection({ kind: "person", id: person.relationshipRecordId })
-    setMobileDetail(true)
+    setMobileScreen(startEditing ? "edit" : "detail")
     setDraft({ ...person })
     setDraftPairs(personPartnerships(person.relationshipRecordId, partnershipList).map((item) => ({ ...item })))
     setPartnershipDraft(null)
@@ -112,7 +125,7 @@ export function RelationshipsSection({
 
   function openPartnership(partnership: PartnershipRecord, startEditing = false) {
     setSelection({ kind: "partnership", id: partnership.partnershipRecordId })
-    setMobileDetail(true)
+    setMobileScreen(startEditing ? "edit" : "detail")
     setPartnershipDraft({ ...partnership })
     setDraft(null)
     setDraftPairs([])
@@ -161,6 +174,7 @@ export function RelationshipsSection({
       if (partnership) setPartnershipDraft({ ...partnership })
     }
     setEditing(false)
+    setMobileScreen((current) => (current === "edit" ? "detail" : current))
     setError(null)
   }
 
@@ -184,6 +198,7 @@ export function RelationshipsSection({
     setDraft(result.relationship)
     setDraftPairs(personPartnerships(result.relationship.relationshipRecordId, nextPairs).map((item) => ({ ...item })))
     setEditing(false)
+    setMobileScreen("detail")
   }
 
   async function savePartnership() {
@@ -199,6 +214,7 @@ export function RelationshipsSection({
     setPairs((current) => mergePartnerships(current, [result.partnership!]))
     setPartnershipDraft(result.partnership)
     setEditing(false)
+    setMobileScreen("detail")
   }
 
   async function remove() {
@@ -219,7 +235,15 @@ export function RelationshipsSection({
     setDraft(null)
     setDraftPairs([])
     setEditing(false)
-    setMobileDetail(false)
+    setMobileScreen("list")
+  }
+
+  function leaveRecord() {
+    if (editing) {
+      cancelEdit()
+      return
+    }
+    setMobileScreen("list")
   }
 
   function patch(partial: Partial<RelationshipRecord>) {
@@ -228,7 +252,7 @@ export function RelationshipsSection({
   }
 
   const list = (
-    <div className="max-h-[75vh] space-y-4 overflow-y-auto pr-1 text-[13px]">
+    <div className="space-y-4 text-[13px] lg:max-h-[75vh] lg:overflow-y-auto lg:pr-1">
       <Button type="button" size="sm" disabled={pending} onClick={() => setPicker("menu")}>
         + Add family member
       </Button>
@@ -394,11 +418,15 @@ export function RelationshipsSection({
       editing={editing}
       pending={pending}
       error={error}
-      onEdit={() => setEditing(true)}
+      onEdit={() => {
+        setEditing(true)
+        setMobileScreen("edit")
+      }}
       onCancel={cancelEdit}
       onChange={setPartnershipDraft}
       onSave={() => void savePartnership()}
-      onBack={() => setMobileDetail(false)}
+      onBack={leaveRecord}
+      backLabel={editing ? "← Back" : "← Back to list"}
     />
   ) : draft ? (
     <PersonDetail
@@ -409,13 +437,17 @@ export function RelationshipsSection({
       pending={pending}
       error={error}
       canRemove={canRemovePerson(draft, people)}
-      onEdit={() => setEditing(true)}
+      onEdit={() => {
+        setEditing(true)
+        setMobileScreen("edit")
+      }}
       onCancel={cancelEdit}
       onPatch={patch}
       onPairs={setDraftPairs}
       onSave={() => void savePerson()}
       onRemove={() => void remove()}
-      onBack={() => setMobileDetail(false)}
+      onBack={leaveRecord}
+      backLabel={editing ? "← Back" : "← Back to list"}
     />
   ) : (
     <div className="flex min-h-48 items-center justify-center rounded-md border border-dashed p-6 text-center text-[13px] text-muted-foreground">
@@ -426,8 +458,8 @@ export function RelationshipsSection({
   return (
     <>
       <div className="lg:grid lg:grid-cols-2 lg:gap-4">
-        <div className={cn(mobileDetail ? "hidden lg:block" : "block")}>{list}</div>
-        <div className={cn(mobileDetail ? "block" : "hidden lg:block")}>{detail}</div>
+        <div className={mobileScreen === "list" ? "min-w-0" : "hidden min-w-0 lg:block"}>{list}</div>
+        <div className={mobileScreen === "list" ? "hidden min-w-0 lg:block" : "min-w-0"}>{detail}</div>
       </div>
       <PickerDialog
         picker={picker}
@@ -484,17 +516,19 @@ function DetailHeader({
   editing,
   onEdit,
   onBack,
+  backLabel,
 }: {
   title: string
   subtitle: string
   editing: boolean
   onEdit: () => void
   onBack: () => void
+  backLabel: string
 }) {
   return (
     <>
       <Button type="button" variant="ghost" size="sm" className="lg:hidden" onClick={onBack}>
-        ← Back to list
+        {backLabel}
       </Button>
       <div className="flex items-start justify-between gap-3">
         <div>
@@ -521,6 +555,7 @@ function PartnershipDetail({
   onChange,
   onSave,
   onBack,
+  backLabel,
 }: {
   partnership: PartnershipRecord
   editing: boolean
@@ -531,16 +566,18 @@ function PartnershipDetail({
   onChange: (partnership: PartnershipRecord) => void
   onSave: () => void
   onBack: () => void
+  backLabel: string
 }) {
   const status = partnership.relationshipStatus ? PARTNERSHIP_STATUS_LABELS[partnership.relationshipStatus] : ""
   return (
-    <div className="space-y-4 text-[13px] [&_input]:text-[13px] [&_label]:text-[13px] [&_select]:text-[13px] [&_textarea]:text-[13px]">
+    <div className="min-w-0 space-y-4 lg:text-[13px] lg:[&_input]:text-[13px] lg:[&_label]:text-[13px] lg:[&_select]:text-[13px] lg:[&_textarea]:text-[13px]">
       <DetailHeader
         title="Parents' relationship"
         subtitle="Mother and father"
         editing={editing}
         onEdit={onEdit}
         onBack={onBack}
+        backLabel={backLabel}
       />
       {editing ? (
         <>
@@ -618,6 +655,117 @@ function PartnershipFields({
   )
 }
 
+function BirthEditor({
+  record,
+  onPatch,
+}: {
+  record: RelationshipRecord
+  onPatch: (partial: Partial<RelationshipRecord>) => void
+}) {
+  const approximate = !record.dateOfBirth && (record.approximateAge != null || record.approximateAgeRecordedOn !== "")
+
+  if (approximate) {
+    return (
+      <div className="space-y-3">
+        <div className="space-y-1.5">
+          <Label htmlFor="rel_approx_age">Approximate age</Label>
+          <Input
+            id="rel_approx_age"
+            className={mobileControlClassName}
+            type="number"
+            min={0}
+            inputMode="numeric"
+            value={record.approximateAge ?? ""}
+            onChange={(event) =>
+              onPatch({
+                dateOfBirth: "",
+                approximateAge: event.target.value === "" ? null : Number(event.target.value),
+              })
+            }
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="rel_approx_recorded">Date this age was recorded</Label>
+          <DateInput
+            id="rel_approx_recorded"
+            type="date"
+            value={record.approximateAgeRecordedOn}
+            onChange={(event) => onPatch({ dateOfBirth: "", approximateAgeRecordedOn: event.target.value })}
+          />
+        </div>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => onPatch({ dateOfBirth: "", approximateAge: null, approximateAgeRecordedOn: "" })}
+        >
+          Enter a date of birth instead
+        </Button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-2">
+      <div className="space-y-1.5">
+        <Label htmlFor="rel_dob">Date of birth</Label>
+        <DateInput
+          id="rel_dob"
+          type="date"
+          value={record.dateOfBirth}
+          onChange={(event) =>
+            onPatch({
+              dateOfBirth: event.target.value,
+              approximateAge: null,
+              approximateAgeRecordedOn: "",
+            })
+          }
+        />
+      </div>
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        onClick={() =>
+          onPatch({
+            dateOfBirth: "",
+            approximateAge: null,
+            approximateAgeRecordedOn: todayDateString(),
+          })
+        }
+      >
+        Date of birth not known
+      </Button>
+    </div>
+  )
+}
+
+function BirthReadOnly({ record }: { record: RelationshipRecord }) {
+  if (record.dateOfBirth) {
+    const age =
+      record.healthStatus === "deceased" ? null : completedYearsBetween(record.dateOfBirth, todayDateString())
+    return (
+      <>
+        <ReadOnlyField label="Date of birth" value={formatPartialWhen("date", record.dateOfBirth)} />
+        {age != null ? <ReadOnlyField label="Age" value={String(age)} /> : null}
+      </>
+    )
+  }
+  if (record.approximateAge != null || record.approximateAgeRecordedOn) {
+    const recorded = record.approximateAgeRecordedOn
+      ? formatPartialWhen("date", record.approximateAgeRecordedOn)
+      : ""
+    const value =
+      record.approximateAge == null
+        ? ""
+        : recorded
+          ? `${record.approximateAge} (recorded ${recorded})`
+          : String(record.approximateAge)
+    return <ReadOnlyField label="Approximate age" value={value} />
+  }
+  return <ReadOnlyField label="Date of birth" value="" />
+}
+
 function PersonDetail({
   draft,
   draftPairs,
@@ -633,6 +781,7 @@ function PersonDetail({
   onSave,
   onRemove,
   onBack,
+  backLabel,
 }: {
   draft: RelationshipRecord
   draftPairs: PartnershipRecord[]
@@ -648,31 +797,32 @@ function PersonDetail({
   onSave: () => void
   onRemove: () => void
   onBack: () => void
+  backLabel: string
 }) {
+  const visibility = relationshipFieldVisibility(draft)
   return (
-    <div className="space-y-4 text-[13px] [&_input]:text-[13px] [&_label]:text-[13px] [&_select]:text-[13px] [&_textarea]:text-[13px]">
+    <div className="min-w-0 space-y-4 lg:text-[13px] lg:[&_input]:text-[13px] lg:[&_label]:text-[13px] lg:[&_select]:text-[13px] lg:[&_textarea]:text-[13px]">
       <DetailHeader
         title={personName(draft)}
         subtitle={personRoleLabel(draft)}
         editing={editing}
         onEdit={onEdit}
         onBack={onBack}
+        backLabel={backLabel}
       />
       {editing ? (
         <>
           <RoleSelect record={draft} onChange={(relationshipToClient) => onPatch({ relationshipToClient })} />
           <TextField id="rel_name" label="Name" value={draft.givenName} onChange={(givenName) => onPatch({ givenName })} />
-          <TextField id="rel_gender" label="Gender" value={draft.gender} onChange={(gender) => onPatch({ gender })} />
-          <div className="space-y-1.5">
-            <Label htmlFor="rel_age">Age</Label>
-            <Input
-              id="rel_age"
-              type="number"
-              min={0}
-              value={draft.age ?? ""}
-              onChange={(event) => onPatch({ age: event.target.value === "" ? null : Number(event.target.value) })}
-            />
-          </div>
+          <SelectField id="rel_sex" label="Sex" value={draft.sex} onChange={(sex) => onPatch({ sex })}>
+            <option value="">Not recorded</option>
+            {SEX_OPTIONS.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </SelectField>
+          <BirthEditor record={draft} onPatch={onPatch} />
           <SelectField
             id="rel_health"
             label="Health status"
@@ -693,6 +843,7 @@ function PersonDetail({
                 <Label htmlFor="rel_age_death">Age at death</Label>
                 <Input
                   id="rel_age_death"
+                  className={mobileControlClassName}
                   type="number"
                   min={0}
                   value={draft.ageAtDeath ?? ""}
@@ -709,12 +860,14 @@ function PersonDetail({
               />
             </>
           ) : null}
-          <TextField
-            id="rel_length"
-            label="Length of relationship"
-            value={draft.lengthOfRelationship}
-            onChange={(lengthOfRelationship) => onPatch({ lengthOfRelationship })}
-          />
+          {visibility.lengthOfRelationship ? (
+            <TextField
+              id="rel_length"
+              label="Length of relationship"
+              value={draft.lengthOfRelationship}
+              onChange={(lengthOfRelationship) => onPatch({ lengthOfRelationship })}
+            />
+          ) : null}
           <RelationshipExtras record={draft} onChange={onPatch} />
           {draftPairs.map((partnership) => {
             const other = otherPersonInPartnership(partnership, draft.relationshipRecordId, people)
@@ -772,8 +925,8 @@ function PersonReadOnly({
     <div className="space-y-3">
       <ReadOnlyField label="Relationship to client" value={personRoleLabel(record)} />
       <ReadOnlyField label="Name" value={record.givenName} />
-      <ReadOnlyField label="Gender" value={record.gender} />
-      <ReadOnlyField label="Age" value={record.age == null ? "" : String(record.age)} />
+      <ReadOnlyField label="Sex" value={record.sex} />
+      <BirthReadOnly record={record} />
       <ReadOnlyField
         label="Health status"
         value={record.healthStatus ? HEALTH_STATUS_LABELS[record.healthStatus] : ""}
@@ -784,7 +937,9 @@ function PersonReadOnly({
           <ReadOnlyField label="Health or cause of death" value={record.healthOrCauseOfDeath} />
         </>
       ) : null}
-      <ReadOnlyField label="Length of relationship" value={record.lengthOfRelationship} />
+      {visibility.lengthOfRelationship ? (
+        <ReadOnlyField label="Length of relationship" value={record.lengthOfRelationship} />
+      ) : null}
       {visibility.relationshipStatus ? <ReadOnlyField label="Relationship status" value={record.relationshipStatus} /> : null}
       {visibility.timeSinceEnded ? <ReadOnlyField label="Time since ended" value={record.timeSinceEnded} /> : null}
       {visibility.qualityOfRelationship ? (
@@ -795,7 +950,12 @@ function PersonReadOnly({
       ) : isMinorChild(record) ? (
         <p className="text-muted-foreground">Dependency is recorded as they depend on the client for children under 18.</p>
       ) : null}
-      {visibility.livingSituation ? <ReadOnlyField label="Living situation" value={record.livingSituation} /> : null}
+      {visibility.livingSituation ? (
+        <ReadOnlyField
+          label="Living situation"
+          value={record.livingSituation ? RELATIONSHIP_LIVING_SITUATION_LABELS[record.livingSituation] : ""}
+        />
+      ) : null}
       {pairs.map((partnership) => {
         const other = otherPersonInPartnership(partnership, record.relationshipRecordId, people)
         const otherLabel = other ? personName(other) : "the other person"
@@ -897,12 +1057,21 @@ function RelationshipExtras({
         <p className="text-muted-foreground">Dependency is recorded as they depend on the client for children under 18.</p>
       ) : null}
       {visibility.livingSituation ? (
-        <TextField
+        <SelectField
           id="rel_living"
           label="Living situation"
           value={record.livingSituation}
-          onChange={(livingSituation) => onChange({ livingSituation })}
-        />
+          onChange={(livingSituation) =>
+            onChange({ livingSituation: livingSituation as RelationshipRecord["livingSituation"] })
+          }
+        >
+          <option value="">Not recorded</option>
+          {RELATIONSHIP_LIVING_SITUATIONS.map((option) => (
+            <option key={option} value={option}>
+              {RELATIONSHIP_LIVING_SITUATION_LABELS[option]}
+            </option>
+          ))}
+        </SelectField>
       ) : null}
     </>
   )

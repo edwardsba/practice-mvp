@@ -8,13 +8,16 @@ import {
   relationshipLineLabel,
 } from "@/lib/client-background/tree"
 import type { PartnershipRecord, RelationshipRecord } from "@/lib/client-background/types"
+import { isMinorChild, relationshipFieldVisibility } from "@/lib/client-background/visibility"
 
 function person(partial: Partial<RelationshipRecord> & Pick<RelationshipRecord, "relationshipRecordId" | "relationshipToClient">): RelationshipRecord {
   return {
-    gender: "",
+    sex: "",
     givenName: "",
     displayOrder: 0,
-    age: null,
+    dateOfBirth: "",
+    approximateAge: null,
+    approximateAgeRecordedOn: "",
     healthStatus: "",
     deceased: false,
     ageAtDeath: null,
@@ -104,10 +107,58 @@ const link = canonicalParentsLink(
 )
 assert.equal(link.partnership?.partnershipRecordId, "parents")
 assert.equal(parentsRelationshipLabel(link.partnership!), "Parents' relationship – Married")
-assert.equal(relationshipLineLabel(mother), "Mother – Jane")
-assert.equal(relationshipLineLabel({ ...mother, age: 62 }), "Mother – Jane – 62")
-assert.equal(relationshipLineLabel(stepParent, "De facto"), "Step-parent – Alex – De facto")
-assert.equal(relationshipLineLabel(fullSibling), "Full sibling – Sam")
+assert.equal(relationshipLineLabel(mother, undefined, "2026-10-02"), "Mother – Jane")
+assert.equal(
+  relationshipLineLabel({ ...mother, dateOfBirth: "1964-01-01" }, undefined, "2026-10-02"),
+  "Mother – Jane – 62"
+)
+assert.equal(
+  relationshipLineLabel(
+    { ...mother, approximateAge: 70, approximateAgeRecordedOn: "2020-06-01" },
+    undefined,
+    "2026-10-02"
+  ),
+  "Mother – Jane – ~76"
+)
+assert.equal(relationshipLineLabel(stepParent, "De facto", "2026-10-02"), "Step-parent – Alex – De facto")
+assert.equal(relationshipLineLabel(fullSibling, undefined, "2026-10-02"), "Full sibling – Sam")
+assert.equal(relationshipFieldVisibility(fullSibling).lengthOfRelationship, false)
+assert.equal(
+  relationshipFieldVisibility(person({ relationshipRecordId: "half-vis", relationshipToClient: "sibling_half" }))
+    .lengthOfRelationship,
+  true
+)
+assert.equal(
+  isMinorChild(
+    person({ relationshipRecordId: "kid", relationshipToClient: "child_biological", dateOfBirth: "2015-01-01" }),
+    "2026-10-02"
+  ),
+  true
+)
+assert.equal(
+  isMinorChild(
+    person({
+      relationshipRecordId: "approx-kid",
+      relationshipToClient: "child_biological",
+      approximateAge: 10,
+      approximateAgeRecordedOn: "2024-01-01",
+    }),
+    "2026-10-02"
+  ),
+  true
+)
+assert.equal(
+  isMinorChild(
+    person({
+      relationshipRecordId: "approx-grown",
+      relationshipToClient: "child_biological",
+      approximateAge: 10,
+      approximateAgeRecordedOn: "2024-01-01",
+    }),
+    "2034-01-01"
+  ),
+  false
+)
 
 const undated = { startPrecision: "" as const, startValue: "", displayOrder: 2 }
 const earlier = { startPrecision: "year" as const, startValue: "1990", displayOrder: 1 }

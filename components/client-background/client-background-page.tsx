@@ -33,7 +33,7 @@ export function ClientBackgroundPage({
   }
 
   return (
-    <div className="space-y-4">
+    <div className="min-w-0 max-w-full space-y-4 max-lg:[&_input]:text-base max-lg:[&_select]:text-base max-lg:[&_textarea]:text-base">
       {SECTIONS.map((item) => (
         <SectionCard
           key={item.id}
@@ -94,7 +94,7 @@ function SectionCard({
           <ChevronDown className={cn("size-4 shrink-0 text-muted-foreground transition-transform", open && "rotate-180")} />
         </button>
       </CardHeader>
-      <CardContent className={cn(!open && "hidden")}>{children}</CardContent>
+      <CardContent className={cn("min-w-0", !open && "hidden")}>{children}</CardContent>
     </Card>
   )
 }

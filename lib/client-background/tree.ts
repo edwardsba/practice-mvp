@@ -1,3 +1,4 @@
+import { estimatedCurrentAge } from "@/lib/client-background/visibility"
 import {
   ORIGIN_PARENT_ROLES,
   PARTNERSHIP_STATUS_LABELS,
@@ -6,6 +7,7 @@ import {
   type RelationshipRecord,
   type RelationshipToClient,
 } from "@/lib/client-background/types"
+import { todayDateString } from "@/lib/dates/practice-time"
 
 export type StepParentNode = {
   person: RelationshipRecord
@@ -52,14 +54,31 @@ export function personRoleLabel(record: Pick<RelationshipRecord, "relationshipTo
   return RELATIONSHIP_TO_CLIENT_LABELS[record.relationshipToClient]
 }
 
+function treeAgeToken(
+  person: Pick<
+    RelationshipRecord,
+    "dateOfBirth" | "approximateAge" | "approximateAgeRecordedOn" | "healthStatus"
+  >,
+  asOf: string
+): string | null {
+  const age = estimatedCurrentAge(person, asOf)
+  if (age == null) return null
+  return person.dateOfBirth ? String(age) : `~${age}`
+}
+
 export function relationshipLineLabel(
-  person: Pick<RelationshipRecord, "relationshipToClient" | "givenName" | "age">,
-  status?: string | null
+  person: Pick<
+    RelationshipRecord,
+    "relationshipToClient" | "givenName" | "dateOfBirth" | "approximateAge" | "approximateAgeRecordedOn" | "healthStatus"
+  >,
+  status?: string | null,
+  asOf = todayDateString()
 ): string {
   const parts = [personRoleLabel(person)]
   const name = person.givenName.trim()
   if (name) parts.push(name)
-  if (person.age != null) parts.push(String(person.age))
+  const age = treeAgeToken(person, asOf)
+  if (age) parts.push(age)
   const statusText = status?.trim()
   if (statusText) parts.push(statusText)
   return parts.join(" – ")

@@ -10,9 +10,11 @@ import {
   RATED_FACTOR_KEYS,
   RATED_VALUES,
   RELATIONSHIP_TO_CLIENT,
+  RELATIONSHIP_LIVING_SITUATIONS,
+  RELATIONSHIP_LIVING_SITUATION_LABELS,
   RESOLVED_OR_ONGOING,
   SELF_HARM_TYPES,
-  SEVERITY_IMPACT,
+  SEX_OPTIONS,
   START_PRECISIONS,
   SUBSTANCE_STATUSES,
   emptyDemographics,
@@ -40,14 +42,15 @@ import {
   type RatedValue,
   type RelationshipRecord,
   type RelationshipToClient,
+  type RelationshipLivingSituation,
   type ResolvedOrOngoing,
   type RiskRatings,
   type SelfHarmType,
-  type SeverityImpact,
   type StartPrecision,
   type SubstanceStatus,
 } from "@/lib/client-background/types"
 import { applyRelationshipVisibilityDefaults } from "@/lib/client-background/visibility"
+import { todayDateString } from "@/lib/dates/practice-time"
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value)
@@ -76,6 +79,34 @@ function intOrNull(value: unknown): number | null {
 function oneOf<T extends string>(value: unknown, options: readonly T[]): T | "" {
   const text = str(value)
   return isOneOf(text, options) ? text : ""
+}
+
+function isoDate(value: unknown): string {
+  const text = str(value)
+  return /^\d{4}-\d{2}-\d{2}$/.test(text) ? text : ""
+}
+
+function ageOrNull(value: unknown): number | null {
+  const age = intOrNull(value)
+  return age != null && age >= 0 && age <= 130 ? age : null
+}
+
+function normalizeSex(value: unknown): string {
+  const text = str(value)
+  const match = SEX_OPTIONS.find((option) => option.toLowerCase() === text.toLowerCase())
+  return match ?? ""
+}
+
+function normalizeLivingSituation(value: unknown): RelationshipLivingSituation | "" {
+  const direct = oneOf<RelationshipLivingSituation>(value, RELATIONSHIP_LIVING_SITUATIONS)
+  if (direct) return direct
+  const text = str(value).toLowerCase()
+  if (!text) return ""
+  return (
+    RELATIONSHIP_LIVING_SITUATIONS.find(
+      (option) => RELATIONSHIP_LIVING_SITUATION_LABELS[option].toLowerCase() === text
+    ) ?? ""
+  )
 }
 
 export function sanitizeIdentity(value: unknown): IdentityFields {
@@ -207,17 +238,34 @@ export function sanitizeRelationship(value: unknown, fallbackId = ""): Relations
   const raw = isRecord(value) ? value : {}
   const role = oneOf<RelationshipToClient>(raw.relationshipToClient, RELATIONSHIP_TO_CLIENT)
   const dependency = oneOf<DependencyValue>(raw.dependency, DEPENDENCY_VALUES)
-  const age = intOrNull(raw.age)
+  const dateOfBirth = isoDate(raw.dateOfBirth)
+  let approximateAge = ageOrNull(raw.approximateAge)
+  let approximateAgeRecordedOn = isoDate(raw.approximateAgeRecordedOn)
+  if (!dateOfBirth && approximateAge == null) {
+    const legacyAge = ageOrNull(raw.age)
+    if (legacyAge != null) {
+      approximateAge = legacyAge
+      approximateAgeRecordedOn = approximateAgeRecordedOn || todayDateString()
+    }
+  }
+  if (dateOfBirth) {
+    approximateAge = null
+    approximateAgeRecordedOn = ""
+  } else if (approximateAge != null && !approximateAgeRecordedOn) {
+    approximateAgeRecordedOn = todayDateString()
+  }
   const explicitHealth = oneOf<HealthStatus>(raw.healthStatus, HEALTH_STATUSES)
   const healthStatus = explicitHealth || (bool(raw.deceased) ? "deceased" : "")
   const deceased = healthStatus === "deceased"
   const record: RelationshipRecord = {
     relationshipRecordId: str(raw.relationshipRecordId) || fallbackId,
     relationshipToClient: role || "parent",
-    gender: str(raw.gender),
+    sex: normalizeSex(raw.sex) || normalizeSex(raw.gender),
     givenName: str(raw.givenName),
     displayOrder: intOrNull(raw.displayOrder) ?? 0,
-    age: age != null && age >= 0 && age <= 130 ? age : null,
+    dateOfBirth,
+    approximateAge,
+    approximateAgeRecordedOn,
     healthStatus,
     deceased,
     ageAtDeath: deceased ? intOrNull(raw.ageAtDeath) : null,
@@ -227,7 +275,7 @@ export function sanitizeRelationship(value: unknown, fallbackId = ""): Relations
     timeSinceEnded: str(raw.timeSinceEnded),
     qualityOfRelationship: str(raw.qualityOfRelationship),
     dependency,
-    livingSituation: str(raw.livingSituation),
+    livingSituation: normalizeLivingSituation(raw.livingSituation),
     linkedPartnerRecordId: str(raw.linkedPartnerRecordId) || null,
     partnershipRecordId: str(raw.partnershipRecordId) || null,
   }
@@ -281,7 +329,6 @@ export function sanitizeEvent(value: unknown, fallbackId = ""): EventRecord {
     endValue: ongoing ? "" : str(raw.endValue),
     endOngoing: ongoing,
     resolvedOrOngoing,
-    severityImpact: oneOf<SeverityImpact>(raw.severityImpact, SEVERITY_IMPACT),
     treated,
     treatmentType: treated === true ? str(raw.treatmentType) : "",
     treatmentDetail: treated === true ? str(raw.treatmentDetail) : "",
@@ -296,9 +343,6 @@ export function sanitizeEvent(value: unknown, fallbackId = ""): EventRecord {
 
   if (eventType === "self_harm") {
     event.selfHarmType = oneOf<SelfHarmType>(raw.selfHarmType, SELF_HARM_TYPES)
-    event.substanceInvolvement = boolOrNull(raw.substanceInvolvement)
-    event.requiredMedicalAttention = boolOrNull(raw.requiredMedicalAttention)
-    event.requiredHospitalisation = boolOrNull(raw.requiredHospitalisation)
   }
 
   if (eventType === "substance_use") {

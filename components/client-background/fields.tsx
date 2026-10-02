@@ -1,6 +1,6 @@
 "use client"
 
-import type { ReactNode } from "react"
+import type { ComponentProps, ReactNode } from "react"
 
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -8,8 +8,11 @@ import { Textarea } from "@/components/ui/textarea"
 import type { StartPrecision } from "@/lib/client-background/types"
 import { cn } from "@/lib/utils"
 
+/** 16px below the lg breakpoint so mobile browsers do not zoom on focus. */
+export const mobileControlClassName = "text-base lg:text-sm"
+
 export const selectClassName =
-  "flex h-9 w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
+  "flex h-9 w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-1 text-base shadow-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 lg:text-sm dark:bg-input/30"
 
 export function Field({
   label,
@@ -48,7 +51,13 @@ export function TextField({
 }) {
   return (
     <Field label={label} htmlFor={id} hint={hint}>
-      <Input id={id} value={value} placeholder={placeholder} onChange={(event) => onChange(event.target.value)} />
+      <Input
+        id={id}
+        className={mobileControlClassName}
+        value={value}
+        placeholder={placeholder}
+        onChange={(event) => onChange(event.target.value)}
+      />
     </Field>
   )
 }
@@ -68,7 +77,13 @@ export function TextAreaField({
 }) {
   return (
     <Field label={label} htmlFor={id}>
-      <Textarea id={id} value={value} placeholder={placeholder} onChange={(event) => onChange(event.target.value)} />
+      <Textarea
+        id={id}
+        className={mobileControlClassName}
+        value={value}
+        placeholder={placeholder}
+        onChange={(event) => onChange(event.target.value)}
+      />
     </Field>
   )
 }
@@ -144,6 +159,24 @@ export function YesNoDetail({
   )
 }
 
+export function DateInput({ className, type = "date", ...props }: ComponentProps<typeof Input>) {
+  return (
+    <div className="grid w-full min-w-0 max-w-full grid-cols-[minmax(0,1fr)] overflow-hidden">
+      <Input
+        type={type}
+        className={cn(
+          mobileControlClassName,
+          "box-border block w-full max-w-full min-w-0 overflow-hidden [min-inline-size:0]",
+          "[&::-webkit-date-and-time-value]:min-w-0 [&::-webkit-date-and-time-value]:text-left",
+          "[&::-webkit-datetime-edit]:block [&::-webkit-datetime-edit]:min-w-0 [&::-webkit-datetime-edit]:overflow-hidden [&::-webkit-datetime-edit]:p-0",
+          className
+        )}
+        {...props}
+      />
+    </div>
+  )
+}
+
 export function PartialDateField({
   id,
   label,
@@ -160,7 +193,7 @@ export function PartialDateField({
   onChange: (precision: StartPrecision | "", value: string) => void
 }) {
   return (
-    <div className="space-y-2">
+    <div className="min-w-0 space-y-2">
       <SelectField
         id={`${id}_precision`}
         label={label}
@@ -176,6 +209,7 @@ export function PartialDateField({
       {precision === "year" ? (
         <Input
           id={id}
+          className={mobileControlClassName}
           inputMode="numeric"
           placeholder="YYYY"
           value={value}
@@ -183,14 +217,15 @@ export function PartialDateField({
         />
       ) : null}
       {precision === "year_month" ? (
-        <Input id={id} type="month" value={value} onChange={(event) => onChange(precision, event.target.value)} />
+        <DateInput id={id} type="month" value={value} onChange={(event) => onChange(precision, event.target.value)} />
       ) : null}
       {precision === "date" ? (
-        <Input id={id} type="date" value={value} onChange={(event) => onChange(precision, event.target.value)} />
+        <DateInput id={id} type="date" value={value} onChange={(event) => onChange(precision, event.target.value)} />
       ) : null}
       {precision === "age" ? (
         <Input
           id={id}
+          className={mobileControlClassName}
           inputMode="numeric"
           placeholder="Age"
           value={value}

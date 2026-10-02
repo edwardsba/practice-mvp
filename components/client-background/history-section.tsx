@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, type ReactNode } from "react"
+import { useState } from "react"
 
 import {
   createEventAction,
@@ -34,8 +34,6 @@ import {
   RESOLVED_OR_ONGOING,
   SELF_HARM_TYPES,
   SELF_HARM_TYPE_LABELS,
-  SEVERITY_IMPACT,
-  SEVERITY_LABELS,
   SUBSTANCE_STATUSES,
   SUBSTANCE_STATUS_LABELS,
   type EventRecord,
@@ -60,6 +58,7 @@ export function HistorySection({
   const [entries, setEntries] = useState(events)
   const [view, setView] = useState<HistoryView>("chronological")
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [mobileScreen, setMobileScreen] = useState<"list" | "detail" | "edit">("list")
   const [draft, setDraft] = useState<EventRecord | null>(null)
   const [editing, setEditing] = useState(false)
   const [pickerOpen, setPickerOpen] = useState(false)
@@ -70,6 +69,7 @@ export function HistorySection({
     setSelectedId(entry.eventRecordId)
     setDraft({ ...entry })
     setEditing(startEditing)
+    setMobileScreen(startEditing ? "edit" : "detail")
     setError(null)
   }
 
@@ -102,12 +102,14 @@ export function HistorySection({
     )
     setDraft(result.event)
     setEditing(false)
+    setMobileScreen("detail")
   }
 
   function cancel() {
     const saved = entries.find((entry) => entry.eventRecordId === draft?.eventRecordId)
     if (saved) setDraft({ ...saved })
     setEditing(false)
+    setMobileScreen((current) => (current === "edit" ? "detail" : current))
     setError(null)
   }
 
@@ -126,6 +128,15 @@ export function HistorySection({
     setSelectedId(null)
     setDraft(null)
     setEditing(false)
+    setMobileScreen("list")
+  }
+
+  function leaveRecord() {
+    if (editing) {
+      cancel()
+      return
+    }
+    setMobileScreen("list")
   }
 
   const chronological = [...entries].sort((a, b) => compareEventsChronologically(a, b, dateOfBirth))
@@ -139,8 +150,13 @@ export function HistorySection({
         error={error}
         dateOfBirth={dateOfBirth}
         relationships={relationships}
-        onEdit={() => setEditing(true)}
+        onEdit={() => {
+          setEditing(true)
+          setMobileScreen("edit")
+        }}
         onCancel={cancel}
+        onBack={leaveRecord}
+        backLabel={editing ? "← Back" : "← Back to list"}
         onChange={setDraft}
         onSave={() => void save()}
         onRemove={() => void remove()}
@@ -149,21 +165,16 @@ export function HistorySection({
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap gap-2">
-        <Button type="button" size="sm" variant={view === "chronological" ? "secondary" : "outline"} onClick={() => setView("chronological")}>
-          Chronological
-        </Button>
-        <Button type="button" size="sm" variant={view === "by_type" ? "secondary" : "outline"} onClick={() => setView("by_type")}>
-          Sort by event type
-        </Button>
+    <div className="min-w-0 space-y-4">
+      <div className={mobileScreen === "list" ? "block" : "hidden lg:block"}>
+        <HistoryViewSwitch view={view} onChange={setView} />
       </div>
-      <div className="grid gap-4 lg:grid-cols-2">
-        <div className="max-h-[75vh] space-y-5 overflow-y-auto pr-1">
+      <div className="lg:grid lg:grid-cols-2 lg:gap-4">
+        <div className={mobileScreen === "list" ? "min-w-0 space-y-5 lg:max-h-[75vh] lg:overflow-y-auto lg:pr-1" : "hidden min-w-0 space-y-5 lg:block lg:max-h-[75vh] lg:overflow-y-auto lg:pr-1"}>
           {error && !draft ? <p className="text-sm text-destructive">{error}</p> : null}
           {view === "chronological" ? (
             <section className="space-y-2">
-              <Button type="button" variant="outline" size="sm" disabled={pending} onClick={() => setPickerOpen(true)}>
+              <Button type="button" size="sm" disabled={pending} onClick={() => setPickerOpen(true)}>
                 + Add entry
               </Button>
               {chronological.length === 0 ? (
@@ -178,7 +189,6 @@ export function HistorySection({
                       dateOfBirth={dateOfBirth}
                       relationships={relationships}
                       onSelect={() => select(entry)}
-                          mobile={entry.eventRecordId === selectedId ? renderPanel() : null}
                     />
                   ))}
                 </ul>
@@ -202,12 +212,11 @@ export function HistorySection({
                           dateOfBirth={dateOfBirth}
                           relationships={relationships}
                           onSelect={() => select(entry)}
-                          mobile={entry.eventRecordId === selectedId ? renderPanel() : null}
                         />
                       ))}
                     </ul>
                   )}
-                  <Button type="button" variant="outline" size="sm" disabled={pending} onClick={() => void add(eventType)}>
+                  <Button type="button" size="sm" disabled={pending} onClick={() => void add(eventType)}>
                     + Add entry
                   </Button>
                 </section>
@@ -215,7 +224,7 @@ export function HistorySection({
             })
           )}
         </div>
-        <div className="hidden lg:block">{renderPanel()}</div>
+        <div className={mobileScreen === "list" ? "hidden min-w-0 lg:block" : "min-w-0"}>{renderPanel()}</div>
       </div>
       <Dialog open={pickerOpen} onOpenChange={setPickerOpen}>
         <DialogContent>
@@ -236,20 +245,43 @@ export function HistorySection({
   )
 }
 
+function HistoryViewSwitch({ view, onChange }: { view: HistoryView; onChange: (view: HistoryView) => void }) {
+  const options: { id: HistoryView; label: string }[] = [
+    { id: "chronological", label: "Chronological" },
+    { id: "by_type", label: "Event type" },
+  ]
+  return (
+    <div className="inline-flex rounded-lg bg-muted p-1" role="group" aria-label="History view">
+      {options.map((option) => (
+        <button
+          key={option.id}
+          type="button"
+          aria-pressed={view === option.id}
+          className={cn(
+            "rounded-md px-3 py-1.5 text-sm font-medium",
+            view === option.id ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"
+          )}
+          onClick={() => onChange(option.id)}
+        >
+          {option.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
 function HistoryRow({
   entry,
   active,
   dateOfBirth,
   relationships,
   onSelect,
-  mobile,
 }: {
   entry: EventRecord
   active: boolean
   dateOfBirth: string | null
   relationships: RelationshipRecord[]
   onSelect: () => void
-  mobile: ReactNode
 }) {
   return (
     <li>
@@ -258,12 +290,11 @@ function HistoryRow({
         className={cn("w-full rounded-md px-2 py-1.5 text-left text-sm hover:bg-muted", active && "bg-muted font-medium")}
         onClick={onSelect}
       >
-        <span className="block truncate">{entry.title.trim() || "Untitled"}</span>
+        <span className="block truncate">{entryListLabel(entry)}</span>
         <span className="block text-xs text-muted-foreground">
           {rowWhen(entry, dateOfBirth)} · {attributionLabel(entry, relationships)}
         </span>
       </button>
-      {mobile ? <div className="mt-2 rounded-md border p-3 lg:hidden">{mobile}</div> : null}
     </li>
   )
 }
@@ -277,6 +308,8 @@ function HistoryPanel({
   relationships,
   onEdit,
   onCancel,
+  onBack,
+  backLabel,
   onChange,
   onSave,
   onRemove,
@@ -289,6 +322,8 @@ function HistoryPanel({
   relationships: RelationshipRecord[]
   onEdit: () => void
   onCancel: () => void
+  onBack: () => void
+  backLabel: string
   onChange: (event: EventRecord) => void
   onSave: () => void
   onRemove: () => void
@@ -302,9 +337,13 @@ function HistoryPanel({
   }
 
   return (
-    <div className="space-y-4 rounded-md border p-4">
+    <div className="min-w-0 space-y-4">
+      <Button type="button" variant="ghost" size="sm" className="lg:hidden" onClick={onBack}>
+        {backLabel}
+      </Button>
+      <div className="min-w-0 space-y-4 rounded-md border p-4">
       <div className="flex items-start justify-between gap-3">
-        <p className="font-medium">{draft.title.trim() || "Untitled"}</p>
+        <p className="font-medium">{entryListLabel(draft)}</p>
         {editing ? null : (
           <Button type="button" variant="outline" size="sm" onClick={onEdit}>
             Edit
@@ -333,8 +372,13 @@ function HistoryPanel({
       ) : (
         <EventReadOnly draft={draft} dateOfBirth={dateOfBirth} relationships={relationships} />
       )}
+      </div>
     </div>
   )
+}
+
+function entryListLabel(entry: Pick<EventRecord, "title" | "eventType">) {
+  return entry.title.trim() || EVENT_TYPE_LABELS[entry.eventType]
 }
 
 function rowWhen(entry: EventRecord, dateOfBirth: string | null) {
@@ -381,9 +425,20 @@ function EventReadOnly({
 
   return (
     <div className="space-y-3">
+      {draft.eventType === "family_events" ? (
+        <ReadOnlyField label="Linked person" value={linked ? personName(linked) : ""} />
+      ) : (
+        <ReadOnlyField label="Attribution" value={attributionLabel(draft, relationships)} />
+      )}
+      <ReadOnlyField label="Event type" value={EVENT_TYPE_LABELS[draft.eventType]} />
+      {draft.eventType === "self_harm" ? (
+        <ReadOnlyField
+          label="Type of self-harm behaviour"
+          value={draft.selfHarmType ? SELF_HARM_TYPE_LABELS[draft.selfHarmType] : ""}
+        />
+      ) : null}
       <ReadOnlyField label="Title" value={draft.title} />
       <ReadOnlyField label="Description" value={draft.description} />
-      <ReadOnlyField label="Event type" value={EVENT_TYPE_LABELS[draft.eventType]} />
       <ReadOnlyField label="Start" value={formatPartialWhen(draft.startPrecision, draft.startValue)} />
       <ReadOnlyField
         label="End"
@@ -391,11 +446,6 @@ function EventReadOnly({
       />
       {age != null ? <ReadOnlyField label="Client's age at the time" value={String(age)} /> : null}
       {stage ? <ReadOnlyField label="Category" value={stage === "childhood" ? "Childhood" : "Adulthood"} /> : null}
-      <ReadOnlyField
-        label="Resolved / Ongoing"
-        value={draft.resolvedOrOngoing === "ongoing" ? "Ongoing" : draft.resolvedOrOngoing === "resolved" ? "Resolved" : ""}
-      />
-      <ReadOnlyField label="Severity / Impact" value={draft.severityImpact ? SEVERITY_LABELS[draft.severityImpact] : ""} />
       <ReadOnlyField label="Treated" value={yesNoLabel(draft.treated)} />
       {draft.treated === true ? (
         <>
@@ -404,19 +454,10 @@ function EventReadOnly({
           <ReadOnlyField label="Outcome" value={draft.outcome} />
         </>
       ) : null}
-      {draft.eventType === "family_events" ? (
-        <ReadOnlyField label="Linked person" value={linked ? personName(linked) : ""} />
-      ) : (
-        <ReadOnlyField label="Attribution" value={attributionLabel(draft, relationships)} />
-      )}
-      {draft.eventType === "self_harm" ? (
-        <>
-          <ReadOnlyField label="Type of self-harm behaviour" value={draft.selfHarmType ? SELF_HARM_TYPE_LABELS[draft.selfHarmType] : ""} />
-          <ReadOnlyField label="Substance involvement at the time" value={yesNoLabel(draft.substanceInvolvement)} />
-          <ReadOnlyField label="Required medical attention" value={yesNoLabel(draft.requiredMedicalAttention)} />
-          <ReadOnlyField label="Required hospitalisation" value={yesNoLabel(draft.requiredHospitalisation)} />
-        </>
-      ) : null}
+      <ReadOnlyField
+        label="Resolved / Ongoing"
+        value={draft.resolvedOrOngoing === "ongoing" ? "Ongoing" : draft.resolvedOrOngoing === "resolved" ? "Resolved" : ""}
+      />
       {draft.eventType === "substance_use" ? (
         <>
           <ReadOnlyField label="Status" value={draft.substanceStatus ? SUBSTANCE_STATUS_LABELS[draft.substanceStatus] : ""} />
@@ -464,9 +505,6 @@ function EventEditor({
     if (next.attribution !== "self_linked") next.relationshipRecordId = null
     if (next.eventType !== "self_harm") {
       next.selfHarmType = ""
-      next.substanceInvolvement = null
-      next.requiredMedicalAttention = null
-      next.requiredHospitalisation = null
     }
     if (next.eventType === "substance_use") {
       if (next.startPrecision === "age") {
@@ -498,117 +536,7 @@ function EventEditor({
   }
 
   return (
-    <div className="space-y-4">
-      <TextField
-        id={`${draft.eventRecordId}_title`}
-        label="Title"
-        value={draft.title}
-        onChange={(title) => patch({ title })}
-      />
-      <TextAreaField
-        id={`${draft.eventRecordId}_description`}
-        label="Description"
-        value={draft.description}
-        onChange={(description) => patch({ description })}
-      />
-      <SelectField
-        id={`${draft.eventRecordId}_type`}
-        label="Event type"
-        value={draft.eventType}
-        onChange={(eventType) => patch({ eventType: eventType as EventType })}
-      >
-        {EVENT_TYPES.map((eventType) => (
-          <option key={eventType} value={eventType}>
-            {EVENT_TYPE_LABELS[eventType]}
-          </option>
-        ))}
-      </SelectField>
-      <PartialDateField
-        id={`${draft.eventRecordId}_start`}
-        label="Start"
-        precision={draft.startPrecision}
-        value={draft.startValue}
-        allowAge={draft.eventType !== "substance_use"}
-        onChange={(startPrecision, startValue) => patch({ startPrecision, startValue })}
-      />
-      {draft.resolvedOrOngoing === "ongoing" ? (
-        <p className="text-xs text-muted-foreground">End date stays blank while this is ongoing.</p>
-      ) : (
-        <PartialDateField
-          id={`${draft.eventRecordId}_end`}
-          label="End"
-          precision={draft.endPrecision}
-          value={draft.endValue}
-          allowAge={draft.eventType !== "substance_use"}
-          onChange={(endPrecision, endValue) => patch({ endPrecision, endValue })}
-        />
-      )}
-      {age != null ? (
-        <div className="space-y-1 text-sm text-muted-foreground">
-          <p>Client&apos;s age at the time: {age}</p>
-          {stage ? <p>Category: {stage === "childhood" ? "Childhood" : "Adulthood"}</p> : null}
-        </div>
-      ) : null}
-      <SelectField
-        id={`${draft.eventRecordId}_resolved`}
-        label="Resolved / Ongoing"
-        value={draft.resolvedOrOngoing}
-        onChange={(resolvedOrOngoing) =>
-          patch({ resolvedOrOngoing: resolvedOrOngoing as EventRecord["resolvedOrOngoing"] })
-        }
-      >
-        <option value="">Not recorded</option>
-        {RESOLVED_OR_ONGOING.map((option) => (
-          <option key={option} value={option}>
-            {option === "ongoing" ? "Ongoing" : "Resolved"}
-          </option>
-        ))}
-      </SelectField>
-      <SelectField
-        id={`${draft.eventRecordId}_severity`}
-        label="Severity / Impact"
-        value={draft.severityImpact}
-        onChange={(severityImpact) => patch({ severityImpact: severityImpact as EventRecord["severityImpact"] })}
-      >
-        <option value="">Not recorded</option>
-        {SEVERITY_IMPACT.map((option) => (
-          <option key={option} value={option}>
-            {SEVERITY_LABELS[option]}
-          </option>
-        ))}
-      </SelectField>
-      <SelectField
-        id={`${draft.eventRecordId}_treated`}
-        label="Treated"
-        value={draft.treated === true ? "yes" : draft.treated === false ? "no" : ""}
-        onChange={(next) => patch({ treated: next === "yes" ? true : next === "no" ? false : null })}
-      >
-        <option value="">Not recorded</option>
-        <option value="yes">Yes</option>
-        <option value="no">No</option>
-      </SelectField>
-      {draft.treated === true ? (
-        <>
-          <TextField
-            id={`${draft.eventRecordId}_tx_type`}
-            label="Treatment type"
-            value={draft.treatmentType}
-            onChange={(treatmentType) => patch({ treatmentType })}
-          />
-          <TextAreaField
-            id={`${draft.eventRecordId}_tx_detail`}
-            label="Treatment detail"
-            value={draft.treatmentDetail}
-            onChange={(treatmentDetail) => patch({ treatmentDetail })}
-          />
-          <TextAreaField
-            id={`${draft.eventRecordId}_outcome`}
-            label="Outcome"
-            value={draft.outcome}
-            onChange={(outcome) => patch({ outcome })}
-          />
-        </>
-      ) : null}
+    <div className="min-w-0 space-y-4">
       {familyEvent ? (
         <SelectField
           id={`${draft.eventRecordId}_person`}
@@ -675,41 +603,119 @@ function EventEditor({
           ) : null}
         </>
       )}
+      <SelectField
+        id={`${draft.eventRecordId}_type`}
+        label="Event type"
+        value={draft.eventType}
+        onChange={(eventType) => patch({ eventType: eventType as EventType })}
+      >
+        {EVENT_TYPES.map((eventType) => (
+          <option key={eventType} value={eventType}>
+            {EVENT_TYPE_LABELS[eventType]}
+          </option>
+        ))}
+      </SelectField>
       {draft.eventType === "self_harm" ? (
+        <SelectField
+          id={`${draft.eventRecordId}_self_harm_type`}
+          label="Type of self-harm behaviour"
+          value={draft.selfHarmType}
+          onChange={(selfHarmType) => patch({ selfHarmType: selfHarmType as EventRecord["selfHarmType"] })}
+        >
+          <option value="">Not recorded</option>
+          {SELF_HARM_TYPES.map((option) => (
+            <option key={option} value={option}>
+              {SELF_HARM_TYPE_LABELS[option]}
+            </option>
+          ))}
+        </SelectField>
+      ) : null}
+      <TextField
+        id={`${draft.eventRecordId}_title`}
+        label="Title"
+        value={draft.title}
+        onChange={(title) => patch({ title })}
+        placeholder="Optional"
+      />
+      <TextAreaField
+        id={`${draft.eventRecordId}_description`}
+        label="Description"
+        value={draft.description}
+        onChange={(description) => patch({ description })}
+      />
+      <PartialDateField
+        id={`${draft.eventRecordId}_start`}
+        label="Start"
+        precision={draft.startPrecision}
+        value={draft.startValue}
+        allowAge={draft.eventType !== "substance_use"}
+        onChange={(startPrecision, startValue) => patch({ startPrecision, startValue })}
+      />
+      {draft.resolvedOrOngoing === "ongoing" ? (
+        <p className="text-xs text-muted-foreground">End date stays blank while this is ongoing.</p>
+      ) : (
+        <PartialDateField
+          id={`${draft.eventRecordId}_end`}
+          label="End"
+          precision={draft.endPrecision}
+          value={draft.endValue}
+          allowAge={draft.eventType !== "substance_use"}
+          onChange={(endPrecision, endValue) => patch({ endPrecision, endValue })}
+        />
+      )}
+      {age != null ? (
+        <div className="space-y-1 text-sm text-muted-foreground">
+          <p>Client&apos;s age at the time: {age}</p>
+          {stage ? <p>Category: {stage === "childhood" ? "Childhood" : "Adulthood"}</p> : null}
+        </div>
+      ) : null}
+      <SelectField
+        id={`${draft.eventRecordId}_treated`}
+        label="Treated"
+        value={draft.treated === true ? "yes" : draft.treated === false ? "no" : ""}
+        onChange={(next) => patch({ treated: next === "yes" ? true : next === "no" ? false : null })}
+      >
+        <option value="">Not recorded</option>
+        <option value="yes">Yes</option>
+        <option value="no">No</option>
+      </SelectField>
+      {draft.treated === true ? (
         <>
-          <SelectField
-            id={`${draft.eventRecordId}_self_harm_type`}
-            label="Type of self-harm behaviour"
-            value={draft.selfHarmType}
-            onChange={(selfHarmType) => patch({ selfHarmType: selfHarmType as EventRecord["selfHarmType"] })}
-          >
-            <option value="">Not recorded</option>
-            {SELF_HARM_TYPES.map((option) => (
-              <option key={option} value={option}>
-                {SELF_HARM_TYPE_LABELS[option]}
-              </option>
-            ))}
-          </SelectField>
-          <YesNo
-            id={`${draft.eventRecordId}_substance`}
-            label="Substance involvement at the time"
-            value={draft.substanceInvolvement}
-            onChange={(substanceInvolvement) => patch({ substanceInvolvement })}
+          <TextField
+            id={`${draft.eventRecordId}_tx_type`}
+            label="Treatment type"
+            value={draft.treatmentType}
+            onChange={(treatmentType) => patch({ treatmentType })}
           />
-          <YesNo
-            id={`${draft.eventRecordId}_medical`}
-            label="Required medical attention"
-            value={draft.requiredMedicalAttention}
-            onChange={(requiredMedicalAttention) => patch({ requiredMedicalAttention })}
+          <TextAreaField
+            id={`${draft.eventRecordId}_tx_detail`}
+            label="Treatment detail"
+            value={draft.treatmentDetail}
+            onChange={(treatmentDetail) => patch({ treatmentDetail })}
           />
-          <YesNo
-            id={`${draft.eventRecordId}_hospital`}
-            label="Required hospitalisation"
-            value={draft.requiredHospitalisation}
-            onChange={(requiredHospitalisation) => patch({ requiredHospitalisation })}
+          <TextAreaField
+            id={`${draft.eventRecordId}_outcome`}
+            label="Outcome"
+            value={draft.outcome}
+            onChange={(outcome) => patch({ outcome })}
           />
         </>
       ) : null}
+      <SelectField
+        id={`${draft.eventRecordId}_resolved`}
+        label="Resolved / Ongoing"
+        value={draft.resolvedOrOngoing}
+        onChange={(resolvedOrOngoing) =>
+          patch({ resolvedOrOngoing: resolvedOrOngoing as EventRecord["resolvedOrOngoing"] })
+        }
+      >
+        <option value="">Not recorded</option>
+        {RESOLVED_OR_ONGOING.map((option) => (
+          <option key={option} value={option}>
+            {option === "ongoing" ? "Ongoing" : "Resolved"}
+          </option>
+        ))}
+      </SelectField>
       {draft.eventType === "substance_use" ? (
         <>
           <SelectField
@@ -742,27 +748,3 @@ function EventEditor({
   )
 }
 
-function YesNo({
-  id,
-  label,
-  value,
-  onChange,
-}: {
-  id: string
-  label: string
-  value: boolean | null
-  onChange: (value: boolean | null) => void
-}) {
-  return (
-    <SelectField
-      id={id}
-      label={label}
-      value={value === true ? "yes" : value === false ? "no" : ""}
-      onChange={(next) => onChange(next === "yes" ? true : next === "no" ? false : null)}
-    >
-      <option value="">Not recorded</option>
-      <option value="yes">Yes</option>
-      <option value="no">No</option>
-    </SelectField>
-  )
-}

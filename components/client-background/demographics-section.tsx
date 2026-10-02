@@ -97,7 +97,7 @@ export function DemographicsSection({
       </div>
       {editing ? (
         <form
-          className="max-w-xl space-y-6"
+          className="max-w-xl min-w-0 space-y-6"
           onSubmit={(event) => {
             event.preventDefault()
             void save()

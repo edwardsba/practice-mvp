@@ -70,6 +70,14 @@ export function clientAgeAtStart(
   return null
 }
 
+/** Completed years from one calendar date to another. Both values are yyyy-MM-dd. */
+export function completedYearsBetween(fromDate: string, toDate: string): number | null {
+  const from = parseDob(fromDate)
+  const to = parseDob(toDate)
+  if (!from || !to) return null
+  return completedYears(from, to)
+}
+
 export function lifeStageAtStart(
   dateOfBirth: string | null | undefined,
   precision: StartPrecision | "",

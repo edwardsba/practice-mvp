@@ -12,10 +12,12 @@ import { sanitizeEvent, sanitizePartnership, sanitizeRelationship } from "@/lib/
 export function toRelationship(row: {
   relationshipRecordId: string
   relationshipToClient: string
-  gender: string | null
+  sex: string | null
   givenName: string | null
   displayOrder: number
-  age: number | null
+  dateOfBirth: string | null
+  approximateAge: number | null
+  approximateAgeRecordedOn: string | null
   healthStatus: string | null
   deceased: boolean
   ageAtDeath: number | null
@@ -35,8 +37,11 @@ export function toRelationship(row: {
   return sanitizeRelationship({
     ...row,
     relationshipToClient: role,
-    gender: row.gender ?? "",
+    sex: row.sex ?? "",
     givenName: row.givenName ?? "",
+    dateOfBirth: row.dateOfBirth ?? "",
+    approximateAge: row.approximateAge,
+    approximateAgeRecordedOn: row.approximateAgeRecordedOn ?? "",
     healthOrCauseOfDeath: row.healthOrCauseOfDeath ?? "",
     lengthOfRelationship: row.lengthOfRelationship ?? "",
     relationshipStatus: row.relationshipStatus ?? "",
@@ -76,7 +81,6 @@ export function toEvent(row: {
   endValue: string | null
   endOngoing: boolean
   resolvedOrOngoing: string | null
-  severityImpact: string | null
   treated: boolean | null
   treatmentType: string | null
   treatmentDetail: string | null
@@ -86,9 +90,6 @@ export function toEvent(row: {
   familySide: string | null
   relationshipRecordId: string | null
   selfHarmType: string | null
-  substanceInvolvement: boolean | null
-  requiredMedicalAttention: boolean | null
-  requiredHospitalisation: boolean | null
   substanceStatus: string | null
   abstinentSincePrecision: string | null
   abstinentSinceValue: string | null
@@ -104,7 +105,6 @@ export function toEvent(row: {
     endPrecision: row.endPrecision ?? "",
     endValue: row.endValue ?? "",
     resolvedOrOngoing: row.resolvedOrOngoing ?? "",
-    severityImpact: row.severityImpact ?? "",
     treatmentType: row.treatmentType ?? "",
     treatmentDetail: row.treatmentDetail ?? "",
     outcome: row.outcome ?? "",

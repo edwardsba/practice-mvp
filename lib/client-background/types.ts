@@ -53,9 +53,6 @@ export type StartPrecision = (typeof START_PRECISIONS)[number]
 export const RESOLVED_OR_ONGOING = ["ongoing", "resolved"] as const
 export type ResolvedOrOngoing = (typeof RESOLVED_OR_ONGOING)[number]
 
-export const SEVERITY_IMPACT = ["mild", "moderate", "severe"] as const
-export type SeverityImpact = (typeof SEVERITY_IMPACT)[number]
-
 export const ATTRIBUTIONS = ["self", "family", "self_linked"] as const
 export type Attribution = (typeof ATTRIBUTIONS)[number]
 
@@ -135,12 +132,6 @@ export const EVENT_TYPE_LABELS: Record<EventType, string> = {
   abuse: "Abuse",
 }
 
-export const SEVERITY_LABELS: Record<SeverityImpact, string> = {
-  mild: "Mild",
-  moderate: "Moderate",
-  severe: "Severe",
-}
-
 export const SELF_HARM_TYPE_LABELS: Record<SelfHarmType, string> = {
   non_lethal: "Non-lethal self-harm",
   potentially_lethal: "Potentially lethal (suicidal) self-harm behaviour",
@@ -165,7 +156,25 @@ export const RATED_VALUE_LABELS: Record<RatedValue, string> = {
   yes: "Yes",
 }
 
-export const SEX_OPTIONS = ["Female", "Male", "Another term", "Prefer not to say"]
+export const SEX_OPTIONS = ["Female", "Male", "Another term", "Prefer not to say"] as const
+export type SexOption = (typeof SEX_OPTIONS)[number]
+
+export const RELATIONSHIP_LIVING_SITUATIONS = [
+  "lives_with_client_full_time",
+  "lives_with_client_part_time",
+  "does_not_live_with_client",
+  "previously_lived_with_client",
+  "unknown",
+] as const
+export type RelationshipLivingSituation = (typeof RELATIONSHIP_LIVING_SITUATIONS)[number]
+
+export const RELATIONSHIP_LIVING_SITUATION_LABELS: Record<RelationshipLivingSituation, string> = {
+  lives_with_client_full_time: "Lives with client (full-time)",
+  lives_with_client_part_time: "Lives with client (part-time or shared arrangement)",
+  does_not_live_with_client: "Does not live with client",
+  previously_lived_with_client: "Previously lived with client, not currently",
+  unknown: "Unknown / not recorded",
+}
 export const PRONOUN_OPTIONS = ["she/her", "he/him", "they/them", "Other"]
 export const EDUCATION_LEVEL_OPTIONS = [
   "Did not complete secondary",
@@ -301,10 +310,14 @@ export type Demographics = {
 export type RelationshipRecord = {
   relationshipRecordId: string
   relationshipToClient: RelationshipToClient
-  gender: string
+  sex: string
   givenName: string
   displayOrder: number
-  age: number | null
+  /** Preferred. Empty when only an approximate age is known. */
+  dateOfBirth: string
+  /** Fallback when date of birth is unknown. True on approximateAgeRecordedOn, not today. */
+  approximateAge: number | null
+  approximateAgeRecordedOn: string
   healthStatus: HealthStatus | ""
   deceased: boolean
   ageAtDeath: number | null
@@ -314,7 +327,7 @@ export type RelationshipRecord = {
   timeSinceEnded: string
   qualityOfRelationship: string
   dependency: DependencyValue | ""
-  livingSituation: string
+  livingSituation: RelationshipLivingSituation | ""
   linkedPartnerRecordId: string | null
   partnershipRecordId: string | null
 }
@@ -340,7 +353,6 @@ export type EventRecord = {
   endValue: string
   endOngoing: boolean
   resolvedOrOngoing: ResolvedOrOngoing | ""
-  severityImpact: SeverityImpact | ""
   treated: boolean | null
   treatmentType: string
   treatmentDetail: string
@@ -350,9 +362,6 @@ export type EventRecord = {
   familySide: FamilySide | ""
   relationshipRecordId: string | null
   selfHarmType: SelfHarmType | ""
-  substanceInvolvement: boolean | null
-  requiredMedicalAttention: boolean | null
-  requiredHospitalisation: boolean | null
   substanceStatus: SubstanceStatus | ""
   abstinentSincePrecision: StartPrecision | ""
   abstinentSinceValue: string
@@ -460,7 +469,6 @@ export function emptyEvent(eventType: EventType, displayOrder: number): Omit<Eve
     endValue: "",
     endOngoing: false,
     resolvedOrOngoing: "",
-    severityImpact: "",
     treated: null,
     treatmentType: "",
     treatmentDetail: "",
@@ -470,9 +478,6 @@ export function emptyEvent(eventType: EventType, displayOrder: number): Omit<Eve
     familySide: "",
     relationshipRecordId: null,
     selfHarmType: "",
-    substanceInvolvement: null,
-    requiredMedicalAttention: null,
-    requiredHospitalisation: null,
     substanceStatus: "",
     abstinentSincePrecision: "",
     abstinentSinceValue: "",

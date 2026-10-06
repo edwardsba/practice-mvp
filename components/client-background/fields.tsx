@@ -255,7 +255,7 @@ export function PartialDatePicker({
 
   const through = asOfParts.year ?? new Date().getFullYear()
   const years = yearChoices(parsed.year, through)
-  const resolvedAgeLabel = ageLabel ?? (mode === "person" ? "Age" : "Client's age at the time")
+  const resolvedAgeLabel = ageLabel ?? (mode === "person" ? "Age" : "Client age at the time")
   const ageHint = ageInvalid
     ? "Enter an age between 0 and 130"
     : ageDisabled
@@ -268,28 +268,26 @@ export function PartialDatePicker({
           ? agePrecisionNote(reading)
           : undefined
 
-  return (
-    <div className="my-8 min-w-0">
-      <fieldset className="m-0 min-w-0 border-0 p-0">
-        <legend className="text-sm font-semibold text-foreground">{dateLabel}</legend>
-        <div className="mt-2 flex flex-col gap-2">
-          {mode === "date-only" ? null : (
-            <>
-              <Label htmlFor={`${id}-age`}>{resolvedAgeLabel}</Label>
-              <Input
-                id={`${id}-age`}
-                className={mobileControlClassName}
-                inputMode="numeric"
-                autoComplete="off"
-                disabled={ageDisabled}
-                value={ageShown}
-                onFocus={(event) => event.currentTarget.select()}
-                onChange={(event) => onAgeInput(event.target.value)}
-              />
-              {ageHint ? <p className="text-xs text-muted-foreground">{ageHint}</p> : null}
-            </>
-          )}
-          <div className="flex min-w-0 gap-2">
+  const ageField =
+    mode === "date-only" ? null : (
+      <Field label={resolvedAgeLabel} htmlFor={`${id}-age`} hint={ageHint || undefined}>
+        <Input
+          id={`${id}-age`}
+          className={mobileControlClassName}
+          inputMode="numeric"
+          autoComplete="off"
+          disabled={ageDisabled}
+          value={ageShown}
+          onFocus={(event) => event.currentTarget.select()}
+          onChange={(event) => onAgeInput(event.target.value)}
+        />
+      </Field>
+    )
+
+  const dateField = (
+    <fieldset className="mx-0 w-full min-w-0 border-0 p-0">
+      <legend className="mb-1.5 block w-full p-0 text-sm leading-none font-medium">{dateLabel}</legend>
+      <div className="flex min-w-0 gap-2">
           <select
             id={`${id}-year`}
             aria-label={`${dateLabel} year`}
@@ -367,10 +365,16 @@ export function PartialDatePicker({
               </option>
             ))}
           </select>
-          </div>
-        </div>
-      </fieldset>
-    </div>
+      </div>
+    </fieldset>
+  )
+
+  return (
+    <>
+      {mode === "person" ? ageField : null}
+      {dateField}
+      {mode === "client-at-event" ? ageField : null}
+    </>
   )
 }
 

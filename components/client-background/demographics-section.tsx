@@ -430,10 +430,10 @@ function OccupationFieldsEditor({
         onChange={(currentlyEmployed) => onChange({ ...value, currentlyEmployed })}
         onDetail={(currentlyEmployedDetail) => onChange({ ...value, currentlyEmployedDetail })}
       />
-      <div className="space-y-3">
+      <div className="space-y-4">
         <p className="text-sm font-medium">Previous jobs</p>
         {value.previousJobs.map((job, index) => (
-          <div key={job.id} className="space-y-4 rounded-md border p-3">
+          <div key={job.id} className="space-y-4 rounded-md border p-4">
             <TextField id={`job_role_${job.id}`} label="Role" value={job.role} onChange={(role) => updateJob(job.id, { role })} />
             <TextField
               id={`job_employer_${job.id}`}

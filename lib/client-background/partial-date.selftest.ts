@@ -41,12 +41,9 @@ assert.deepEqual(assessAge(parsePartialDate("1986-10"), parsePartialDate(asOf), 
   high: 40,
 })
 assert.equal(displayedAge(assessAge(parsePartialDate("1996"), parsePartialDate(asOf), "person")), "~30")
-assert.equal(agePrecisionNote(assessAge(parsePartialDate("1964-01-01"), parsePartialDate(asOf), "person")), "Exact")
+assert.equal(agePrecisionNote(assessAge(parsePartialDate("1964-01-01"), parsePartialDate(asOf), "person")), "")
 assert.equal(agePrecisionNote(assessAge(parsePartialDate("1996"), parsePartialDate(asOf), "person")), "Approximate")
-assert.equal(
-  agePrecisionNote(assessAge(parsePartialDate("1986-10"), parsePartialDate(asOf), "person")),
-  "could be 39 or 40"
-)
+assert.equal(agePrecisionNote(assessAge(parsePartialDate("1986-10"), parsePartialDate(asOf), "person")), "Approximate")
 
 const birth = "2000-06-15"
 assert.equal(yearFromTypedAge(18, { kind: "since-birth", birthDate: birth }), "2018")

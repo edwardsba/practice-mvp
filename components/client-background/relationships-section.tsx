@@ -595,7 +595,7 @@ function PartnershipDetail({
           />
         </>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-4">
           <ReadOnlyField label="Relationship status" value={status} />
           <ReadOnlyField label="Start" value={formatPartialDateLabel(partnership.started)} />
           <ReadOnlyField label="End" value={formatPartialDateLabel(partnership.ended)} />
@@ -616,7 +616,7 @@ function PartnershipFields({
   onChange: (partnership: PartnershipRecord) => void
 }) {
   return (
-    <div className="space-y-3 rounded-md border p-3">
+    <div className="space-y-4 rounded-md border p-4">
       <p className="font-medium">Relationship — with {otherLabel}</p>
       <SelectField
         id={`partnership_status_${partnership.partnershipRecordId}`}
@@ -844,7 +844,7 @@ function PersonReadOnly({
 }) {
   const visibility = relationshipFieldVisibility(record)
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       <ReadOnlyField label="Relationship to client" value={personRoleLabel(record)} />
       <ReadOnlyField label="Name" value={record.givenName} />
       <ReadOnlyField label="Sex" value={record.sex} />
@@ -883,7 +883,7 @@ function PersonReadOnly({
         const otherLabel = other ? personName(other) : "the other person"
         const status = partnership.relationshipStatus ? PARTNERSHIP_STATUS_LABELS[partnership.relationshipStatus] : ""
         return (
-          <div key={partnership.partnershipRecordId} className="space-y-3 rounded-md border p-3">
+          <div key={partnership.partnershipRecordId} className="space-y-4 rounded-md border p-4">
             <p className="font-medium">Relationship — with {otherLabel}</p>
             <ReadOnlyField label="Relationship status" value={status} />
             <ReadOnlyField label="Start" value={formatPartialDateLabel(partnership.started)} />

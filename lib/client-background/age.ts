@@ -136,11 +136,9 @@ export function displayedAge(reading: AgeReading): string {
   return ""
 }
 
-/** Short line under the age input. */
+/** Short line under the age input. A full date has no line. */
 export function agePrecisionNote(reading: AgeReading): string {
-  if (reading.kind === "exact") return "Exact"
-  if (reading.kind === "approximate") return "Approximate"
-  if (reading.kind === "ambiguous" || reading.kind === "before_birth") return displayedAge(reading)
+  if (reading.kind === "approximate" || reading.kind === "ambiguous") return "Approximate"
   return ""
 }
 

@@ -445,7 +445,7 @@ function EventReadOnly({
   const linked = relationships.find((person) => person.relationshipRecordId === draft.relationshipRecordId)
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       {draft.eventType === "family_events" ? (
         <ReadOnlyField label="Linked person" value={linked ? personName(linked) : ""} />
       ) : (
@@ -461,13 +461,13 @@ function EventReadOnly({
       <ReadOnlyField label="Title" value={draft.title} />
       <ReadOnlyField label="Description" value={draft.description} />
       <ReadOnlyField label="Start" value={formatPartialWhen(draft.startPrecision, draft.startValue)} />
-      <ReadOnlyField label="Client's age at start" value={ageText(dateOfBirth, draft.startPrecision, draft.startValue)} />
+      <ReadOnlyField label="Client age at start" value={ageText(dateOfBirth, draft.startPrecision, draft.startValue)} />
       <ReadOnlyField
         label="End"
         value={draft.resolvedOrOngoing === "ongoing" ? "Left blank — ongoing" : formatPartialWhen(draft.endPrecision, draft.endValue)}
       />
       {draft.resolvedOrOngoing === "ongoing" ? null : (
-        <ReadOnlyField label="Client's age at end" value={ageText(dateOfBirth, draft.endPrecision, draft.endValue)} />
+        <ReadOnlyField label="Client age at end" value={ageText(dateOfBirth, draft.endPrecision, draft.endValue)} />
       )}
       {stage ? <ReadOnlyField label="Category" value={stage === "childhood" ? "Childhood" : "Adulthood"} /> : null}
       <ReadOnlyField label="Treated" value={yesNoLabel(draft.treated)} />
@@ -660,7 +660,7 @@ function EventEditor({
       <PartialDatePicker
         id={`${draft.eventRecordId}_start`}
         dateLabel="Start"
-        ageLabel="Client's age at start"
+        ageLabel="Client age at start"
         mode="client-at-event"
         clientDateOfBirth={dateOfBirth}
         value={draft.startPrecision === "age" ? "" : draft.startValue}
@@ -676,7 +676,7 @@ function EventEditor({
         <PartialDatePicker
           id={`${draft.eventRecordId}_end`}
           dateLabel="End"
-          ageLabel="Client's age at end"
+          ageLabel="Client age at end"
           mode="client-at-event"
           clientDateOfBirth={dateOfBirth}
           value={draft.endPrecision === "age" ? "" : draft.endValue}

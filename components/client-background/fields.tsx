@@ -269,24 +269,27 @@ export function PartialDatePicker({
           : undefined
 
   return (
-    <fieldset className="m-0 min-w-0 border-0 p-0">
-      <legend className="text-sm font-medium">{dateLabel}</legend>
-      <div className="mt-1.5 space-y-3">
-        {mode === "date-only" ? null : (
-          <Field label={resolvedAgeLabel} htmlFor={`${id}-age`} hint={ageHint || undefined}>
-            <Input
-              id={`${id}-age`}
-              className={mobileControlClassName}
-              inputMode="numeric"
-              autoComplete="off"
-              disabled={ageDisabled}
-              value={ageShown}
-              onFocus={(event) => event.currentTarget.select()}
-              onChange={(event) => onAgeInput(event.target.value)}
-            />
-          </Field>
-        )}
-        <div className="flex min-w-0 gap-2">
+    <div className="my-8 min-w-0">
+      <fieldset className="m-0 min-w-0 border-0 p-0">
+        <legend className="text-sm font-semibold text-foreground">{dateLabel}</legend>
+        <div className="mt-2 flex flex-col gap-2">
+          {mode === "date-only" ? null : (
+            <>
+              <Label htmlFor={`${id}-age`}>{resolvedAgeLabel}</Label>
+              <Input
+                id={`${id}-age`}
+                className={mobileControlClassName}
+                inputMode="numeric"
+                autoComplete="off"
+                disabled={ageDisabled}
+                value={ageShown}
+                onFocus={(event) => event.currentTarget.select()}
+                onChange={(event) => onAgeInput(event.target.value)}
+              />
+              {ageHint ? <p className="text-xs text-muted-foreground">{ageHint}</p> : null}
+            </>
+          )}
+          <div className="flex min-w-0 gap-2">
           <select
             id={`${id}-year`}
             aria-label={`${dateLabel} year`}
@@ -364,9 +367,10 @@ export function PartialDatePicker({
               </option>
             ))}
           </select>
+          </div>
         </div>
-      </div>
-    </fieldset>
+      </fieldset>
+    </div>
   )
 }
 

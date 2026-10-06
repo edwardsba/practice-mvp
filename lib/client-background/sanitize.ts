@@ -163,13 +163,15 @@ export function sanitizeEducation(value: unknown): EducationFields {
 
 function sanitizeJob(value: unknown): PreviousJob | null {
   if (!isRecord(value)) return null
+  const started = canonicalPartialDate(str(value.started)) || canonicalPartialDate(str(value.dates))
   const job: PreviousJob = {
     id: str(value.id) || crypto.randomUUID(),
     role: str(value.role),
     employer: str(value.employer),
-    dates: canonicalPartialDate(str(value.dates)),
+    started,
+    ended: canonicalPartialDate(str(value.ended)),
   }
-  if (!job.role && !job.employer && !job.dates) return null
+  if (!job.role && !job.employer && !job.started && !job.ended) return null
   return job
 }
 

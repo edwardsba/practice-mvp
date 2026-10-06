@@ -198,7 +198,7 @@ function DemographicsReadOnly({ value }: { value: Demographics }) {
           ) : (
             value.occupation.previousJobs.map((job) => (
               <p key={job.id} className="text-sm">
-                {[job.role, job.employer, formatPartialDateLabel(job.dates)].filter(Boolean).join(" · ") || "Not recorded"}
+                {[job.role, job.employer, jobDateRange(job)].filter(Boolean).join(" · ") || "Not recorded"}
               </p>
             ))
           )}
@@ -214,6 +214,13 @@ function DemographicsReadOnly({ value }: { value: Demographics }) {
       </Subsection>
     </div>
   )
+}
+
+function jobDateRange(job: PreviousJob) {
+  const start = formatPartialDateLabel(job.started)
+  const end = formatPartialDateLabel(job.ended)
+  if (start && end) return `${start} – ${end}`
+  return start || end
 }
 
 function yesNoText(value: boolean | null, detail: string) {
@@ -426,7 +433,7 @@ function OccupationFieldsEditor({
       <div className="space-y-3">
         <p className="text-sm font-medium">Previous jobs</p>
         {value.previousJobs.map((job, index) => (
-          <div key={job.id} className="space-y-2 rounded-md border p-3">
+          <div key={job.id} className="space-y-4 rounded-md border p-3">
             <TextField id={`job_role_${job.id}`} label="Role" value={job.role} onChange={(role) => updateJob(job.id, { role })} />
             <TextField
               id={`job_employer_${job.id}`}
@@ -435,11 +442,18 @@ function OccupationFieldsEditor({
               onChange={(employer) => updateJob(job.id, { employer })}
             />
             <PartialDatePicker
-              id={`job_dates_${job.id}`}
-              dateLabel="Dates"
+              id={`job_start_${job.id}`}
+              dateLabel="Start"
               mode="date-only"
-              value={job.dates}
-              onChange={(dates) => updateJob(job.id, { dates })}
+              value={job.started}
+              onChange={(started) => updateJob(job.id, { started })}
+            />
+            <PartialDatePicker
+              id={`job_end_${job.id}`}
+              dateLabel="End"
+              mode="date-only"
+              value={job.ended}
+              onChange={(ended) => updateJob(job.id, { ended })}
             />
             <Button
               type="button"
@@ -458,7 +472,7 @@ function OccupationFieldsEditor({
           onClick={() =>
             onChange({
               ...value,
-              previousJobs: [...value.previousJobs, { id: crypto.randomUUID(), role: "", employer: "", dates: "" }],
+              previousJobs: [...value.previousJobs, { id: crypto.randomUUID(), role: "", employer: "", started: "", ended: "" }],
             })
           }
         >

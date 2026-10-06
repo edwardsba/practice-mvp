@@ -571,7 +571,7 @@ function PartnershipDetail({
 }) {
   const status = partnership.relationshipStatus ? PARTNERSHIP_STATUS_LABELS[partnership.relationshipStatus] : ""
   return (
-    <div className="min-w-0 space-y-4 lg:text-[13px] lg:[&_input]:text-[13px] lg:[&_label]:text-[13px] lg:[&_select]:text-[13px] lg:[&_textarea]:text-[13px]">
+    <div className="min-w-0 space-y-4 lg:text-[13px] lg:[&_input]:text-[13px] lg:[&_label]:text-[13px] lg:[&_legend]:text-[13px] lg:[&_select]:text-[13px] lg:[&_textarea]:text-[13px]">
       <DetailHeader
         title="Parents' relationship"
         subtitle="Mother and father"
@@ -723,7 +723,7 @@ function PersonDetail({
 }) {
   const visibility = relationshipFieldVisibility(draft)
   return (
-    <div className="min-w-0 space-y-4 lg:text-[13px] lg:[&_input]:text-[13px] lg:[&_label]:text-[13px] lg:[&_select]:text-[13px] lg:[&_textarea]:text-[13px]">
+    <div className="min-w-0 space-y-4 lg:text-[13px] lg:[&_input]:text-[13px] lg:[&_label]:text-[13px] lg:[&_legend]:text-[13px] lg:[&_select]:text-[13px] lg:[&_textarea]:text-[13px]">
       <DetailHeader
         title={personName(draft)}
         subtitle={personRoleLabel(draft)}

@@ -10,7 +10,7 @@ import {
   yearFromTypedAge,
 } from "@/lib/client-background/age"
 import { daysInMonth, formatPartialDate, parsePartialDate } from "@/lib/client-background/partial-date"
-import { sanitizeRelationship } from "@/lib/client-background/sanitize"
+import { sanitizeOccupation, sanitizeRelationship } from "@/lib/client-background/sanitize"
 import { estimatedCurrentAge } from "@/lib/client-background/visibility"
 
 assert.equal(formatPartialDate(parsePartialDate("1964")), "1964")
@@ -93,6 +93,18 @@ const kept = sanitizeRelationship({
 })
 assert.equal(kept.dateOfBirth, "1964-06")
 assert.equal(kept.approximateAge, null)
+
+const movedJob = sanitizeOccupation({
+  previousJobs: [{ id: "job-1", role: "Nurse", dates: "2015" }],
+})
+assert.equal(movedJob.previousJobs[0]?.started, "2015")
+assert.equal(movedJob.previousJobs[0]?.ended, "")
+
+const keptRange = sanitizeOccupation({
+  previousJobs: [{ id: "job-2", role: "Teacher", started: "2016-03", ended: "2018" }],
+})
+assert.equal(keptRange.previousJobs[0]?.started, "2016-03")
+assert.equal(keptRange.previousJobs[0]?.ended, "2018")
 
 assert.equal(estimatedCurrentAge({ dateOfBirth: "1950", healthStatus: "" }, "2026-10-02"), 76)
 assert.equal(estimatedCurrentAge({ dateOfBirth: "1964-01-01", healthStatus: "deceased" }, "2026-10-02"), null)

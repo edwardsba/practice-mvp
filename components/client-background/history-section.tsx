@@ -660,6 +660,7 @@ function EventEditor({
       <PartialDatePicker
         id={`${draft.eventRecordId}_start`}
         dateLabel="Start"
+        ageLabel="Client's age at start"
         mode="client-at-event"
         clientDateOfBirth={dateOfBirth}
         value={draft.startPrecision === "age" ? "" : draft.startValue}
@@ -675,6 +676,7 @@ function EventEditor({
         <PartialDatePicker
           id={`${draft.eventRecordId}_end`}
           dateLabel="End"
+          ageLabel="Client's age at end"
           mode="client-at-event"
           clientDateOfBirth={dateOfBirth}
           value={draft.endPrecision === "age" ? "" : draft.endValue}

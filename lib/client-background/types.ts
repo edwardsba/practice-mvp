@@ -286,7 +286,8 @@ export type PreviousJob = {
   id: string
   role: string
   employer: string
-  dates: string
+  started: string
+  ended: string
 }
 
 export type NecessityAccess = Record<NecessityKey, boolean>

@@ -188,6 +188,7 @@ export function PartialDatePicker({
   value,
   onChange,
   mode,
+  ageLabel,
   clientDateOfBirth = null,
   legacyAge = "",
 }: {
@@ -196,6 +197,8 @@ export function PartialDatePicker({
   value: string
   onChange: (value: string) => void
   mode: "person" | "client-at-event" | "date-only"
+  /** Names the age that fills this date. History passes start and end separately. */
+  ageLabel?: string
   clientDateOfBirth?: string | null
   /** Shown in the disabled age input when a legacy age-only value could not be converted. */
   legacyAge?: string
@@ -252,6 +255,7 @@ export function PartialDatePicker({
 
   const through = asOfParts.year ?? new Date().getFullYear()
   const years = yearChoices(parsed.year, through)
+  const resolvedAgeLabel = ageLabel ?? (mode === "person" ? "Age" : "Client's age at the time")
   const ageHint = ageInvalid
     ? "Enter an age between 0 and 130"
     : ageDisabled
@@ -265,32 +269,32 @@ export function PartialDatePicker({
           : undefined
 
   return (
-    <div className="min-w-0 space-y-3">
-      {mode === "date-only" ? null : (
-        <Field
-          label={mode === "person" ? "Age" : "Client's age at the time"}
-          htmlFor={`${id}-age`}
-          hint={ageHint || undefined}
-        >
-          <Input
-            id={`${id}-age`}
-            className={mobileControlClassName}
-            inputMode="numeric"
-            autoComplete="off"
-            disabled={ageDisabled}
-            value={ageShown}
-            onFocus={(event) => event.currentTarget.select()}
-            onChange={(event) => onAgeInput(event.target.value)}
-          />
-        </Field>
-      )}
-      <fieldset className="min-w-0 space-y-1.5">
-        <legend className="text-sm font-medium">{dateLabel}</legend>
+    <fieldset className="m-0 min-w-0 border-0 p-0">
+      <legend className="text-sm font-medium">{dateLabel}</legend>
+      <div className="mt-1.5 space-y-3">
+        {mode === "date-only" ? null : (
+          <Field label={resolvedAgeLabel} htmlFor={`${id}-age`} hint={ageHint || undefined}>
+            <Input
+              id={`${id}-age`}
+              className={mobileControlClassName}
+              inputMode="numeric"
+              autoComplete="off"
+              disabled={ageDisabled}
+              value={ageShown}
+              onFocus={(event) => event.currentTarget.select()}
+              onChange={(event) => onAgeInput(event.target.value)}
+            />
+          </Field>
+        )}
         <div className="flex min-w-0 gap-2">
           <select
             id={`${id}-year`}
             aria-label={`${dateLabel} year`}
-            className={cn(selectClassName, "w-0 min-w-0 flex-1 basis-0")}
+            className={cn(
+              selectClassName,
+              "w-0 min-w-0 flex-1 basis-0",
+              parsed.year == null ? "text-muted-foreground" : "text-foreground"
+            )}
             value={parsed.year == null ? "" : String(parsed.year)}
             onChange={(event) => {
               const year = event.target.value === "" ? null : Number(event.target.value)
@@ -301,9 +305,11 @@ export function PartialDatePicker({
               commit({ year, month: parsed.month, day: parsed.month == null ? null : parsed.day })
             }}
           >
-            <option value="">Not selected</option>
+            <option value="" className="text-foreground">
+              Year
+            </option>
             {years.map((year) => (
-              <option key={year} value={year}>
+              <option key={year} value={year} className="text-foreground">
                 {year}
               </option>
             ))}
@@ -311,7 +317,11 @@ export function PartialDatePicker({
           <select
             id={`${id}-month`}
             aria-label={`${dateLabel} month`}
-            className={cn(selectClassName, "w-0 min-w-0 flex-1 basis-0")}
+            className={cn(
+              selectClassName,
+              "w-0 min-w-0 flex-1 basis-0",
+              parsed.month == null ? "text-muted-foreground" : "text-foreground"
+            )}
             disabled={parsed.year == null}
             value={parsed.month == null ? "" : String(parsed.month)}
             onChange={(event) => {
@@ -320,9 +330,11 @@ export function PartialDatePicker({
               commit({ year: parsed.year, month, day: month == null ? null : parsed.day })
             }}
           >
-            <option value="">Not selected</option>
+            <option value="" className="text-foreground">
+              Month
+            </option>
             {MONTH_LABELS.map((label, index) => (
-              <option key={label} value={index + 1}>
+              <option key={label} value={index + 1} className="text-foreground">
                 {label}
               </option>
             ))}
@@ -330,7 +342,11 @@ export function PartialDatePicker({
           <select
             id={`${id}-day`}
             aria-label={`${dateLabel} day`}
-            className={cn(selectClassName, "w-0 min-w-0 flex-1 basis-0")}
+            className={cn(
+              selectClassName,
+              "w-0 min-w-0 flex-1 basis-0",
+              parsed.day == null ? "text-muted-foreground" : "text-foreground"
+            )}
             disabled={parsed.year == null || parsed.month == null}
             value={parsed.day == null ? "" : String(parsed.day)}
             onChange={(event) => {
@@ -339,16 +355,18 @@ export function PartialDatePicker({
               commit({ year: parsed.year, month: parsed.month, day })
             }}
           >
-            <option value="">Not selected</option>
+            <option value="" className="text-foreground">
+              Day
+            </option>
             {Array.from({ length: 31 }, (_, index) => index + 1).map((day) => (
-              <option key={day} value={day}>
+              <option key={day} value={day} className="text-foreground">
                 {String(day).padStart(2, "0")}
               </option>
             ))}
           </select>
         </div>
-      </fieldset>
-    </div>
+      </div>
+    </fieldset>
   )
 }
 

@@ -313,9 +313,9 @@ export type RelationshipRecord = {
   sex: string
   givenName: string
   displayOrder: number
-  /** Preferred. Empty when only an approximate age is known. */
+  /** Partial date: YYYY, YYYY-MM, or YYYY-MM-DD. Age is derived from this and is never stored. */
   dateOfBirth: string
-  /** Fallback when date of birth is unknown. True on approximateAgeRecordedOn, not today. */
+  /** Retired. Cleared on read after conversion into a year-only dateOfBirth. */
   approximateAge: number | null
   approximateAgeRecordedOn: string
   healthStatus: HealthStatus | ""

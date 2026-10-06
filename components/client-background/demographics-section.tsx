@@ -3,7 +3,7 @@
 import { useState, type ReactNode } from "react"
 
 import { saveDemographicsAction } from "@/app/clients/[client_id]/background/actions"
-import { ReadOnlyField, SaveRow, SelectField, TextAreaField, TextField, YesNoDetail } from "@/components/client-background/fields"
+import { PartialDatePicker, ReadOnlyField, SaveRow, SelectField, TextAreaField, TextField, YesNoDetail } from "@/components/client-background/fields"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
@@ -21,6 +21,7 @@ import {
   type OccupationFields,
   type PreviousJob,
 } from "@/lib/client-background/types"
+import { formatPartialDateLabel } from "@/lib/client-background/age"
 import { cn } from "@/lib/utils"
 
 export function DemographicsSection({
@@ -197,7 +198,7 @@ function DemographicsReadOnly({ value }: { value: Demographics }) {
           ) : (
             value.occupation.previousJobs.map((job) => (
               <p key={job.id} className="text-sm">
-                {[job.role, job.employer, job.dates].filter(Boolean).join(" · ") || "Not recorded"}
+                {[job.role, job.employer, formatPartialDateLabel(job.dates)].filter(Boolean).join(" · ") || "Not recorded"}
               </p>
             ))
           )}
@@ -433,12 +434,12 @@ function OccupationFieldsEditor({
               value={job.employer}
               onChange={(employer) => updateJob(job.id, { employer })}
             />
-            <TextField
+            <PartialDatePicker
               id={`job_dates_${job.id}`}
-              label="Dates"
+              dateLabel="Dates"
+              mode="date-only"
               value={job.dates}
               onChange={(dates) => updateJob(job.id, { dates })}
-              placeholder="e.g. 2016–2019"
             />
             <Button
               type="button"

@@ -10,6 +10,7 @@ import {
   clients,
 } from "@/db/schema"
 import { db } from "@/lib/db"
+import { settleEventDates } from "@/lib/client-background/age"
 import { toEvent, toPartnership, toRelationship } from "@/lib/client-background/map"
 import {
   demographicsFromStored,
@@ -100,7 +101,7 @@ export async function loadClientBackground(
       : emptyDemographics(),
     relationships: relationshipRows.map(toRelationship),
     partnerships: partnershipRows.map(toPartnership),
-    events: eventRows.map(toEvent),
+    events: eventRows.map((row) => settleEventDates(toEvent(row), client.dateOfBirth)),
     risk: background?.riskJson ? sanitizeRisk(background.riskJson) : emptyRisk(),
   }
 }

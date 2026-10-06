@@ -93,8 +93,8 @@ assert.equal(tree.unlinkedStepSiblings.length, 0)
 
 assert.equal(clientAgeAtStart("2000-06-15", "date", "2018-06-14"), 17)
 assert.equal(clientAgeAtStart("2000-06-15", "date", "2018-06-15"), 18)
-assert.equal(clientAgeAtStart("2000-06-15", "year", "2018"), 17)
-assert.equal(clientAgeAtStart("2000-06-15", "year_month", "2018-06"), 17)
+assert.equal(clientAgeAtStart("2000-06-15", "year", "2018"), 18)
+assert.equal(clientAgeAtStart("2000-06-15", "year_month", "2018-06"), null)
 assert.equal(clientAgeAtStart(null, "age", "14"), 14)
 assert.equal(clientAgeAtStart(null, "date", "2018-06-15"), null)
 assert.equal(lifeStageAtStart("2000-06-15", "date", "2018-06-14"), "childhood")
@@ -113,12 +113,16 @@ assert.equal(
   "Mother – Jane – 62"
 )
 assert.equal(
+  relationshipLineLabel({ ...mother, dateOfBirth: "1950" }, undefined, "2026-10-02"),
+  "Mother – Jane – ~76"
+)
+assert.equal(
   relationshipLineLabel(
-    { ...mother, approximateAge: 70, approximateAgeRecordedOn: "2020-06-01" },
+    { ...mother, dateOfBirth: "1964-01-01", healthStatus: "deceased" },
     undefined,
     "2026-10-02"
   ),
-  "Mother – Jane – ~76"
+  "Mother – Jane"
 )
 assert.equal(relationshipLineLabel(stepParent, "De facto", "2026-10-02"), "Step-parent – Alex – De facto")
 assert.equal(relationshipLineLabel(fullSibling, undefined, "2026-10-02"), "Full sibling – Sam")
@@ -138,10 +142,9 @@ assert.equal(
 assert.equal(
   isMinorChild(
     person({
-      relationshipRecordId: "approx-kid",
+      relationshipRecordId: "year-kid",
       relationshipToClient: "child_biological",
-      approximateAge: 10,
-      approximateAgeRecordedOn: "2024-01-01",
+      dateOfBirth: "2014",
     }),
     "2026-10-02"
   ),
@@ -150,10 +153,9 @@ assert.equal(
 assert.equal(
   isMinorChild(
     person({
-      relationshipRecordId: "approx-grown",
+      relationshipRecordId: "year-grown",
       relationshipToClient: "child_biological",
-      approximateAge: 10,
-      approximateAgeRecordedOn: "2024-01-01",
+      dateOfBirth: "2014",
     }),
     "2034-01-01"
   ),

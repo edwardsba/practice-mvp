@@ -1,4 +1,5 @@
-import { completedYearsBetween } from "@/lib/client-background/age"
+import { assessAge } from "@/lib/client-background/age"
+import { parsePartialDate } from "@/lib/client-background/partial-date"
 import type { RelationshipRecord } from "@/lib/client-background/types"
 import { todayDateString } from "@/lib/dates/practice-time"
 
@@ -11,26 +12,17 @@ export type RelationshipFieldVisibility = {
   lengthOfRelationship: boolean
 }
 
-type AgeSource = Pick<
-  RelationshipRecord,
-  "dateOfBirth" | "approximateAge" | "approximateAgeRecordedOn" | "healthStatus"
->
+type AgeSource = Pick<RelationshipRecord, "dateOfBirth" | "healthStatus">
 
 /**
- * Age used for rules such as "child under 18". A date of birth is exact.
- * An approximate age is moved forward by the years since it was recorded,
- * so a figure from years ago is not treated as today's age.
+ * Age today from the stored partial date of birth.
+ * A year-only date uses the difference in calendar years. Deceased people have no current age.
  */
 export function estimatedCurrentAge(record: AgeSource, asOf: string): number | null {
   if (record.healthStatus === "deceased") return null
-  if (record.dateOfBirth) return completedYearsBetween(record.dateOfBirth, asOf)
-  if (record.approximateAge == null) return null
-  if (!record.approximateAgeRecordedOn) return record.approximateAge
-  const elapsed = completedYearsBetween(record.approximateAgeRecordedOn, asOf)
-  if (elapsed == null) return record.approximateAge
-  const age = record.approximateAge + elapsed
-  if (age < 0 || age > 130) return null
-  return age
+  const age = assessAge(parsePartialDate(record.dateOfBirth), parsePartialDate(asOf), "person")
+  if (age.kind === "exact" || age.kind === "approximate") return age.years
+  return null
 }
 
 export function isMinorChild(

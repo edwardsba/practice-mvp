@@ -8,7 +8,7 @@ import {
   updateEventAction,
 } from "@/app/clients/[client_id]/background/actions"
 import {
-  PartialDateField,
+  PartialDatePicker,
   ReadOnlyField,
   SaveRow,
   SelectField,
@@ -23,7 +23,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { clientAgeAtStart, compareEventsChronologically, formatPartialWhen, lifeStageAtStart } from "@/lib/client-background/age"
+import {
+  compareEventsChronologically,
+  describeClientAge,
+  displayedAge,
+  formatPartialWhen,
+  lifeStageAtStart,
+} from "@/lib/client-background/age"
+import { formatPartialDate, parsePartialDate, precisionForPartialDate } from "@/lib/client-background/partial-date"
 import { personName } from "@/lib/client-background/tree"
 import {
   EVENT_TYPES,
@@ -381,13 +388,28 @@ function entryListLabel(entry: Pick<EventRecord, "title" | "eventType">) {
   return entry.title.trim() || EVENT_TYPE_LABELS[entry.eventType]
 }
 
+function ageText(dateOfBirth: string | null, precision: EventRecord["startPrecision"], value: string) {
+  return displayedAge(describeClientAge(dateOfBirth, precision, value))
+}
+
+function storedPartial(value: string) {
+  const parsed = parsePartialDate(value)
+  return { precision: precisionForPartialDate(parsed), value: formatPartialDate(parsed) }
+}
+
 function rowWhen(entry: EventRecord, dateOfBirth: string | null) {
   const formatted = formatPartialWhen(entry.startPrecision, entry.startValue)
-  const age = clientAgeAtStart(dateOfBirth, entry.startPrecision, entry.startValue)
-  if (!formatted && age == null) return "Date not recorded"
+  const described = describeClientAge(dateOfBirth, entry.startPrecision, entry.startValue)
+  const ageLabel = displayedAge(described)
+  if (!formatted && described.kind === "none") return "Date not recorded"
   if (entry.startPrecision === "age") return formatted || "Date not recorded"
-  if (age != null && formatted) return `Age ${age} · ${formatted}`
-  if (age != null) return `Age ${age}`
+  if (described.kind === "before_birth") {
+    return formatted ? `Before client was born · ${formatted}` : "Before client was born"
+  }
+  if (described.kind === "exact" && formatted) return `Age ${described.years} · ${formatted}`
+  if (described.kind === "approximate" && formatted) return `Age ~${described.years} · ${formatted}`
+  if (ageLabel && formatted) return `${ageLabel} · ${formatted}`
+  if (ageLabel) return ageLabel
   return formatted
 }
 
@@ -419,7 +441,6 @@ function EventReadOnly({
   dateOfBirth: string | null
   relationships: RelationshipRecord[]
 }) {
-  const age = clientAgeAtStart(dateOfBirth, draft.startPrecision, draft.startValue)
   const stage = lifeStageAtStart(dateOfBirth, draft.startPrecision, draft.startValue)
   const linked = relationships.find((person) => person.relationshipRecordId === draft.relationshipRecordId)
 
@@ -440,11 +461,14 @@ function EventReadOnly({
       <ReadOnlyField label="Title" value={draft.title} />
       <ReadOnlyField label="Description" value={draft.description} />
       <ReadOnlyField label="Start" value={formatPartialWhen(draft.startPrecision, draft.startValue)} />
+      <ReadOnlyField label="Client's age at start" value={ageText(dateOfBirth, draft.startPrecision, draft.startValue)} />
       <ReadOnlyField
         label="End"
         value={draft.resolvedOrOngoing === "ongoing" ? "Left blank — ongoing" : formatPartialWhen(draft.endPrecision, draft.endValue)}
       />
-      {age != null ? <ReadOnlyField label="Client's age at the time" value={String(age)} /> : null}
+      {draft.resolvedOrOngoing === "ongoing" ? null : (
+        <ReadOnlyField label="Client's age at end" value={ageText(dateOfBirth, draft.endPrecision, draft.endValue)} />
+      )}
       {stage ? <ReadOnlyField label="Category" value={stage === "childhood" ? "Childhood" : "Adulthood"} /> : null}
       <ReadOnlyField label="Treated" value={yesNoLabel(draft.treated)} />
       {draft.treated === true ? (
@@ -484,7 +508,6 @@ function EventEditor({
   relationships: RelationshipRecord[]
   onChange: (event: EventRecord) => void
 }) {
-  const age = clientAgeAtStart(dateOfBirth, draft.startPrecision, draft.startValue)
   const stage = lifeStageAtStart(dateOfBirth, draft.startPrecision, draft.startValue)
   const familyEvent = draft.eventType === "family_events"
 
@@ -506,16 +529,7 @@ function EventEditor({
     if (next.eventType !== "self_harm") {
       next.selfHarmType = ""
     }
-    if (next.eventType === "substance_use") {
-      if (next.startPrecision === "age") {
-        next.startPrecision = ""
-        next.startValue = ""
-      }
-      if (next.endPrecision === "age") {
-        next.endPrecision = ""
-        next.endValue = ""
-      }
-    } else {
+    if (next.eventType !== "substance_use") {
       next.substanceStatus = ""
       next.abstinentSincePrecision = ""
       next.abstinentSinceValue = ""
@@ -643,31 +657,38 @@ function EventEditor({
         value={draft.description}
         onChange={(description) => patch({ description })}
       />
-      <PartialDateField
+      <PartialDatePicker
         id={`${draft.eventRecordId}_start`}
-        label="Start"
-        precision={draft.startPrecision}
-        value={draft.startValue}
-        allowAge={draft.eventType !== "substance_use"}
-        onChange={(startPrecision, startValue) => patch({ startPrecision, startValue })}
+        dateLabel="Start"
+        mode="client-at-event"
+        clientDateOfBirth={dateOfBirth}
+        value={draft.startPrecision === "age" ? "" : draft.startValue}
+        legacyAge={draft.startPrecision === "age" ? draft.startValue : ""}
+        onChange={(startValue) => {
+          const next = storedPartial(startValue)
+          patch({ startPrecision: next.precision, startValue: next.value })
+        }}
       />
       {draft.resolvedOrOngoing === "ongoing" ? (
         <p className="text-xs text-muted-foreground">End date stays blank while this is ongoing.</p>
       ) : (
-        <PartialDateField
+        <PartialDatePicker
           id={`${draft.eventRecordId}_end`}
-          label="End"
-          precision={draft.endPrecision}
-          value={draft.endValue}
-          allowAge={draft.eventType !== "substance_use"}
-          onChange={(endPrecision, endValue) => patch({ endPrecision, endValue })}
+          dateLabel="End"
+          mode="client-at-event"
+          clientDateOfBirth={dateOfBirth}
+          value={draft.endPrecision === "age" ? "" : draft.endValue}
+          legacyAge={draft.endPrecision === "age" ? draft.endValue : ""}
+          onChange={(endValue) => {
+            const next = storedPartial(endValue)
+            patch({ endPrecision: next.precision, endValue: next.value })
+          }}
         />
       )}
-      {age != null ? (
-        <div className="space-y-1 text-sm text-muted-foreground">
-          <p>Client&apos;s age at the time: {age}</p>
-          {stage ? <p>Category: {stage === "childhood" ? "Childhood" : "Adulthood"}</p> : null}
-        </div>
+      {stage ? (
+        <p className="text-sm text-muted-foreground">
+          Category: {stage === "childhood" ? "Childhood" : "Adulthood"}
+        </p>
       ) : null}
       <SelectField
         id={`${draft.eventRecordId}_treated`}
@@ -732,14 +753,15 @@ function EventEditor({
             ))}
           </SelectField>
           {draft.substanceStatus === "abstinent" ? (
-            <PartialDateField
+            <PartialDatePicker
               id={`${draft.eventRecordId}_abstinent`}
-              label="Abstinent since"
-              precision={draft.abstinentSincePrecision}
-              value={draft.abstinentSinceValue}
-              onChange={(abstinentSincePrecision, abstinentSinceValue) =>
-                patch({ abstinentSincePrecision, abstinentSinceValue })
-              }
+              dateLabel="Abstinent since"
+              mode="date-only"
+              value={draft.abstinentSincePrecision === "age" ? "" : draft.abstinentSinceValue}
+              onChange={(abstinentSinceValue) => {
+                const next = storedPartial(abstinentSinceValue)
+                patch({ abstinentSincePrecision: next.precision, abstinentSinceValue: next.value })
+              }}
             />
           ) : null}
         </>

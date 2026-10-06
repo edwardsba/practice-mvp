@@ -1,4 +1,5 @@
-import { estimatedCurrentAge } from "@/lib/client-background/visibility"
+import { assessAge, displayedAge } from "@/lib/client-background/age"
+import { parsePartialDate } from "@/lib/client-background/partial-date"
 import {
   ORIGIN_PARENT_ROLES,
   PARTNERSHIP_STATUS_LABELS,
@@ -55,21 +56,19 @@ export function personRoleLabel(record: Pick<RelationshipRecord, "relationshipTo
 }
 
 function treeAgeToken(
-  person: Pick<
-    RelationshipRecord,
-    "dateOfBirth" | "approximateAge" | "approximateAgeRecordedOn" | "healthStatus"
-  >,
+  person: Pick<RelationshipRecord, "dateOfBirth" | "healthStatus">,
   asOf: string
 ): string | null {
-  const age = estimatedCurrentAge(person, asOf)
-  if (age == null) return null
-  return person.dateOfBirth ? String(age) : `~${age}`
+  if (person.healthStatus === "deceased") return null
+  const age = assessAge(parsePartialDate(person.dateOfBirth), parsePartialDate(asOf), "person")
+  const label = displayedAge(age)
+  return label && age.kind !== "before_birth" ? label : null
 }
 
 export function relationshipLineLabel(
   person: Pick<
     RelationshipRecord,
-    "relationshipToClient" | "givenName" | "dateOfBirth" | "approximateAge" | "approximateAgeRecordedOn" | "healthStatus"
+    "relationshipToClient" | "givenName" | "dateOfBirth" | "healthStatus"
   >,
   status?: string | null,
   asOf = todayDateString()

@@ -9,8 +9,8 @@ import {
   updateRelationshipAction,
 } from "@/app/clients/[client_id]/background/actions"
 import {
-  DateInput,
   mobileControlClassName,
+  PartialDatePicker,
   ReadOnlyField,
   SaveRow,
   SelectField,
@@ -27,7 +27,8 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { completedYearsBetween, formatPartialWhen } from "@/lib/client-background/age"
+import { assessAge, displayedAge, formatPartialDateLabel } from "@/lib/client-background/age"
+import { parsePartialDate } from "@/lib/client-background/partial-date"
 import {
   DEPENDENCY_LABELS,
   DEPENDENCY_VALUES,
@@ -596,8 +597,8 @@ function PartnershipDetail({
       ) : (
         <div className="space-y-3">
           <ReadOnlyField label="Relationship status" value={status} />
-          <ReadOnlyField label="Start" value={partnership.started} />
-          <ReadOnlyField label="End" value={partnership.ended} />
+          <ReadOnlyField label="Start" value={formatPartialDateLabel(partnership.started)} />
+          <ReadOnlyField label="End" value={formatPartialDateLabel(partnership.ended)} />
           <ReadOnlyField label="Quality of relationship" value={partnership.qualityOfRelationship} />
         </div>
       )}
@@ -632,16 +633,17 @@ function PartnershipFields({
           </option>
         ))}
       </SelectField>
-      <TextField
+      <PartialDatePicker
         id={`partnership_start_${partnership.partnershipRecordId}`}
-        label="Start"
+        dateLabel="Start"
+        mode="date-only"
         value={partnership.started}
         onChange={(started) => onChange({ ...partnership, started })}
-        placeholder="Year, date, or duration"
       />
-      <TextField
+      <PartialDatePicker
         id={`partnership_end_${partnership.partnershipRecordId}`}
-        label="End"
+        dateLabel="End"
+        mode="date-only"
         value={partnership.ended}
         onChange={(ended) => onChange({ ...partnership, ended })}
       />
@@ -662,108 +664,28 @@ function BirthEditor({
   record: RelationshipRecord
   onPatch: (partial: Partial<RelationshipRecord>) => void
 }) {
-  const approximate = !record.dateOfBirth && (record.approximateAge != null || record.approximateAgeRecordedOn !== "")
-
-  if (approximate) {
-    return (
-      <div className="min-w-0 space-y-3">
-        <div className="space-y-1.5">
-          <Label htmlFor="rel_approx_age">Approximate age</Label>
-          <Input
-            id="rel_approx_age"
-            className={mobileControlClassName}
-            type="number"
-            min={0}
-            inputMode="numeric"
-            value={record.approximateAge ?? ""}
-            onChange={(event) =>
-              onPatch({
-                dateOfBirth: "",
-                approximateAge: event.target.value === "" ? null : Number(event.target.value),
-              })
-            }
-          />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="rel_approx_recorded">Date this age was recorded</Label>
-          <DateInput
-            id="rel_approx_recorded"
-            type="date"
-            value={record.approximateAgeRecordedOn}
-            onChange={(event) => onPatch({ dateOfBirth: "", approximateAgeRecordedOn: event.target.value })}
-          />
-        </div>
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          onClick={() => onPatch({ dateOfBirth: "", approximateAge: null, approximateAgeRecordedOn: "" })}
-        >
-          Enter a date of birth instead
-        </Button>
-      </div>
-    )
-  }
-
   return (
-    <div className="min-w-0 space-y-2">
-      <div className="space-y-1.5">
-        <Label htmlFor="rel_dob">Date of birth</Label>
-        <DateInput
-          id="rel_dob"
-          type="date"
-          value={record.dateOfBirth}
-          onChange={(event) =>
-            onPatch({
-              dateOfBirth: event.target.value,
-              approximateAge: null,
-              approximateAgeRecordedOn: "",
-            })
-          }
-        />
-      </div>
-      <Button
-        type="button"
-        variant="ghost"
-        size="sm"
-        onClick={() =>
-          onPatch({
-            dateOfBirth: "",
-            approximateAge: null,
-            approximateAgeRecordedOn: todayDateString(),
-          })
-        }
-      >
-        Date of birth not known
-      </Button>
-    </div>
+    <PartialDatePicker
+      id="rel_dob"
+      dateLabel="Date of birth"
+      mode={record.healthStatus === "deceased" ? "date-only" : "person"}
+      value={record.dateOfBirth}
+      onChange={(dateOfBirth) => onPatch({ dateOfBirth, approximateAge: null, approximateAgeRecordedOn: "" })}
+    />
   )
 }
 
 function BirthReadOnly({ record }: { record: RelationshipRecord }) {
-  if (record.dateOfBirth) {
-    const age =
-      record.healthStatus === "deceased" ? null : completedYearsBetween(record.dateOfBirth, todayDateString())
-    return (
-      <>
-        <ReadOnlyField label="Date of birth" value={formatPartialWhen("date", record.dateOfBirth)} />
-        {age != null ? <ReadOnlyField label="Age" value={String(age)} /> : null}
-      </>
-    )
-  }
-  if (record.approximateAge != null || record.approximateAgeRecordedOn) {
-    const recorded = record.approximateAgeRecordedOn
-      ? formatPartialWhen("date", record.approximateAgeRecordedOn)
-      : ""
-    const value =
-      record.approximateAge == null
-        ? ""
-        : recorded
-          ? `${record.approximateAge} (recorded ${recorded})`
-          : String(record.approximateAge)
-    return <ReadOnlyField label="Approximate age" value={value} />
-  }
-  return <ReadOnlyField label="Date of birth" value="" />
+  const age =
+    record.healthStatus === "deceased"
+      ? ""
+      : displayedAge(assessAge(parsePartialDate(record.dateOfBirth), parsePartialDate(todayDateString()), "person"))
+  return (
+    <>
+      <ReadOnlyField label="Date of birth" value={formatPartialDateLabel(record.dateOfBirth)} />
+      {record.healthStatus === "deceased" ? null : <ReadOnlyField label="Age" value={age} />}
+    </>
+  )
 }
 
 function PersonDetail({
@@ -964,8 +886,8 @@ function PersonReadOnly({
           <div key={partnership.partnershipRecordId} className="space-y-3 rounded-md border p-3">
             <p className="font-medium">Relationship — with {otherLabel}</p>
             <ReadOnlyField label="Relationship status" value={status} />
-            <ReadOnlyField label="Start" value={partnership.started} />
-            <ReadOnlyField label="End" value={partnership.ended} />
+            <ReadOnlyField label="Start" value={formatPartialDateLabel(partnership.started)} />
+            <ReadOnlyField label="End" value={formatPartialDateLabel(partnership.ended)} />
             <ReadOnlyField label="Quality of relationship" value={partnership.qualityOfRelationship} />
           </div>
         )

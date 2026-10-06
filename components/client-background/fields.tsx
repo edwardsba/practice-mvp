@@ -1,12 +1,18 @@
 "use client"
 
-import type { ComponentProps, CSSProperties, ReactNode } from "react"
-import { Calendar } from "lucide-react"
+import { useState, type ReactNode } from "react"
 
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import type { StartPrecision } from "@/lib/client-background/types"
+import { agePrecisionNote, assessAge, typedAgeMatches, yearFromTypedAge } from "@/lib/client-background/age"
+import {
+  MONTH_LABELS,
+  formatPartialDate,
+  parsePartialDate,
+  type PartialDate,
+} from "@/lib/client-background/partial-date"
+import { todayDateString } from "@/lib/dates/practice-time"
 import { cn } from "@/lib/utils"
 
 /** 16px below the lg breakpoint so mobile browsers do not zoom on focus. */
@@ -160,93 +166,188 @@ export function YesNoDetail({
   )
 }
 
-const dateInputStyle: CSSProperties = {
-  WebkitAppearance: "none",
-  appearance: "none",
-  display: "block",
-  width: "100%",
-  maxWidth: "100%",
-  minWidth: 0,
-  boxSizing: "border-box",
+function yearChoices(selected: number | null, through: number): number[] {
+  const start = through - 130
+  const years: number[] = []
+  for (let year = through; year >= start; year -= 1) years.push(year)
+  if (selected != null && !years.includes(selected)) years.push(selected)
+  return years.sort((a, b) => b - a)
 }
 
-export function DateInput({ className, style, type = "date", ...props }: ComponentProps<typeof Input>) {
-  return (
-    <div className="relative w-full min-w-0 max-w-full overflow-hidden">
-      <Input
-        type={type}
-        style={{ ...dateInputStyle, ...style }}
-        className={cn(
-          mobileControlClassName,
-          "h-9 pr-8",
-          "[&::-webkit-date-and-time-value]:m-0 [&::-webkit-date-and-time-value]:block [&::-webkit-date-and-time-value]:min-w-0 [&::-webkit-date-and-time-value]:text-left",
-          className
-        )}
-        {...props}
-      />
-      <Calendar
-        aria-hidden
-        className="pointer-events-none absolute top-1/2 right-2.5 size-4 -translate-y-1/2 text-muted-foreground"
-      />
-    </div>
-  )
+function isWholeAge(text: string): boolean {
+  return /^\d{1,3}$/.test(text) && Number(text) <= 130
 }
 
-export function PartialDateField({
+/**
+ * Partial date as three native selects. Person and client-at-event modes add
+ * an age that fills the year and is never stored. Date-only mode is the selects.
+ */
+export function PartialDatePicker({
   id,
-  label,
-  precision,
+  dateLabel,
   value,
   onChange,
-  allowAge = true,
+  mode,
+  clientDateOfBirth = null,
+  legacyAge = "",
 }: {
   id: string
-  label: string
-  precision: StartPrecision | ""
+  dateLabel: string
   value: string
-  allowAge?: boolean
-  onChange: (precision: StartPrecision | "", value: string) => void
+  onChange: (value: string) => void
+  mode: "person" | "client-at-event" | "date-only"
+  clientDateOfBirth?: string | null
+  /** Shown in the disabled age input when a legacy age-only value could not be converted. */
+  legacyAge?: string
 }) {
+  const asOf = todayDateString()
+  const parsed = parsePartialDate(value)
+  const asOfParts = parsePartialDate(asOf)
+  const birthParts = parsePartialDate(clientDateOfBirth ?? "")
+  const reading =
+    mode === "person"
+      ? assessAge(parsed, asOfParts, "person")
+      : mode === "client-at-event"
+        ? assessAge(parsed, birthParts, "client-at-event")
+        : null
+  const ageDisabled = mode === "client-at-event" && birthParts.year == null
+  const [ageDraft, setAgeDraft] = useState<string | null>(null)
+  const derivedNumber =
+    reading && (reading.kind === "exact" || reading.kind === "approximate") ? String(reading.years) : ""
+  const ageShown = ageDraft ?? (ageDisabled && legacyAge.trim() ? legacyAge.trim() : derivedNumber)
+  const ageInvalid = ageDraft != null && ageDraft.trim() !== "" && !isWholeAge(ageDraft.trim())
+
+  function commit(next: PartialDate) {
+    setAgeDraft(null)
+    onChange(formatPartialDate(next))
+  }
+
+  function onAgeInput(raw: string) {
+    const text = raw.trim()
+    if (text === "") {
+      setAgeDraft(null)
+      onChange("")
+      return
+    }
+    if (!isWholeAge(text)) {
+      setAgeDraft(raw)
+      return
+    }
+    const age = Number(text)
+    if (reading && typedAgeMatches(reading, age)) {
+      setAgeDraft(reading.kind === "ambiguous" ? String(age) : null)
+      return
+    }
+    const year =
+      mode === "person"
+        ? yearFromTypedAge(age, { kind: "today", asOf })
+        : yearFromTypedAge(age, { kind: "since-birth", birthDate: clientDateOfBirth ?? "" })
+    if (year == null) {
+      setAgeDraft(raw)
+      return
+    }
+    setAgeDraft(null)
+    onChange(year)
+  }
+
+  const through = asOfParts.year ?? new Date().getFullYear()
+  const years = yearChoices(parsed.year, through)
+  const ageHint = ageInvalid
+    ? "Enter an age between 0 and 130"
+    : ageDisabled
+      ? "The client's date of birth is needed to enter by age."
+      : reading?.kind === "before_birth"
+        ? mode === "client-at-event"
+          ? "Before client was born"
+          : undefined
+        : reading
+          ? agePrecisionNote(reading)
+          : undefined
+
   return (
-    <div className="min-w-0 space-y-2">
-      <SelectField
-        id={`${id}_precision`}
-        label={label}
-        value={precision}
-        onChange={(next) => onChange(next as StartPrecision | "", "")}
-      >
-        <option value="">Not recorded</option>
-        <option value="year">Year</option>
-        <option value="year_month">Month and year</option>
-        <option value="date">Full date</option>
-        {allowAge ? <option value="age">Age only</option> : null}
-      </SelectField>
-      {precision === "year" ? (
-        <Input
-          id={id}
-          className={mobileControlClassName}
-          inputMode="numeric"
-          placeholder="YYYY"
-          value={value}
-          onChange={(event) => onChange(precision, event.target.value)}
-        />
-      ) : null}
-      {precision === "year_month" ? (
-        <DateInput id={id} type="month" value={value} onChange={(event) => onChange(precision, event.target.value)} />
-      ) : null}
-      {precision === "date" ? (
-        <DateInput id={id} type="date" value={value} onChange={(event) => onChange(precision, event.target.value)} />
-      ) : null}
-      {precision === "age" ? (
-        <Input
-          id={id}
-          className={mobileControlClassName}
-          inputMode="numeric"
-          placeholder="Age"
-          value={value}
-          onChange={(event) => onChange(precision, event.target.value)}
-        />
-      ) : null}
+    <div className="min-w-0 space-y-3">
+      {mode === "date-only" ? null : (
+        <Field
+          label={mode === "person" ? "Age" : "Client's age at the time"}
+          htmlFor={`${id}-age`}
+          hint={ageHint || undefined}
+        >
+          <Input
+            id={`${id}-age`}
+            className={mobileControlClassName}
+            inputMode="numeric"
+            autoComplete="off"
+            disabled={ageDisabled}
+            value={ageShown}
+            onFocus={(event) => event.currentTarget.select()}
+            onChange={(event) => onAgeInput(event.target.value)}
+          />
+        </Field>
+      )}
+      <fieldset className="min-w-0 space-y-1.5">
+        <legend className="text-sm font-medium">{dateLabel}</legend>
+        <div className="flex min-w-0 gap-2">
+          <select
+            id={`${id}-year`}
+            aria-label={`${dateLabel} year`}
+            className={cn(selectClassName, "w-0 min-w-0 flex-1 basis-0")}
+            value={parsed.year == null ? "" : String(parsed.year)}
+            onChange={(event) => {
+              const year = event.target.value === "" ? null : Number(event.target.value)
+              if (year == null) {
+                commit({ year: null, month: null, day: null })
+                return
+              }
+              commit({ year, month: parsed.month, day: parsed.month == null ? null : parsed.day })
+            }}
+          >
+            <option value="">Not selected</option>
+            {years.map((year) => (
+              <option key={year} value={year}>
+                {year}
+              </option>
+            ))}
+          </select>
+          <select
+            id={`${id}-month`}
+            aria-label={`${dateLabel} month`}
+            className={cn(selectClassName, "w-0 min-w-0 flex-1 basis-0")}
+            disabled={parsed.year == null}
+            value={parsed.month == null ? "" : String(parsed.month)}
+            onChange={(event) => {
+              if (parsed.year == null) return
+              const month = event.target.value === "" ? null : Number(event.target.value)
+              commit({ year: parsed.year, month, day: month == null ? null : parsed.day })
+            }}
+          >
+            <option value="">Not selected</option>
+            {MONTH_LABELS.map((label, index) => (
+              <option key={label} value={index + 1}>
+                {label}
+              </option>
+            ))}
+          </select>
+          <select
+            id={`${id}-day`}
+            aria-label={`${dateLabel} day`}
+            className={cn(selectClassName, "w-0 min-w-0 flex-1 basis-0")}
+            disabled={parsed.year == null || parsed.month == null}
+            value={parsed.day == null ? "" : String(parsed.day)}
+            onChange={(event) => {
+              if (parsed.year == null || parsed.month == null) return
+              const day = event.target.value === "" ? null : Number(event.target.value)
+              commit({ year: parsed.year, month: parsed.month, day })
+            }}
+          >
+            <option value="">Not selected</option>
+            {Array.from({ length: 31 }, (_, index) => index + 1).map((day) => (
+              <option key={day} value={day}>
+                {String(day).padStart(2, "0")}
+              </option>
+            ))}
+          </select>
+        </div>
+      </fieldset>
     </div>
   )
 }

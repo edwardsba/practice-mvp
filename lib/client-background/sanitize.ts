@@ -49,6 +49,11 @@ import {
   type StartPrecision,
   type SubstanceStatus,
 } from "@/lib/client-background/types"
+import {
+  canonicalPartialDate,
+  parsePartialDate,
+  precisionForPartialDate,
+} from "@/lib/client-background/partial-date"
 import { applyRelationshipVisibilityDefaults } from "@/lib/client-background/visibility"
 import { todayDateString } from "@/lib/dates/practice-time"
 
@@ -162,7 +167,7 @@ function sanitizeJob(value: unknown): PreviousJob | null {
     id: str(value.id) || crypto.randomUUID(),
     role: str(value.role),
     employer: str(value.employer),
-    dates: str(value.dates),
+    dates: canonicalPartialDate(str(value.dates)),
   }
   if (!job.role && !job.employer && !job.dates) return null
   return job
@@ -238,21 +243,24 @@ export function sanitizeRelationship(value: unknown, fallbackId = ""): Relations
   const raw = isRecord(value) ? value : {}
   const role = oneOf<RelationshipToClient>(raw.relationshipToClient, RELATIONSHIP_TO_CLIENT)
   const dependency = oneOf<DependencyValue>(raw.dependency, DEPENDENCY_VALUES)
-  const dateOfBirth = isoDate(raw.dateOfBirth)
-  let approximateAge = ageOrNull(raw.approximateAge)
-  let approximateAgeRecordedOn = isoDate(raw.approximateAgeRecordedOn)
-  if (!dateOfBirth && approximateAge == null) {
-    const legacyAge = ageOrNull(raw.age)
-    if (legacyAge != null) {
-      approximateAge = legacyAge
-      approximateAgeRecordedOn = approximateAgeRecordedOn || todayDateString()
+  let dateOfBirth = canonicalPartialDate(str(raw.dateOfBirth))
+  if (!dateOfBirth) {
+    let approximateAge = ageOrNull(raw.approximateAge)
+    let recordedOn = isoDate(raw.approximateAgeRecordedOn)
+    if (approximateAge == null) {
+      const legacyAge = ageOrNull(raw.age)
+      if (legacyAge != null) {
+        approximateAge = legacyAge
+        recordedOn = recordedOn || todayDateString()
+      }
     }
-  }
-  if (dateOfBirth) {
-    approximateAge = null
-    approximateAgeRecordedOn = ""
-  } else if (approximateAge != null && !approximateAgeRecordedOn) {
-    approximateAgeRecordedOn = todayDateString()
+    if (approximateAge != null) {
+      const recordedYear = parsePartialDate(recordedOn || todayDateString()).year
+      if (recordedYear != null) {
+        const year = recordedYear - approximateAge
+        if (year >= 1 && year <= 9999) dateOfBirth = String(year)
+      }
+    }
   }
   const explicitHealth = oneOf<HealthStatus>(raw.healthStatus, HEALTH_STATUSES)
   const healthStatus = explicitHealth || (bool(raw.deceased) ? "deceased" : "")
@@ -264,8 +272,8 @@ export function sanitizeRelationship(value: unknown, fallbackId = ""): Relations
     givenName: str(raw.givenName),
     displayOrder: intOrNull(raw.displayOrder) ?? 0,
     dateOfBirth,
-    approximateAge,
-    approximateAgeRecordedOn,
+    approximateAge: null,
+    approximateAgeRecordedOn: "",
     healthStatus,
     deceased,
     ageAtDeath: deceased ? intOrNull(raw.ageAtDeath) : null,
@@ -293,14 +301,30 @@ export function sanitizePartnership(value: unknown, fallbackId = ""): Partnershi
     partnerAId: str(raw.partnerAId),
     partnerBId: str(raw.partnerBId),
     relationshipStatus: oneOf<PartnershipStatus>(raw.relationshipStatus, PARTNERSHIP_STATUSES),
-    started: str(raw.started),
-    ended: str(raw.ended),
+    started: canonicalPartialDate(str(raw.started)),
+    ended: canonicalPartialDate(str(raw.ended)),
     qualityOfRelationship: str(raw.qualityOfRelationship),
   }
 }
 
 function sanitizePrecision(value: unknown): StartPrecision | "" {
   return oneOf<StartPrecision>(value, START_PRECISIONS)
+}
+
+function normalizePartialBoundary(
+  precision: StartPrecision | "",
+  value: string
+): { precision: StartPrecision | ""; value: string } {
+  if (!precision) return { precision: "", value: "" }
+  if (precision === "age") {
+    const trimmed = value.trim()
+    if (!/^\d{1,3}$/.test(trimmed)) return { precision: "", value: "" }
+    const age = Number(trimmed)
+    if (age > 130) return { precision: "", value: "" }
+    return { precision: "age", value: String(age) }
+  }
+  const formatted = canonicalPartialDate(value)
+  return { precision: precisionForPartialDate(parsePartialDate(formatted)), value: formatted }
 }
 
 export function sanitizeEvent(value: unknown, fallbackId = ""): EventRecord {
@@ -353,9 +377,15 @@ export function sanitizeEvent(value: unknown, fallbackId = ""): EventRecord {
     }
   }
 
-  if (!event.startPrecision) event.startValue = ""
-  if (!event.endPrecision) event.endValue = ""
-  if (!event.abstinentSincePrecision) event.abstinentSinceValue = ""
+  const start = normalizePartialBoundary(event.startPrecision, event.startValue)
+  event.startPrecision = start.precision
+  event.startValue = start.value
+  const end = normalizePartialBoundary(event.endPrecision, event.endValue)
+  event.endPrecision = end.precision
+  event.endValue = end.value
+  const abstinent = normalizePartialBoundary(event.abstinentSincePrecision, event.abstinentSinceValue)
+  event.abstinentSincePrecision = abstinent.precision === "age" ? "" : abstinent.precision
+  event.abstinentSinceValue = abstinent.precision === "age" ? "" : abstinent.value
 
   return event
 }

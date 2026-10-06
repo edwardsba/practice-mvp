@@ -46,7 +46,9 @@ export const clientRelationshipRecords = pgTable("client_relationship_records", 
   sex: text("sex"),
   givenName: text("given_name"),
   displayOrder: integer("display_order").notNull().default(0),
+  /** Partial date: YYYY, YYYY-MM, or YYYY-MM-DD. */
   dateOfBirth: text("date_of_birth"),
+  /** Legacy. New writes leave this null and store a year in date_of_birth instead. */
   approximateAge: integer("approximate_age"),
   approximateAgeRecordedOn: text("approximate_age_recorded_on"),
   deceased: boolean("deceased").notNull().default(false),

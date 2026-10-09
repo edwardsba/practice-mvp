@@ -286,6 +286,7 @@ export function sanitizeRelationship(value: unknown, fallbackId = ""): Relations
     qualityOfRelationship: str(raw.qualityOfRelationship),
     dependency,
     livingSituation: normalizeLivingSituation(raw.livingSituation),
+    caregiverRelationship: str(raw.caregiverRelationship),
     linkedPartnerRecordId: str(raw.linkedPartnerRecordId) || null,
     partnershipRecordId: str(raw.partnershipRecordId) || null,
   }

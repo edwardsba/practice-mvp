@@ -18,7 +18,7 @@ import {
   updatePartnership,
   updateRelationshipDetail,
 } from "@/lib/client-background/mutations"
-import type { CreateRelationshipInput, EventType } from "@/lib/client-background/types"
+import type { EventType, RelationshipRelink } from "@/lib/client-background/types"
 
 function refresh(clientId: string) {
   revalidatePath(`/clients/${clientId}/background`)
@@ -104,13 +104,18 @@ export async function saveRiskAction(clientId: string, risk: unknown) {
   return result
 }
 
-export async function createRelationshipAction(clientId: string, spec: CreateRelationshipInput) {
+export async function createRelationshipAction(
+  clientId: string,
+  relationship: unknown,
+  associatedParentId?: string | null
+) {
   const context = await requirePractitionerContext()
   const result = await createRelationship({
     clientId,
     practiceId: context.practiceId,
     userId: context.userId,
-    spec,
+    relationship,
+    associatedParentId,
   })
   if (!result.error) refresh(clientId)
   return result
@@ -119,7 +124,8 @@ export async function createRelationshipAction(clientId: string, spec: CreateRel
 export async function updateRelationshipAction(
   clientId: string,
   relationship: unknown,
-  partnerships: unknown
+  partnerships: unknown,
+  options?: { associatedParentId?: string | null; relink?: RelationshipRelink | null }
 ) {
   const context = await requirePractitionerContext()
   const result = await updateRelationshipDetail({
@@ -128,6 +134,8 @@ export async function updateRelationshipAction(
     userId: context.userId,
     relationship,
     partnerships,
+    associatedParentId: options?.associatedParentId,
+    relink: options?.relink,
   })
   if (!result.error) refresh(clientId)
   return result

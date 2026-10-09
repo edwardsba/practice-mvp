@@ -25,11 +25,13 @@ export function Field({
   label,
   htmlFor,
   hint,
+  error,
   children,
 }: {
   label: string
   htmlFor?: string
   hint?: string
+  error?: string | null
   children: ReactNode
 }) {
   return (
@@ -37,6 +39,7 @@ export function Field({
       <Label htmlFor={htmlFor}>{label}</Label>
       {children}
       {hint ? <p className="text-xs text-muted-foreground">{hint}</p> : null}
+      {error ? <p className="text-sm text-destructive">{error}</p> : null}
     </div>
   )
 }
@@ -102,6 +105,8 @@ export function SelectField({
   onChange,
   children,
   hint,
+  error,
+  disabled,
 }: {
   id: string
   label: string
@@ -109,10 +114,19 @@ export function SelectField({
   onChange: (value: string) => void
   children: ReactNode
   hint?: string
+  error?: string | null
+  disabled?: boolean
 }) {
   return (
-    <Field label={label} htmlFor={id} hint={hint}>
-      <select id={id} className={selectClassName} value={value} onChange={(event) => onChange(event.target.value)}>
+    <Field label={label} htmlFor={id} hint={hint} error={error}>
+      <select
+        id={id}
+        className={cn(selectClassName, "disabled:cursor-not-allowed disabled:opacity-50")}
+        value={value}
+        disabled={disabled}
+        aria-invalid={error ? true : undefined}
+        onChange={(event) => onChange(event.target.value)}
+      >
         {children}
       </select>
     </Field>

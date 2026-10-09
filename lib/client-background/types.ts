@@ -3,6 +3,7 @@ export const RELATIONSHIP_TO_CLIENT = [
   "father",
   "parent",
   "step_parent",
+  "other_caregiver",
   "sibling_full",
   "sibling_half",
   "sibling_step",
@@ -12,6 +13,22 @@ export const RELATIONSHIP_TO_CLIENT = [
   "child_step",
 ] as const
 export type RelationshipToClient = (typeof RELATIONSHIP_TO_CLIENT)[number]
+
+/** Types offered by Add relationship and by the type select. Mother and Father are always present and are not chosen here. */
+export const ADDABLE_RELATIONSHIP_GROUPS: { label: string; roles: RelationshipToClient[] }[] = [
+  { label: "Parents", roles: ["parent", "step_parent", "other_caregiver"] },
+  { label: "Siblings", roles: ["sibling_full", "sibling_half", "sibling_step"] },
+  { label: "Partners", roles: ["current_partner", "prior_partner"] },
+  { label: "Children", roles: ["child_biological", "child_step"] },
+]
+
+export const ADDABLE_RELATIONSHIP_ROLES: RelationshipToClient[] = ADDABLE_RELATIONSHIP_GROUPS.flatMap(
+  (group) => group.roles
+)
+
+export type RelationshipRelink =
+  | { action: "move"; targetRecordId: string }
+  | { action: "unlink" }
 
 export const ORIGIN_PARENT_ROLES = ["mother", "father", "parent"] as const
 export type OriginParentRole = (typeof ORIGIN_PARENT_ROLES)[number]
@@ -85,12 +102,13 @@ export const RELATIONSHIP_TO_CLIENT_LABELS: Record<RelationshipToClient, string>
   father: "Father",
   parent: "Parent",
   step_parent: "Step-parent",
-  sibling_full: "Full sibling",
+  other_caregiver: "Other primary caregiver",
+  sibling_full: "Sibling",
   sibling_half: "Half-sibling",
   sibling_step: "Step-sibling",
   current_partner: "Current partner",
   prior_partner: "Prior partner",
-  child_biological: "Biological child",
+  child_biological: "Child",
   child_step: "Step-child",
 }
 
@@ -329,6 +347,8 @@ export type RelationshipRecord = {
   qualityOfRelationship: string
   dependency: DependencyValue | ""
   livingSituation: RelationshipLivingSituation | ""
+  /** Free text for other_caregiver, such as grandparent or foster carer. Cleared for every other role. */
+  caregiverRelationship: string
   linkedPartnerRecordId: string | null
   partnershipRecordId: string | null
 }
@@ -485,15 +505,6 @@ export function emptyEvent(eventType: EventType, displayOrder: number): Omit<Eve
     displayOrder,
   }
 }
-
-export type CreateRelationshipInput =
-  | { kind: "parent"; role: "mother" | "father" | "parent" }
-  | { kind: "full_sibling"; partnershipRecordId: string | null }
-  | { kind: "partner"; role: "current_partner" | "prior_partner" }
-  | { kind: "unlinked_child"; role: "child_biological" | "child_step" }
-  | { kind: "child"; partnerRecordId: string; role: "child_biological" | "child_step" }
-  | { kind: "step_parent"; parentRecordId: string }
-  | { kind: "step_sibling"; partnershipRecordId: string; role: "sibling_half" | "sibling_step" }
 
 export function isOneOf<T extends string>(value: string, options: readonly T[]): value is T {
   return (options as readonly string[]).includes(value)

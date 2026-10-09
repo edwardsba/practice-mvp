@@ -4,6 +4,7 @@ import { clientAgeAtStart, compareEventsChronologically, lifeStageAtStart } from
 import {
   buildRelationshipTree,
   canonicalParentsLink,
+  familyOfOriginSequence,
   parentsRelationshipLabel,
   relationshipLineLabel,
 } from "@/lib/client-background/tree"
@@ -28,6 +29,7 @@ function person(partial: Partial<RelationshipRecord> & Pick<RelationshipRecord, 
     qualityOfRelationship: "",
     dependency: "",
     livingSituation: "",
+    caregiverRelationship: "",
     linkedPartnerRecordId: null,
     partnershipRecordId: null,
     ...partial,
@@ -67,16 +69,47 @@ const child = person({
   linkedPartnerRecordId: "partner",
 })
 const unlinked = person({ relationshipRecordId: "unlinked", relationshipToClient: "child_step", givenName: "Kai" })
+const looseChild = person({
+  relationshipRecordId: "loose",
+  relationshipToClient: "child_biological",
+  givenName: "Noa",
+})
+const extraParent = person({
+  relationshipRecordId: "parent",
+  relationshipToClient: "parent",
+  givenName: "Pat",
+  displayOrder: 2,
+})
+const caregiver = person({
+  relationshipRecordId: "care",
+  relationshipToClient: "other_caregiver",
+  givenName: "Nan",
+  caregiverRelationship: "grandparent",
+  displayOrder: 4,
+})
 
-const tree = buildRelationshipTree(
-  [child, halfSibling, partner, fullSibling, stepParent, father, mother, unlinked],
-  [
-    partnership({ partnershipRecordId: "parents", partnerAId: "mother", partnerBId: "father" }),
-    partnership({ partnershipRecordId: "step-link", partnerAId: "mother", partnerBId: "step" }),
-  ]
-)
+const treePeople = [
+  child,
+  halfSibling,
+  partner,
+  fullSibling,
+  stepParent,
+  father,
+  mother,
+  unlinked,
+  looseChild,
+  extraParent,
+  caregiver,
+]
+const treePartnerships = [
+  partnership({ partnershipRecordId: "parents", partnerAId: "mother", partnerBId: "father" }),
+  partnership({ partnershipRecordId: "step-link", partnerAId: "mother", partnerBId: "step" }),
+]
 
-assert.deepEqual(tree.originParents.map((item) => item.relationshipRecordId), ["mother", "father"])
+const tree = buildRelationshipTree(treePeople, treePartnerships)
+
+assert.deepEqual(tree.originParents.map((item) => item.relationshipRecordId), ["mother", "father", "parent"])
+assert.deepEqual(tree.otherCaregivers.map((item) => item.relationshipRecordId), ["care"])
 assert.deepEqual(tree.fullSiblings.map((item) => item.relationshipRecordId), ["sib"])
 assert.equal(tree.otherFamily.length, 1)
 assert.equal(tree.otherFamily[0]?.parent.relationshipRecordId, "mother")
@@ -87,7 +120,16 @@ assert.deepEqual(
 )
 assert.equal(tree.partners.length, 1)
 assert.deepEqual(tree.partners[0]?.children.map((item) => item.relationshipRecordId), ["child"])
-assert.deepEqual(tree.unlinkedChildren.map((item) => item.relationshipRecordId), ["unlinked"])
+assert.deepEqual(tree.unlinkedChildren.map((item) => item.relationshipRecordId), ["loose"])
+assert.deepEqual(tree.unlinkedStepChildren.map((item) => item.relationshipRecordId), ["unlinked"])
+assert.equal(
+  tree.unlinkedChildren.some((item) => item.relationshipToClient === "child_step"),
+  false
+)
+assert.equal(
+  tree.unlinkedStepChildren.some((item) => item.relationshipToClient === "child_biological"),
+  false
+)
 assert.equal(tree.unlinkedStepParents.length, 0)
 assert.equal(tree.unlinkedStepSiblings.length, 0)
 
@@ -125,7 +167,27 @@ assert.equal(
   "Mother – Jane"
 )
 assert.equal(relationshipLineLabel(stepParent, "De facto", "2026-10-02"), "Step-parent – Alex – De facto")
-assert.equal(relationshipLineLabel(fullSibling, undefined, "2026-10-02"), "Full sibling – Sam")
+assert.equal(relationshipLineLabel(fullSibling, undefined, "2026-10-02"), "Sibling – Sam")
+assert.equal(
+  relationshipLineLabel(caregiver, undefined, "2026-10-02"),
+  "Other primary caregiver – Nan (grandparent)"
+)
+assert.equal(
+  relationshipLineLabel({ ...caregiver, caregiverRelationship: "" }, undefined, "2026-10-02"),
+  "Other primary caregiver – Nan"
+)
+
+const originOrder = familyOfOriginSequence(treePeople, treePartnerships)
+const parentsRelationshipIndex = originOrder.findIndex((item) => item.kind === "parents-relationship")
+const caregiverIndex = originOrder.findIndex((item) => item.kind === "person" && item.id === "care")
+const siblingIndex = originOrder.findIndex((item) => item.kind === "person" && item.id === "sib")
+assert.deepEqual(
+  originOrder.flatMap((item) => (item.kind === "person" ? [item.id] : [])).slice(0, 3),
+  ["mother", "father", "parent"]
+)
+assert.ok(parentsRelationshipIndex > 2)
+assert.ok(caregiverIndex > parentsRelationshipIndex)
+assert.ok(siblingIndex > caregiverIndex)
 assert.equal(relationshipFieldVisibility(fullSibling).lengthOfRelationship, false)
 assert.equal(
   relationshipFieldVisibility(person({ relationshipRecordId: "half-vis", relationshipToClient: "sibling_half" }))

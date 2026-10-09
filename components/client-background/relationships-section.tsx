@@ -22,6 +22,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
@@ -30,6 +31,8 @@ import { Label } from "@/components/ui/label"
 import { assessAge, displayedAge, formatPartialDateLabel } from "@/lib/client-background/age"
 import { parsePartialDate } from "@/lib/client-background/partial-date"
 import {
+  ADDABLE_RELATIONSHIP_GROUPS,
+  ADDABLE_RELATIONSHIP_ROLES,
   DEPENDENCY_LABELS,
   DEPENDENCY_VALUES,
   HEALTH_STATUSES,
@@ -42,21 +45,28 @@ import {
   SEX_OPTIONS,
   type PartnershipRecord,
   type RelationshipRecord,
+  type RelationshipRelink,
   type RelationshipToClient,
 } from "@/lib/client-background/types"
 import { todayDateString } from "@/lib/dates/practice-time"
-import type { CreateRelationshipInput } from "@/lib/client-background/types"
 import {
+  brokenLinksForRoleChange,
   buildRelationshipTree,
   canonicalParentsLink,
+  familyOfOriginLayout,
+  linkedParentId,
   originPartnerships,
   otherPersonInPartnership,
   parentsRelationshipLabel,
   partnershipsForPerson,
   personName,
   personRoleLabel,
+  personWithRoleLabel,
   relationshipLineLabel,
+  stepParentLinkLabel,
+  stepParentLinks,
   treeLineStatus,
+  type BrokenLinks,
 } from "@/lib/client-background/tree"
 import {
   applyRelationshipVisibilityDefaults,
@@ -65,16 +75,19 @@ import {
 } from "@/lib/client-background/visibility"
 import { cn } from "@/lib/utils"
 
-type Picker =
-  | null
-  | "menu"
-  | "partner"
-  | "unlinked-child"
-  | "sibling-partnership"
-  | { kind: "child"; partnerRecordId: string }
-  | { kind: "step-sibling"; partnershipRecordId: string }
-
 type Selection = { kind: "person"; id: string } | { kind: "partnership"; id: string } | null
+
+type RelinkPrompt = {
+  links: BrokenLinks
+  moveTo: string
+  name: string
+  oldRole: RelationshipToClient
+  newRole: RelationshipToClient
+}
+
+const STEP_SIBLING_HELPER = "A step-sibling is listed under a step-parent. Add the step-parent first."
+const STEP_CHILD_HELPER = "A step-child is linked to a partner. Add the partner first."
+const CAREGIVER_HINT = "For example: grandparent, aunt, foster carer."
 
 export function RelationshipsSection({
   clientId,
@@ -90,22 +103,29 @@ export function RelationshipsSection({
   const [selection, setSelection] = useState<Selection>(null)
   const [mobileScreen, setMobileScreen] = useState<"list" | "detail" | "edit">("list")
   const [editing, setEditing] = useState(false)
+  const [isNew, setIsNew] = useState(false)
   const [draft, setDraft] = useState<RelationshipRecord | null>(null)
   const [draftPairs, setDraftPairs] = useState<PartnershipRecord[]>([])
+  const [associatedParentId, setAssociatedParentId] = useState<string | null>(null)
   const [partnershipDraft, setPartnershipDraft] = useState<PartnershipRecord | null>(null)
-  const [picker, setPicker] = useState<Picker>(null)
+  const [typeListOpen, setTypeListOpen] = useState(false)
+  const [relinkPrompt, setRelinkPrompt] = useState<RelinkPrompt | null>(null)
+  const [linkError, setLinkError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const tree = useMemo(() => buildRelationshipTree(people, pairs), [people, pairs])
   const parentLinks = useMemo(() => originPartnerships(people, pairs), [people, pairs])
   const parentsLink = useMemo(() => canonicalParentsLink(people, pairs), [people, pairs])
-  const originRows = useMemo(() => {
-    const primary = [parentsLink.mother, parentsLink.father].filter((person): person is RelationshipRecord => person != null)
-    const primaryIds = new Set(primary.map((person) => person.relationshipRecordId))
-    const rest = tree.originParents.filter((person) => !primaryIds.has(person.relationshipRecordId))
-    return [...primary, ...rest]
-  }, [parentsLink, tree.originParents])
+  const layout = useMemo(() => familyOfOriginLayout(tree, parentsLink), [tree, parentsLink])
+  const needsLinking = useMemo(
+    () => [
+      ...tree.unlinkedStepParents.map((person) => ({ person, action: "Choose parent ›" })),
+      ...tree.unlinkedStepSiblings.map((person) => ({ person, action: "Choose step-parent ›" })),
+      ...tree.unlinkedStepChildren.map((person) => ({ person, action: "Choose partner ›" })),
+    ],
+    [tree]
+  )
 
   function personPartnerships(personId: string, partnershipList: PartnershipRecord[]) {
     return partnershipsForPerson(personId, partnershipList).filter(
@@ -114,60 +134,83 @@ export function RelationshipsSection({
   }
 
   function openPerson(person: RelationshipRecord, partnershipList: PartnershipRecord[], startEditing = false) {
+    setIsNew(false)
     setSelection({ kind: "person", id: person.relationshipRecordId })
     setMobileScreen(startEditing ? "edit" : "detail")
     setDraft({ ...person })
     setDraftPairs(personPartnerships(person.relationshipRecordId, partnershipList).map((item) => ({ ...item })))
+    setAssociatedParentId(linkedParentId(person.relationshipRecordId, people, partnershipList))
     setPartnershipDraft(null)
     setEditing(startEditing)
     setError(null)
-    setPicker(null)
+    setLinkError(null)
+    setTypeListOpen(false)
+    setRelinkPrompt(null)
   }
 
   function openPartnership(partnership: PartnershipRecord, startEditing = false) {
+    setIsNew(false)
     setSelection({ kind: "partnership", id: partnership.partnershipRecordId })
     setMobileScreen(startEditing ? "edit" : "detail")
     setPartnershipDraft({ ...partnership })
     setDraft(null)
     setDraftPairs([])
+    setAssociatedParentId(null)
     setEditing(startEditing)
     setError(null)
-    setPicker(null)
+    setLinkError(null)
+    setTypeListOpen(false)
+    setRelinkPrompt(null)
   }
 
-  async function create(spec: CreateRelationshipInput) {
-    setPending(true)
+  function openNew(
+    role: RelationshipToClient,
+    preset?: {
+      associatedParentId?: string | null
+      partnershipRecordId?: string | null
+      linkedPartnerRecordId?: string | null
+    }
+  ) {
+    const record = blankRelationship(role)
+    if (preset?.partnershipRecordId) record.partnershipRecordId = preset.partnershipRecordId
+    if (preset?.linkedPartnerRecordId) record.linkedPartnerRecordId = preset.linkedPartnerRecordId
+    if (role === "sibling_full" && !record.partnershipRecordId && parentLinks.length === 1) {
+      record.partnershipRecordId = parentLinks[0].partnershipRecordId
+    }
+    setIsNew(true)
+    setSelection(null)
+    setDraft(record)
+    setDraftPairs([])
+    setAssociatedParentId(role === "step_parent" ? preset?.associatedParentId ?? null : null)
+    setPartnershipDraft(null)
+    setEditing(true)
+    setMobileScreen("edit")
     setError(null)
-    const result = await createRelationshipAction(clientId, spec)
-    setPending(false)
-    if (result.error || !result.relationship) {
-      setError(result.error ?? "Could not add this person.")
-      return
-    }
-    const nextPeople = [...people, result.relationship]
-    const nextPairs = mergePartnerships(pairs, result.partnerships ?? [])
-    setPeople(nextPeople)
-    setPairs(nextPairs)
-    openPerson(result.relationship, nextPairs, true)
-  }
-
-  function addFullSibling() {
-    if (parentLinks.length > 1) {
-      setPicker("sibling-partnership")
-      return
-    }
-    void create({
-      kind: "full_sibling",
-      partnershipRecordId: parentLinks[0]?.partnershipRecordId ?? null,
-    })
+    setLinkError(null)
+    setTypeListOpen(false)
+    setRelinkPrompt(null)
   }
 
   function cancelEdit() {
+    setLinkError(null)
+    setRelinkPrompt(null)
+    if (isNew) {
+      setIsNew(false)
+      setDraft(null)
+      setDraftPairs([])
+      setAssociatedParentId(null)
+      setEditing(false)
+      setSelection(null)
+      setMobileScreen("list")
+      setError(null)
+      return
+    }
     if (selection?.kind === "person") {
       const person = people.find((item) => item.relationshipRecordId === selection.id)
       if (person) {
         setDraft({ ...person })
         setDraftPairs(personPartnerships(person.relationshipRecordId, pairs).map((item) => ({ ...item })))
+        setAssociatedParentId(linkedParentId(person.relationshipRecordId, people, pairs))
       }
     }
     if (selection?.kind === "partnership") {
@@ -179,27 +222,80 @@ export function RelationshipsSection({
     setError(null)
   }
 
-  async function savePerson() {
+  function changeRole(role: RelationshipToClient) {
     if (!draft) return
+    const stayingStep = role === "step_parent" && draft.relationshipToClient === "step_parent"
+    setLinkError(null)
+    setDraft(withRole(draft, role, parentLinks))
+    if (!stayingStep) setAssociatedParentId(null)
+  }
+
+  async function savePerson(relink?: RelationshipRelink) {
+    if (!draft) return
+    const associationError = associationErrorFor(draft, associatedParentId, parentLinks)
+    if (associationError) {
+      setLinkError(associationError)
+      return
+    }
+    setLinkError(null)
+
+    if (!isNew && !relink) {
+      const existing = people.find((person) => person.relationshipRecordId === draft.relationshipRecordId)
+      if (existing) {
+        const links = brokenLinksForRoleChange(existing, draft.relationshipToClient, people, pairs)
+        if (links) {
+          setRelinkPrompt({
+            links,
+            moveTo: links.targets[0]?.id ?? "",
+            name: personName({ ...existing, givenName: draft.givenName.trim() || existing.givenName }),
+            oldRole: existing.relationshipToClient,
+            newRole: draft.relationshipToClient,
+          })
+          return
+        }
+      }
+    }
+
     setPending(true)
     setError(null)
-    const result = await updateRelationshipAction(clientId, draft, draftPairs)
+    const result = isNew
+      ? await createRelationshipAction(clientId, draft, associatedParentId)
+      : await updateRelationshipAction(clientId, draft, draftPairs, {
+          associatedParentId,
+          relink: relink ?? null,
+        })
     setPending(false)
     if (result.error || !result.relationship) {
       setError(result.error ?? "Could not save this person.")
+      setRelinkPrompt(null)
       return
     }
-    setPeople((current) =>
-      current.map((person) =>
-        person.relationshipRecordId === result.relationship!.relationshipRecordId ? result.relationship! : person
-      )
+
+    const removed = new Set(result.removedPartnershipIds ?? [])
+    const nextPairs = mergePartnerships(pairs, result.partnerships ?? []).filter(
+      (pair) => !removed.has(pair.partnershipRecordId)
     )
-    const nextPairs = result.partnerships ? mergePartnerships(pairs, result.partnerships) : pairs
-    if (result.partnerships) setPairs(nextPairs)
+    const nextPeople = new Map(people.map((person) => [person.relationshipRecordId, person]))
+    for (const person of result.affectedRelationships ?? []) {
+      nextPeople.set(person.relationshipRecordId, person)
+    }
+    nextPeople.set(result.relationship.relationshipRecordId, result.relationship)
+    const peopleList = [...nextPeople.values()]
+    const nextParents = canonicalParentsLink(peopleList, nextPairs)
+    setPeople(peopleList)
+    setPairs(nextPairs)
+    setIsNew(false)
     setDraft(result.relationship)
-    setDraftPairs(personPartnerships(result.relationship.relationshipRecordId, nextPairs).map((item) => ({ ...item })))
+    setDraftPairs(
+      partnershipsForPerson(result.relationship.relationshipRecordId, nextPairs)
+        .filter((item) => item.partnershipRecordId !== nextParents.partnership?.partnershipRecordId)
+        .map((item) => ({ ...item }))
+    )
+    setAssociatedParentId(linkedParentId(result.relationship.relationshipRecordId, peopleList, nextPairs))
+    setSelection({ kind: "person", id: result.relationship.relationshipRecordId })
     setEditing(false)
     setMobileScreen("detail")
+    setRelinkPrompt(null)
   }
 
   async function savePartnership() {
@@ -219,7 +315,7 @@ export function RelationshipsSection({
   }
 
   async function remove() {
-    if (!draft) return
+    if (!draft || isNew) return
     if (!window.confirm(`Remove ${personName(draft)} from this client's relationships?`)) return
     setPending(true)
     setError(null)
@@ -235,7 +331,9 @@ export function RelationshipsSection({
     setSelection(null)
     setDraft(null)
     setDraftPairs([])
+    setAssociatedParentId(null)
     setEditing(false)
+    setIsNew(false)
     setMobileScreen("list")
   }
 
@@ -249,18 +347,38 @@ export function RelationshipsSection({
 
   function patch(partial: Partial<RelationshipRecord>) {
     if (!draft) return
+    setLinkError(null)
     setDraft(applyRelationshipVisibilityDefaults({ ...draft, ...partial }))
   }
 
   const list = (
     <div className="space-y-4 text-[13px] lg:max-h-[75vh] lg:overflow-y-auto lg:pr-1">
-      <Button type="button" size="sm" disabled={pending} onClick={() => setPicker("menu")}>
-        + Add family member
+      <Button type="button" size="sm" disabled={pending} onClick={() => setTypeListOpen(true)}>
+        + Add relationship
       </Button>
       {error && !draft && !partnershipDraft ? <p className="text-sm text-destructive">{error}</p> : null}
 
       <section className="space-y-1">
         <h2 className="text-sm font-semibold">Family of Origin</h2>
+        {layout.parents.map((person) => (
+          <TreeRow
+            key={person.relationshipRecordId}
+            label={relationshipLineLabel(person, treeLineStatus(person, pairs))}
+            selected={selection?.kind === "person" && selection.id === person.relationshipRecordId}
+            onSelect={() => openPerson(person, pairs)}
+            extra={
+              <Button
+                type="button"
+                variant="ghost"
+                size="xs"
+                disabled={pending}
+                onClick={() => openNew("step_parent", { associatedParentId: person.relationshipRecordId })}
+              >
+                + Add step-parent
+              </Button>
+            }
+          />
+        ))}
         {parentsLink.partnership ? (
           <TreeRow
             label={parentsRelationshipLabel(parentsLink.partnership)}
@@ -270,28 +388,15 @@ export function RelationshipsSection({
         ) : (
           <p className="px-2 text-muted-foreground">Parents&apos; relationship</p>
         )}
-        {originRows.map((person) => (
+        {layout.caregivers.map((person) => (
           <TreeRow
             key={person.relationshipRecordId}
             label={relationshipLineLabel(person, treeLineStatus(person, pairs))}
             selected={selection?.kind === "person" && selection.id === person.relationshipRecordId}
             onSelect={() => openPerson(person, pairs)}
-            extra={
-              person.relationshipToClient === "mother" || person.relationshipToClient === "father" ? (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="xs"
-                  disabled={pending}
-                  onClick={() => void create({ kind: "step_parent", parentRecordId: person.relationshipRecordId })}
-                >
-                  + Add relationship
-                </Button>
-              ) : null
-            }
           />
         ))}
-        {tree.fullSiblings.map((person) => (
+        {layout.siblings.map((person) => (
           <TreeRow
             key={person.relationshipRecordId}
             label={relationshipLineLabel(person)}
@@ -300,7 +405,7 @@ export function RelationshipsSection({
           />
         ))}
         <div className="pt-1">
-          <Button type="button" variant="outline" size="xs" disabled={pending} onClick={addFullSibling}>
+          <Button type="button" variant="outline" size="xs" disabled={pending} onClick={() => openNew("sibling_full")}>
             + Add sibling
           </Button>
         </div>
@@ -308,9 +413,7 @@ export function RelationshipsSection({
 
       <section className="space-y-2 border-t pt-4">
         <h2 className="text-sm font-semibold">Extended Family</h2>
-        {tree.otherFamily.length === 0 && tree.unlinkedStepParents.length === 0 && tree.unlinkedStepSiblings.length === 0 ? (
-          <p className="text-muted-foreground">Nothing recorded</p>
-        ) : null}
+        {tree.otherFamily.length === 0 ? <p className="text-muted-foreground">Nothing recorded</p> : null}
         {tree.otherFamily.map((group) => (
           <div key={group.parent.relationshipRecordId} className="space-y-1">
             <p className="font-medium">{personName(group.parent)}</p>
@@ -335,29 +438,15 @@ export function RelationshipsSection({
                   variant="outline"
                   size="xs"
                   disabled={pending}
-                  onClick={() => setPicker({ kind: "step-sibling", partnershipRecordId: node.partnership.partnershipRecordId })}
+                  onClick={() =>
+                    openNew("sibling_step", { partnershipRecordId: node.partnership.partnershipRecordId })
+                  }
                 >
                   + Add step-sibling
                 </Button>
               </div>
             ))}
           </div>
-        ))}
-        {tree.unlinkedStepParents.map((person) => (
-          <TreeRow
-            key={person.relationshipRecordId}
-            label={relationshipLineLabel(person, treeLineStatus(person, pairs))}
-            selected={selection?.kind === "person" && selection.id === person.relationshipRecordId}
-            onSelect={() => openPerson(person, pairs)}
-          />
-        ))}
-        {tree.unlinkedStepSiblings.map((person) => (
-          <TreeRow
-            key={person.relationshipRecordId}
-            label={relationshipLineLabel(person)}
-            selected={selection?.kind === "person" && selection.id === person.relationshipRecordId}
-            onSelect={() => openPerson(person, pairs)}
-          />
         ))}
       </section>
 
@@ -385,14 +474,14 @@ export function RelationshipsSection({
                 variant="outline"
                 size="xs"
                 disabled={pending}
-                onClick={() => setPicker({ kind: "child", partnerRecordId: node.person.relationshipRecordId })}
+                onClick={() => openNew("child_biological", { linkedPartnerRecordId: node.person.relationshipRecordId })}
               >
                 + Add child
               </Button>
             </div>
           </div>
         ))}
-        <Button type="button" variant="outline" size="xs" disabled={pending} onClick={() => setPicker("partner")}>
+        <Button type="button" variant="outline" size="xs" disabled={pending} onClick={() => openNew("current_partner")}>
           + Add partner
         </Button>
         <div className="space-y-1">
@@ -405,11 +494,37 @@ export function RelationshipsSection({
               onSelect={() => openPerson(child, pairs)}
             />
           ))}
-          <Button type="button" variant="outline" size="xs" disabled={pending} onClick={() => setPicker("unlinked-child")}>
+          <Button type="button" variant="outline" size="xs" disabled={pending} onClick={() => openNew("child_biological")}>
             + Add child
           </Button>
         </div>
       </section>
+
+      {needsLinking.length > 0 ? (
+        <section className="space-y-1 rounded-md border border-amber-300 bg-amber-50 p-2 text-amber-950 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100">
+          <h2 className="px-2 text-sm font-semibold">Needs linking</h2>
+          {needsLinking.map(({ person, action }) => {
+            const name = person.givenName.trim() || "Not recorded"
+            const selected = selection?.kind === "person" && selection.id === person.relationshipRecordId
+            return (
+              <button
+                key={person.relationshipRecordId}
+                type="button"
+                className={cn(
+                  "flex min-h-11 w-full items-center justify-between gap-3 rounded-md px-2 text-left text-[13px] hover:bg-amber-100 dark:hover:bg-amber-900",
+                  selected && "bg-amber-100 font-medium dark:bg-amber-900"
+                )}
+                onClick={() => openPerson(person, pairs, true)}
+              >
+                <span>
+                  {personRoleLabel(person)} — {name}
+                </span>
+                <span className="shrink-0 text-xs font-medium">{action}</span>
+              </button>
+            )
+          })}
+        </section>
+      ) : null}
     </div>
   )
 
@@ -434,16 +549,26 @@ export function RelationshipsSection({
       draft={draft}
       draftPairs={draftPairs}
       people={people}
+      partnerships={pairs}
+      isNew={isNew}
       editing={editing}
       pending={pending}
       error={error}
-      canRemove={canRemovePerson(draft, people)}
+      linkError={linkError}
+      associatedParentId={associatedParentId}
+      canRemove={!isNew && canRemovePerson(draft, people)}
       onEdit={() => {
         setEditing(true)
         setMobileScreen("edit")
       }}
       onCancel={cancelEdit}
       onPatch={patch}
+      onRole={changeRole}
+      onAssociatedParentId={(id) => {
+        setLinkError(null)
+        setAssociatedParentId(id)
+      }}
+      onReplaceWithNew={openNew}
       onPairs={setDraftPairs}
       onSave={() => void savePerson()}
       onRemove={() => void remove()}
@@ -452,7 +577,7 @@ export function RelationshipsSection({
     />
   ) : (
     <div className="flex min-h-48 items-center justify-center rounded-md border border-dashed p-6 text-center text-[13px] text-muted-foreground">
-      Select someone from the list, or add a new person
+      Select someone from the list, or add a relationship
     </div>
   )
 
@@ -462,17 +587,95 @@ export function RelationshipsSection({
         <div className={mobileScreen === "list" ? "min-w-0" : "hidden min-w-0 lg:block"}>{list}</div>
         <div className={mobileScreen === "list" ? "hidden min-w-0 lg:block" : "min-w-0"}>{detail}</div>
       </div>
-      <PickerDialog
-        picker={picker}
-        parentLinks={parentLinks}
-        people={people}
-        pending={pending}
-        onClose={() => setPicker(null)}
-        onPick={setPicker}
-        onCreate={(spec) => void create(spec)}
-      />
+      <TypeListDialog open={typeListOpen} pending={pending} onClose={() => setTypeListOpen(false)} onChoose={openNew} />
+      {relinkPrompt ? (
+        <RelinkDialog
+          prompt={relinkPrompt}
+          pending={pending}
+          onMoveTo={(moveTo) => setRelinkPrompt({ ...relinkPrompt, moveTo })}
+          onCancel={() => setRelinkPrompt(null)}
+          onConfirm={() => {
+            const relink: RelationshipRelink = relinkPrompt.moveTo
+              ? { action: "move", targetRecordId: relinkPrompt.moveTo }
+              : { action: "unlink" }
+            void savePerson(relink)
+          }}
+        />
+      ) : null}
     </>
   )
+}
+
+function blankRelationship(role: RelationshipToClient): RelationshipRecord {
+  return {
+    relationshipRecordId: "",
+    relationshipToClient: role,
+    sex: "",
+    givenName: "",
+    displayOrder: 0,
+    dateOfBirth: "",
+    approximateAge: null,
+    approximateAgeRecordedOn: "",
+    healthStatus: "",
+    deceased: false,
+    ageAtDeath: null,
+    healthOrCauseOfDeath: "",
+    lengthOfRelationship: "",
+    relationshipStatus: "",
+    timeSinceEnded: "",
+    qualityOfRelationship: "",
+    dependency: "",
+    livingSituation: "",
+    caregiverRelationship: "",
+    linkedPartnerRecordId: null,
+    partnershipRecordId: null,
+  }
+}
+
+function withRole(
+  record: RelationshipRecord,
+  role: RelationshipToClient,
+  originLinks: PartnershipRecord[]
+): RelationshipRecord {
+  const nested = role === "sibling_half" || role === "sibling_step"
+  const wasNested = record.relationshipToClient === "sibling_half" || record.relationshipToClient === "sibling_step"
+  const child = role === "child_biological" || role === "child_step"
+  const wasChild = record.relationshipToClient === "child_biological" || record.relationshipToClient === "child_step"
+
+  let partnershipRecordId: string | null = null
+  if (nested && wasNested) partnershipRecordId = record.partnershipRecordId
+  if (role === "sibling_full") {
+    if (record.relationshipToClient === "sibling_full" && record.partnershipRecordId) {
+      partnershipRecordId = record.partnershipRecordId
+    } else if (originLinks.length === 1) {
+      partnershipRecordId = originLinks[0].partnershipRecordId
+    }
+  }
+
+  return applyRelationshipVisibilityDefaults({
+    ...record,
+    relationshipToClient: role,
+    partnershipRecordId,
+    linkedPartnerRecordId: child && wasChild ? record.linkedPartnerRecordId : null,
+    caregiverRelationship: role === "other_caregiver" ? record.caregiverRelationship : "",
+  })
+}
+
+function associationErrorFor(
+  draft: RelationshipRecord,
+  parentId: string | null,
+  originLinks: PartnershipRecord[]
+): string | null {
+  const role = draft.relationshipToClient
+  if (role === "step_parent" && !parentId) return "Choose an associated parent."
+  if ((role === "sibling_half" || role === "sibling_step") && !draft.partnershipRecordId) {
+    return "Choose an associated step-parent."
+  }
+  if (role === "sibling_full" && originLinks.length > 1 && !draft.partnershipRecordId) {
+    return "Choose the parents' partnership."
+  }
+  if (role === "child_step" && !draft.linkedPartnerRecordId) return "Choose an associated partner."
+  return null
 }
 
 function canRemovePerson(person: RelationshipRecord, people: RelationshipRecord[]) {
@@ -682,8 +885,8 @@ function BirthReadOnly({ record }: { record: RelationshipRecord }) {
       : displayedAge(assessAge(parsePartialDate(record.dateOfBirth), parsePartialDate(todayDateString()), "person"))
   return (
     <>
-      <ReadOnlyField label="Date of birth" value={formatPartialDateLabel(record.dateOfBirth)} />
       {record.healthStatus === "deceased" ? null : <ReadOnlyField label="Age" value={age} />}
+      <ReadOnlyField label="Date of birth" value={formatPartialDateLabel(record.dateOfBirth)} />
     </>
   )
 }
@@ -692,13 +895,20 @@ function PersonDetail({
   draft,
   draftPairs,
   people,
+  partnerships,
+  isNew,
   editing,
   pending,
   error,
+  linkError,
+  associatedParentId,
   canRemove,
   onEdit,
   onCancel,
   onPatch,
+  onRole,
+  onAssociatedParentId,
+  onReplaceWithNew,
   onPairs,
   onSave,
   onRemove,
@@ -708,13 +918,20 @@ function PersonDetail({
   draft: RelationshipRecord
   draftPairs: PartnershipRecord[]
   people: RelationshipRecord[]
+  partnerships: PartnershipRecord[]
+  isNew: boolean
   editing: boolean
   pending: boolean
   error: string | null
+  linkError: string | null
+  associatedParentId: string | null
   canRemove: boolean
   onEdit: () => void
   onCancel: () => void
   onPatch: (partial: Partial<RelationshipRecord>) => void
+  onRole: (role: RelationshipToClient) => void
+  onAssociatedParentId: (id: string | null) => void
+  onReplaceWithNew: (role: RelationshipToClient) => void
   onPairs: (pairs: PartnershipRecord[]) => void
   onSave: () => void
   onRemove: () => void
@@ -725,7 +942,7 @@ function PersonDetail({
   return (
     <div className="min-w-0 space-y-4 lg:text-[13px] lg:[&_input]:text-[13px] lg:[&_label]:text-[13px] lg:[&_legend]:text-[13px] lg:[&_select]:text-[13px] lg:[&_textarea]:text-[13px]">
       <DetailHeader
-        title={personName(draft)}
+        title={isNew ? "New relationship" : personName(draft)}
         subtitle={personRoleLabel(draft)}
         editing={editing}
         onEdit={onEdit}
@@ -734,8 +951,19 @@ function PersonDetail({
       />
       {editing ? (
         <>
-          <RoleSelect record={draft} onChange={(relationshipToClient) => onPatch({ relationshipToClient })} />
+          <RoleSelect record={draft} onChange={onRole} />
           <TextField id="rel_name" label="Name" value={draft.givenName} onChange={(givenName) => onPatch({ givenName })} />
+          <AssociationFields
+            draft={draft}
+            people={people}
+            partnerships={partnerships}
+            associatedParentId={associatedParentId}
+            linkError={linkError}
+            pending={pending}
+            onPatch={onPatch}
+            onAssociatedParentId={onAssociatedParentId}
+            onReplaceWithNew={onReplaceWithNew}
+          />
           <SelectField id="rel_sex" label="Sex" value={draft.sex} onChange={(sex) => onPatch({ sex })}>
             <option value="">Not recorded</option>
             {SEX_OPTIONS.map((option) => (
@@ -833,6 +1061,217 @@ function PersonDetail({
   )
 }
 
+function AssociationFields({
+  draft,
+  people,
+  partnerships,
+  associatedParentId,
+  linkError,
+  pending,
+  onPatch,
+  onAssociatedParentId,
+  onReplaceWithNew,
+}: {
+  draft: RelationshipRecord
+  people: RelationshipRecord[]
+  partnerships: PartnershipRecord[]
+  associatedParentId: string | null
+  linkError: string | null
+  pending: boolean
+  onPatch: (partial: Partial<RelationshipRecord>) => void
+  onAssociatedParentId: (id: string | null) => void
+  onReplaceWithNew: (role: RelationshipToClient) => void
+}) {
+  const role = draft.relationshipToClient
+  const selfId = draft.relationshipRecordId
+
+  if (role === "step_parent") {
+    return (
+      <SelectField
+        id="rel_associated_parent"
+        label="Associated parent"
+        value={associatedParentId ?? ""}
+        error={linkError}
+        onChange={(value) => onAssociatedParentId(value || null)}
+      >
+        <option value="">Choose a parent</option>
+        {originParentOptions(people, selfId).map((person) => (
+          <option key={person.relationshipRecordId} value={person.relationshipRecordId}>
+            {personWithRoleLabel(person)}
+          </option>
+        ))}
+      </SelectField>
+    )
+  }
+
+  if (role === "other_caregiver") {
+    return (
+      <TextField
+        id="rel_caregiver"
+        label="Caregiver relationship"
+        hint={CAREGIVER_HINT}
+        value={draft.caregiverRelationship}
+        onChange={(caregiverRelationship) => onPatch({ caregiverRelationship })}
+      />
+    )
+  }
+
+  if (role === "sibling_half" || role === "sibling_step") {
+    const links = stepParentLinks(people, partnerships).filter(
+      (link) => link.stepParent.relationshipRecordId !== selfId
+    )
+    if (links.length === 0) {
+      return (
+        <div className="space-y-1.5">
+          <SelectField
+            id="rel_associated_step_parent"
+            label="Associated step-parent"
+            value=""
+            disabled
+            error={linkError}
+            hint={STEP_SIBLING_HELPER}
+            onChange={() => undefined}
+          >
+            <option value="">No step-parent recorded</option>
+          </SelectField>
+          <Button type="button" variant="outline" size="sm" disabled={pending} onClick={() => onReplaceWithNew("step_parent")}>
+            + Add step-parent
+          </Button>
+        </div>
+      )
+    }
+    return (
+      <SelectField
+        id="rel_associated_step_parent"
+        label="Associated step-parent"
+        value={draft.partnershipRecordId ?? ""}
+        error={linkError}
+        onChange={(value) => onPatch({ partnershipRecordId: value || null })}
+      >
+        <option value="">Choose a step-parent</option>
+        {links.map((link) => (
+          <option key={link.partnershipRecordId} value={link.partnershipRecordId}>
+            {stepParentLinkLabel(link)}
+          </option>
+        ))}
+      </SelectField>
+    )
+  }
+
+  if (role === "sibling_full") {
+    const origins = originPartnerships(people, partnerships)
+    if (origins.length <= 1) return null
+    return (
+      <SelectField
+        id="rel_parents_partnership"
+        label="Parents' partnership"
+        value={draft.partnershipRecordId ?? ""}
+        error={linkError}
+        onChange={(value) => onPatch({ partnershipRecordId: value || null })}
+      >
+        <option value="">Choose parents</option>
+        {origins.map((partnership) => (
+          <option key={partnership.partnershipRecordId} value={partnership.partnershipRecordId}>
+            {parentsPartnershipChoice(partnership, people)}
+          </option>
+        ))}
+      </SelectField>
+    )
+  }
+
+  if (role === "child_biological" || role === "child_step") {
+    const partners = partnerOptions(people, selfId)
+    if (role === "child_step" && partners.length === 0) {
+      return (
+        <div className="space-y-1.5">
+          <SelectField
+            id="rel_associated_partner"
+            label="Associated partner"
+            value=""
+            disabled
+            error={linkError}
+            hint={STEP_CHILD_HELPER}
+            onChange={() => undefined}
+          >
+            <option value="">No partner recorded</option>
+          </SelectField>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={pending}
+            onClick={() => onReplaceWithNew("current_partner")}
+          >
+            + Add partner
+          </Button>
+        </div>
+      )
+    }
+    return (
+      <SelectField
+        id="rel_associated_partner"
+        label="Associated partner"
+        value={draft.linkedPartnerRecordId ?? ""}
+        error={linkError}
+        onChange={(value) => onPatch({ linkedPartnerRecordId: value || null })}
+      >
+        {role === "child_biological" ? (
+          <option value="">Not linked to a partner</option>
+        ) : (
+          <option value="">Choose a partner</option>
+        )}
+        {partners.map((person) => (
+          <option key={person.relationshipRecordId} value={person.relationshipRecordId}>
+            {personWithRoleLabel(person)}
+          </option>
+        ))}
+      </SelectField>
+    )
+  }
+
+  return null
+}
+
+function originParentOptions(people: RelationshipRecord[], excludeId: string) {
+  const rank = (role: RelationshipToClient) => (role === "mother" ? 0 : role === "father" ? 1 : 2)
+  return people
+    .filter(
+      (person) =>
+        (person.relationshipToClient === "mother" ||
+          person.relationshipToClient === "father" ||
+          person.relationshipToClient === "parent") &&
+        person.relationshipRecordId !== excludeId
+    )
+    .sort(
+      (a, b) =>
+        rank(a.relationshipToClient) - rank(b.relationshipToClient) ||
+        a.displayOrder - b.displayOrder ||
+        a.givenName.localeCompare(b.givenName)
+    )
+}
+
+function partnerOptions(people: RelationshipRecord[], excludeId: string) {
+  const rank = (role: RelationshipToClient) => (role === "current_partner" ? 0 : 1)
+  return people
+    .filter(
+      (person) =>
+        (person.relationshipToClient === "current_partner" || person.relationshipToClient === "prior_partner") &&
+        person.relationshipRecordId !== excludeId
+    )
+    .sort(
+      (a, b) =>
+        rank(a.relationshipToClient) - rank(b.relationshipToClient) ||
+        a.displayOrder - b.displayOrder ||
+        a.givenName.localeCompare(b.givenName)
+    )
+}
+
+function parentsPartnershipChoice(partnership: PartnershipRecord, people: RelationshipRecord[]) {
+  const a = people.find((person) => person.relationshipRecordId === partnership.partnerAId)
+  const b = people.find((person) => person.relationshipRecordId === partnership.partnerBId)
+  return `Sibling of ${a ? personName(a) : "parent"} and ${b ? personName(b) : "parent"}`
+}
+
 function PersonReadOnly({
   record,
   pairs,
@@ -847,6 +1286,9 @@ function PersonReadOnly({
     <div className="space-y-4">
       <ReadOnlyField label="Relationship to client" value={personRoleLabel(record)} />
       <ReadOnlyField label="Name" value={record.givenName} />
+      {record.relationshipToClient === "other_caregiver" ? (
+        <ReadOnlyField label="Caregiver relationship" value={record.caregiverRelationship} />
+      ) : null}
       <ReadOnlyField label="Sex" value={record.sex} />
       <BirthReadOnly record={record} />
       <ReadOnlyField
@@ -905,25 +1347,20 @@ function RoleSelect({
 }) {
   const role = record.relationshipToClient
   if (role === "mother" || role === "father") return null
-  const options = roleOptions(role)
-  if (!options) return null
   return (
-    <SelectField id="rel_role" label="Relationship to client" value={role} onChange={(next) => onChange(next as RelationshipToClient)}>
-      {options.map((option) => (
+    <SelectField
+      id="rel_role"
+      label="Relationship to client"
+      value={role}
+      onChange={(next) => onChange(next as RelationshipToClient)}
+    >
+      {ADDABLE_RELATIONSHIP_ROLES.map((option) => (
         <option key={option} value={option}>
           {RELATIONSHIP_TO_CLIENT_LABELS[option]}
         </option>
       ))}
     </SelectField>
   )
-}
-
-function roleOptions(role: RelationshipToClient): RelationshipToClient[] | null {
-  if (role === "mother" || role === "father" || role === "parent") return ["mother", "father", "parent"]
-  if (role === "current_partner" || role === "prior_partner") return ["current_partner", "prior_partner"]
-  if (role === "child_biological" || role === "child_step") return ["child_biological", "child_step"]
-  if (role === "sibling_half" || role === "sibling_step") return ["sibling_half", "sibling_step"]
-  return null
 }
 
 function RelationshipExtras({
@@ -999,148 +1436,100 @@ function RelationshipExtras({
   )
 }
 
-function PickerDialog({
-  picker,
-  parentLinks,
-  people,
+function TypeListDialog({
+  open,
   pending,
   onClose,
-  onPick,
-  onCreate,
+  onChoose,
 }: {
-  picker: Picker
-  parentLinks: PartnershipRecord[]
-  people: RelationshipRecord[]
+  open: boolean
   pending: boolean
   onClose: () => void
-  onPick: (picker: Picker) => void
-  onCreate: (spec: CreateRelationshipInput) => void
+  onChoose: (role: RelationshipToClient) => void
 }) {
   return (
-    <Dialog open={picker !== null} onOpenChange={(open) => !open && onClose()}>
+    <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{pickerTitle(picker)}</DialogTitle>
-          <DialogDescription>{pickerDescription(picker)}</DialogDescription>
+          <DialogTitle>Add relationship</DialogTitle>
+          <DialogDescription>Choose a relationship type. Nothing is saved until you press Save.</DialogDescription>
         </DialogHeader>
-        <div className="flex flex-col gap-2">
-          {picker === "menu" ? (
-            <>
-              <Button
-                type="button"
-                variant="outline"
-                disabled={pending}
-                onClick={() => {
-                  if (parentLinks.length > 1) onPick("sibling-partnership")
-                  else onCreate({ kind: "full_sibling", partnershipRecordId: parentLinks[0]?.partnershipRecordId ?? null })
-                }}
-              >
-                Sibling
-              </Button>
-              <Button type="button" variant="outline" disabled={pending} onClick={() => onPick("partner")}>
-                Partner
-              </Button>
-              <Button type="button" variant="outline" disabled={pending} onClick={() => onPick("unlinked-child")}>
-                Child not linked to a partner
-              </Button>
-            </>
-          ) : null}
-          {picker === "partner" ? (
-            <>
-              <Button type="button" variant="outline" disabled={pending} onClick={() => onCreate({ kind: "partner", role: "current_partner" })}>
-                Current partner
-              </Button>
-              <Button type="button" variant="outline" disabled={pending} onClick={() => onCreate({ kind: "partner", role: "prior_partner" })}>
-                Prior partner
-              </Button>
-            </>
-          ) : null}
-          {picker === "unlinked-child" || (picker && typeof picker === "object" && picker.kind === "child") ? (
-            <>
-              <Button
-                type="button"
-                variant="outline"
-                disabled={pending}
-                onClick={() =>
-                  onCreate(
-                    picker && typeof picker === "object" && picker.kind === "child"
-                      ? { kind: "child", partnerRecordId: picker.partnerRecordId, role: "child_biological" }
-                      : { kind: "unlinked_child", role: "child_biological" }
-                  )
-                }
-              >
-                Biological child
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                disabled={pending}
-                onClick={() =>
-                  onCreate(
-                    picker && typeof picker === "object" && picker.kind === "child"
-                      ? { kind: "child", partnerRecordId: picker.partnerRecordId, role: "child_step" }
-                      : { kind: "unlinked_child", role: "child_step" }
-                  )
-                }
-              >
-                Step-child
-              </Button>
-            </>
-          ) : null}
-          {picker && typeof picker === "object" && picker.kind === "step-sibling" ? (
-            <>
-              <Button
-                type="button"
-                variant="outline"
-                disabled={pending}
-                onClick={() => onCreate({ kind: "step_sibling", partnershipRecordId: picker.partnershipRecordId, role: "sibling_half" })}
-              >
-                Half-sibling
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                disabled={pending}
-                onClick={() => onCreate({ kind: "step_sibling", partnershipRecordId: picker.partnershipRecordId, role: "sibling_step" })}
-              >
-                Step-sibling
-              </Button>
-            </>
-          ) : null}
-          {picker === "sibling-partnership"
-            ? parentLinks.map((partnership) => {
-                const a = people.find((person) => person.relationshipRecordId === partnership.partnerAId)
-                const b = people.find((person) => person.relationshipRecordId === partnership.partnerBId)
-                return (
-                  <Button
-                    key={partnership.partnershipRecordId}
-                    type="button"
-                    variant="outline"
-                    disabled={pending}
-                    onClick={() => onCreate({ kind: "full_sibling", partnershipRecordId: partnership.partnershipRecordId })}
-                  >
-                    Sibling of {a ? personName(a) : "parent"} and {b ? personName(b) : "parent"}
-                  </Button>
-                )
-              })
-            : null}
+        <div className="flex max-h-[60vh] flex-col gap-3 overflow-y-auto">
+          {ADDABLE_RELATIONSHIP_GROUPS.map((group) => (
+            <div key={group.label} className="space-y-2">
+              <p className="text-xs font-medium text-muted-foreground">{group.label}</p>
+              {group.roles.map((role) => (
+                <Button
+                  key={role}
+                  type="button"
+                  variant="outline"
+                  className="w-full justify-start"
+                  disabled={pending}
+                  onClick={() => onChoose(role)}
+                >
+                  {RELATIONSHIP_TO_CLIENT_LABELS[role]}
+                </Button>
+              ))}
+            </div>
+          ))}
         </div>
       </DialogContent>
     </Dialog>
   )
 }
 
-function pickerTitle(picker: Picker) {
-  if (picker === "menu") return "Add family member"
-  if (picker === "partner") return "Add partner"
-  if (picker === "unlinked-child" || (picker && typeof picker === "object" && picker.kind === "child")) return "Add child"
-  if (picker && typeof picker === "object" && picker.kind === "step-sibling") return "Add step-sibling"
-  if (picker === "sibling-partnership") return "Which parents?"
-  return "Add"
-}
-
-function pickerDescription(picker: Picker) {
-  if (picker === "menu") return "Choose the kind of person to add."
-  if (picker === "sibling-partnership") return "Full siblings are linked to a parent partnership."
-  return "This creates one person. You can fill in the details next."
+function RelinkDialog({
+  prompt,
+  pending,
+  onMoveTo,
+  onCancel,
+  onConfirm,
+}: {
+  prompt: RelinkPrompt
+  pending: boolean
+  onMoveTo: (moveTo: string) => void
+  onCancel: () => void
+  onConfirm: () => void
+}) {
+  const count = prompt.links.people.length
+  const title =
+    count === 1 ? `1 person is linked to ${prompt.name}` : `${count} people are linked to ${prompt.name}`
+  const oldRole = RELATIONSHIP_TO_CLIENT_LABELS[prompt.oldRole].toLowerCase()
+  const newRole = RELATIONSHIP_TO_CLIENT_LABELS[prompt.newRole].toLowerCase()
+  return (
+    <Dialog open onOpenChange={(next) => !next && !pending && onCancel()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>
+            They are listed under {prompt.name} as a {oldRole}. Once {prompt.name} is a {newRole}, that link no longer
+            applies.
+          </DialogDescription>
+        </DialogHeader>
+        <ul className="space-y-1 text-sm">
+          {prompt.links.people.map((person) => (
+            <li key={person.relationshipRecordId}>
+              {personRoleLabel(person)} — {person.givenName.trim() || "Not recorded"}
+            </li>
+          ))}
+        </ul>
+        <SelectField id="relink_move" label="Move them to" value={prompt.moveTo} onChange={onMoveTo}>
+          {prompt.links.targets.map((target) => (
+            <option key={target.id} value={target.id}>
+              {target.label}
+            </option>
+          ))}
+          <option value="">Leave unlinked for now</option>
+        </SelectField>
+        <DialogFooter>
+          <Button type="button" variant="outline" disabled={pending} onClick={onCancel}>
+            Cancel
+          </Button>
+          <Button type="button" disabled={pending} onClick={onConfirm}>
+            Change and save
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
 }

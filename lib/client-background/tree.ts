@@ -28,12 +28,38 @@ export type PartnerNode = {
 
 export type RelationshipTree = {
   originParents: RelationshipRecord[]
+  /** Other primary caregivers, shown in Family of Origin after the parents' relationship. */
+  otherCaregivers: RelationshipRecord[]
   fullSiblings: RelationshipRecord[]
   otherFamily: OtherFamilyGroup[]
   unlinkedStepParents: RelationshipRecord[]
   unlinkedStepSiblings: RelationshipRecord[]
   partners: PartnerNode[]
+  /** Biological children with no partner. A valid state, kept under "Children not linked to a listed partner". */
   unlinkedChildren: RelationshipRecord[]
+  /** Step-children with no partner. They need a partner before they can sit in the tree. */
+  unlinkedStepChildren: RelationshipRecord[]
+}
+
+export type FamilyOfOriginEntry =
+  | { kind: "person"; id: string }
+  | { kind: "parents-relationship" }
+
+export type StepParentLink = {
+  partnershipRecordId: string
+  stepParent: RelationshipRecord
+  parent: RelationshipRecord
+}
+
+export type MoveTarget = {
+  id: string
+  label: string
+}
+
+export type BrokenLinks = {
+  kind: "siblings" | "children" | "step-parents"
+  people: RelationshipRecord[]
+  targets: MoveTarget[]
 }
 
 const ORIGIN = new Set<RelationshipToClient>(ORIGIN_PARENT_ROLES)
@@ -68,11 +94,23 @@ function treeAgeToken(
 export function relationshipLineLabel(
   person: Pick<
     RelationshipRecord,
-    "relationshipToClient" | "givenName" | "dateOfBirth" | "healthStatus"
+    "relationshipToClient" | "givenName" | "dateOfBirth" | "healthStatus" | "caregiverRelationship"
   >,
   status?: string | null,
   asOf = todayDateString()
 ): string {
+  if (person.relationshipToClient === "other_caregiver") {
+    const name = person.givenName.trim()
+    const relation = person.caregiverRelationship.trim()
+    let label = name ? `Other primary caregiver – ${name}` : "Other primary caregiver"
+    if (relation) label += ` (${relation})`
+    const age = treeAgeToken(person, asOf)
+    if (age) label += ` – ${age}`
+    const statusText = status?.trim()
+    if (statusText) label += ` – ${statusText}`
+    return label
+  }
+
   const parts = [personRoleLabel(person)]
   const name = person.givenName.trim()
   if (name) parts.push(name)
@@ -179,6 +217,10 @@ export function buildRelationshipTree(
     .filter((person) => ORIGIN.has(person.relationshipToClient))
     .sort((a, b) => originRank(a.relationshipToClient) - originRank(b.relationshipToClient) || byOrder(a, b))
 
+  const otherCaregivers = people
+    .filter((person) => person.relationshipToClient === "other_caregiver")
+    .sort(byOrder)
+
   const fullSiblings = people
     .filter((person) => person.relationshipToClient === "sibling_full")
     .sort(byOrder)
@@ -257,17 +299,213 @@ export function buildRelationshipTree(
   )
   const unlinkedChildren = people
     .filter(
-      (person) => CHILDREN.has(person.relationshipToClient) && !linkedChildIds.has(person.relationshipRecordId)
+      (person) =>
+        person.relationshipToClient === "child_biological" && !linkedChildIds.has(person.relationshipRecordId)
+    )
+    .sort(byOrder)
+
+  const unlinkedStepChildren = people
+    .filter(
+      (person) => person.relationshipToClient === "child_step" && !linkedChildIds.has(person.relationshipRecordId)
     )
     .sort(byOrder)
 
   return {
     originParents,
+    otherCaregivers,
     fullSiblings,
     otherFamily,
     unlinkedStepParents,
     unlinkedStepSiblings,
     partners,
     unlinkedChildren,
+    unlinkedStepChildren,
   }
+}
+
+export function familyOfOriginLayout(
+  tree: RelationshipTree,
+  link: { mother: RelationshipRecord | null; father: RelationshipRecord | null }
+): {
+  parents: RelationshipRecord[]
+  caregivers: RelationshipRecord[]
+  siblings: RelationshipRecord[]
+} {
+  const primary = [link.mother, link.father].filter((person): person is RelationshipRecord => person != null)
+  const primaryIds = new Set(primary.map((person) => person.relationshipRecordId))
+  return {
+    parents: [
+      ...primary,
+      ...tree.originParents.filter((person) => !primaryIds.has(person.relationshipRecordId)),
+    ],
+    caregivers: tree.otherCaregivers,
+    siblings: tree.fullSiblings,
+  }
+}
+
+/** Family of Origin display order: parents, their relationship, other primary caregivers, then siblings. */
+export function familyOfOriginSequence(
+  people: RelationshipRecord[],
+  partnerships: PartnershipRecord[]
+): FamilyOfOriginEntry[] {
+  const tree = buildRelationshipTree(people, partnerships)
+  const layout = familyOfOriginLayout(tree, canonicalParentsLink(people, partnerships))
+  return [
+    ...layout.parents.map((person) => ({ kind: "person" as const, id: person.relationshipRecordId })),
+    { kind: "parents-relationship" as const },
+    ...layout.caregivers.map((person) => ({ kind: "person" as const, id: person.relationshipRecordId })),
+    ...layout.siblings.map((person) => ({ kind: "person" as const, id: person.relationshipRecordId })),
+  ]
+}
+
+export function stepParentLinks(
+  people: RelationshipRecord[],
+  partnerships: PartnershipRecord[]
+): StepParentLink[] {
+  const byId = new Map(people.map((person) => [person.relationshipRecordId, person]))
+  const links: StepParentLink[] = []
+  for (const partnership of partnerships) {
+    const a = byId.get(partnership.partnerAId)
+    const b = byId.get(partnership.partnerBId)
+    if (!a || !b) continue
+    const stepParent =
+      a.relationshipToClient === "step_parent" ? a : b.relationshipToClient === "step_parent" ? b : null
+    const parent = ORIGIN.has(a.relationshipToClient) ? a : ORIGIN.has(b.relationshipToClient) ? b : null
+    if (!stepParent || !parent || stepParent.relationshipRecordId === parent.relationshipRecordId) continue
+    links.push({ partnershipRecordId: partnership.partnershipRecordId, stepParent, parent })
+  }
+  return links.sort(
+    (a, b) => byOrder(a.stepParent, b.stepParent) || byOrder(a.parent, b.parent)
+  )
+}
+
+export function linkedParentId(
+  stepParentId: string,
+  people: RelationshipRecord[],
+  partnerships: PartnershipRecord[]
+): string | null {
+  return (
+    stepParentLinks(people, partnerships).find((link) => link.stepParent.relationshipRecordId === stepParentId)
+      ?.parent.relationshipRecordId ?? null
+  )
+}
+
+export function stepParentLinkLabel(link: StepParentLink): string {
+  const stepName = link.stepParent.givenName.trim() || personRoleLabel(link.stepParent)
+  const parentName = link.parent.givenName.trim() || personRoleLabel(link.parent)
+  return `${stepName} (${parentName}'s partner)`
+}
+
+export function personWithRoleLabel(person: Pick<RelationshipRecord, "givenName" | "relationshipToClient">): string {
+  const name = person.givenName.trim()
+  const role = personRoleLabel(person)
+  return name ? `${name} (${role})` : role
+}
+
+function uniqueStepParentTargets(
+  excludeId: string,
+  people: RelationshipRecord[],
+  partnerships: PartnershipRecord[]
+): MoveTarget[] {
+  const seen = new Set<string>()
+  const targets: MoveTarget[] = []
+  for (const link of stepParentLinks(people, partnerships)) {
+    const id = link.stepParent.relationshipRecordId
+    if (id === excludeId || seen.has(id)) continue
+    seen.add(id)
+    targets.push({ id, label: stepParentLinkLabel(link) })
+  }
+  return targets
+}
+
+function partnerTargets(excludeId: string, people: RelationshipRecord[]): MoveTarget[] {
+  return people
+    .filter(
+      (person) => PARTNERS.has(person.relationshipToClient) && person.relationshipRecordId !== excludeId
+    )
+    .sort((a, b) => {
+      const rank = (role: RelationshipToClient) => (role === "current_partner" ? 0 : 1)
+      return rank(a.relationshipToClient) - rank(b.relationshipToClient) || byOrder(a, b)
+    })
+    .map((person) => ({ id: person.relationshipRecordId, label: personWithRoleLabel(person) }))
+}
+
+function originParentTargets(excludeId: string, people: RelationshipRecord[]): MoveTarget[] {
+  return people
+    .filter((person) => ORIGIN.has(person.relationshipToClient) && person.relationshipRecordId !== excludeId)
+    .sort((a, b) => originRank(a.relationshipToClient) - originRank(b.relationshipToClient) || byOrder(a, b))
+    .map((person) => ({ id: person.relationshipRecordId, label: personWithRoleLabel(person) }))
+}
+
+/**
+ * People whose link breaks when `person` changes to `nextRole`.
+ * Half-sibling ↔ step-sibling and child ↔ step-child do not break anyone else's link.
+ * Current partner ↔ prior partner does not either.
+ */
+export function brokenLinksForRoleChange(
+  person: RelationshipRecord,
+  nextRole: RelationshipToClient,
+  people: RelationshipRecord[],
+  partnerships: PartnershipRecord[]
+): BrokenLinks | null {
+  const current = person.relationshipToClient
+  if (current === nextRole || current === "mother" || current === "father") return null
+
+  if (current === "step_parent") {
+    const partnershipIds = new Set(
+      stepParentLinks(people, partnerships)
+        .filter((link) => link.stepParent.relationshipRecordId === person.relationshipRecordId)
+        .map((link) => link.partnershipRecordId)
+    )
+    const linked = people
+      .filter(
+        (item) =>
+          NESTED_SIBLINGS.has(item.relationshipToClient) &&
+          item.partnershipRecordId != null &&
+          partnershipIds.has(item.partnershipRecordId)
+      )
+      .sort(byOrder)
+    if (linked.length === 0) return null
+    return {
+      kind: "siblings",
+      people: linked,
+      targets: uniqueStepParentTargets(person.relationshipRecordId, people, partnerships),
+    }
+  }
+
+  if (
+    (current === "current_partner" || current === "prior_partner") &&
+    nextRole !== "current_partner" &&
+    nextRole !== "prior_partner"
+  ) {
+    const linked = people
+      .filter(
+        (item) =>
+          CHILDREN.has(item.relationshipToClient) && item.linkedPartnerRecordId === person.relationshipRecordId
+      )
+      .sort(byOrder)
+    if (linked.length === 0) return null
+    return {
+      kind: "children",
+      people: linked,
+      targets: partnerTargets(person.relationshipRecordId, people),
+    }
+  }
+
+  if (current === "parent") {
+    const linkedIds = new Set(
+      stepParentLinks(people, partnerships)
+        .filter((link) => link.parent.relationshipRecordId === person.relationshipRecordId)
+        .map((link) => link.stepParent.relationshipRecordId)
+    )
+    const linked = people.filter((item) => linkedIds.has(item.relationshipRecordId)).sort(byOrder)
+    if (linked.length === 0) return null
+    return {
+      kind: "step-parents",
+      people: linked,
+      targets: originParentTargets(person.relationshipRecordId, people),
+    }
+  }
+
+  return null
 }

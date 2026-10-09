@@ -90,6 +90,7 @@
     "db:client-background": "tsx db/apply-client-background-migration.ts",
     "db:client-background-display": "tsx db/apply-client-background-display-migration.ts",
     "db:client-background-fields": "tsx db/apply-client-background-fields-migration.ts",
+    "db:client-background-caregiver": "tsx db/apply-client-background-caregiver-migration.ts",
     "db:letter-body": "tsx db/apply-letter-body-migration.ts",
     "db:report-versioning": "tsx db/apply-report-versioning-migration.ts",
     "db:session-note-versioning": "tsx db/apply-session-note-versioning-migration.ts",

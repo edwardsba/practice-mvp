@@ -16,8 +16,14 @@ import {
   sanitizeRisk,
 } from "@/lib/client-background/sanitize"
 import {
+  brokenLinksForRoleChange,
+  originPartnerships,
+  stepParentLinks,
+  type BrokenLinks,
+  type StepParentLink,
+} from "@/lib/client-background/tree"
+import {
   emptyEvent,
-  type CreateRelationshipInput,
   type EducationFields,
   type EventRecord,
   type EventType,
@@ -26,6 +32,7 @@ import {
   type OccupationFields,
   type PartnershipRecord,
   type RelationshipRecord,
+  type RelationshipRelink,
   type RelationshipToClient,
   type RiskRatings,
 } from "@/lib/client-background/types"
@@ -36,6 +43,27 @@ export type MutationResult<T> = { error?: string } & T
 
 const ORIGIN_ROLES = ["mother", "father", "parent"] as const
 const PARTNER_ROLES = ["current_partner", "prior_partner"] as const
+
+type WriteContext = {
+  clientId: string
+  practiceId: string
+  userId: string
+}
+
+export type RelationshipWriteResult = {
+  relationship?: RelationshipRecord
+  partnerships?: PartnershipRecord[]
+  affectedRelationships?: RelationshipRecord[]
+  removedPartnershipIds?: string[]
+}
+
+function isOriginRole(role: string): boolean {
+  return (ORIGIN_ROLES as readonly string[]).includes(role)
+}
+
+function isPartnerRole(role: string): boolean {
+  return (PARTNER_ROLES as readonly string[]).includes(role)
+}
 
 async function assertClient(clientId: string, practiceId: string) {
   const [client] = await db
@@ -112,6 +140,7 @@ function relationshipColumns(record: RelationshipRecord) {
     qualityOfRelationship: record.qualityOfRelationship || null,
     dependency: record.dependency || null,
     livingSituation: record.livingSituation || null,
+    caregiverRelationship: record.caregiverRelationship || null,
     linkedPartnerRecordId: record.linkedPartnerRecordId,
     partnershipRecordId: record.partnershipRecordId,
     updatedAt: new Date(),
@@ -131,6 +160,7 @@ function clearInapplicableLinks(record: RelationshipRecord): RelationshipRecord 
   if (!keepsPartnershipLink) next.partnershipRecordId = null
   if (!isPartner) next.relationshipStatus = ""
   if (next.relationshipToClient !== "prior_partner") next.timeSinceEnded = ""
+  if (next.relationshipToClient !== "other_caregiver") next.caregiverRelationship = ""
   return next
 }
 
@@ -471,111 +501,404 @@ export async function saveRisk(
   }
 }
 
+async function loadFamily(tx: Tx, clientId: string, practiceId: string) {
+  const relationshipRows = await tx
+    .select()
+    .from(clientRelationshipRecords)
+    .where(
+      and(eq(clientRelationshipRecords.clientId, clientId), eq(clientRelationshipRecords.practiceId, practiceId))
+    )
+  const partnershipRows = await tx
+    .select()
+    .from(clientPartnershipRecords)
+    .where(
+      and(eq(clientPartnershipRecords.clientId, clientId), eq(clientPartnershipRecords.practiceId, practiceId))
+    )
+  return {
+    people: relationshipRows.map(toRelationship),
+    partnerships: partnershipRows.map(toPartnership),
+  }
+}
+
+function validateRelationshipLinks(input: {
+  draft: RelationshipRecord
+  people: RelationshipRecord[]
+  partnerships: PartnershipRecord[]
+  associatedParentId: string | null
+  selfId: string | null
+}): { error: string } | { draft: RelationshipRecord; associatedParentId: string | null } {
+  const { people, partnerships, selfId } = input
+  let draft = input.draft
+  const role = draft.relationshipToClient
+
+  if (role === "mother" || role === "father") {
+    return { draft, associatedParentId: null }
+  }
+
+  if (role === "step_parent") {
+    const parentId = input.associatedParentId
+    const parent = parentId ? people.find((person) => person.relationshipRecordId === parentId) : undefined
+    if (!parentId || !parent || !isOriginRole(parent.relationshipToClient) || parentId === selfId) {
+      return { error: "Choose an associated parent." }
+    }
+    return { draft, associatedParentId: parentId }
+  }
+
+  if (role === "sibling_full") {
+    const origins = originPartnerships(people, partnerships)
+    if (draft.partnershipRecordId) {
+      const match = origins.some((item) => item.partnershipRecordId === draft.partnershipRecordId)
+      if (!match) return { error: "Choose the parents' partnership." }
+    } else if (origins.length === 1) {
+      draft = { ...draft, partnershipRecordId: origins[0].partnershipRecordId }
+    } else if (origins.length > 1) {
+      return { error: "Choose the parents' partnership." }
+    }
+    return { draft, associatedParentId: null }
+  }
+
+  if (role === "sibling_half" || role === "sibling_step") {
+    const link = stepParentLinks(people, partnerships).find(
+      (item) => item.partnershipRecordId === draft.partnershipRecordId
+    )
+    if (!draft.partnershipRecordId || !link || link.stepParent.relationshipRecordId === selfId) {
+      return { error: "Choose an associated step-parent." }
+    }
+    return { draft, associatedParentId: null }
+  }
+
+  if (role === "child_biological" || role === "child_step") {
+    if (role === "child_step" && !draft.linkedPartnerRecordId) {
+      return { error: "Choose an associated partner." }
+    }
+    if (draft.linkedPartnerRecordId) {
+      const partner = people.find((person) => person.relationshipRecordId === draft.linkedPartnerRecordId)
+      if (
+        !partner ||
+        !isPartnerRole(partner.relationshipToClient) ||
+        partner.relationshipRecordId === selfId
+      ) {
+        return { error: "Choose an associated partner." }
+      }
+    }
+    return { draft, associatedParentId: null }
+  }
+
+  return { draft, associatedParentId: null }
+}
+
+function validateRelink(
+  links: BrokenLinks | null,
+  relink: RelationshipRelink | null,
+  family: { people: RelationshipRecord[]; partnerships: PartnershipRecord[] },
+  selfId: string
+): string | null {
+  if (!links) return null
+  if (!relink) return "Choose where to move the people linked to this person."
+  if (relink.action === "unlink") return null
+  const target = family.people.find((person) => person.relationshipRecordId === relink.targetRecordId)
+  if (!target || target.relationshipRecordId === selfId) {
+    return "Choose where to move the people linked to this person."
+  }
+  if (links.kind === "siblings") {
+    const linked = stepParentLinks(family.people, family.partnerships).some(
+      (link) => link.stepParent.relationshipRecordId === target.relationshipRecordId
+    )
+    if (target.relationshipToClient !== "step_parent" || !linked) {
+      return "Choose a step-parent to move them to."
+    }
+  }
+  if (links.kind === "children" && !isPartnerRole(target.relationshipToClient)) {
+    return "Choose a partner to move them to."
+  }
+  if (links.kind === "step-parents" && !isOriginRole(target.relationshipToClient)) {
+    return "Choose a parent to move them to."
+  }
+  return null
+}
+
+async function setSiblingPartnership(
+  tx: Tx,
+  ctx: WriteContext,
+  siblingId: string,
+  partnershipRecordId: string | null
+): Promise<RelationshipRecord | null> {
+  const [row] = await tx
+    .update(clientRelationshipRecords)
+    .set({ partnershipRecordId, updatedAt: new Date() })
+    .where(
+      and(
+        eq(clientRelationshipRecords.relationshipRecordId, siblingId),
+        eq(clientRelationshipRecords.clientId, ctx.clientId),
+        eq(clientRelationshipRecords.practiceId, ctx.practiceId)
+      )
+    )
+    .returning()
+  if (!row) return null
+  await writeAudit(tx, {
+    practiceId: ctx.practiceId,
+    userId: ctx.userId,
+    clientId: ctx.clientId,
+    eventType: "client_relationship.updated",
+    entityType: "client_relationship",
+    entityId: row.relationshipRecordId,
+  })
+  return toRelationship(row)
+}
+
+async function setChildPartner(
+  tx: Tx,
+  ctx: WriteContext,
+  childId: string,
+  linkedPartnerRecordId: string | null
+): Promise<RelationshipRecord | null> {
+  const [row] = await tx
+    .update(clientRelationshipRecords)
+    .set({ linkedPartnerRecordId, updatedAt: new Date() })
+    .where(
+      and(
+        eq(clientRelationshipRecords.relationshipRecordId, childId),
+        eq(clientRelationshipRecords.clientId, ctx.clientId),
+        eq(clientRelationshipRecords.practiceId, ctx.practiceId)
+      )
+    )
+    .returning()
+  if (!row) return null
+  await writeAudit(tx, {
+    practiceId: ctx.practiceId,
+    userId: ctx.userId,
+    clientId: ctx.clientId,
+    eventType: "client_relationship.updated",
+    entityType: "client_relationship",
+    entityId: row.relationshipRecordId,
+  })
+  return toRelationship(row)
+}
+
+async function clearSiblingLinks(
+  tx: Tx,
+  ctx: WriteContext,
+  partnershipRecordId: string
+): Promise<RelationshipRecord[]> {
+  const rows = await tx
+    .update(clientRelationshipRecords)
+    .set({ partnershipRecordId: null, updatedAt: new Date() })
+    .where(
+      and(
+        eq(clientRelationshipRecords.partnershipRecordId, partnershipRecordId),
+        eq(clientRelationshipRecords.clientId, ctx.clientId),
+        eq(clientRelationshipRecords.practiceId, ctx.practiceId)
+      )
+    )
+    .returning()
+  const affected: RelationshipRecord[] = []
+  for (const row of rows) {
+    await writeAudit(tx, {
+      practiceId: ctx.practiceId,
+      userId: ctx.userId,
+      clientId: ctx.clientId,
+      eventType: "client_relationship.updated",
+      entityType: "client_relationship",
+      entityId: row.relationshipRecordId,
+    })
+    affected.push(toRelationship(row))
+  }
+  return affected
+}
+
+async function insertStepPartnership(
+  tx: Tx,
+  ctx: WriteContext,
+  parentId: string,
+  stepParentId: string
+): Promise<PartnershipRecord> {
+  const [partnership] = await tx
+    .insert(clientPartnershipRecords)
+    .values({
+      clientId: ctx.clientId,
+      practiceId: ctx.practiceId,
+      partnerAId: parentId,
+      partnerBId: stepParentId,
+    })
+    .returning()
+  await writeAudit(tx, {
+    practiceId: ctx.practiceId,
+    userId: ctx.userId,
+    clientId: ctx.clientId,
+    eventType: "client_partnership.created",
+    entityType: "client_partnership",
+    entityId: partnership.partnershipRecordId,
+  })
+  return toPartnership(partnership)
+}
+
+async function retargetPartnershipParent(
+  tx: Tx,
+  ctx: WriteContext,
+  link: StepParentLink,
+  nextParentId: string,
+  partnerships: PartnershipRecord[]
+): Promise<PartnershipRecord> {
+  const partnership = partnerships.find((item) => item.partnershipRecordId === link.partnershipRecordId)
+  if (!partnership) throw new Error("Partnership was not found.")
+  const parentIsA = partnership.partnerAId === link.parent.relationshipRecordId
+  const [saved] = await tx
+    .update(clientPartnershipRecords)
+    .set({
+      ...(parentIsA ? { partnerAId: nextParentId } : { partnerBId: nextParentId }),
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(clientPartnershipRecords.partnershipRecordId, partnership.partnershipRecordId),
+        eq(clientPartnershipRecords.clientId, ctx.clientId),
+        eq(clientPartnershipRecords.practiceId, ctx.practiceId)
+      )
+    )
+    .returning()
+  await writeAudit(tx, {
+    practiceId: ctx.practiceId,
+    userId: ctx.userId,
+    clientId: ctx.clientId,
+    eventType: "client_partnership.updated",
+    entityType: "client_partnership",
+    entityId: saved.partnershipRecordId,
+  })
+  return toPartnership(saved)
+}
+
+async function deletePartnership(tx: Tx, ctx: WriteContext, partnershipRecordId: string) {
+  await writeAudit(tx, {
+    practiceId: ctx.practiceId,
+    userId: ctx.userId,
+    clientId: ctx.clientId,
+    eventType: "client_partnership.deleted",
+    entityType: "client_partnership",
+    entityId: partnershipRecordId,
+  })
+  await tx
+    .delete(clientPartnershipRecords)
+    .where(
+      and(
+        eq(clientPartnershipRecords.partnershipRecordId, partnershipRecordId),
+        eq(clientPartnershipRecords.clientId, ctx.clientId),
+        eq(clientPartnershipRecords.practiceId, ctx.practiceId)
+      )
+    )
+}
+
+async function applyRelink(
+  tx: Tx,
+  ctx: WriteContext,
+  input: {
+    links: BrokenLinks
+    relink: RelationshipRelink
+    people: RelationshipRecord[]
+    partnerships: PartnershipRecord[]
+    selfId: string
+  }
+): Promise<{
+  affected: RelationshipRecord[]
+  partnerships: PartnershipRecord[]
+  removedPartnershipIds: string[]
+}> {
+  const affected: RelationshipRecord[] = []
+  const partnerships: PartnershipRecord[] = []
+  const removedPartnershipIds: string[] = []
+  const { links, relink, people, selfId } = input
+
+  if (links.kind === "siblings") {
+    const partnershipId =
+      relink.action === "move"
+        ? stepParentLinks(people, input.partnerships).find(
+            (link) => link.stepParent.relationshipRecordId === relink.targetRecordId
+          )?.partnershipRecordId
+        : null
+    if (relink.action === "move" && !partnershipId) throw new Error("Step-parent partnership was not found.")
+    for (const sibling of links.people) {
+      const updated = await setSiblingPartnership(
+        tx,
+        ctx,
+        sibling.relationshipRecordId,
+        relink.action === "move" ? partnershipId! : null
+      )
+      if (updated) affected.push(updated)
+    }
+  }
+
+  if (links.kind === "children") {
+    const targetId = relink.action === "move" ? relink.targetRecordId : null
+    for (const child of links.people) {
+      const updated = await setChildPartner(tx, ctx, child.relationshipRecordId, targetId)
+      if (updated) affected.push(updated)
+    }
+  }
+
+  if (links.kind === "step-parents") {
+    const owned = stepParentLinks(people, input.partnerships).filter(
+      (link) =>
+        link.parent.relationshipRecordId === selfId &&
+        links.people.some((person) => person.relationshipRecordId === link.stepParent.relationshipRecordId)
+    )
+    if (relink.action === "move") {
+      for (const link of owned) {
+        if (link.parent.relationshipRecordId === relink.targetRecordId) continue
+        partnerships.push(
+          await retargetPartnershipParent(tx, ctx, link, relink.targetRecordId, input.partnerships)
+        )
+      }
+    } else {
+      for (const link of owned) {
+        affected.push(...(await clearSiblingLinks(tx, ctx, link.partnershipRecordId)))
+        await deletePartnership(tx, ctx, link.partnershipRecordId)
+        removedPartnershipIds.push(link.partnershipRecordId)
+      }
+    }
+  }
+
+  return { affected, partnerships, removedPartnershipIds }
+}
+
 export async function createRelationship(input: {
   clientId: string
   practiceId: string
   userId: string
-  spec: CreateRelationshipInput
-}): Promise<MutationResult<{ relationship?: RelationshipRecord; partnerships?: PartnershipRecord[] }>> {
+  relationship: unknown
+  associatedParentId?: string | null
+}): Promise<MutationResult<RelationshipWriteResult>> {
   const client = await assertClient(input.clientId, input.practiceId)
   if (!client) return { error: "Client was not found." }
 
+  const sanitized = clearInapplicableLinks(sanitizeRelationship(input.relationship))
+  if (sanitized.relationshipToClient === "mother" || sanitized.relationshipToClient === "father") {
+    return { error: "Mother and father stay on the client and are not chosen here." }
+  }
+
+  const ctx: WriteContext = {
+    clientId: input.clientId,
+    practiceId: input.practiceId,
+    userId: input.userId,
+  }
+
   try {
     return await db.transaction(async (tx) => {
+      const family = await loadFamily(tx, input.clientId, input.practiceId)
+      const validated = validateRelationshipLinks({
+        draft: sanitized,
+        people: family.people,
+        partnerships: family.partnerships,
+        associatedParentId: input.associatedParentId ?? null,
+        selfId: null,
+      })
+      if ("error" in validated) return validated
+
       const displayOrder = await nextRelationshipOrder(tx, input.clientId, input.practiceId)
-      let role: RelationshipToClient = "parent"
-      let linkedPartnerRecordId: string | null = null
-      let partnershipRecordId: string | null = null
-      let stepParentAnchorId: string | null = null
-
-      if (input.spec.kind === "parent") role = input.spec.role
-      if (input.spec.kind === "partner") role = input.spec.role
-      if (input.spec.kind === "unlinked_child") role = input.spec.role
-      if (input.spec.kind === "step_parent") {
-        role = "step_parent"
-        const parent = await ownedRelationship(tx, input.spec.parentRecordId, input.clientId, input.practiceId)
-        if (!parent || (parent.relationshipToClient !== "mother" && parent.relationshipToClient !== "father")) {
-          return { error: "A step-parent can only be added from a mother or father." }
-        }
-        stepParentAnchorId = parent.relationshipRecordId
-      }
-      if (input.spec.kind === "full_sibling") {
-        role = "sibling_full"
-        if (input.spec.partnershipRecordId) {
-          const [partnership] = await tx
-            .select()
-            .from(clientPartnershipRecords)
-            .where(
-              and(
-                eq(clientPartnershipRecords.partnershipRecordId, input.spec.partnershipRecordId),
-                eq(clientPartnershipRecords.clientId, input.clientId),
-                eq(clientPartnershipRecords.practiceId, input.practiceId)
-              )
-            )
-            .limit(1)
-          if (!partnership) return { error: "That parent partnership was not found." }
-          const ends = await tx
-            .select({ relationshipToClient: clientRelationshipRecords.relationshipToClient })
-            .from(clientRelationshipRecords)
-            .where(
-              inArray(clientRelationshipRecords.relationshipRecordId, [
-                partnership.partnerAId,
-                partnership.partnerBId,
-              ])
-            )
-          const bothOrigin =
-            ends.length === 2 &&
-            ends.every((row) => (ORIGIN_ROLES as readonly string[]).includes(row.relationshipToClient))
-          if (!bothOrigin) return { error: "Full siblings link to the parents' partnership." }
-          partnershipRecordId = partnership.partnershipRecordId
-        }
-      }
-      if (input.spec.kind === "child") {
-        role = input.spec.role
-        const partner = await ownedRelationship(tx, input.spec.partnerRecordId, input.clientId, input.practiceId)
-        if (!partner || !(PARTNER_ROLES as readonly string[]).includes(partner.relationshipToClient)) {
-          return { error: "Choose a current or prior partner for this child." }
-        }
-        linkedPartnerRecordId = partner.relationshipRecordId
-      }
-      if (input.spec.kind === "step_sibling") {
-        role = input.spec.role
-        const [partnership] = await tx
-          .select()
-          .from(clientPartnershipRecords)
-          .where(
-            and(
-              eq(clientPartnershipRecords.partnershipRecordId, input.spec.partnershipRecordId),
-              eq(clientPartnershipRecords.clientId, input.clientId),
-              eq(clientPartnershipRecords.practiceId, input.practiceId)
-            )
-          )
-          .limit(1)
-        if (!partnership) return { error: "That partnership was not found." }
-        const ends = await tx
-          .select()
-          .from(clientRelationshipRecords)
-          .where(
-            inArray(clientRelationshipRecords.relationshipRecordId, [
-              partnership.partnerAId,
-              partnership.partnerBId,
-            ])
-          )
-        if (!ends.some((row) => row.relationshipToClient === "step_parent")) {
-          return { error: "Step-siblings are added under a step-parent." }
-        }
-        partnershipRecordId = partnership.partnershipRecordId
-      }
-
       const [created] = await tx
         .insert(clientRelationshipRecords)
         .values({
           clientId: input.clientId,
           practiceId: input.practiceId,
-          relationshipToClient: role,
-          displayOrder,
-          linkedPartnerRecordId,
-          partnershipRecordId,
+          ...relationshipColumns({ ...validated.draft, displayOrder }),
         })
         .returning()
 
@@ -588,37 +911,22 @@ export async function createRelationship(input: {
         entityId: created.relationshipRecordId,
       })
 
-      const createdPartnerships: PartnershipRecord[] = []
-
-      if (stepParentAnchorId) {
-        const [partnership] = await tx
-          .insert(clientPartnershipRecords)
-          .values({
-            clientId: input.clientId,
-            practiceId: input.practiceId,
-            partnerAId: stepParentAnchorId,
-            partnerBId: created.relationshipRecordId,
-          })
-          .returning()
-        await writeAudit(tx, {
-          practiceId: input.practiceId,
-          userId: input.userId,
-          clientId: input.clientId,
-          eventType: "client_partnership.created",
-          entityType: "client_partnership",
-          entityId: partnership.partnershipRecordId,
-        })
-        createdPartnerships.push(toPartnership(partnership))
+      const partnerships: PartnershipRecord[] = []
+      if (validated.draft.relationshipToClient === "step_parent" && validated.associatedParentId) {
+        partnerships.push(
+          await insertStepPartnership(tx, ctx, validated.associatedParentId, created.relationshipRecordId)
+        )
       }
-
-      if (input.spec.kind === "parent") {
+      if (validated.draft.relationshipToClient === "parent") {
         const origin = await ensureOriginPartnership(tx, input.clientId, input.practiceId, input.userId)
-        if (origin) createdPartnerships.push(origin)
+        if (origin) partnerships.push(origin)
       }
 
       return {
         relationship: toRelationship(created),
-        partnerships: createdPartnerships,
+        partnerships,
+        affectedRelationships: [],
+        removedPartnershipIds: [],
       }
     })
   } catch {
@@ -632,61 +940,137 @@ export async function updateRelationshipDetail(input: {
   userId: string
   relationship: unknown
   partnerships: unknown
-}): Promise<MutationResult<{ relationship?: RelationshipRecord; partnerships?: PartnershipRecord[] }>> {
+  associatedParentId?: string | null
+  relink?: RelationshipRelink | null
+}): Promise<MutationResult<RelationshipWriteResult>> {
   const client = await assertClient(input.clientId, input.practiceId)
   if (!client) return { error: "Client was not found." }
 
-  const draft = clearInapplicableLinks(sanitizeRelationship(input.relationship))
+  let draft = clearInapplicableLinks(sanitizeRelationship(input.relationship))
   if (!draft.relationshipRecordId) return { error: "That person was not found." }
   const partnershipDrafts = Array.isArray(input.partnerships)
     ? input.partnerships.map((item) => sanitizePartnership(item))
     : []
 
+  const ctx: WriteContext = {
+    clientId: input.clientId,
+    practiceId: input.practiceId,
+    userId: input.userId,
+  }
+
   try {
     return await db.transaction(async (tx) => {
-      const existing = await ownedRelationship(
-        tx,
-        draft.relationshipRecordId,
-        input.clientId,
-        input.practiceId
-      )
+      const existing = await ownedRelationship(tx, draft.relationshipRecordId, input.clientId, input.practiceId)
       if (!existing) return { error: "That person was not found." }
 
-      if (draft.linkedPartnerRecordId) {
-        const partner = await ownedRelationship(
-          tx,
-          draft.linkedPartnerRecordId,
-          input.clientId,
-          input.practiceId
-        )
-        if (!partner || !(PARTNER_ROLES as readonly string[]).includes(partner.relationshipToClient)) {
-          return { error: "That child is not linked to a partner on this client." }
+      if (existing.relationshipToClient === "mother" || existing.relationshipToClient === "father") {
+        draft = clearInapplicableLinks({
+          ...draft,
+          relationshipToClient: existing.relationshipToClient as RelationshipToClient,
+        })
+      } else if (draft.relationshipToClient === "mother" || draft.relationshipToClient === "father") {
+        return { error: "Mother and father stay on the client and are not chosen here." }
+      }
+
+      draft = { ...draft, displayOrder: existing.displayOrder }
+      const family = await loadFamily(tx, input.clientId, input.practiceId)
+      const existingRecord = family.people.find(
+        (person) => person.relationshipRecordId === existing.relationshipRecordId
+      )
+      if (!existingRecord) return { error: "That person was not found." }
+
+      const validated = validateRelationshipLinks({
+        draft,
+        people: family.people,
+        partnerships: family.partnerships,
+        associatedParentId: input.associatedParentId ?? null,
+        selfId: existing.relationshipRecordId,
+      })
+      if ("error" in validated) return validated
+      draft = validated.draft
+
+      const links = brokenLinksForRoleChange(
+        existingRecord,
+        draft.relationshipToClient,
+        family.people,
+        family.partnerships
+      )
+      const relinkError = validateRelink(links, input.relink ?? null, family, existing.relationshipRecordId)
+      if (relinkError) return { error: relinkError }
+
+      const affected: RelationshipRecord[] = []
+      const removed = new Set<string>()
+      const savedPartnerships = new Map<string, PartnershipRecord>()
+
+      if (links && input.relink) {
+        const applied = await applyRelink(tx, ctx, {
+          links,
+          relink: input.relink,
+          people: family.people,
+          partnerships: family.partnerships,
+          selfId: existing.relationshipRecordId,
+        })
+        affected.push(...applied.affected)
+        for (const id of applied.removedPartnershipIds) removed.add(id)
+        for (const partnership of applied.partnerships) {
+          savedPartnerships.set(partnership.partnershipRecordId, partnership)
         }
       }
 
-      if (draft.partnershipRecordId) {
-        const [partnership] = await tx
-          .select()
-          .from(clientPartnershipRecords)
-          .where(
-            and(
-              eq(clientPartnershipRecords.partnershipRecordId, draft.partnershipRecordId),
-              eq(clientPartnershipRecords.clientId, input.clientId),
-              eq(clientPartnershipRecords.practiceId, input.practiceId)
-            )
+      const wasStep = existing.relationshipToClient === "step_parent"
+      const nowStep = draft.relationshipToClient === "step_parent"
+      const ownLinks = stepParentLinks(family.people, family.partnerships).filter(
+        (link) => link.stepParent.relationshipRecordId === existing.relationshipRecordId
+      )
+
+      if (wasStep && nowStep) {
+        if (ownLinks.length === 0 && validated.associatedParentId) {
+          const created = await insertStepPartnership(
+            tx,
+            ctx,
+            validated.associatedParentId,
+            existing.relationshipRecordId
           )
-          .limit(1)
-        if (!partnership) return { error: "That sibling partnership was not found." }
+          savedPartnerships.set(created.partnershipRecordId, created)
+        } else if (
+          ownLinks[0] &&
+          validated.associatedParentId &&
+          ownLinks[0].parent.relationshipRecordId !== validated.associatedParentId
+        ) {
+          const updated = await retargetPartnershipParent(
+            tx,
+            ctx,
+            ownLinks[0],
+            validated.associatedParentId,
+            family.partnerships
+          )
+          savedPartnerships.set(updated.partnershipRecordId, updated)
+        }
+      } else if (wasStep && !nowStep) {
+        for (const link of ownLinks) {
+          if (removed.has(link.partnershipRecordId)) continue
+          affected.push(...(await clearSiblingLinks(tx, ctx, link.partnershipRecordId)))
+          await deletePartnership(tx, ctx, link.partnershipRecordId)
+          removed.add(link.partnershipRecordId)
+        }
+      } else if (!wasStep && nowStep && validated.associatedParentId) {
+        const created = await insertStepPartnership(
+          tx,
+          ctx,
+          validated.associatedParentId,
+          existing.relationshipRecordId
+        )
+        savedPartnerships.set(created.partnershipRecordId, created)
       }
 
       const [updated] = await tx
         .update(clientRelationshipRecords)
-        .set(relationshipColumns({ ...draft, displayOrder: existing.displayOrder }))
+        .set(relationshipColumns(draft))
         .where(eq(clientRelationshipRecords.relationshipRecordId, existing.relationshipRecordId))
         .returning()
 
-      const savedPartnerships: PartnershipRecord[] = []
       for (const partnership of partnershipDrafts) {
+        if (removed.has(partnership.partnershipRecordId)) continue
         const [owned] = await tx
           .select()
           .from(clientPartnershipRecords)
@@ -700,8 +1084,7 @@ export async function updateRelationshipDetail(input: {
           .limit(1)
         if (!owned) continue
         const involvesPerson =
-          owned.partnerAId === existing.relationshipRecordId ||
-          owned.partnerBId === existing.relationshipRecordId
+          owned.partnerAId === existing.relationshipRecordId || owned.partnerBId === existing.relationshipRecordId
         if (!involvesPerson) continue
         const [saved] = await tx
           .update(clientPartnershipRecords)
@@ -714,7 +1097,7 @@ export async function updateRelationshipDetail(input: {
           })
           .where(eq(clientPartnershipRecords.partnershipRecordId, owned.partnershipRecordId))
           .returning()
-        savedPartnerships.push(toPartnership(saved))
+        savedPartnerships.set(saved.partnershipRecordId, toPartnership(saved))
         await writeAudit(tx, {
           practiceId: input.practiceId,
           userId: input.userId,
@@ -723,6 +1106,11 @@ export async function updateRelationshipDetail(input: {
           entityType: "client_partnership",
           entityId: saved.partnershipRecordId,
         })
+      }
+
+      if (draft.relationshipToClient === "parent") {
+        const origin = await ensureOriginPartnership(tx, input.clientId, input.practiceId, input.userId)
+        if (origin) savedPartnerships.set(origin.partnershipRecordId, origin)
       }
 
       await writeAudit(tx, {
@@ -734,7 +1122,18 @@ export async function updateRelationshipDetail(input: {
         entityId: updated.relationshipRecordId,
       })
 
-      return { relationship: toRelationship(updated), partnerships: savedPartnerships }
+      const affectedById = new Map<string, RelationshipRecord>()
+      for (const person of affected) {
+        if (person.relationshipRecordId === updated.relationshipRecordId) continue
+        affectedById.set(person.relationshipRecordId, person)
+      }
+
+      return {
+        relationship: toRelationship(updated),
+        partnerships: [...savedPartnerships.values()],
+        affectedRelationships: [...affectedById.values()],
+        removedPartnershipIds: [...removed],
+      }
     })
   } catch {
     return { error: "Could not save this person." }

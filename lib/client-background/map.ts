@@ -28,6 +28,7 @@ export function toRelationship(row: {
   qualityOfRelationship: string | null
   dependency: string | null
   livingSituation: string | null
+  caregiverRelationship: string | null
   linkedPartnerRecordId: string | null
   partnershipRecordId: string | null
 }): RelationshipRecord {
@@ -49,6 +50,7 @@ export function toRelationship(row: {
     qualityOfRelationship: row.qualityOfRelationship ?? "",
     dependency: row.dependency ?? "",
     livingSituation: row.livingSituation ?? "",
+    caregiverRelationship: row.caregiverRelationship ?? "",
   })
 }
 

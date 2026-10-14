@@ -128,6 +128,18 @@ export function parentsRelationshipLabel(partnership: Pick<PartnershipRecord, "r
   return status ? `Parents' relationship – ${status}` : "Parents' relationship"
 }
 
+/** Relatives recorded as living with the client, for the demographics living-situation list. */
+export function livingWithClientLines(people: RelationshipRecord[]): string[] {
+  return people.flatMap((person) => {
+    const partTime = person.livingSituation === "lives_with_client_part_time"
+    const fullTime = person.livingSituation === "lives_with_client_full_time"
+    if (!partTime && !fullTime) return []
+    const name = person.givenName.trim() || "Not recorded"
+    const suffix = partTime ? " (part-time)" : ""
+    return [`${RELATIONSHIP_TO_CLIENT_LABELS[person.relationshipToClient]} — ${name}${suffix}`]
+  })
+}
+
 /** Status shown on a tree row. Quality of relationship is never included. */
 export function treeLineStatus(
   person: RelationshipRecord,

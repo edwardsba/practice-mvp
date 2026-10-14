@@ -1,13 +1,19 @@
 import {
   isOneOf,
   RELATIONSHIP_TO_CLIENT,
+  type ClientRelationshipStatusValue,
   type EventRecord,
   type EventType,
   type PartnershipRecord,
   type RelationshipRecord,
   type RelationshipToClient,
 } from "@/lib/client-background/types"
-import { sanitizeEvent, sanitizePartnership, sanitizeRelationship } from "@/lib/client-background/sanitize"
+import {
+  sanitizeClientRelationshipStatus,
+  sanitizeEvent,
+  sanitizePartnership,
+  sanitizeRelationship,
+} from "@/lib/client-background/sanitize"
 
 export function toRelationship(row: {
   relationshipRecordId: string
@@ -25,6 +31,8 @@ export function toRelationship(row: {
   lengthOfRelationship: string | null
   relationshipStatus: string | null
   timeSinceEnded: string | null
+  supportive: string | null
+  conflict: string | null
   qualityOfRelationship: string | null
   dependency: string | null
   livingSituation: string | null
@@ -47,10 +55,24 @@ export function toRelationship(row: {
     lengthOfRelationship: row.lengthOfRelationship ?? "",
     relationshipStatus: row.relationshipStatus ?? "",
     timeSinceEnded: row.timeSinceEnded ?? "",
+    supportive: row.supportive ?? "",
+    conflict: row.conflict ?? "",
     qualityOfRelationship: row.qualityOfRelationship ?? "",
     dependency: row.dependency ?? "",
     livingSituation: row.livingSituation ?? "",
     caregiverRelationship: row.caregiverRelationship ?? "",
+  })
+}
+
+export function toClientRelationshipStatus(
+  row: {
+    relationshipStatus: string | null
+    relationshipStatusOther: string | null
+  } | null
+): ClientRelationshipStatusValue {
+  return sanitizeClientRelationshipStatus({
+    relationshipStatus: row?.relationshipStatus ?? "",
+    relationshipStatusOther: row?.relationshipStatusOther ?? "",
   })
 }
 

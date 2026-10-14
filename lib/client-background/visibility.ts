@@ -1,16 +1,29 @@
 import { assessAge } from "@/lib/client-background/age"
 import { parsePartialDate } from "@/lib/client-background/partial-date"
-import type { RelationshipRecord } from "@/lib/client-background/types"
+import type { RelationshipRecord, RelationshipToClient } from "@/lib/client-background/types"
 import { todayDateString } from "@/lib/dates/practice-time"
 
 export type RelationshipFieldVisibility = {
-  qualityOfRelationship: boolean
+  dateOfBirth: boolean
+  health: boolean
+  lengthOfRelationship: boolean
+  supportive: boolean
+  comment: boolean
   dependency: boolean
   livingSituation: boolean
+  clientRelationshipStatus: boolean
+  howItEnded: boolean
   timeSinceEnded: boolean
-  relationshipStatus: boolean
-  lengthOfRelationship: boolean
 }
+
+const LENGTH_OF_RELATIONSHIP_ROLES = new Set<RelationshipToClient>([
+  "other_caregiver",
+  "step_parent",
+  "sibling_step",
+  "current_partner",
+  "prior_partner",
+  "child_step",
+])
 
 type AgeSource = Pick<RelationshipRecord, "dateOfBirth" | "healthStatus">
 
@@ -41,57 +54,47 @@ export function relationshipFieldVisibility(
   record: Pick<RelationshipRecord, "relationshipToClient"> & AgeSource,
   asOf = todayDateString()
 ): RelationshipFieldVisibility {
-  const isPartner =
-    record.relationshipToClient === "current_partner" ||
-    record.relationshipToClient === "prior_partner"
-  const lengthOfRelationship = record.relationshipToClient !== "sibling_full"
-
-  if (record.relationshipToClient === "prior_partner") {
-    return {
-      qualityOfRelationship: false,
-      dependency: false,
-      livingSituation: false,
-      timeSinceEnded: true,
-      relationshipStatus: true,
-      lengthOfRelationship,
-    }
-  }
-
-  if (isMinorChild(record, asOf)) {
-    return {
-      qualityOfRelationship: true,
-      dependency: false,
-      livingSituation: true,
-      timeSinceEnded: false,
-      relationshipStatus: false,
-      lengthOfRelationship,
-    }
-  }
+  const role = record.relationshipToClient
+  const priorPartner = role === "prior_partner"
+  const deceased = record.healthStatus === "deceased"
 
   return {
-    qualityOfRelationship: true,
-    dependency: true,
-    livingSituation: true,
-    timeSinceEnded: false,
-    relationshipStatus: isPartner,
-    lengthOfRelationship,
+    dateOfBirth: !priorPartner,
+    health: !priorPartner,
+    lengthOfRelationship: LENGTH_OF_RELATIONSHIP_ROLES.has(role),
+    supportive: true,
+    comment: true,
+    dependency: !priorPartner && !deceased && !isMinorChild(record, asOf),
+    livingSituation: !priorPartner && !deceased,
+    clientRelationshipStatus: role === "current_partner",
+    howItEnded: priorPartner,
+    timeSinceEnded: priorPartner,
   }
 }
 
-export function applyRelationshipVisibilityDefaults(
-  record: RelationshipRecord
-): RelationshipRecord {
-  const next = record.relationshipToClient === "sibling_full" ? { ...record, lengthOfRelationship: "" } : record
-  if (isMinorChild(next)) {
-    return { ...next, dependency: "they_depend_on_me" }
+/** Drops values for fields the current type and health status do not show. */
+export function applyRelationshipVisibilityDefaults(record: RelationshipRecord): RelationshipRecord {
+  const visibility = relationshipFieldVisibility(record)
+  const next: RelationshipRecord = { ...record }
+
+  if (!visibility.dateOfBirth) {
+    next.dateOfBirth = ""
+    next.approximateAge = null
+    next.approximateAgeRecordedOn = ""
   }
-  if (next.relationshipToClient === "prior_partner") {
-    return {
-      ...next,
-      qualityOfRelationship: "",
-      dependency: "",
-      livingSituation: "",
-    }
+  if (!visibility.health) {
+    next.healthStatus = ""
+    next.deceased = false
+    next.ageAtDeath = null
+    next.healthOrCauseOfDeath = ""
   }
+  if (!visibility.lengthOfRelationship) next.lengthOfRelationship = ""
+  if (!visibility.howItEnded) next.relationshipStatus = ""
+  if (!visibility.timeSinceEnded) next.timeSinceEnded = ""
+  if (!visibility.dependency) {
+    next.dependency = isMinorChild(record) ? "they_depend_on_me" : ""
+  }
+  if (!visibility.livingSituation) next.livingSituation = ""
+
   return next
 }

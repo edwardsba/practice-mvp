@@ -3,23 +3,33 @@
 import { useState, type ReactNode } from "react"
 
 import { saveDemographicsAction } from "@/app/clients/[client_id]/background/actions"
-import { PartialDatePicker, ReadOnlyField, SaveRow, SelectField, TextAreaField, TextField, YesNoDetail } from "@/components/client-background/fields"
+import { PartialDatePicker, ReadOnlyField, SaveRow, SelectField, TextField, YesNoDetail } from "@/components/client-background/fields"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
+import { livingWithClientLines } from "@/lib/client-background/tree"
 import {
   EDUCATION_LEVEL_OPTIONS,
+  EMPLOYED_WORK_STATUSES,
   HOUSING_STABILITY_OPTIONS,
+  HOUSING_TYPE_OPTIONS,
+  LIVES_WITH_LABELS,
+  LIVES_WITH_OPTIONS,
   NECESSITY_KEYS,
   NECESSITY_LABELS,
   PRONOUN_OPTIONS,
   SEX_OPTIONS,
+  WORK_STATUS_LABELS,
+  WORK_STATUSES,
   type Demographics,
   type EducationFields,
   type IdentityFields,
+  type LivesWith,
   type LivingSituationFields,
   type OccupationFields,
   type PreviousJob,
+  type RelationshipRecord,
+  type WorkStatus,
 } from "@/lib/client-background/types"
 import { formatPartialDateLabel } from "@/lib/client-background/age"
 import { cn } from "@/lib/utils"
@@ -27,9 +37,11 @@ import { cn } from "@/lib/utils"
 export function DemographicsSection({
   clientId,
   demographics,
+  relationships,
 }: {
   clientId: string
   demographics: Demographics
+  relationships: RelationshipRecord[]
 }) {
   const [saved, setSaved] = useState(demographics)
   const [draft, setDraft] = useState(demographics)
@@ -107,19 +119,19 @@ export function DemographicsSection({
           <Subsection title="Identity">
             <IdentityFieldsEditor value={draft.identity} onChange={updateIdentity} />
           </Subsection>
-          <Subsection title="Living Situation" divided>
-            <LivingFieldsEditor value={draft.livingSituation} onChange={updateLiving} />
-          </Subsection>
           <Subsection title="Education" divided>
             <EducationFieldsEditor value={draft.education} onChange={updateEducation} />
           </Subsection>
           <Subsection title="Occupation & Financial Concerns" divided>
             <OccupationFieldsEditor value={draft.occupation} onChange={updateOccupation} />
           </Subsection>
+          <Subsection title="Living Situation" divided>
+            <LivingFieldsEditor value={draft.livingSituation} relationships={relationships} onChange={updateLiving} />
+          </Subsection>
           <SaveRow pending={pending} error={error} onSave={() => void save()} />
         </form>
       ) : (
-        <DemographicsReadOnly value={saved} />
+        <DemographicsReadOnly value={saved} relationships={relationships} />
       )}
     </div>
   )
@@ -142,7 +154,13 @@ function Subsection({
   )
 }
 
-function DemographicsReadOnly({ value }: { value: Demographics }) {
+function DemographicsReadOnly({
+  value,
+  relationships,
+}: {
+  value: Demographics
+  relationships: RelationshipRecord[]
+}) {
   const pronouns =
     value.identity.pronouns === "Other"
       ? value.identity.pronounsOther || "Other"
@@ -158,39 +176,28 @@ function DemographicsReadOnly({ value }: { value: Demographics }) {
         <ReadOnlyField label="Race/Ethnicity" value={value.identity.raceEthnicity} />
         <ReadOnlyField label="Religion" value={value.identity.religion} />
         <ReadOnlyField label="Primary language" value={value.identity.primaryLanguage} />
-        <ReadOnlyField label="Disability" value={value.identity.disability} />
+        <ReadOnlyField
+          label="Disability"
+          value={yesNoText(value.identity.disability, value.identity.disabilityDetail)}
+        />
         <ReadOnlyField label="Accessibility needs" value={value.identity.accessibilityNeeds} />
-      </Subsection>
-      <Subsection title="Living Situation" divided>
-        <ReadOnlyField label="Living arrangement" value={value.livingSituation.livingArrangement} />
-        <ReadOnlyField
-          label="Client depends on others in the household"
-          value={yesNoText(value.livingSituation.clientDependsOnOthers, value.livingSituation.clientDependsOnOthersDetail)}
-        />
-        <ReadOnlyField
-          label="Others in the household depend on the client"
-          value={yesNoText(value.livingSituation.othersDependOnClient, value.livingSituation.othersDependOnClientDetail)}
-        />
-        <ReadOnlyField label="Household composition" value={value.livingSituation.householdComposition} />
-        <ReadOnlyField label="Housing stability" value={value.livingSituation.housingStability} />
       </Subsection>
       <Subsection title="Education" divided>
         <ReadOnlyField label="Level of education" value={value.education.level} />
-        <ReadOnlyField label="Field of study" value={value.education.fieldOfStudy} />
         <ReadOnlyField
           label="Currently studying"
           value={yesNoText(value.education.currentlyStudying, value.education.currentlyStudyingDetail)}
         />
+        <ReadOnlyField label="Field of study" value={value.education.fieldOfStudy} />
         <ReadOnlyField
           label="Disruption to education"
           value={yesNoText(value.education.disruption, value.education.disruptionDetail)}
         />
       </Subsection>
       <Subsection title="Occupation & Financial Concerns" divided>
-        <ReadOnlyField
-          label="Currently employed"
-          value={yesNoText(value.occupation.currentlyEmployed, value.occupation.currentlyEmployedDetail)}
-        />
+        <ReadOnlyField label="Work status" value={workStatusText(value.occupation)} />
+        {value.occupation.role.trim() ? <ReadOnlyField label="Role" value={value.occupation.role} /> : null}
+        {value.occupation.employer.trim() ? <ReadOnlyField label="Employer" value={value.occupation.employer} /> : null}
         <div className="space-y-1">
           <p className="text-xs text-muted-foreground">Previous jobs</p>
           {value.occupation.previousJobs.length === 0 ? (
@@ -212,6 +219,12 @@ function DemographicsReadOnly({ value }: { value: Demographics }) {
           value={limited.length ? `Limited: ${limited.map((key) => NECESSITY_LABELS[key]).join(", ")}` : "No limits recorded"}
         />
       </Subsection>
+      <Subsection title="Living Situation" divided>
+        <ReadOnlyField label="Housing type" value={value.livingSituation.housingType} />
+        <ReadOnlyField label="Who the client lives with" value={livesWithText(value.livingSituation)} />
+        <PeopleLivingWithClient relationships={relationships} />
+        <ReadOnlyField label="Housing stability" value={value.livingSituation.housingStability} />
+      </Subsection>
     </div>
   )
 }
@@ -227,6 +240,57 @@ function yesNoText(value: boolean | null, detail: string) {
   if (value == null) return ""
   if (!value) return "No"
   return detail.trim() ? `Yes — ${detail.trim()}` : "Yes"
+}
+
+function workStatusText(occupation: OccupationFields) {
+  if (!occupation.workStatus) return ""
+  if (occupation.workStatus === "other") {
+    const other = occupation.workStatusOther.trim()
+    return other ? `Other — ${other}` : "Other"
+  }
+  return WORK_STATUS_LABELS[occupation.workStatus]
+}
+
+function livesWithText(living: LivingSituationFields) {
+  if (!living.livesWith) return ""
+  if (living.livesWith === "other") {
+    const other = living.livesWithOther.trim()
+    return other ? `Other — ${other}` : "Other"
+  }
+  return LIVES_WITH_LABELS[living.livesWith]
+}
+
+function employedWorkStatus(status: WorkStatus | "") {
+  return status !== "" && (EMPLOYED_WORK_STATUSES as readonly string[]).includes(status)
+}
+
+function withWorkStatus(value: OccupationFields, workStatus: WorkStatus | ""): OccupationFields {
+  const employed = employedWorkStatus(workStatus)
+  return {
+    ...value,
+    workStatus,
+    role: employed ? value.role : "",
+    employer: employed ? value.employer : "",
+    workStatusOther: workStatus === "other" ? value.workStatusOther : "",
+  }
+}
+
+function PeopleLivingWithClient({ relationships }: { relationships: RelationshipRecord[] }) {
+  const lines = livingWithClientLines(relationships)
+  return (
+    <div className="space-y-1">
+      <p className="text-xs text-muted-foreground">People living with the client</p>
+      {lines.length === 0 ? (
+        <p className="text-sm">No family members recorded as living with the client</p>
+      ) : (
+        lines.map((line, index) => (
+          <p key={`${line}-${index}`} className="text-sm">
+            {line}
+          </p>
+        ))
+      )}
+    </div>
+  )
 }
 
 function IdentityFieldsEditor({
@@ -287,11 +351,13 @@ function IdentityFieldsEditor({
         value={value.primaryLanguage}
         onChange={(primaryLanguage) => onChange({ ...value, primaryLanguage })}
       />
-      <TextField
+      <YesNoDetail
         id="disability"
         label="Disability"
         value={value.disability}
+        detail={value.disabilityDetail}
         onChange={(disability) => onChange({ ...value, disability })}
+        onDetail={(disabilityDetail) => onChange({ ...value, disabilityDetail })}
       />
       <TextField
         id="accessibility"
@@ -305,42 +371,56 @@ function IdentityFieldsEditor({
 
 function LivingFieldsEditor({
   value,
+  relationships,
   onChange,
 }: {
   value: LivingSituationFields
+  relationships: RelationshipRecord[]
   onChange: (value: LivingSituationFields) => void
 }) {
   return (
     <>
-      <TextField
-        id="living_arrangement"
-        label="Living arrangement"
-        value={value.livingArrangement}
-        hint="Where the client lives — for example own home, renting, a parent's home, supported accommodation, or residential care."
-        onChange={(livingArrangement) => onChange({ ...value, livingArrangement })}
-      />
-      <YesNoDetail
-        id="client_depends"
-        label="Client depends on others in the household"
-        value={value.clientDependsOnOthers}
-        detail={value.clientDependsOnOthersDetail}
-        onChange={(clientDependsOnOthers) => onChange({ ...value, clientDependsOnOthers })}
-        onDetail={(clientDependsOnOthersDetail) => onChange({ ...value, clientDependsOnOthersDetail })}
-      />
-      <YesNoDetail
-        id="others_depend"
-        label="Others in the household depend on the client"
-        value={value.othersDependOnClient}
-        detail={value.othersDependOnClientDetail}
-        onChange={(othersDependOnClient) => onChange({ ...value, othersDependOnClient })}
-        onDetail={(othersDependOnClientDetail) => onChange({ ...value, othersDependOnClientDetail })}
-      />
-      <TextAreaField
-        id="household"
-        label="Household composition"
-        value={value.householdComposition}
-        onChange={(householdComposition) => onChange({ ...value, householdComposition })}
-      />
+      <SelectField
+        id="housing_type"
+        label="Housing type"
+        value={value.housingType}
+        onChange={(housingType) => onChange({ ...value, housingType })}
+      >
+        <option value="">Not recorded</option>
+        {HOUSING_TYPE_OPTIONS.map((option) => (
+          <option key={option} value={option}>
+            {option}
+          </option>
+        ))}
+      </SelectField>
+      <SelectField
+        id="lives_with"
+        label="Who the client lives with"
+        value={value.livesWith}
+        onChange={(livesWith) =>
+          onChange({
+            ...value,
+            livesWith: livesWith as LivesWith | "",
+            livesWithOther: livesWith === "other" ? value.livesWithOther : "",
+          })
+        }
+      >
+        <option value="">Not recorded</option>
+        {LIVES_WITH_OPTIONS.map((option) => (
+          <option key={option} value={option}>
+            {LIVES_WITH_LABELS[option]}
+          </option>
+        ))}
+      </SelectField>
+      {value.livesWith === "other" ? (
+        <TextField
+          id="lives_with_other"
+          label="Other living arrangement"
+          value={value.livesWithOther}
+          onChange={(livesWithOther) => onChange({ ...value, livesWithOther })}
+        />
+      ) : null}
+      <PeopleLivingWithClient relationships={relationships} />
       <SelectField
         id="housing_stability"
         label="Housing stability"
@@ -380,12 +460,6 @@ function EducationFieldsEditor({
           </option>
         ))}
       </SelectField>
-      <TextField
-        id="field_of_study"
-        label="Field of study"
-        value={value.fieldOfStudy}
-        onChange={(fieldOfStudy) => onChange({ ...value, fieldOfStudy })}
-      />
       <YesNoDetail
         id="currently_studying"
         label="Currently studying"
@@ -393,6 +467,12 @@ function EducationFieldsEditor({
         detail={value.currentlyStudyingDetail}
         onChange={(currentlyStudying) => onChange({ ...value, currentlyStudying })}
         onDetail={(currentlyStudyingDetail) => onChange({ ...value, currentlyStudyingDetail })}
+      />
+      <TextField
+        id="field_of_study"
+        label="Field of study"
+        value={value.fieldOfStudy}
+        onChange={(fieldOfStudy) => onChange({ ...value, fieldOfStudy })}
       />
       <YesNoDetail
         id="disruption"
@@ -422,14 +502,38 @@ function OccupationFieldsEditor({
 
   return (
     <>
-      <YesNoDetail
-        id="currently_employed"
-        label="Currently employed"
-        value={value.currentlyEmployed}
-        detail={value.currentlyEmployedDetail}
-        onChange={(currentlyEmployed) => onChange({ ...value, currentlyEmployed })}
-        onDetail={(currentlyEmployedDetail) => onChange({ ...value, currentlyEmployedDetail })}
-      />
+      <SelectField
+        id="work_status"
+        label="Work status"
+        value={value.workStatus}
+        onChange={(workStatus) => onChange(withWorkStatus(value, workStatus as WorkStatus | ""))}
+      >
+        <option value="">Not recorded</option>
+        {WORK_STATUSES.map((option) => (
+          <option key={option} value={option}>
+            {WORK_STATUS_LABELS[option]}
+          </option>
+        ))}
+      </SelectField>
+      {employedWorkStatus(value.workStatus) ? (
+        <>
+          <TextField id="work_role" label="Role" value={value.role} onChange={(role) => onChange({ ...value, role })} />
+          <TextField
+            id="work_employer"
+            label="Employer"
+            value={value.employer}
+            onChange={(employer) => onChange({ ...value, employer })}
+          />
+        </>
+      ) : null}
+      {value.workStatus === "other" ? (
+        <TextField
+          id="work_status_other"
+          label="Other work status"
+          value={value.workStatusOther}
+          onChange={(workStatusOther) => onChange({ ...value, workStatusOther })}
+        />
+      ) : null}
       <div className="space-y-4">
         <p className="text-sm font-medium">Previous jobs</p>
         {value.previousJobs.map((job, index) => (

@@ -42,13 +42,18 @@ export function ClientBackgroundPage({
           onToggle={() => toggle(item.id)}
         >
           {item.id === "demographics" ? (
-            <DemographicsSection clientId={clientId} demographics={data.demographics} />
+            <DemographicsSection
+              clientId={clientId}
+              demographics={data.demographics}
+              relationships={data.relationships}
+            />
           ) : null}
           {item.id === "relationships" ? (
             <RelationshipsSection
               clientId={clientId}
               relationships={data.relationships}
               partnerships={data.partnerships}
+              relationshipStatus={data.relationshipStatus}
             />
           ) : null}
           {item.id === "history" ? (

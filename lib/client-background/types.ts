@@ -197,11 +197,108 @@ export const PRONOUN_OPTIONS = ["she/her", "he/him", "they/them", "Other"]
 export const EDUCATION_LEVEL_OPTIONS = [
   "Did not complete secondary",
   "Secondary",
+  "Trade apprenticeship",
   "Certificate / diploma",
   "Bachelor degree",
   "Postgraduate",
   "Other",
 ]
+export const CLIENT_RELATIONSHIP_STATUSES = [
+  "single",
+  "in_relationship_not_living_together",
+  "engaged",
+  "defacto",
+  "married",
+  "separated",
+  "divorced",
+  "widowed",
+  "other",
+] as const
+export type ClientRelationshipStatus = (typeof CLIENT_RELATIONSHIP_STATUSES)[number]
+
+export const CLIENT_RELATIONSHIP_STATUS_LABELS: Record<ClientRelationshipStatus, string> = {
+  single: "Single",
+  in_relationship_not_living_together: "In a relationship (not living together)",
+  engaged: "Engaged",
+  defacto: "De facto",
+  married: "Married",
+  separated: "Separated",
+  divorced: "Divorced",
+  widowed: "Widowed",
+  other: "Other",
+}
+
+export type ClientRelationshipStatusValue = {
+  relationshipStatus: ClientRelationshipStatus | ""
+  relationshipStatusOther: string
+}
+
+/** Ratings on a relationship record. Empty means not recorded. */
+export const RELATIONSHIP_RATING_VALUES = ["no", "somewhat", "yes"] as const
+export type RelationshipRating = (typeof RELATIONSHIP_RATING_VALUES)[number]
+
+export const RELATIONSHIP_RATING_LABELS: Record<RelationshipRating, string> = {
+  no: "No",
+  somewhat: "Somewhat",
+  yes: "Yes",
+}
+
+export const WORK_STATUSES = [
+  "full_time",
+  "part_time",
+  "casual",
+  "self_employed",
+  "unemployed",
+  "student",
+  "retired",
+  "home_duties_or_carer",
+  "unable_to_work",
+  "other",
+] as const
+export type WorkStatus = (typeof WORK_STATUSES)[number]
+
+export const EMPLOYED_WORK_STATUSES = ["full_time", "part_time", "casual", "self_employed"] as const
+
+export const WORK_STATUS_LABELS: Record<WorkStatus, string> = {
+  full_time: "Full-time",
+  part_time: "Part-time",
+  casual: "Casual",
+  self_employed: "Self-employed",
+  unemployed: "Unemployed",
+  student: "Student",
+  retired: "Retired",
+  home_duties_or_carer: "Home duties or carer",
+  unable_to_work: "Unable to work",
+  other: "Other",
+}
+
+export const LIVES_WITH_OPTIONS = [
+  "alone",
+  "with_partner",
+  "with_partner_and_children",
+  "with_children_sole_parent",
+  "with_parents",
+  "with_other_family",
+  "with_flatmates_or_friends",
+  "supported_or_residential",
+  "no_fixed_address",
+  "other",
+] as const
+export type LivesWith = (typeof LIVES_WITH_OPTIONS)[number]
+
+export const LIVES_WITH_LABELS: Record<LivesWith, string> = {
+  alone: "Alone",
+  with_partner: "With partner",
+  with_partner_and_children: "With partner and children",
+  with_children_sole_parent: "With children (sole parent)",
+  with_parents: "With parents",
+  with_other_family: "With other family (for example grandparents, siblings or relatives)",
+  with_flatmates_or_friends: "With flatmates or friends",
+  supported_or_residential:
+    "Supported or residential accommodation (for example a group home, rehab or aged care)",
+  no_fixed_address: "No fixed address",
+  other: "Other",
+}
 export const HOUSING_TYPE_OPTIONS = [
   "Owner-occupied",
   "Private rental",
@@ -277,17 +374,15 @@ export type IdentityFields = {
   raceEthnicity: string
   religion: string
   primaryLanguage: string
-  disability: string
+  disability: boolean | null
+  disabilityDetail: string
   accessibilityNeeds: string
 }
 
 export type LivingSituationFields = {
-  livingArrangement: string
-  clientDependsOnOthers: boolean | null
-  clientDependsOnOthersDetail: string
-  othersDependOnClient: boolean | null
-  othersDependOnClientDetail: string
-  householdComposition: string
+  housingType: string
+  livesWith: LivesWith | ""
+  livesWithOther: string
   housingStability: string
 }
 
@@ -311,8 +406,10 @@ export type PreviousJob = {
 export type NecessityAccess = Record<NecessityKey, boolean>
 
 export type OccupationFields = {
-  currentlyEmployed: boolean | null
-  currentlyEmployedDetail: string
+  workStatus: WorkStatus | ""
+  workStatusOther: string
+  role: string
+  employer: string
   previousJobs: PreviousJob[]
   financialConcerns: boolean | null
   financialConcernsDetail: string
@@ -342,8 +439,12 @@ export type RelationshipRecord = {
   ageAtDeath: number | null
   healthOrCauseOfDeath: string
   lengthOfRelationship: string
+  /** Prior partner: how the relationship ended. Cleared for every other role. */
   relationshipStatus: string
   timeSinceEnded: string
+  supportive: RelationshipRating | ""
+  conflict: RelationshipRating | ""
+  /** Free-text comment under the supportive and conflict ratings. */
   qualityOfRelationship: string
   dependency: DependencyValue | ""
   livingSituation: RelationshipLivingSituation | ""
@@ -392,6 +493,7 @@ export type EventRecord = {
 export type ClientBackgroundData = {
   dateOfBirth: string | null
   backgroundCapturedAt: string | null
+  relationshipStatus: ClientRelationshipStatusValue
   demographics: Demographics
   relationships: RelationshipRecord[]
   partnerships: PartnershipRecord[]
@@ -421,19 +523,24 @@ export function emptyIdentity(): IdentityFields {
     raceEthnicity: "",
     religion: "",
     primaryLanguage: "",
-    disability: "",
+    disability: null,
+    disabilityDetail: "",
     accessibilityNeeds: "",
+  }
+}
+
+export function emptyClientRelationshipStatus(): ClientRelationshipStatusValue {
+  return {
+    relationshipStatus: "",
+    relationshipStatusOther: "",
   }
 }
 
 export function emptyLivingSituation(): LivingSituationFields {
   return {
-    livingArrangement: "",
-    clientDependsOnOthers: null,
-    clientDependsOnOthersDetail: "",
-    othersDependOnClient: null,
-    othersDependOnClientDetail: "",
-    householdComposition: "",
+    housingType: "",
+    livesWith: "",
+    livesWithOther: "",
     housingStability: "",
   }
 }
@@ -461,8 +568,10 @@ export function emptyNecessities(): NecessityAccess {
 
 export function emptyOccupation(): OccupationFields {
   return {
-    currentlyEmployed: null,
-    currentlyEmployedDetail: "",
+    workStatus: "",
+    workStatusOther: "",
+    role: "",
+    employer: "",
     previousJobs: [],
     financialConcerns: null,
     financialConcernsDetail: "",

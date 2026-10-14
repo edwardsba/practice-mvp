@@ -32,6 +32,8 @@ function person(partial: Partial<RelationshipRecord> & Pick<RelationshipRecord, 
     caregiverRelationship: "",
     linkedPartnerRecordId: null,
     partnershipRecordId: null,
+    supportive: "",
+    conflict: "",
     ...partial,
   }
 }
@@ -192,8 +194,113 @@ assert.equal(relationshipFieldVisibility(fullSibling).lengthOfRelationship, fals
 assert.equal(
   relationshipFieldVisibility(person({ relationshipRecordId: "half-vis", relationshipToClient: "sibling_half" }))
     .lengthOfRelationship,
-  true
+  false
 )
+
+const asOf = "2026-10-02"
+const motherVisibility = relationshipFieldVisibility(mother, asOf)
+assert.equal(motherVisibility.dateOfBirth, true)
+assert.equal(motherVisibility.health, true)
+assert.equal(motherVisibility.lengthOfRelationship, false)
+assert.equal(motherVisibility.supportive, true)
+assert.equal(motherVisibility.comment, true)
+assert.equal(motherVisibility.dependency, true)
+assert.equal(motherVisibility.livingSituation, true)
+assert.equal(motherVisibility.clientRelationshipStatus, false)
+assert.equal(motherVisibility.howItEnded, false)
+
+const caregiverVisibility = relationshipFieldVisibility(caregiver, asOf)
+assert.equal(caregiverVisibility.lengthOfRelationship, true)
+assert.equal(caregiverVisibility.dependency, true)
+
+const stepVisibility = relationshipFieldVisibility(stepParent, asOf)
+assert.equal(stepVisibility.lengthOfRelationship, true)
+assert.equal(stepVisibility.dateOfBirth, true)
+assert.equal(stepVisibility.clientRelationshipStatus, false)
+
+const stepSiblingVisibility = relationshipFieldVisibility(
+  person({ relationshipRecordId: "step-sib", relationshipToClient: "sibling_step" }),
+  asOf
+)
+assert.equal(stepSiblingVisibility.lengthOfRelationship, true)
+assert.equal(stepSiblingVisibility.dateOfBirth, true)
+assert.equal(stepSiblingVisibility.howItEnded, false)
+
+const currentPartnerVisibility = relationshipFieldVisibility(partner, asOf)
+assert.equal(currentPartnerVisibility.clientRelationshipStatus, true)
+assert.equal(currentPartnerVisibility.howItEnded, false)
+assert.equal(currentPartnerVisibility.timeSinceEnded, false)
+assert.equal(currentPartnerVisibility.dateOfBirth, true)
+assert.equal(currentPartnerVisibility.lengthOfRelationship, true)
+assert.equal(currentPartnerVisibility.dependency, true)
+
+const priorPartnerVisibility = relationshipFieldVisibility(
+  person({
+    relationshipRecordId: "ex",
+    relationshipToClient: "prior_partner",
+    dateOfBirth: "1980-01-01",
+    healthStatus: "good",
+  }),
+  asOf
+)
+assert.equal(priorPartnerVisibility.dateOfBirth, false)
+assert.equal(priorPartnerVisibility.health, false)
+assert.equal(priorPartnerVisibility.lengthOfRelationship, true)
+assert.equal(priorPartnerVisibility.supportive, true)
+assert.equal(priorPartnerVisibility.comment, true)
+assert.equal(priorPartnerVisibility.dependency, false)
+assert.equal(priorPartnerVisibility.livingSituation, false)
+assert.equal(priorPartnerVisibility.clientRelationshipStatus, false)
+assert.equal(priorPartnerVisibility.howItEnded, true)
+assert.equal(priorPartnerVisibility.timeSinceEnded, true)
+
+const adultChildVisibility = relationshipFieldVisibility(
+  person({
+    relationshipRecordId: "grown",
+    relationshipToClient: "child_biological",
+    dateOfBirth: "2000-01-01",
+  }),
+  asOf
+)
+assert.equal(adultChildVisibility.dependency, true)
+assert.equal(adultChildVisibility.lengthOfRelationship, false)
+assert.equal(adultChildVisibility.livingSituation, true)
+
+const stepChildVisibility = relationshipFieldVisibility(
+  person({
+    relationshipRecordId: "step-child",
+    relationshipToClient: "child_step",
+    dateOfBirth: "2000-01-01",
+  }),
+  asOf
+)
+assert.equal(stepChildVisibility.lengthOfRelationship, true)
+assert.equal(stepChildVisibility.dependency, true)
+
+const minorVisibility = relationshipFieldVisibility(
+  person({
+    relationshipRecordId: "kid",
+    relationshipToClient: "child_biological",
+    dateOfBirth: "2015-01-01",
+  }),
+  asOf
+)
+assert.equal(minorVisibility.dependency, false)
+assert.equal(minorVisibility.livingSituation, true)
+
+const deceasedVisibility = relationshipFieldVisibility(
+  person({
+    relationshipRecordId: "late",
+    relationshipToClient: "father",
+    healthStatus: "deceased",
+    dateOfBirth: "1950-01-01",
+  }),
+  asOf
+)
+assert.equal(deceasedVisibility.dependency, false)
+assert.equal(deceasedVisibility.livingSituation, false)
+assert.equal(deceasedVisibility.health, true)
+assert.equal(deceasedVisibility.dateOfBirth, true)
 assert.equal(
   isMinorChild(
     person({ relationshipRecordId: "kid", relationshipToClient: "child_biological", dateOfBirth: "2015-01-01" }),

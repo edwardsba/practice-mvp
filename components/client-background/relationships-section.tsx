@@ -5,6 +5,7 @@ import { useMemo, useState, type ReactNode } from "react"
 import {
   createRelationshipAction,
   deleteRelationshipAction,
+  saveClientRelationshipStatusAction,
   updatePartnershipAction,
   updateRelationshipAction,
 } from "@/app/clients/[client_id]/background/actions"
@@ -33,6 +34,8 @@ import { parsePartialDate } from "@/lib/client-background/partial-date"
 import {
   ADDABLE_RELATIONSHIP_GROUPS,
   ADDABLE_RELATIONSHIP_ROLES,
+  CLIENT_RELATIONSHIP_STATUS_LABELS,
+  CLIENT_RELATIONSHIP_STATUSES,
   DEPENDENCY_LABELS,
   DEPENDENCY_VALUES,
   HEALTH_STATUSES,
@@ -41,9 +44,14 @@ import {
   PARTNERSHIP_STATUS_LABELS,
   RELATIONSHIP_LIVING_SITUATIONS,
   RELATIONSHIP_LIVING_SITUATION_LABELS,
+  RELATIONSHIP_RATING_LABELS,
+  RELATIONSHIP_RATING_VALUES,
   RELATIONSHIP_TO_CLIENT_LABELS,
   SEX_OPTIONS,
+  type ClientRelationshipStatus,
+  type ClientRelationshipStatusValue,
   type PartnershipRecord,
+  type RelationshipRating,
   type RelationshipRecord,
   type RelationshipRelink,
   type RelationshipToClient,
@@ -93,13 +101,17 @@ export function RelationshipsSection({
   clientId,
   relationships,
   partnerships,
+  relationshipStatus,
 }: {
   clientId: string
   relationships: RelationshipRecord[]
   partnerships: PartnershipRecord[]
+  relationshipStatus: ClientRelationshipStatusValue
 }) {
   const [people, setPeople] = useState(relationships)
   const [pairs, setPairs] = useState(partnerships)
+  const [clientStatus, setClientStatus] = useState(relationshipStatus)
+  const [partnerStatusDraft, setPartnerStatusDraft] = useState(relationshipStatus)
   const [selection, setSelection] = useState<Selection>(null)
   const [mobileScreen, setMobileScreen] = useState<"list" | "detail" | "edit">("list")
   const [editing, setEditing] = useState(false)
@@ -127,6 +139,11 @@ export function RelationshipsSection({
     [tree]
   )
 
+  function applyClientStatus(next: ClientRelationshipStatusValue) {
+    setClientStatus(next)
+    setPartnerStatusDraft(next)
+  }
+
   function personPartnerships(personId: string, partnershipList: PartnershipRecord[]) {
     return partnershipsForPerson(personId, partnershipList).filter(
       (item) => item.partnershipRecordId !== parentsLink.partnership?.partnershipRecordId
@@ -141,6 +158,7 @@ export function RelationshipsSection({
     setDraftPairs(personPartnerships(person.relationshipRecordId, partnershipList).map((item) => ({ ...item })))
     setAssociatedParentId(linkedParentId(person.relationshipRecordId, people, partnershipList))
     setPartnershipDraft(null)
+    setPartnerStatusDraft(clientStatus)
     setEditing(startEditing)
     setError(null)
     setLinkError(null)
@@ -183,6 +201,7 @@ export function RelationshipsSection({
     setDraftPairs([])
     setAssociatedParentId(role === "step_parent" ? preset?.associatedParentId ?? null : null)
     setPartnershipDraft(null)
+    setPartnerStatusDraft(clientStatus)
     setEditing(true)
     setMobileScreen("edit")
     setError(null)
@@ -199,6 +218,7 @@ export function RelationshipsSection({
       setDraft(null)
       setDraftPairs([])
       setAssociatedParentId(null)
+      setPartnerStatusDraft(clientStatus)
       setEditing(false)
       setSelection(null)
       setMobileScreen("list")
@@ -211,6 +231,7 @@ export function RelationshipsSection({
         setDraft({ ...person })
         setDraftPairs(personPartnerships(person.relationshipRecordId, pairs).map((item) => ({ ...item })))
         setAssociatedParentId(linkedParentId(person.relationshipRecordId, people, pairs))
+        setPartnerStatusDraft(clientStatus)
       }
     }
     if (selection?.kind === "partnership") {
@@ -258,11 +279,14 @@ export function RelationshipsSection({
 
     setPending(true)
     setError(null)
+    const statusPayload =
+      draft.relationshipToClient === "current_partner" ? partnerStatusDraft : undefined
     const result = isNew
-      ? await createRelationshipAction(clientId, draft, associatedParentId)
+      ? await createRelationshipAction(clientId, draft, associatedParentId, statusPayload)
       : await updateRelationshipAction(clientId, draft, draftPairs, {
           associatedParentId,
           relink: relink ?? null,
+          clientRelationshipStatus: statusPayload,
         })
     setPending(false)
     if (result.error || !result.relationship) {
@@ -296,6 +320,7 @@ export function RelationshipsSection({
     setEditing(false)
     setMobileScreen("detail")
     setRelinkPrompt(null)
+    if (result.clientRelationshipStatus) applyClientStatus(result.clientRelationshipStatus)
   }
 
   async function savePartnership() {
@@ -452,6 +477,7 @@ export function RelationshipsSection({
 
       <section className="space-y-2 border-t pt-4">
         <h2 className="text-sm font-semibold">Partners and Children</h2>
+        <ClientRelationshipStatusPanel clientId={clientId} value={clientStatus} onSaved={applyClientStatus} />
         {tree.partners.map((node) => (
           <div key={node.person.relationshipRecordId} className="space-y-1">
             <TreeRow
@@ -570,6 +596,8 @@ export function RelationshipsSection({
       }}
       onReplaceWithNew={openNew}
       onPairs={setDraftPairs}
+      clientRelationshipStatus={partnerStatusDraft}
+      onClientRelationshipStatus={setPartnerStatusDraft}
       onSave={() => void savePerson()}
       onRemove={() => void remove()}
       onBack={leaveRecord}
@@ -623,6 +651,8 @@ function blankRelationship(role: RelationshipToClient): RelationshipRecord {
     lengthOfRelationship: "",
     relationshipStatus: "",
     timeSinceEnded: "",
+    supportive: "",
+    conflict: "",
     qualityOfRelationship: "",
     dependency: "",
     livingSituation: "",
@@ -910,6 +940,8 @@ function PersonDetail({
   onAssociatedParentId,
   onReplaceWithNew,
   onPairs,
+  clientRelationshipStatus,
+  onClientRelationshipStatus,
   onSave,
   onRemove,
   onBack,
@@ -933,6 +965,8 @@ function PersonDetail({
   onAssociatedParentId: (id: string | null) => void
   onReplaceWithNew: (role: RelationshipToClient) => void
   onPairs: (pairs: PartnershipRecord[]) => void
+  clientRelationshipStatus: ClientRelationshipStatusValue
+  onClientRelationshipStatus: (value: ClientRelationshipStatusValue) => void
   onSave: () => void
   onRemove: () => void
   onBack: () => void
@@ -972,42 +1006,46 @@ function PersonDetail({
               </option>
             ))}
           </SelectField>
-          <BirthEditor record={draft} onPatch={onPatch} />
-          <SelectField
-            id="rel_health"
-            label="Health status"
-            value={draft.healthStatus}
-            hint="Select 'Deceased' if this person has passed away."
-            onChange={(healthStatus) => onPatch({ healthStatus: healthStatus as RelationshipRecord["healthStatus"] })}
-          >
-            <option value="">Not recorded</option>
-            {HEALTH_STATUSES.map((status) => (
-              <option key={status} value={status}>
-                {HEALTH_STATUS_LABELS[status]}
-              </option>
-            ))}
-          </SelectField>
-          {draft.healthStatus === "deceased" ? (
+          {visibility.dateOfBirth ? <BirthEditor record={draft} onPatch={onPatch} /> : null}
+          {visibility.health ? (
             <>
-              <div className="space-y-1.5">
-                <Label htmlFor="rel_age_death">Age at death</Label>
-                <Input
-                  id="rel_age_death"
-                  className={mobileControlClassName}
-                  type="number"
-                  min={0}
-                  value={draft.ageAtDeath ?? ""}
-                  onChange={(event) =>
-                    onPatch({ ageAtDeath: event.target.value === "" ? null : Number(event.target.value) })
-                  }
-                />
-              </div>
-              <TextField
-                id="rel_cause"
-                label="Health or cause of death"
-                value={draft.healthOrCauseOfDeath}
-                onChange={(healthOrCauseOfDeath) => onPatch({ healthOrCauseOfDeath })}
-              />
+              <SelectField
+                id="rel_health"
+                label="Health status"
+                value={draft.healthStatus}
+                hint="Select 'Deceased' if this person has passed away."
+                onChange={(healthStatus) => onPatch({ healthStatus: healthStatus as RelationshipRecord["healthStatus"] })}
+              >
+                <option value="">Not recorded</option>
+                {HEALTH_STATUSES.map((status) => (
+                  <option key={status} value={status}>
+                    {HEALTH_STATUS_LABELS[status]}
+                  </option>
+                ))}
+              </SelectField>
+              {draft.healthStatus === "deceased" ? (
+                <>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="rel_age_death">Age at death</Label>
+                    <Input
+                      id="rel_age_death"
+                      className={mobileControlClassName}
+                      type="number"
+                      min={0}
+                      value={draft.ageAtDeath ?? ""}
+                      onChange={(event) =>
+                        onPatch({ ageAtDeath: event.target.value === "" ? null : Number(event.target.value) })
+                      }
+                    />
+                  </div>
+                  <TextField
+                    id="rel_cause"
+                    label="Health or cause of death"
+                    value={draft.healthOrCauseOfDeath}
+                    onChange={(healthOrCauseOfDeath) => onPatch({ healthOrCauseOfDeath })}
+                  />
+                </>
+              ) : null}
             </>
           ) : null}
           {visibility.lengthOfRelationship ? (
@@ -1018,7 +1056,12 @@ function PersonDetail({
               onChange={(lengthOfRelationship) => onPatch({ lengthOfRelationship })}
             />
           ) : null}
-          <RelationshipExtras record={draft} onChange={onPatch} />
+          <RelationshipExtras
+            record={draft}
+            clientRelationshipStatus={clientRelationshipStatus}
+            onChange={onPatch}
+            onClientRelationshipStatus={onClientRelationshipStatus}
+          />
           {draftPairs.map((partnership) => {
             const other = otherPersonInPartnership(partnership, draft.relationshipRecordId, people)
             return (
@@ -1055,7 +1098,12 @@ function PersonDetail({
           />
         </>
       ) : (
-        <PersonReadOnly record={draft} pairs={draftPairs} people={people} />
+        <PersonReadOnly
+          record={draft}
+          pairs={draftPairs}
+          people={people}
+          clientRelationshipStatus={clientRelationshipStatus}
+        />
       )}
     </div>
   )
@@ -1276,10 +1324,12 @@ function PersonReadOnly({
   record,
   pairs,
   people,
+  clientRelationshipStatus,
 }: {
   record: RelationshipRecord
   pairs: PartnershipRecord[]
   people: RelationshipRecord[]
+  clientRelationshipStatus: ClientRelationshipStatusValue
 }) {
   const visibility = relationshipFieldVisibility(record)
   return (
@@ -1290,25 +1340,35 @@ function PersonReadOnly({
         <ReadOnlyField label="Caregiver relationship" value={record.caregiverRelationship} />
       ) : null}
       <ReadOnlyField label="Sex" value={record.sex} />
-      <BirthReadOnly record={record} />
-      <ReadOnlyField
-        label="Health status"
-        value={record.healthStatus ? HEALTH_STATUS_LABELS[record.healthStatus] : ""}
-      />
-      {record.healthStatus === "deceased" ? (
+      {visibility.dateOfBirth ? <BirthReadOnly record={record} /> : null}
+      {visibility.health ? (
         <>
-          <ReadOnlyField label="Age at death" value={record.ageAtDeath == null ? "" : String(record.ageAtDeath)} />
-          <ReadOnlyField label="Health or cause of death" value={record.healthOrCauseOfDeath} />
+          <ReadOnlyField
+            label="Health status"
+            value={record.healthStatus ? HEALTH_STATUS_LABELS[record.healthStatus] : ""}
+          />
+          {record.healthStatus === "deceased" ? (
+            <>
+              <ReadOnlyField label="Age at death" value={record.ageAtDeath == null ? "" : String(record.ageAtDeath)} />
+              <ReadOnlyField label="Health or cause of death" value={record.healthOrCauseOfDeath} />
+            </>
+          ) : null}
         </>
       ) : null}
       {visibility.lengthOfRelationship ? (
         <ReadOnlyField label="Length of relationship" value={record.lengthOfRelationship} />
       ) : null}
-      {visibility.relationshipStatus ? <ReadOnlyField label="Relationship status" value={record.relationshipStatus} /> : null}
-      {visibility.timeSinceEnded ? <ReadOnlyField label="Time since ended" value={record.timeSinceEnded} /> : null}
-      {visibility.qualityOfRelationship ? (
-        <ReadOnlyField label="Quality of relationship (with client)" value={record.qualityOfRelationship} />
+      {visibility.clientRelationshipStatus ? (
+        <ReadOnlyField
+          label="Current relationship status"
+          value={clientRelationshipStatusText(clientRelationshipStatus)}
+        />
       ) : null}
+      {visibility.howItEnded ? <ReadOnlyField label="How it ended" value={record.relationshipStatus} /> : null}
+      {visibility.timeSinceEnded ? <ReadOnlyField label="Time since ended" value={record.timeSinceEnded} /> : null}
+      <ReadOnlyField label="Supportive" value={ratingText(record.supportive)} />
+      <ReadOnlyField label="Conflict or strain" value={ratingText(record.conflict)} />
+      <ReadOnlyField label="Comment" value={record.qualityOfRelationship} />
       {visibility.dependency ? (
         <ReadOnlyField label="Dependency" value={record.dependency ? DEPENDENCY_LABELS[record.dependency] : ""} />
       ) : isMinorChild(record) ? (
@@ -1365,21 +1425,31 @@ function RoleSelect({
 
 function RelationshipExtras({
   record,
+  clientRelationshipStatus,
   onChange,
+  onClientRelationshipStatus,
 }: {
   record: RelationshipRecord
+  clientRelationshipStatus: ClientRelationshipStatusValue
   onChange: (partial: Partial<RelationshipRecord>) => void
+  onClientRelationshipStatus: (value: ClientRelationshipStatusValue) => void
 }) {
   const visibility = relationshipFieldVisibility(record)
   return (
     <>
-      {visibility.relationshipStatus ? (
+      {visibility.clientRelationshipStatus ? (
+        <ClientRelationshipStatusFields
+          idPrefix="partner_client"
+          value={clientRelationshipStatus}
+          onChange={onClientRelationshipStatus}
+        />
+      ) : null}
+      {visibility.howItEnded ? (
         <TextField
           id="rel_status"
-          label="Relationship status"
+          label="How it ended"
           value={record.relationshipStatus}
           onChange={(relationshipStatus) => onChange({ relationshipStatus })}
-          placeholder="e.g. married, de facto, separated"
         />
       ) : null}
       {visibility.timeSinceEnded ? (
@@ -1390,14 +1460,38 @@ function RelationshipExtras({
           onChange={(timeSinceEnded) => onChange({ timeSinceEnded })}
         />
       ) : null}
-      {visibility.qualityOfRelationship ? (
-        <TextAreaField
-          id="rel_quality"
-          label="Quality of relationship (with client)"
-          value={record.qualityOfRelationship}
-          onChange={(qualityOfRelationship) => onChange({ qualityOfRelationship })}
-        />
-      ) : null}
+      <SelectField
+        id="rel_supportive"
+        label="Supportive?"
+        value={record.supportive}
+        onChange={(supportive) => onChange({ supportive: supportive as RelationshipRating | "" })}
+      >
+        <option value="">Not recorded</option>
+        {RELATIONSHIP_RATING_VALUES.map((option) => (
+          <option key={option} value={option}>
+            {RELATIONSHIP_RATING_LABELS[option]}
+          </option>
+        ))}
+      </SelectField>
+      <SelectField
+        id="rel_conflict"
+        label="Conflict or strain?"
+        value={record.conflict}
+        onChange={(conflict) => onChange({ conflict: conflict as RelationshipRating | "" })}
+      >
+        <option value="">Not recorded</option>
+        {RELATIONSHIP_RATING_VALUES.map((option) => (
+          <option key={option} value={option}>
+            {RELATIONSHIP_RATING_LABELS[option]}
+          </option>
+        ))}
+      </SelectField>
+      <TextAreaField
+        id="rel_quality"
+        label="Comment"
+        value={record.qualityOfRelationship}
+        onChange={(qualityOfRelationship) => onChange({ qualityOfRelationship })}
+      />
       {visibility.dependency ? (
         <SelectField
           id="rel_dependency"
@@ -1433,6 +1527,135 @@ function RelationshipExtras({
         </SelectField>
       ) : null}
     </>
+  )
+}
+
+function clientRelationshipStatusText(value: ClientRelationshipStatusValue) {
+  if (!value.relationshipStatus) return ""
+  if (value.relationshipStatus === "other") return value.relationshipStatusOther.trim() || "Other"
+  return CLIENT_RELATIONSHIP_STATUS_LABELS[value.relationshipStatus]
+}
+
+function ratingText(value: RelationshipRating | "") {
+  return value ? RELATIONSHIP_RATING_LABELS[value] : ""
+}
+
+function ClientRelationshipStatusFields({
+  idPrefix,
+  value,
+  onChange,
+}: {
+  idPrefix: string
+  value: ClientRelationshipStatusValue
+  onChange: (value: ClientRelationshipStatusValue) => void
+}) {
+  return (
+    <>
+      <SelectField
+        id={`${idPrefix}_relationship_status`}
+        label="Current relationship status"
+        value={value.relationshipStatus}
+        onChange={(relationshipStatus) =>
+          onChange({
+            relationshipStatus: relationshipStatus as ClientRelationshipStatus | "",
+            relationshipStatusOther: relationshipStatus === "other" ? value.relationshipStatusOther : "",
+          })
+        }
+      >
+        <option value="">Not recorded</option>
+        {CLIENT_RELATIONSHIP_STATUSES.map((option) => (
+          <option key={option} value={option}>
+            {CLIENT_RELATIONSHIP_STATUS_LABELS[option]}
+          </option>
+        ))}
+      </SelectField>
+      {value.relationshipStatus === "other" ? (
+        <TextField
+          id={`${idPrefix}_relationship_status_other`}
+          label="Other relationship status"
+          value={value.relationshipStatusOther}
+          onChange={(relationshipStatusOther) => onChange({ ...value, relationshipStatusOther })}
+        />
+      ) : null}
+    </>
+  )
+}
+
+function ClientRelationshipStatusPanel({
+  clientId,
+  value,
+  onSaved,
+}: {
+  clientId: string
+  value: ClientRelationshipStatusValue
+  onSaved: (value: ClientRelationshipStatusValue) => void
+}) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(value)
+  const [pending, setPending] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const label = clientRelationshipStatusText(value) || "Not recorded"
+
+  async function save() {
+    setPending(true)
+    setError(null)
+    const result = await saveClientRelationshipStatusAction(clientId, draft)
+    setPending(false)
+    if (result.error || result.relationshipStatus === undefined || result.relationshipStatusOther === undefined) {
+      setError(result.error ?? "Could not save relationship status.")
+      return
+    }
+    onSaved({
+      relationshipStatus: result.relationshipStatus,
+      relationshipStatusOther: result.relationshipStatusOther,
+    })
+    setEditing(false)
+  }
+
+  if (!editing) {
+    return (
+      <div className="flex items-center justify-between gap-2 px-2">
+        <p className="text-sm">Current relationship status: {label}</p>
+        <Button
+          type="button"
+          variant="outline"
+          size="xs"
+          onClick={() => {
+            setDraft(value)
+            setError(null)
+            setEditing(true)
+          }}
+        >
+          Edit
+        </Button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-4 px-2">
+      <ClientRelationshipStatusFields idPrefix="client" value={draft} onChange={setDraft} />
+      <SaveRow
+        pending={pending}
+        error={error}
+        onSave={() => void save()}
+        extra={
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            disabled={pending}
+            onClick={() => {
+              setDraft(value)
+              setError(null)
+              setEditing(false)
+            }}
+          >
+            Cancel
+          </Button>
+        }
+      />
+    </div>
   )
 }
 

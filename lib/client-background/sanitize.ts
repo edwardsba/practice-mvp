@@ -17,6 +17,12 @@ import {
   SEX_OPTIONS,
   START_PRECISIONS,
   SUBSTANCE_STATUSES,
+  CLIENT_RELATIONSHIP_STATUSES,
+  EMPLOYED_WORK_STATUSES,
+  HOUSING_TYPE_OPTIONS,
+  LIVES_WITH_OPTIONS,
+  RELATIONSHIP_RATING_VALUES,
+  WORK_STATUSES,
   emptyDemographics,
   emptyEducation,
   emptyEvent,
@@ -26,6 +32,8 @@ import {
   emptyOccupation,
   emptyRisk,
   type Attribution,
+  type ClientRelationshipStatus,
+  type ClientRelationshipStatusValue,
   type Demographics,
   type DependencyValue,
   type EducationFields,
@@ -34,8 +42,11 @@ import {
   type FamilySide,
   type HealthStatus,
   type IdentityFields,
+  type LivesWith,
   type LivingSituationFields,
   type OccupationFields,
+  type RelationshipRating,
+  type WorkStatus,
   type PartnershipRecord,
   type PartnershipStatus,
   type PreviousJob,
@@ -114,6 +125,19 @@ function normalizeLivingSituation(value: unknown): RelationshipLivingSituation |
   )
 }
 
+function disabilityFrom(raw: Record<string, unknown>): Pick<IdentityFields, "disability" | "disabilityDetail"> {
+  if (typeof raw.disability === "string") {
+    const text = raw.disability.trim()
+    if (text) return { disability: true, disabilityDetail: text }
+    return { disability: null, disabilityDetail: "" }
+  }
+  const disability = boolOrNull(raw.disability)
+  return {
+    disability,
+    disabilityDetail: disability === true ? str(raw.disabilityDetail) : "",
+  }
+}
+
 export function sanitizeIdentity(value: unknown): IdentityFields {
   const raw = isRecord(value) ? value : {}
   const genderIdentity = str(raw.genderIdentity)
@@ -126,24 +150,36 @@ export function sanitizeIdentity(value: unknown): IdentityFields {
     raceEthnicity: str(raw.raceEthnicity),
     religion: str(raw.religion),
     primaryLanguage: str(raw.primaryLanguage),
-    disability: str(raw.disability),
+    ...disabilityFrom(raw),
     accessibilityNeeds: str(raw.accessibilityNeeds),
   }
 }
 
+function housingTypeFrom(raw: Record<string, unknown>): string {
+  const stored = str(raw.housingType)
+  if (isOneOf(stored, HOUSING_TYPE_OPTIONS)) return stored
+  const legacy = str(raw.livingArrangement)
+  if (isOneOf(legacy, HOUSING_TYPE_OPTIONS)) return legacy
+  return ""
+}
+
 export function sanitizeLivingSituation(value: unknown): LivingSituationFields {
   const raw = isRecord(value) ? value : {}
-  const clientDependsOnOthers = boolOrNull(raw.clientDependsOnOthers)
-  const othersDependOnClient = boolOrNull(raw.othersDependOnClient)
+  const livesWith = oneOf<LivesWith>(raw.livesWith, LIVES_WITH_OPTIONS)
   return {
-    livingArrangement: str(raw.livingArrangement) || str(raw.housingType),
-    clientDependsOnOthers,
-    clientDependsOnOthersDetail:
-      clientDependsOnOthers === true ? str(raw.clientDependsOnOthersDetail) : "",
-    othersDependOnClient,
-    othersDependOnClientDetail: othersDependOnClient === true ? str(raw.othersDependOnClientDetail) : "",
-    householdComposition: str(raw.householdComposition),
+    housingType: housingTypeFrom(raw),
+    livesWith,
+    livesWithOther: livesWith === "other" ? str(raw.livesWithOther) : "",
     housingStability: str(raw.housingStability),
+  }
+}
+
+export function sanitizeClientRelationshipStatus(value: unknown): ClientRelationshipStatusValue {
+  const raw = isRecord(value) ? value : {}
+  const relationshipStatus = oneOf<ClientRelationshipStatus>(raw.relationshipStatus, CLIENT_RELATIONSHIP_STATUSES)
+  return {
+    relationshipStatus,
+    relationshipStatusOther: relationshipStatus === "other" ? str(raw.relationshipStatusOther) : "",
   }
 }
 
@@ -175,9 +211,28 @@ function sanitizeJob(value: unknown): PreviousJob | null {
   return job
 }
 
+function workStatusFrom(raw: Record<string, unknown>): Pick<
+  OccupationFields,
+  "workStatus" | "workStatusOther" | "role" | "employer"
+> {
+  let workStatus = oneOf<WorkStatus>(raw.workStatus, WORK_STATUSES)
+  let role = str(raw.role)
+  const employer = str(raw.employer)
+  if (!workStatus && boolOrNull(raw.currentlyEmployed) === true) {
+    workStatus = "full_time"
+    if (!role) role = str(raw.currentlyEmployedDetail)
+  }
+  const employed = workStatus !== "" && (EMPLOYED_WORK_STATUSES as readonly string[]).includes(workStatus)
+  return {
+    workStatus,
+    workStatusOther: workStatus === "other" ? str(raw.workStatusOther) : "",
+    role: employed ? role : "",
+    employer: employed ? employer : "",
+  }
+}
+
 export function sanitizeOccupation(value: unknown): OccupationFields {
   const raw = isRecord(value) ? value : {}
-  const currentlyEmployed = boolOrNull(raw.currentlyEmployed)
   const financialConcerns = boolOrNull(raw.financialConcerns)
   const necessitiesRaw = isRecord(raw.necessities) ? raw.necessities : {}
   const necessities = emptyNecessities()
@@ -191,8 +246,7 @@ export function sanitizeOccupation(value: unknown): OccupationFields {
       })
     : []
   return {
-    currentlyEmployed,
-    currentlyEmployedDetail: currentlyEmployed === true ? str(raw.currentlyEmployedDetail) : "",
+    ...workStatusFrom(raw),
     previousJobs: jobs,
     financialConcerns,
     financialConcernsDetail: financialConcerns === true ? str(raw.financialConcernsDetail) : "",
@@ -283,6 +337,8 @@ export function sanitizeRelationship(value: unknown, fallbackId = ""): Relations
     lengthOfRelationship: str(raw.lengthOfRelationship),
     relationshipStatus: str(raw.relationshipStatus),
     timeSinceEnded: str(raw.timeSinceEnded),
+    supportive: oneOf<RelationshipRating>(raw.supportive, RELATIONSHIP_RATING_VALUES),
+    conflict: oneOf<RelationshipRating>(raw.conflict, RELATIONSHIP_RATING_VALUES),
     qualityOfRelationship: str(raw.qualityOfRelationship),
     dependency,
     livingSituation: normalizeLivingSituation(raw.livingSituation),

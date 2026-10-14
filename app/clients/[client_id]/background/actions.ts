@@ -8,6 +8,7 @@ import {
   createRelationship,
   deleteEvent,
   deleteRelationship,
+  saveClientRelationshipStatus,
   saveDemographics,
   saveEducation,
   saveIdentity,
@@ -92,6 +93,18 @@ export async function saveDemographicsAction(clientId: string, demographics: unk
   return result
 }
 
+export async function saveClientRelationshipStatusAction(clientId: string, relationshipStatus: unknown) {
+  const context = await requirePractitionerContext()
+  const result = await saveClientRelationshipStatus({
+    clientId,
+    practiceId: context.practiceId,
+    userId: context.userId,
+    relationshipStatus,
+  })
+  if (!result.error) refresh(clientId)
+  return result
+}
+
 export async function saveRiskAction(clientId: string, risk: unknown) {
   const context = await requirePractitionerContext()
   const result = await saveRisk({
@@ -107,7 +120,8 @@ export async function saveRiskAction(clientId: string, risk: unknown) {
 export async function createRelationshipAction(
   clientId: string,
   relationship: unknown,
-  associatedParentId?: string | null
+  associatedParentId?: string | null,
+  clientRelationshipStatus?: unknown
 ) {
   const context = await requirePractitionerContext()
   const result = await createRelationship({
@@ -116,6 +130,7 @@ export async function createRelationshipAction(
     userId: context.userId,
     relationship,
     associatedParentId,
+    clientRelationshipStatus,
   })
   if (!result.error) refresh(clientId)
   return result
@@ -125,7 +140,11 @@ export async function updateRelationshipAction(
   clientId: string,
   relationship: unknown,
   partnerships: unknown,
-  options?: { associatedParentId?: string | null; relink?: RelationshipRelink | null }
+  options?: {
+    associatedParentId?: string | null
+    relink?: RelationshipRelink | null
+    clientRelationshipStatus?: unknown
+  }
 ) {
   const context = await requirePractitionerContext()
   const result = await updateRelationshipDetail({
@@ -136,6 +155,7 @@ export async function updateRelationshipAction(
     partnerships,
     associatedParentId: options?.associatedParentId,
     relink: options?.relink,
+    clientRelationshipStatus: options?.clientRelationshipStatus,
   })
   if (!result.error) refresh(clientId)
   return result

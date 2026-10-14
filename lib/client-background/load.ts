@@ -11,13 +11,14 @@ import {
 } from "@/db/schema"
 import { db } from "@/lib/db"
 import { settleEventDates } from "@/lib/client-background/age"
-import { toEvent, toPartnership, toRelationship } from "@/lib/client-background/map"
+import { toClientRelationshipStatus, toEvent, toPartnership, toRelationship } from "@/lib/client-background/map"
 import {
   demographicsFromStored,
   sanitizeRisk,
 } from "@/lib/client-background/sanitize"
 import {
   emptyDemographics,
+  emptyClientRelationshipStatus,
   emptyRisk,
   type ClientBackgroundData,
 } from "@/lib/client-background/types"
@@ -96,6 +97,9 @@ export async function loadClientBackground(
     backgroundCapturedAt: client.backgroundCapturedAt
       ? client.backgroundCapturedAt.toISOString()
       : null,
+    relationshipStatus: background
+      ? toClientRelationshipStatus(background)
+      : emptyClientRelationshipStatus(),
     demographics: background
       ? demographicsFromStored(background)
       : emptyDemographics(),

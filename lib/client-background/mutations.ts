@@ -6,6 +6,7 @@ import { auditEvents, clientBackgrounds, clientEventRecords, clientPartnershipRe
 import { db } from "@/lib/db"
 import { toEvent, toPartnership, toRelationship } from "@/lib/client-background/map"
 import {
+  sanitizeClientRelationshipStatus,
   sanitizeEducation,
   sanitizeEvent,
   sanitizeIdentity,
@@ -22,8 +23,10 @@ import {
   type BrokenLinks,
   type StepParentLink,
 } from "@/lib/client-background/tree"
+import { applyRelationshipVisibilityDefaults } from "@/lib/client-background/visibility"
 import {
   emptyEvent,
+  type ClientRelationshipStatusValue,
   type EducationFields,
   type EventRecord,
   type EventType,
@@ -55,6 +58,7 @@ export type RelationshipWriteResult = {
   partnerships?: PartnershipRecord[]
   affectedRelationships?: RelationshipRecord[]
   removedPartnershipIds?: string[]
+  clientRelationshipStatus?: ClientRelationshipStatusValue
 }
 
 function isOriginRole(role: string): boolean {
@@ -137,6 +141,8 @@ function relationshipColumns(record: RelationshipRecord) {
     lengthOfRelationship: record.lengthOfRelationship || null,
     relationshipStatus: record.relationshipStatus || null,
     timeSinceEnded: record.timeSinceEnded || null,
+    supportive: record.supportive || null,
+    conflict: record.conflict || null,
     qualityOfRelationship: record.qualityOfRelationship || null,
     dependency: record.dependency || null,
     livingSituation: record.livingSituation || null,
@@ -148,20 +154,74 @@ function relationshipColumns(record: RelationshipRecord) {
 }
 
 function clearInapplicableLinks(record: RelationshipRecord): RelationshipRecord {
-  const next = { ...record }
+  const next = applyRelationshipVisibilityDefaults(record)
   const isChild = next.relationshipToClient === "child_biological" || next.relationshipToClient === "child_step"
   const keepsPartnershipLink =
     next.relationshipToClient === "sibling_full" ||
     next.relationshipToClient === "sibling_half" ||
     next.relationshipToClient === "sibling_step"
-  const isPartner =
-    next.relationshipToClient === "current_partner" || next.relationshipToClient === "prior_partner"
   if (!isChild) next.linkedPartnerRecordId = null
   if (!keepsPartnershipLink) next.partnershipRecordId = null
-  if (!isPartner) next.relationshipStatus = ""
-  if (next.relationshipToClient !== "prior_partner") next.timeSinceEnded = ""
   if (next.relationshipToClient !== "other_caregiver") next.caregiverRelationship = ""
   return next
+}
+
+async function writeClientRelationshipStatus(
+  tx: Tx,
+  input: WriteContext & ClientRelationshipStatusValue
+): Promise<ClientRelationshipStatusValue> {
+  const now = new Date()
+  const [existing] = await tx
+    .select({
+      clientBackgroundId: clientBackgrounds.clientBackgroundId,
+      practiceId: clientBackgrounds.practiceId,
+    })
+    .from(clientBackgrounds)
+    .where(eq(clientBackgrounds.clientId, input.clientId))
+    .limit(1)
+
+  if (existing && existing.practiceId !== input.practiceId) {
+    throw new Error("practice_mismatch")
+  }
+
+  const values = {
+    relationshipStatus: input.relationshipStatus || null,
+    relationshipStatusOther: input.relationshipStatusOther || null,
+    updatedAt: now,
+  }
+
+  let entityId = ""
+  if (!existing) {
+    const [created] = await tx
+      .insert(clientBackgrounds)
+      .values({
+        clientId: input.clientId,
+        practiceId: input.practiceId,
+        ...values,
+      })
+      .returning({ clientBackgroundId: clientBackgrounds.clientBackgroundId })
+    entityId = created.clientBackgroundId
+  } else {
+    entityId = existing.clientBackgroundId
+    await tx
+      .update(clientBackgrounds)
+      .set(values)
+      .where(eq(clientBackgrounds.clientBackgroundId, existing.clientBackgroundId))
+  }
+
+  await writeAudit(tx, {
+    practiceId: input.practiceId,
+    userId: input.userId,
+    clientId: input.clientId,
+    eventType: "client_background.updated",
+    entityType: "client_background",
+    entityId,
+  })
+
+  return {
+    relationshipStatus: input.relationshipStatus,
+    relationshipStatusOther: input.relationshipStatusOther,
+  }
 }
 
 async function ownedRelationship(tx: Tx, id: string, clientId: string, practiceId: string) {
@@ -484,6 +544,30 @@ export async function saveOccupation(
     return { ...result, occupation }
   } catch {
     return { error: "Could not save occupation and financial concerns." }
+  }
+}
+
+export async function saveClientRelationshipStatus(input: {
+  clientId: string
+  practiceId: string
+  userId: string
+  relationshipStatus: unknown
+}): Promise<{ error?: string } & Partial<ClientRelationshipStatusValue>> {
+  const client = await assertClient(input.clientId, input.practiceId)
+  if (!client) return { error: "Client was not found." }
+  const status = sanitizeClientRelationshipStatus(input.relationshipStatus)
+  try {
+    const saved = await db.transaction((tx) =>
+      writeClientRelationshipStatus(tx, {
+        clientId: input.clientId,
+        practiceId: input.practiceId,
+        userId: input.userId,
+        ...status,
+      })
+    )
+    return { error: undefined, ...saved }
+  } catch {
+    return { error: "Could not save relationship status." }
   }
 }
 
@@ -865,6 +949,7 @@ export async function createRelationship(input: {
   userId: string
   relationship: unknown
   associatedParentId?: string | null
+  clientRelationshipStatus?: unknown
 }): Promise<MutationResult<RelationshipWriteResult>> {
   const client = await assertClient(input.clientId, input.practiceId)
   if (!client) return { error: "Client was not found." }
@@ -922,11 +1007,20 @@ export async function createRelationship(input: {
         if (origin) partnerships.push(origin)
       }
 
+      const clientRelationshipStatus =
+        validated.draft.relationshipToClient === "current_partner" && input.clientRelationshipStatus !== undefined
+          ? await writeClientRelationshipStatus(tx, {
+              ...ctx,
+              ...sanitizeClientRelationshipStatus(input.clientRelationshipStatus),
+            })
+          : undefined
+
       return {
         relationship: toRelationship(created),
         partnerships,
         affectedRelationships: [],
         removedPartnershipIds: [],
+        clientRelationshipStatus,
       }
     })
   } catch {
@@ -942,6 +1036,7 @@ export async function updateRelationshipDetail(input: {
   partnerships: unknown
   associatedParentId?: string | null
   relink?: RelationshipRelink | null
+  clientRelationshipStatus?: unknown
 }): Promise<MutationResult<RelationshipWriteResult>> {
   const client = await assertClient(input.clientId, input.practiceId)
   if (!client) return { error: "Client was not found." }
@@ -1128,11 +1223,20 @@ export async function updateRelationshipDetail(input: {
         affectedById.set(person.relationshipRecordId, person)
       }
 
+      const clientRelationshipStatus =
+        draft.relationshipToClient === "current_partner" && input.clientRelationshipStatus !== undefined
+          ? await writeClientRelationshipStatus(tx, {
+              ...ctx,
+              ...sanitizeClientRelationshipStatus(input.clientRelationshipStatus),
+            })
+          : undefined
+
       return {
         relationship: toRelationship(updated),
         partnerships: [...savedPartnerships.values()],
         affectedRelationships: [...affectedById.values()],
         removedPartnershipIds: [...removed],
+        clientRelationshipStatus,
       }
     })
   } catch {

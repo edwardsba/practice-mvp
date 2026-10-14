@@ -30,6 +30,9 @@ export const clientBackgrounds = pgTable("client_backgrounds", {
   educationJson: jsonb("education_json"),
   occupationJson: jsonb("occupation_json"),
   riskJson: jsonb("risk_json"),
+  /** Client's current relationship status. Not a field of any relative. */
+  relationshipStatus: text("relationship_status"),
+  relationshipStatusOther: text("relationship_status_other"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 })
@@ -56,8 +59,11 @@ export const clientRelationshipRecords = pgTable("client_relationship_records", 
   ageAtDeath: integer("age_at_death"),
   healthOrCauseOfDeath: text("health_or_cause_of_death"),
   lengthOfRelationship: text("length_of_relationship"),
+  /** Prior partner: how the relationship ended. Current partners leave this null. */
   relationshipStatus: text("relationship_status"),
   timeSinceEnded: text("time_since_ended"),
+  supportive: text("supportive"),
+  conflict: text("conflict"),
   qualityOfRelationship: text("quality_of_relationship"),
   dependency: text("dependency"),
   livingSituation: text("living_situation"),

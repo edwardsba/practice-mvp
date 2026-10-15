@@ -22,7 +22,7 @@ import {
   updatePartnership,
   updateRelationshipDetail,
 } from "@/lib/client-background/mutations"
-import type { EventType, RelationshipRelink } from "@/lib/client-background/types"
+import type { RelationshipRelink } from "@/lib/client-background/types"
 
 function refresh(clientId: string) {
   revalidatePath(`/clients/${clientId}/background`)
@@ -189,14 +189,13 @@ export async function deleteRelationshipAction(clientId: string, relationshipRec
   return result
 }
 
-export async function createEventAction(clientId: string, eventType: EventType, initial?: unknown) {
+export async function createEventAction(clientId: string, event: unknown) {
   const context = await requirePractitionerContext()
   const result = await createEvent({
     clientId,
     practiceId: context.practiceId,
     userId: context.userId,
-    eventType,
-    initial,
+    event,
   })
   if (!result.error) refresh(clientId)
   return result

@@ -33,11 +33,9 @@ import {
 import { applyRelationshipVisibilityDefaults } from "@/lib/client-background/visibility"
 import {
   emptyDemographics,
-  emptyEvent,
   type ClientRelationshipStatusValue,
   type EducationFields,
   type EventRecord,
-  type EventType,
   type IdentityFields,
   type LivingSituationFields,
   type OccupationFields,
@@ -1393,22 +1391,16 @@ export async function createEvent(input: {
   clientId: string
   practiceId: string
   userId: string
-  eventType: EventType
-  initial?: unknown
+  event: unknown
 }): Promise<MutationResult<{ event?: EventRecord }>> {
   const client = await assertClient(input.clientId, input.practiceId)
   if (!client) return { error: "Client was not found." }
+  const parsed = sanitizeEvent(input.event)
 
   try {
     return await db.transaction(async (tx) => {
-      const displayOrder = await nextEventOrder(tx, input.clientId, input.practiceId, input.eventType)
-      const extra = input.initial && typeof input.initial === "object" ? input.initial : {}
-      const draft = sanitizeEvent({
-        ...emptyEvent(input.eventType, displayOrder),
-        ...extra,
-        eventType: input.eventType,
-        displayOrder,
-      })
+      const displayOrder = await nextEventOrder(tx, input.clientId, input.practiceId, parsed.eventType)
+      const draft = { ...parsed, eventRecordId: "", displayOrder }
       const [created] = await tx
         .insert(clientEventRecords)
         .values({

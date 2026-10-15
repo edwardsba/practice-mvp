@@ -565,6 +565,7 @@ export function InterviewRelationships({
               {personSheet ? (personSheet.isNew ? "New relationship" : personName(personSheet.draft)) : "Parents' relationship"}
             </SheetTitle>
           </SheetHeader>
+          <div className="px-4 pb-4">
           {personSheet ? (
             <PersonDetail
               draft={personSheet.draft}
@@ -611,6 +612,7 @@ export function InterviewRelationships({
               backLabel="← Back"
             />
           ) : null}
+          </div>
         </SheetContent>
       </Sheet>
       {relinkPrompt ? (

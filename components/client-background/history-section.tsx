@@ -35,6 +35,7 @@ import { personName } from "@/lib/client-background/tree"
 import {
   EVENT_TYPES,
   EVENT_TYPE_LABELS,
+  emptyEvent,
   FAMILY_RELATION_PICKS,
   FAMILY_SIDES,
   FAMILY_SIDE_LABELS,
@@ -67,12 +68,14 @@ export function HistorySection({
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [mobileScreen, setMobileScreen] = useState<"list" | "detail" | "edit">("list")
   const [draft, setDraft] = useState<EventRecord | null>(null)
+  const [isNew, setIsNew] = useState(false)
   const [editing, setEditing] = useState(false)
   const [pickerOpen, setPickerOpen] = useState(false)
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   function select(entry: EventRecord, startEditing = false) {
+    setIsNew(false)
     setSelectedId(entry.eventRecordId)
     setDraft({ ...entry })
     setEditing(startEditing)
@@ -80,39 +83,49 @@ export function HistorySection({
     setError(null)
   }
 
-  async function add(eventType: EventType) {
+  function add(eventType: EventType) {
     setPickerOpen(false)
-    setPending(true)
     setError(null)
-    const result = await createEventAction(clientId, eventType)
-    setPending(false)
-    if (result.error || !result.event) {
-      setError(result.error ?? "Could not add this entry.")
-      return
-    }
-    setEntries((current) => [...current, result.event!])
-    select(result.event, true)
+    setIsNew(true)
+    setSelectedId(null)
+    setDraft({ ...emptyEvent(eventType, 0), eventRecordId: "" })
+    setEditing(true)
+    setMobileScreen("edit")
   }
 
   async function save() {
     if (!draft) return
     setPending(true)
     setError(null)
-    const result = await updateEventAction(clientId, draft)
+    const result = isNew ? await createEventAction(clientId, draft) : await updateEventAction(clientId, draft)
     setPending(false)
     if (result.error || !result.event) {
       setError(result.error ?? "Could not save this entry.")
       return
     }
     setEntries((current) =>
-      current.map((entry) => (entry.eventRecordId === result.event!.eventRecordId ? result.event! : entry))
+      isNew
+        ? [...current, result.event!]
+        : current.map((entry) => (entry.eventRecordId === result.event!.eventRecordId ? result.event! : entry))
     )
+    const created = isNew
+    setIsNew(false)
+    setSelectedId(result.event.eventRecordId)
     setDraft(result.event)
     setEditing(false)
-    setMobileScreen("detail")
+    setMobileScreen(created ? "list" : "detail")
   }
 
   function cancel() {
+    if (isNew) {
+      setIsNew(false)
+      setDraft(null)
+      setSelectedId(null)
+      setEditing(false)
+      setMobileScreen("list")
+      setError(null)
+      return
+    }
     const saved = entries.find((entry) => entry.eventRecordId === draft?.eventRecordId)
     if (saved) setDraft({ ...saved })
     setEditing(false)
@@ -164,6 +177,7 @@ export function HistorySection({
         onCancel={cancel}
         onBack={leaveRecord}
         backLabel={editing ? "← Back" : "← Back to list"}
+        isNew={isNew}
         onChange={setDraft}
         onSave={() => void save()}
         onRemove={() => void remove()}
@@ -318,6 +332,7 @@ export function HistoryPanel({
   onBack,
   backLabel,
   hideBack = false,
+  isNew = false,
   onChange,
   onSave,
   onRemove,
@@ -333,6 +348,7 @@ export function HistoryPanel({
   onBack: () => void
   backLabel: string
   hideBack?: boolean
+  isNew?: boolean
   onChange: (event: EventRecord) => void
   onSave: () => void
   onRemove: () => void
@@ -373,9 +389,11 @@ export function HistoryPanel({
                 <Button type="button" variant="ghost" size="sm" className="min-h-11" disabled={pending} onClick={onCancel}>
                   Cancel
                 </Button>
-                <Button type="button" variant="ghost" size="sm" className="min-h-11" disabled={pending} onClick={onRemove}>
-                  Remove
-                </Button>
+                {isNew ? null : (
+                  <Button type="button" variant="ghost" size="sm" className="min-h-11" disabled={pending} onClick={onRemove}>
+                    Remove
+                  </Button>
+                )}
               </>
             }
           />

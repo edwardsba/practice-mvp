@@ -32,7 +32,7 @@ import {
   type ScreeningAnswer,
   type ScreeningAnswers,
 } from "@/lib/client-background/interview-history"
-import type { EventRecord, RelationshipRecord } from "@/lib/client-background/types"
+import { emptyEvent, type EventRecord, type RelationshipRecord } from "@/lib/client-background/types"
 import { cn } from "@/lib/utils"
 
 const ANSWERS: { value: ScreeningAnswer; label: string }[] = [
@@ -142,22 +142,19 @@ export function InterviewHistory({
     }
   }
 
-  async function addEntry(key: HistoryQuestionKey, event: MouseEvent<HTMLButtonElement>) {
+  function addEntry(key: HistoryQuestionKey, event: MouseEvent<HTMLButtonElement>) {
     remember(event)
     const question = HISTORY_QUESTIONS[key]
-    setPending(true)
     setError(null)
-    onPhase("history", "saving", null)
-    const result = await createEventAction(clientId, question.eventType, { attribution: question.attribution })
-    setPending(false)
-    if (result.error || !result.event) {
-      onPhase("history", "error", () => void addEntry(key, event))
-      setError(result.error ?? "Could not add this entry.")
-      return
-    }
-    replaceEntries([...entriesRef.current, result.event])
-    setSheet({ draft: result.event, editing: true, isNew: true })
-    onPhase("history", "saved", null)
+    setSheet({
+      draft: {
+        ...emptyEvent(question.eventType, 0),
+        eventRecordId: "",
+        attribution: question.attribution,
+      },
+      editing: true,
+      isNew: true,
+    })
   }
 
   async function saveEntry() {
@@ -165,7 +162,9 @@ export function InterviewHistory({
     setPending(true)
     setError(null)
     onPhase("history", "saving", null)
-    const result = await updateEventAction(clientId, sheet.draft)
+    const result = sheet.isNew
+      ? await createEventAction(clientId, sheet.draft)
+      : await updateEventAction(clientId, sheet.draft)
     setPending(false)
     if (result.error || !result.event) {
       setError(result.error ?? "Could not save this entry.")
@@ -173,7 +172,11 @@ export function InterviewHistory({
       return
     }
     replaceEntries(
-      entriesRef.current.map((entry) => (entry.eventRecordId === result.event!.eventRecordId ? result.event! : entry))
+      sheet.isNew
+        ? [...entriesRef.current, result.event]
+        : entriesRef.current.map((entry) =>
+            entry.eventRecordId === result.event!.eventRecordId ? result.event! : entry
+          )
     )
     onPhase("history", "saved", null)
     closeSheet(true)
@@ -181,6 +184,10 @@ export function InterviewHistory({
 
   function cancelEntry() {
     if (!sheet) return
+    if (sheet.isNew) {
+      closeSheet(true)
+      return
+    }
     const saved = entriesRef.current.find((entry) => entry.eventRecordId === sheet.draft.eventRecordId)
     if (!saved) {
       closeSheet(true)
@@ -278,7 +285,7 @@ export function InterviewHistory({
                       <button
                         type="button"
                         className="flex min-h-11 w-full items-center px-2 text-left text-sm text-primary"
-                        onClick={(event) => void addEntry(key, event)}
+                        onClick={(event) => addEntry(key, event)}
                       >
                         + Add entry
                       </button>
@@ -296,22 +303,25 @@ export function InterviewHistory({
           <SheetHeader>
             <SheetTitle>{sheet ? historyEntryLines(sheet.draft, dateOfBirth, relationships).title : "History"}</SheetTitle>
           </SheetHeader>
-          <HistoryPanel
-            draft={sheet?.draft ?? null}
-            editing={sheet?.editing ?? false}
-            pending={pending}
-            error={error}
-            dateOfBirth={dateOfBirth}
-            relationships={relationships}
-            hideBack
-            onEdit={() => sheet && setSheet({ ...sheet, editing: true })}
-            onCancel={cancelEntry}
-            onBack={() => closeSheet()}
-            backLabel="← Back"
-            onChange={(draft) => sheet && setSheet({ ...sheet, draft })}
-            onSave={() => void saveEntry()}
-            onRemove={() => void removeEntry()}
-          />
+          <div className="px-4 pb-4">
+            <HistoryPanel
+              draft={sheet?.draft ?? null}
+              editing={sheet?.editing ?? false}
+              pending={pending}
+              error={error}
+              dateOfBirth={dateOfBirth}
+              relationships={relationships}
+              hideBack
+              isNew={sheet?.isNew ?? false}
+              onEdit={() => sheet && setSheet({ ...sheet, editing: true })}
+              onCancel={cancelEntry}
+              onBack={() => closeSheet()}
+              backLabel="← Back"
+              onChange={(draft) => sheet && setSheet({ ...sheet, draft })}
+              onSave={() => void saveEntry()}
+              onRemove={() => void removeEntry()}
+            />
+          </div>
         </SheetContent>
       </Sheet>
 

@@ -7,7 +7,7 @@ import { BackButton } from "@/components/ui/back-button"
 import { EntityPageHeader } from "@/components/ui/entity-page-header"
 import { clients } from "@/db/schema"
 import { requirePractitionerContext } from "@/lib/auth"
-import { loadClientBackground } from "@/lib/client-background/load"
+import { loadBackgroundInterviewCard, loadClientBackground } from "@/lib/client-background/load"
 import { ensureFamilyOfOrigin } from "@/lib/client-background/mutations"
 import { db } from "@/lib/db"
 
@@ -44,6 +44,8 @@ export default async function ClientBackgroundRoute({
 
   const data = await loadClientBackground(clientId, context.practiceId)
   if (!data) notFound()
+  const interview = await loadBackgroundInterviewCard(clientId, context.practiceId)
+  if (!interview) notFound()
 
   const clientName = `${client.firstName} ${client.lastName}`
 
@@ -57,7 +59,7 @@ export default async function ClientBackgroundRoute({
         name={clientName}
         subheading="Demographics, relationships, history, and risk"
       />
-      <ClientBackgroundPage clientId={clientId} data={data} />
+      <ClientBackgroundPage clientId={clientId} data={data} interview={interview} />
     </AppShell>
   )
 }

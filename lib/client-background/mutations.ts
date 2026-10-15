@@ -2,10 +2,17 @@ import "server-only"
 
 import { and, eq, inArray, or } from "drizzle-orm"
 
-import { auditEvents, clientBackgrounds, clientEventRecords, clientPartnershipRecords, clientRelationshipRecords, clients } from "@/db/schema"
+import { auditEvents, clientBackgroundInterviews, clientBackgrounds, clientEventRecords, clientPartnershipRecords, clientRelationshipRecords, clients } from "@/db/schema"
 import { db } from "@/lib/db"
-import { toEvent, toPartnership, toRelationship } from "@/lib/client-background/map"
+import { settleEventDates } from "@/lib/client-background/age"
+import { toClientRelationshipStatus, toEvent, toPartnership, toRelationship } from "@/lib/client-background/map"
 import {
+  finalScreeningAnswers,
+  sanitizeScreening,
+  type ScreeningAnswers,
+} from "@/lib/client-background/interview-history"
+import {
+  demographicsFromStored,
   sanitizeClientRelationshipStatus,
   sanitizeEducation,
   sanitizeEvent,
@@ -25,6 +32,7 @@ import {
 } from "@/lib/client-background/tree"
 import { applyRelationshipVisibilityDefaults } from "@/lib/client-background/visibility"
 import {
+  emptyDemographics,
   emptyEvent,
   type ClientRelationshipStatusValue,
   type EducationFields,
@@ -1386,6 +1394,7 @@ export async function createEvent(input: {
   practiceId: string
   userId: string
   eventType: EventType
+  initial?: unknown
 }): Promise<MutationResult<{ event?: EventRecord }>> {
   const client = await assertClient(input.clientId, input.practiceId)
   if (!client) return { error: "Client was not found." }
@@ -1393,7 +1402,13 @@ export async function createEvent(input: {
   try {
     return await db.transaction(async (tx) => {
       const displayOrder = await nextEventOrder(tx, input.clientId, input.practiceId, input.eventType)
-      const draft = emptyEvent(input.eventType, displayOrder)
+      const extra = input.initial && typeof input.initial === "object" ? input.initial : {}
+      const draft = sanitizeEvent({
+        ...emptyEvent(input.eventType, displayOrder),
+        ...extra,
+        eventType: input.eventType,
+        displayOrder,
+      })
       const [created] = await tx
         .insert(clientEventRecords)
         .values({
@@ -1506,5 +1521,197 @@ export async function deleteEvent(input: {
     })
   } catch {
     return { error: "Could not remove this entry." }
+  }
+}
+
+function isUniqueViolation(error: unknown) {
+  return typeof error === "object" && error !== null && "code" in error && error.code === "23505"
+}
+
+async function inProgressInterview(clientId: string, practiceId: string) {
+  const [row] = await db
+    .select({ clientBackgroundInterviewId: clientBackgroundInterviews.clientBackgroundInterviewId })
+    .from(clientBackgroundInterviews)
+    .where(
+      and(
+        eq(clientBackgroundInterviews.clientId, clientId),
+        eq(clientBackgroundInterviews.practiceId, practiceId),
+        eq(clientBackgroundInterviews.status, "in_progress")
+      )
+    )
+    .limit(1)
+  return row ?? null
+}
+
+export async function startBackgroundInterview(input: {
+  clientId: string
+  practiceId: string
+  userId: string
+  practitionerProfileId: string
+}): Promise<{ error?: string; interviewId?: string }> {
+  const client = await assertClient(input.clientId, input.practiceId)
+  if (!client) return { error: "Client was not found." }
+  const existing = await inProgressInterview(input.clientId, input.practiceId)
+  if (existing) return { interviewId: existing.clientBackgroundInterviewId }
+
+  try {
+    return await db.transaction(async (tx) => {
+      const [created] = await tx
+        .insert(clientBackgroundInterviews)
+        .values({
+          clientId: input.clientId,
+          practiceId: input.practiceId,
+          practitionerProfileId: input.practitionerProfileId,
+          status: "in_progress",
+          screeningJson: {},
+        })
+        .returning({ clientBackgroundInterviewId: clientBackgroundInterviews.clientBackgroundInterviewId })
+      await writeAudit(tx, {
+        practiceId: input.practiceId,
+        userId: input.userId,
+        clientId: input.clientId,
+        eventType: "client_background_interview.started",
+        entityType: "client_background_interview",
+        entityId: created.clientBackgroundInterviewId,
+      })
+      return { interviewId: created.clientBackgroundInterviewId }
+    })
+  } catch (error) {
+    if (isUniqueViolation(error)) {
+      const raced = await inProgressInterview(input.clientId, input.practiceId)
+      if (raced) return { interviewId: raced.clientBackgroundInterviewId }
+    }
+    return { error: "Could not start the background interview." }
+  }
+}
+
+export async function saveInterviewScreening(input: {
+  clientId: string
+  practiceId: string
+  userId: string
+  screening: unknown
+}): Promise<{ error?: string; screening?: ScreeningAnswers }> {
+  const client = await assertClient(input.clientId, input.practiceId)
+  if (!client) return { error: "Client was not found." }
+  const screening = sanitizeScreening(input.screening)
+  try {
+    return await db.transaction(async (tx) => {
+      const [existing] = await tx
+        .select({ clientBackgroundInterviewId: clientBackgroundInterviews.clientBackgroundInterviewId })
+        .from(clientBackgroundInterviews)
+        .where(
+          and(
+            eq(clientBackgroundInterviews.clientId, input.clientId),
+            eq(clientBackgroundInterviews.practiceId, input.practiceId),
+            eq(clientBackgroundInterviews.status, "in_progress")
+          )
+        )
+        .limit(1)
+      if (!existing) return { error: "There is no background interview in progress." }
+      await tx
+        .update(clientBackgroundInterviews)
+        .set({ screeningJson: screening, updatedAt: new Date() })
+        .where(eq(clientBackgroundInterviews.clientBackgroundInterviewId, existing.clientBackgroundInterviewId))
+      await writeAudit(tx, {
+        practiceId: input.practiceId,
+        userId: input.userId,
+        clientId: input.clientId,
+        eventType: "client_background_interview.screening_updated",
+        entityType: "client_background_interview",
+        entityId: existing.clientBackgroundInterviewId,
+      })
+      return { screening }
+    })
+  } catch {
+    return { error: "Could not save the screening answers." }
+  }
+}
+
+export async function completeBackgroundInterview(input: {
+  clientId: string
+  practiceId: string
+  userId: string
+}): Promise<{ error?: string }> {
+  const client = await assertClient(input.clientId, input.practiceId)
+  if (!client) return { error: "Client was not found." }
+
+  try {
+    return await db.transaction(async (tx) => {
+      const [interview] = await tx
+        .select()
+        .from(clientBackgroundInterviews)
+        .where(
+          and(
+            eq(clientBackgroundInterviews.clientId, input.clientId),
+            eq(clientBackgroundInterviews.practiceId, input.practiceId),
+            eq(clientBackgroundInterviews.status, "in_progress")
+          )
+        )
+        .limit(1)
+      if (!interview) return { error: "There is no background interview in progress." }
+
+      const [clientRow] = await tx
+        .select({ dateOfBirth: clients.dateOfBirth })
+        .from(clients)
+        .where(and(eq(clients.clientId, input.clientId), eq(clients.practiceId, input.practiceId)))
+        .limit(1)
+
+      const [background] = await tx
+        .select()
+        .from(clientBackgrounds)
+        .where(
+          and(eq(clientBackgrounds.clientId, input.clientId), eq(clientBackgrounds.practiceId, input.practiceId))
+        )
+        .limit(1)
+
+      const family = await loadFamily(tx, input.clientId, input.practiceId)
+      const eventRows = await tx
+        .select()
+        .from(clientEventRecords)
+        .where(
+          and(eq(clientEventRecords.clientId, input.clientId), eq(clientEventRecords.practiceId, input.practiceId))
+        )
+      const dateOfBirth = clientRow?.dateOfBirth ?? null
+      const events = eventRows.map((row) => settleEventDates(toEvent(row), dateOfBirth))
+      const screening = finalScreeningAnswers(sanitizeScreening(interview.screeningJson), events, dateOfBirth)
+      const completedAt = new Date()
+      const demographics = background ? demographicsFromStored(background) : emptyDemographics()
+      const snapshot = {
+        demographics,
+        relationshipStatus: toClientRelationshipStatus(background ?? null),
+        relationships: family.people,
+        partnerships: family.partnerships,
+        events,
+        screening,
+      }
+
+      await tx
+        .update(clientBackgroundInterviews)
+        .set({
+          status: "completed",
+          completedAt,
+          screeningJson: screening,
+          snapshotJson: snapshot,
+          updatedAt: completedAt,
+        })
+        .where(eq(clientBackgroundInterviews.clientBackgroundInterviewId, interview.clientBackgroundInterviewId))
+
+      await tx
+        .update(clients)
+        .set({ backgroundCapturedAt: completedAt, updatedAt: completedAt })
+        .where(and(eq(clients.clientId, input.clientId), eq(clients.practiceId, input.practiceId)))
+
+      await writeAudit(tx, {
+        practiceId: input.practiceId,
+        userId: input.userId,
+        clientId: input.clientId,
+        eventType: "client_background_interview.completed",
+        entityType: "client_background_interview",
+        entityId: interview.clientBackgroundInterviewId,
+      })
+      return {}
+    })
+  } catch {
+    return { error: "Could not complete the background interview." }
   }
 }

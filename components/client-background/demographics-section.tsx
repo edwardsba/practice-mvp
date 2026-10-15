@@ -293,7 +293,7 @@ function PeopleLivingWithClient({ relationships }: { relationships: Relationship
   )
 }
 
-function IdentityFieldsEditor({
+export function IdentityFieldsEditor({
   value,
   onChange,
 }: {
@@ -369,7 +369,7 @@ function IdentityFieldsEditor({
   )
 }
 
-function LivingFieldsEditor({
+export function LivingFieldsEditor({
   value,
   relationships,
   onChange,
@@ -438,7 +438,7 @@ function LivingFieldsEditor({
   )
 }
 
-function EducationFieldsEditor({
+export function EducationFieldsEditor({
   value,
   onChange,
 }: {
@@ -486,12 +486,14 @@ function EducationFieldsEditor({
   )
 }
 
-function OccupationFieldsEditor({
+export function OccupationFieldsEditor({
   value,
   onChange,
+  onCommit,
 }: {
   value: OccupationFields
   onChange: (value: OccupationFields) => void
+  onCommit?: () => void
 }) {
   function updateJob(id: string, patch: Partial<PreviousJob>) {
     onChange({
@@ -563,7 +565,10 @@ function OccupationFieldsEditor({
               type="button"
               variant="ghost"
               size="sm"
-              onClick={() => onChange({ ...value, previousJobs: value.previousJobs.filter((item) => item.id !== job.id) })}
+              onClick={() => {
+                onChange({ ...value, previousJobs: value.previousJobs.filter((item) => item.id !== job.id) })
+                onCommit?.()
+              }}
             >
               Remove job {index + 1}
             </Button>
@@ -573,12 +578,14 @@ function OccupationFieldsEditor({
           type="button"
           variant="outline"
           size="sm"
-          onClick={() =>
+          className="min-h-11"
+          onClick={() => {
             onChange({
               ...value,
               previousJobs: [...value.previousJobs, { id: crypto.randomUUID(), role: "", employer: "", started: "", ended: "" }],
             })
-          }
+            onCommit?.()
+          }}
         >
           + Add job
         </Button>
@@ -599,12 +606,13 @@ function OccupationFieldsEditor({
             <Checkbox
               id={`necessity_${key}`}
               checked={value.necessities[key]}
-              onCheckedChange={(checked) =>
+              onCheckedChange={(checked) => {
                 onChange({
                   ...value,
                   necessities: { ...value.necessities, [key]: checked === true },
                 })
-              }
+                onCommit?.()
+              }}
             />
             <Label htmlFor={`necessity_${key}`} className="cursor-pointer font-normal">
               {NECESSITY_LABELS[key]}

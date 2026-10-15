@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm"
 import {
   boolean,
   integer,
@@ -5,10 +6,11 @@ import {
   pgTable,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core"
 
-import { clients, practices } from "./01-core"
+import { clients, practices, practitionerProfiles } from "./01-core"
 
 /**
  * Living client background. One row per client, edited in place.
@@ -137,3 +139,37 @@ export const clientEventRecords = pgTable("client_event_records", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 })
+
+/**
+ * A clinician-led background interview. Field values live on Client Background.
+ * This row stores who ran it, the history screening answers, and a completion snapshot.
+ * self_report_id is reserved for a future client self-report and is unused.
+ */
+export const clientBackgroundInterviews = pgTable(
+  "client_background_interviews",
+  {
+    clientBackgroundInterviewId: uuid("client_background_interview_id").primaryKey().defaultRandom(),
+    clientId: uuid("client_id")
+      .notNull()
+      .references(() => clients.clientId),
+    practiceId: uuid("practice_id")
+      .notNull()
+      .references(() => practices.practiceId),
+    practitionerProfileId: uuid("practitioner_profile_id")
+      .notNull()
+      .references(() => practitionerProfiles.practitionerProfileId),
+    status: text("status").notNull(),
+    startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    screeningJson: jsonb("screening_json").notNull().default({}),
+    snapshotJson: jsonb("snapshot_json"),
+    selfReportId: uuid("self_report_id"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    oneInProgress: uniqueIndex("client_background_interviews_one_in_progress")
+      .on(table.clientId)
+      .where(sql`${table.status} = 'in_progress'`),
+  })
+)

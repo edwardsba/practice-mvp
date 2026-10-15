@@ -85,7 +85,7 @@ import { cn } from "@/lib/utils"
 
 type Selection = { kind: "person"; id: string } | { kind: "partnership"; id: string } | null
 
-type RelinkPrompt = {
+export type RelinkPrompt = {
   links: BrokenLinks
   moveTo: string
   name: string
@@ -634,7 +634,7 @@ export function RelationshipsSection({
   )
 }
 
-function blankRelationship(role: RelationshipToClient): RelationshipRecord {
+export function blankRelationship(role: RelationshipToClient): RelationshipRecord {
   return {
     relationshipRecordId: "",
     relationshipToClient: role,
@@ -662,7 +662,7 @@ function blankRelationship(role: RelationshipToClient): RelationshipRecord {
   }
 }
 
-function withRole(
+export function withRole(
   record: RelationshipRecord,
   role: RelationshipToClient,
   originLinks: PartnershipRecord[]
@@ -691,7 +691,7 @@ function withRole(
   })
 }
 
-function associationErrorFor(
+export function associationErrorFor(
   draft: RelationshipRecord,
   parentId: string | null,
   originLinks: PartnershipRecord[]
@@ -708,12 +708,12 @@ function associationErrorFor(
   return null
 }
 
-function canRemovePerson(person: RelationshipRecord, people: RelationshipRecord[]) {
+export function canRemovePerson(person: RelationshipRecord, people: RelationshipRecord[]) {
   if (person.relationshipToClient !== "mother" && person.relationshipToClient !== "father") return true
   return people.filter((item) => item.relationshipToClient === person.relationshipToClient).length > 1
 }
 
-function mergePartnerships(current: PartnershipRecord[], incoming: PartnershipRecord[]) {
+export function mergePartnerships(current: PartnershipRecord[], incoming: PartnershipRecord[]) {
   const byId = new Map(current.map((item) => [item.partnershipRecordId, item]))
   for (const item of incoming) byId.set(item.partnershipRecordId, item)
   return [...byId.values()]
@@ -761,7 +761,7 @@ function DetailHeader({
 }) {
   return (
     <>
-      <Button type="button" variant="ghost" size="sm" className="lg:hidden" onClick={onBack}>
+      <Button type="button" variant="ghost" size="sm" className="min-h-11 lg:hidden" onClick={onBack}>
         {backLabel}
       </Button>
       <div className="flex items-start justify-between gap-3">
@@ -770,7 +770,7 @@ function DetailHeader({
           <p className="text-muted-foreground">{subtitle}</p>
         </div>
         {editing ? null : (
-          <Button type="button" variant="outline" size="sm" onClick={onEdit}>
+          <Button type="button" variant="outline" size="sm" className="min-h-11" onClick={onEdit}>
             Edit
           </Button>
         )}
@@ -779,7 +779,7 @@ function DetailHeader({
   )
 }
 
-function PartnershipDetail({
+export function PartnershipDetail({
   partnership,
   editing,
   pending,
@@ -821,7 +821,7 @@ function PartnershipDetail({
             error={error}
             onSave={onSave}
             extra={
-              <Button type="button" variant="ghost" size="sm" disabled={pending} onClick={onCancel}>
+              <Button type="button" variant="ghost" size="sm" className="min-h-11" disabled={pending} onClick={onCancel}>
                 Cancel
               </Button>
             }
@@ -921,7 +921,7 @@ function BirthReadOnly({ record }: { record: RelationshipRecord }) {
   )
 }
 
-function PersonDetail({
+export function PersonDetail({
   draft,
   draftPairs,
   people,
@@ -1085,11 +1085,11 @@ function PersonDetail({
             onSave={onSave}
             extra={
               <>
-                <Button type="button" variant="ghost" size="sm" disabled={pending} onClick={onCancel}>
+                <Button type="button" variant="ghost" size="sm" className="min-h-11" disabled={pending} onClick={onCancel}>
                   Cancel
                 </Button>
                 {canRemove ? (
-                  <Button type="button" variant="ghost" size="sm" disabled={pending} onClick={onRemove}>
+                  <Button type="button" variant="ghost" size="sm" className="min-h-11" disabled={pending} onClick={onRemove}>
                     Remove
                   </Button>
                 ) : null}
@@ -1540,7 +1540,7 @@ function ratingText(value: RelationshipRating | "") {
   return value ? RELATIONSHIP_RATING_LABELS[value] : ""
 }
 
-function ClientRelationshipStatusFields({
+export function ClientRelationshipStatusFields({
   idPrefix,
   value,
   onChange,
@@ -1701,7 +1701,7 @@ function TypeListDialog({
   )
 }
 
-function RelinkDialog({
+export function RelinkDialog({
   prompt,
   pending,
   onMoveTo,

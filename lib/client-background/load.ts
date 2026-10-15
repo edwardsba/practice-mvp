@@ -1,16 +1,19 @@
 import "server-only"
 
-import { and, asc, eq, sql } from "drizzle-orm"
+import { and, asc, desc, eq, sql } from "drizzle-orm"
 
 import {
+  clientBackgroundInterviews,
   clientBackgrounds,
   clientEventRecords,
   clientPartnershipRecords,
   clientRelationshipRecords,
   clients,
+  practitionerProfiles,
 } from "@/db/schema"
 import { db } from "@/lib/db"
 import { settleEventDates } from "@/lib/client-background/age"
+import { sanitizeScreening, screeningAnsweredCount } from "@/lib/client-background/interview-history"
 import { toClientRelationshipStatus, toEvent, toPartnership, toRelationship } from "@/lib/client-background/map"
 import {
   demographicsFromStored,
@@ -146,4 +149,109 @@ export async function loadClientBackgroundSummary(
     eventCount: events?.count ?? 0,
     backgroundCapturedAt: client.backgroundCapturedAt,
   }
+}
+
+export type BackgroundInterviewCardData = {
+  inProgress: { startedAt: string; answered: number } | null
+  lastCompletedAt: string | null
+  completed: { interviewId: string; completedAt: string; practitionerName: string }[]
+}
+
+function interviewDate(value: Date) {
+  return value.toLocaleDateString("en-AU", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    timeZone: "Australia/Sydney",
+  })
+}
+
+function practitionerName(row: { preferredName: string | null; firstName: string; lastName: string }) {
+  const given = row.preferredName?.trim() || row.firstName.trim()
+  return [given, row.lastName.trim()].filter(Boolean).join(" ")
+}
+
+export async function loadBackgroundInterviewCard(
+  clientId: string,
+  practiceId: string
+): Promise<BackgroundInterviewCardData | null> {
+  const client = await clientInPractice(clientId, practiceId)
+  if (!client) return null
+
+  const rows = await db
+    .select({
+      interviewId: clientBackgroundInterviews.clientBackgroundInterviewId,
+      status: clientBackgroundInterviews.status,
+      startedAt: clientBackgroundInterviews.startedAt,
+      completedAt: clientBackgroundInterviews.completedAt,
+      screeningJson: clientBackgroundInterviews.screeningJson,
+      preferredName: practitionerProfiles.preferredName,
+      firstName: practitionerProfiles.firstName,
+      lastName: practitionerProfiles.lastName,
+    })
+    .from(clientBackgroundInterviews)
+    .innerJoin(
+      practitionerProfiles,
+      eq(practitionerProfiles.practitionerProfileId, clientBackgroundInterviews.practitionerProfileId)
+    )
+    .where(
+      and(
+        eq(clientBackgroundInterviews.clientId, clientId),
+        eq(clientBackgroundInterviews.practiceId, practiceId)
+      )
+    )
+    .orderBy(desc(clientBackgroundInterviews.startedAt))
+
+  const eventRows = await db
+    .select()
+    .from(clientEventRecords)
+    .where(and(eq(clientEventRecords.clientId, clientId), eq(clientEventRecords.practiceId, practiceId)))
+  const events = eventRows.map((row) => toEvent(row))
+
+  const inProgress = rows.find((row) => row.status === "in_progress") ?? null
+  const completed = rows
+    .filter((row) => row.status === "completed" && row.completedAt)
+    .sort((a, b) => (b.completedAt?.getTime() ?? 0) - (a.completedAt?.getTime() ?? 0))
+
+  return {
+    inProgress: inProgress
+      ? {
+          startedAt: interviewDate(inProgress.startedAt),
+          answered: screeningAnsweredCount(sanitizeScreening(inProgress.screeningJson), events, client.dateOfBirth),
+        }
+      : null,
+    lastCompletedAt: completed[0]?.completedAt ? interviewDate(completed[0].completedAt) : null,
+    completed: completed.flatMap((row) =>
+      row.completedAt
+        ? [
+            {
+              interviewId: row.interviewId,
+              completedAt: interviewDate(row.completedAt),
+              practitionerName: practitionerName(row),
+            },
+          ]
+        : []
+    ),
+  }
+}
+
+export async function loadInProgressInterview(clientId: string, practiceId: string) {
+  const client = await clientInPractice(clientId, practiceId)
+  if (!client) return null
+  const [row] = await db
+    .select({
+      interviewId: clientBackgroundInterviews.clientBackgroundInterviewId,
+      screeningJson: clientBackgroundInterviews.screeningJson,
+    })
+    .from(clientBackgroundInterviews)
+    .where(
+      and(
+        eq(clientBackgroundInterviews.clientId, clientId),
+        eq(clientBackgroundInterviews.practiceId, practiceId),
+        eq(clientBackgroundInterviews.status, "in_progress")
+      )
+    )
+    .limit(1)
+  if (!row) return null
+  return { interviewId: row.interviewId, screening: sanitizeScreening(row.screeningJson) }
 }

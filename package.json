@@ -92,6 +92,7 @@
     "db:client-background-fields": "tsx db/apply-client-background-fields-migration.ts",
     "db:client-background-caregiver": "tsx db/apply-client-background-caregiver-migration.ts",
     "db:client-background-interview-fields": "tsx db/apply-client-background-interview-fields-migration.ts",
+    "db:client-background-interviews": "tsx db/apply-client-background-interviews-migration.ts",
     "db:letter-body": "tsx db/apply-letter-body-migration.ts",
     "db:report-versioning": "tsx db/apply-report-versioning-migration.ts",
     "db:session-note-versioning": "tsx db/apply-session-note-versioning-migration.ts",

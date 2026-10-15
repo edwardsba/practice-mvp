@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache"
 
 import { requirePractitionerContext } from "@/lib/auth"
 import {
+  completeBackgroundInterview,
   createEvent,
   createRelationship,
   deleteEvent,
@@ -15,6 +16,8 @@ import {
   saveLivingSituation,
   saveOccupation,
   saveRisk,
+  saveInterviewScreening,
+  startBackgroundInterview,
   updateEvent,
   updatePartnership,
   updateRelationshipDetail,
@@ -23,6 +26,7 @@ import type { EventType, RelationshipRelink } from "@/lib/client-background/type
 
 function refresh(clientId: string) {
   revalidatePath(`/clients/${clientId}/background`)
+  revalidatePath(`/clients/${clientId}/background/interview`)
   revalidatePath(`/clients/${clientId}`)
 }
 
@@ -185,13 +189,49 @@ export async function deleteRelationshipAction(clientId: string, relationshipRec
   return result
 }
 
-export async function createEventAction(clientId: string, eventType: EventType) {
+export async function createEventAction(clientId: string, eventType: EventType, initial?: unknown) {
   const context = await requirePractitionerContext()
   const result = await createEvent({
     clientId,
     practiceId: context.practiceId,
     userId: context.userId,
     eventType,
+    initial,
+  })
+  if (!result.error) refresh(clientId)
+  return result
+}
+
+export async function startBackgroundInterviewAction(clientId: string) {
+  const context = await requirePractitionerContext()
+  const result = await startBackgroundInterview({
+    clientId,
+    practiceId: context.practiceId,
+    userId: context.userId,
+    practitionerProfileId: context.practitionerProfileId,
+  })
+  if (result.interviewId) refresh(clientId)
+  return result
+}
+
+export async function saveInterviewScreeningAction(clientId: string, screening: unknown) {
+  const context = await requirePractitionerContext()
+  const result = await saveInterviewScreening({
+    clientId,
+    practiceId: context.practiceId,
+    userId: context.userId,
+    screening,
+  })
+  if (!result.error) refresh(clientId)
+  return result
+}
+
+export async function completeBackgroundInterviewAction(clientId: string) {
+  const context = await requirePractitionerContext()
+  const result = await completeBackgroundInterview({
+    clientId,
+    practiceId: context.practiceId,
+    userId: context.userId,
   })
   if (!result.error) refresh(clientId)
   return result

@@ -306,7 +306,7 @@ function HistoryRow({
   )
 }
 
-function HistoryPanel({
+export function HistoryPanel({
   draft,
   editing,
   pending,
@@ -317,6 +317,7 @@ function HistoryPanel({
   onCancel,
   onBack,
   backLabel,
+  hideBack = false,
   onChange,
   onSave,
   onRemove,
@@ -331,6 +332,7 @@ function HistoryPanel({
   onCancel: () => void
   onBack: () => void
   backLabel: string
+  hideBack?: boolean
   onChange: (event: EventRecord) => void
   onSave: () => void
   onRemove: () => void
@@ -345,14 +347,16 @@ function HistoryPanel({
 
   return (
     <div className="min-w-0 space-y-4">
-      <Button type="button" variant="ghost" size="sm" className="lg:hidden" onClick={onBack}>
-        {backLabel}
-      </Button>
+      {hideBack ? null : (
+        <Button type="button" variant="ghost" size="sm" className="min-h-11 lg:hidden" onClick={onBack}>
+          {backLabel}
+        </Button>
+      )}
       <div className="min-w-0 space-y-4 rounded-md border p-4">
       <div className="flex items-start justify-between gap-3">
         <p className="font-medium">{entryListLabel(draft)}</p>
         {editing ? null : (
-          <Button type="button" variant="outline" size="sm" onClick={onEdit}>
+          <Button type="button" variant="outline" size="sm" className="min-h-11" onClick={onEdit}>
             Edit
           </Button>
         )}
@@ -366,10 +370,10 @@ function HistoryPanel({
             onSave={onSave}
             extra={
               <>
-                <Button type="button" variant="ghost" size="sm" disabled={pending} onClick={onCancel}>
+                <Button type="button" variant="ghost" size="sm" className="min-h-11" disabled={pending} onClick={onCancel}>
                   Cancel
                 </Button>
-                <Button type="button" variant="ghost" size="sm" disabled={pending} onClick={onRemove}>
+                <Button type="button" variant="ghost" size="sm" className="min-h-11" disabled={pending} onClick={onRemove}>
                   Remove
                 </Button>
               </>
@@ -386,6 +390,17 @@ function HistoryPanel({
 
 function entryListLabel(entry: Pick<EventRecord, "title" | "eventType">) {
   return entry.title.trim() || EVENT_TYPE_LABELS[entry.eventType]
+}
+
+export function historyEntryLines(
+  entry: EventRecord,
+  dateOfBirth: string | null,
+  relationships: RelationshipRecord[]
+) {
+  return {
+    title: entryListLabel(entry),
+    meta: `${rowWhen(entry, dateOfBirth)} · ${attributionLabel(entry, relationships)}`,
+  }
 }
 
 function ageText(dateOfBirth: string | null, precision: EventRecord["startPrecision"], value: string) {

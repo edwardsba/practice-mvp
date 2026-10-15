@@ -408,7 +408,7 @@ export function SaveRow({
       <button
         type="button"
         className={cn(
-          "inline-flex h-8 items-center rounded-lg bg-primary px-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/80 disabled:opacity-50"
+          "inline-flex min-h-11 items-center rounded-lg bg-primary px-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/80 disabled:opacity-50"
         )}
         disabled={pending}
         onClick={onSave}

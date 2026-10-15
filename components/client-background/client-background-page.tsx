@@ -5,8 +5,10 @@ import { ChevronDown } from "lucide-react"
 
 import { DemographicsSection } from "@/components/client-background/demographics-section"
 import { HistorySection } from "@/components/client-background/history-section"
+import { BackgroundInterviewCard } from "@/components/client-background/interview-card"
 import { RelationshipsSection } from "@/components/client-background/relationships-section"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import type { BackgroundInterviewCardData } from "@/lib/client-background/load"
 import type { ClientBackgroundData } from "@/lib/client-background/types"
 import { cn } from "@/lib/utils"
 
@@ -22,9 +24,11 @@ type SectionId = (typeof SECTIONS)[number]["id"]
 export function ClientBackgroundPage({
   clientId,
   data,
+  interview,
 }: {
   clientId: string
   data: ClientBackgroundData
+  interview: BackgroundInterviewCardData
 }) {
   const [open, setOpen] = useState<SectionId | null>(null)
 
@@ -34,6 +38,7 @@ export function ClientBackgroundPage({
 
   return (
     <div className="min-w-0 max-w-full space-y-4 max-lg:[&_input]:text-base max-lg:[&_select]:text-base max-lg:[&_textarea]:text-base">
+      <BackgroundInterviewCard clientId={clientId} summary={interview} />
       {SECTIONS.map((item) => (
         <SectionCard
           key={item.id}

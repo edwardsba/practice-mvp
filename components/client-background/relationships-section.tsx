@@ -10,6 +10,7 @@ import {
   updateRelationshipAction,
 } from "@/app/clients/[client_id]/background/actions"
 import {
+  AddButton,
   mobileControlClassName,
   PartialDatePicker,
   ReadOnlyField,
@@ -392,15 +393,11 @@ export function RelationshipsSection({
             selected={selection?.kind === "person" && selection.id === person.relationshipRecordId}
             onSelect={() => openPerson(person, pairs)}
             extra={
-              <Button
-                type="button"
-                variant="ghost"
-                size="xs"
+              <AddButton
+                label="+ Add step-parent"
                 disabled={pending}
                 onClick={() => openNew("step_parent", { associatedParentId: person.relationshipRecordId })}
-              >
-                + Add step-parent
-              </Button>
+              />
             }
           />
         ))}
@@ -430,9 +427,7 @@ export function RelationshipsSection({
           />
         ))}
         <div className="pt-1">
-          <Button type="button" variant="outline" size="xs" disabled={pending} onClick={() => openNew("sibling_full")}>
-            + Add sibling
-          </Button>
+          <AddButton label="+ Add sibling" disabled={pending} onClick={() => openNew("sibling_full")} />
         </div>
       </section>
 
@@ -458,17 +453,13 @@ export function RelationshipsSection({
                     />
                   </div>
                 ))}
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="xs"
+                <AddButton
+                  label="+ Add step-sibling"
                   disabled={pending}
                   onClick={() =>
                     openNew("sibling_step", { partnershipRecordId: node.partnership.partnershipRecordId })
                   }
-                >
-                  + Add step-sibling
-                </Button>
+                />
               </div>
             ))}
           </div>
@@ -495,21 +486,15 @@ export function RelationshipsSection({
               </div>
             ))}
             <div className="ml-3">
-              <Button
-                type="button"
-                variant="outline"
-                size="xs"
+              <AddButton
+                label="+ Add child"
                 disabled={pending}
                 onClick={() => openNew("child_biological", { linkedPartnerRecordId: node.person.relationshipRecordId })}
-              >
-                + Add child
-              </Button>
+              />
             </div>
           </div>
         ))}
-        <Button type="button" variant="outline" size="xs" disabled={pending} onClick={() => openNew("current_partner")}>
-          + Add partner
-        </Button>
+        <AddButton label="+ Add partner" disabled={pending} onClick={() => openNew("current_partner")} />
         <div className="space-y-1">
           <p className="font-medium">Children not linked to a listed partner</p>
           {tree.unlinkedChildren.map((child) => (
@@ -520,9 +505,7 @@ export function RelationshipsSection({
               onSelect={() => openPerson(child, pairs)}
             />
           ))}
-          <Button type="button" variant="outline" size="xs" disabled={pending} onClick={() => openNew("child_biological")}>
-            + Add child
-          </Button>
+          <AddButton label="+ Add child" disabled={pending} onClick={() => openNew("child_biological")} />
         </div>
       </section>
 
@@ -1182,9 +1165,7 @@ function AssociationFields({
           >
             <option value="">No step-parent recorded</option>
           </SelectField>
-          <Button type="button" variant="outline" size="sm" disabled={pending} onClick={() => onReplaceWithNew("step_parent")}>
-            + Add step-parent
-          </Button>
+          <AddButton label="+ Add step-parent" disabled={pending} onClick={() => onReplaceWithNew("step_parent")} />
         </div>
       )
     }
@@ -1243,15 +1224,11 @@ function AssociationFields({
           >
             <option value="">No partner recorded</option>
           </SelectField>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
+          <AddButton
+            label="+ Add partner"
             disabled={pending}
             onClick={() => onReplaceWithNew("current_partner")}
-          >
-            + Add partner
-          </Button>
+          />
         </div>
       )
     }

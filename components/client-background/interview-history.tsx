@@ -10,6 +10,7 @@ import {
   saveInterviewScreeningAction,
   updateEventAction,
 } from "@/app/clients/[client_id]/background/actions"
+import { AddButton } from "@/components/client-background/fields"
 import { HistoryPanel, historyEntryLines } from "@/components/client-background/history-section"
 import type { SavePhase } from "@/components/client-background/interview-autosave"
 import { Button } from "@/components/ui/button"
@@ -270,7 +271,7 @@ export function InterviewHistory({
                           <button
                             key={entry.eventRecordId}
                             type="button"
-                            className="flex min-h-11 w-full flex-col justify-center rounded-md px-2 text-left hover:bg-muted"
+                            className="flex min-h-11 w-full cursor-pointer flex-col justify-center rounded-md px-2 text-left hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
                             onClick={(event) => {
                               remember(event)
                               setSheet({ draft: { ...entry }, editing: false, isNew: false })
@@ -282,13 +283,7 @@ export function InterviewHistory({
                           </button>
                         )
                       })}
-                      <button
-                        type="button"
-                        className="flex min-h-11 w-full items-center px-2 text-left text-sm text-primary"
-                        onClick={(event) => addEntry(key, event)}
-                      >
-                        + Add entry
-                      </button>
+                      <AddButton label="+ Add entry" onClick={(event) => addEntry(key, event)} />
                     </div>
                   ) : null}
                 </div>

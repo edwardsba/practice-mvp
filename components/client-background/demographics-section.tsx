@@ -3,7 +3,7 @@
 import { useState, type ReactNode } from "react"
 
 import { saveDemographicsAction } from "@/app/clients/[client_id]/background/actions"
-import { PartialDatePicker, ReadOnlyField, SaveRow, SelectField, TextField, YesNoDetail } from "@/components/client-background/fields"
+import { AddButton, PartialDatePicker, ReadOnlyField, SaveRow, SelectField, TextField, YesNoDetail } from "@/components/client-background/fields"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
@@ -574,11 +574,8 @@ export function OccupationFieldsEditor({
             </Button>
           </div>
         ))}
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="min-h-11"
+        <AddButton
+          label="+ Add job"
           onClick={() => {
             onChange({
               ...value,
@@ -586,9 +583,7 @@ export function OccupationFieldsEditor({
             })
             onCommit?.()
           }}
-        >
-          + Add job
-        </Button>
+        />
       </div>
       <YesNoDetail
         id="financial_concerns"

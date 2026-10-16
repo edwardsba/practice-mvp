@@ -1,7 +1,8 @@
 "use client"
 
-import { useState, type ReactNode } from "react"
+import { useState, type MouseEvent, type ReactNode } from "react"
 
+import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
@@ -389,6 +390,31 @@ export function PartialDatePicker({
       {dateField}
       {mode === "client-at-event" ? ageField : null}
     </>
+  )
+}
+
+export function AddButton({
+  label,
+  onClick,
+  disabled,
+  className,
+}: {
+  label: string
+  onClick: (event: MouseEvent<HTMLButtonElement>) => void
+  disabled?: boolean
+  className?: string
+}) {
+  return (
+    <Button
+      type="button"
+      variant="outline"
+      size="sm"
+      disabled={disabled}
+      className={cn("min-h-11 self-start", className)}
+      onClick={onClick}
+    >
+      {label}
+    </Button>
   )
 }
 

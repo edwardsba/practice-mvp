@@ -10,6 +10,7 @@ import {
   updatePartnershipAction,
   updateRelationshipAction,
 } from "@/app/clients/[client_id]/background/actions"
+import { AddButton } from "@/components/client-background/fields"
 import { AutosaveFields, type SavePhase } from "@/components/client-background/interview-autosave"
 import {
   ClientRelationshipStatusFields,
@@ -544,7 +545,7 @@ export function InterviewRelationships({
                 <button
                   key={person.relationshipRecordId}
                   type="button"
-                  className="flex min-h-11 w-full items-center justify-between gap-3 rounded-md px-2 text-left text-sm hover:bg-amber-100 dark:hover:bg-amber-900"
+                  className="flex min-h-11 w-full cursor-pointer items-center justify-between gap-3 rounded-md px-2 text-left text-sm hover:bg-amber-200 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none dark:hover:bg-amber-800"
                   onClick={(event) => openPerson(person, true, event)}
                 >
                   <span>
@@ -655,23 +656,9 @@ function RowButton({
     <button
       type="button"
       disabled={disabled}
-      className="flex min-h-11 w-full items-center rounded-md px-2 text-left text-sm hover:bg-muted disabled:hover:bg-transparent"
+      className="flex min-h-11 w-full cursor-pointer items-center rounded-md px-2 text-left text-sm hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none disabled:cursor-default disabled:hover:bg-transparent"
       onClick={onClick}
     >
-      {label}
-    </button>
-  )
-}
-
-function AddButton({
-  label,
-  onClick,
-}: {
-  label: string
-  onClick: (event: MouseEvent<HTMLButtonElement>) => void
-}) {
-  return (
-    <button type="button" className="flex min-h-11 w-full items-center px-2 text-left text-sm text-primary" onClick={onClick}>
       {label}
     </button>
   )

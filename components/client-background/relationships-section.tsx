@@ -71,7 +71,9 @@ import {
   personName,
   personRoleLabel,
   personWithRoleLabel,
+  parentsPartnershipChoice,
   relationshipLineLabel,
+  relationshipLinkLine,
   stepParentLinkLabel,
   stepParentLinks,
   treeLineStatus,
@@ -1084,6 +1086,7 @@ export function PersonDetail({
         <PersonReadOnly
           record={draft}
           pairs={draftPairs}
+          partnerships={partnerships}
           people={people}
           clientRelationshipStatus={clientRelationshipStatus}
         />
@@ -1291,24 +1294,21 @@ function partnerOptions(people: RelationshipRecord[], excludeId: string) {
     )
 }
 
-function parentsPartnershipChoice(partnership: PartnershipRecord, people: RelationshipRecord[]) {
-  const a = people.find((person) => person.relationshipRecordId === partnership.partnerAId)
-  const b = people.find((person) => person.relationshipRecordId === partnership.partnerBId)
-  return `Sibling of ${a ? personName(a) : "parent"} and ${b ? personName(b) : "parent"}`
-}
-
 function PersonReadOnly({
   record,
   pairs,
+  partnerships,
   people,
   clientRelationshipStatus,
 }: {
   record: RelationshipRecord
   pairs: PartnershipRecord[]
+  partnerships: PartnershipRecord[]
   people: RelationshipRecord[]
   clientRelationshipStatus: ClientRelationshipStatusValue
 }) {
   const visibility = relationshipFieldVisibility(record)
+  const link = relationshipLinkLine(record, people, partnerships)
   return (
     <div className="space-y-4">
       <ReadOnlyField label="Relationship to client" value={personRoleLabel(record)} />
@@ -1316,6 +1316,7 @@ function PersonReadOnly({
       {record.relationshipToClient === "other_caregiver" ? (
         <ReadOnlyField label="Caregiver relationship" value={record.caregiverRelationship} />
       ) : null}
+      {link ? <ReadOnlyField label={link.label} value={link.value} /> : null}
       <ReadOnlyField label="Sex" value={record.sex} />
       {visibility.dateOfBirth ? <BirthReadOnly record={record} /> : null}
       {visibility.health ? (

@@ -414,6 +414,68 @@ export function personWithRoleLabel(person: Pick<RelationshipRecord, "givenName"
   return name ? `${name} (${role})` : role
 }
 
+/** Option text for a full sibling's parents' partnership select. */
+export function parentsPartnershipChoice(partnership: PartnershipRecord, people: RelationshipRecord[]) {
+  const a = people.find((person) => person.relationshipRecordId === partnership.partnerAId)
+  const b = people.find((person) => person.relationshipRecordId === partnership.partnerBId)
+  return `Sibling of ${a ? personName(a) : "parent"} and ${b ? personName(b) : "parent"}`
+}
+
+export type RelationshipLinkLine = { label: string; value: string }
+
+/**
+ * The link row shown in a relationship's read-only view.
+ * Labels match the edit form's select options. Null means the row is omitted.
+ */
+export function relationshipLinkLine(
+  record: Pick<
+    RelationshipRecord,
+    "relationshipRecordId" | "relationshipToClient" | "linkedPartnerRecordId" | "partnershipRecordId"
+  >,
+  people: RelationshipRecord[],
+  partnerships: PartnershipRecord[]
+): RelationshipLinkLine | null {
+  const role = record.relationshipToClient
+  if (role === "child_biological" || role === "child_step") {
+    const partner = people.find((person) => person.relationshipRecordId === record.linkedPartnerRecordId)
+    return {
+      label: "Associated partner",
+      value: partner
+        ? personWithRoleLabel(partner)
+        : role === "child_biological"
+          ? "Not linked to a partner"
+          : "Not linked",
+    }
+  }
+  if (role === "step_parent") {
+    const parentId = linkedParentId(record.relationshipRecordId, people, partnerships)
+    const parent = people.find((person) => person.relationshipRecordId === parentId)
+    return {
+      label: "Associated parent",
+      value: parent ? personWithRoleLabel(parent) : "Not linked",
+    }
+  }
+  if (role === "sibling_half" || role === "sibling_step") {
+    const link = stepParentLinks(people, partnerships).find(
+      (item) => item.partnershipRecordId === record.partnershipRecordId
+    )
+    return {
+      label: "Associated step-parent",
+      value: link ? stepParentLinkLabel(link) : "Not linked",
+    }
+  }
+  if (role === "sibling_full") {
+    const origins = originPartnerships(people, partnerships)
+    if (origins.length <= 1) return null
+    const partnership = origins.find((item) => item.partnershipRecordId === record.partnershipRecordId)
+    return {
+      label: "Parents' partnership",
+      value: partnership ? parentsPartnershipChoice(partnership, people) : "",
+    }
+  }
+  return null
+}
+
 function uniqueStepParentTargets(
   excludeId: string,
   people: RelationshipRecord[],

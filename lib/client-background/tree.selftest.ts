@@ -7,6 +7,7 @@ import {
   familyOfOriginSequence,
   parentsRelationshipLabel,
   relationshipLineLabel,
+  relationshipLinkLine,
 } from "@/lib/client-background/tree"
 import type { PartnershipRecord, RelationshipRecord } from "@/lib/client-background/types"
 import { isMinorChild, relationshipFieldVisibility } from "@/lib/client-background/visibility"
@@ -337,5 +338,46 @@ const later = { startPrecision: "year" as const, startValue: "2010", displayOrde
 assert.ok(compareEventsChronologically(undated, earlier, null) < 0)
 assert.ok(compareEventsChronologically(earlier, later, null) < 0)
 assert.ok(compareEventsChronologically(later, undated, "1980-01-01") > 0)
+
+const sally = person({ relationshipRecordId: "sally", relationshipToClient: "mother", givenName: "Sally" })
+const phil = person({ relationshipRecordId: "phil", relationshipToClient: "prior_partner", givenName: "Phil" })
+const henry = person({
+  relationshipRecordId: "henry",
+  relationshipToClient: "child_biological",
+  givenName: "Henry",
+  linkedPartnerRecordId: "phil",
+})
+const unlinkedChild = person({
+  relationshipRecordId: "unlinked-child",
+  relationshipToClient: "child_biological",
+  givenName: "No partner",
+})
+const stepPhil = person({ relationshipRecordId: "step-phil", relationshipToClient: "step_parent", givenName: "Phil" })
+const stepSibling = person({
+  relationshipRecordId: "step-sib",
+  relationshipToClient: "sibling_step",
+  givenName: "Robin",
+  partnershipRecordId: "sally-phil",
+})
+const linkPeople = [sally, phil, henry, unlinkedChild, stepPhil, stepSibling]
+const linkPartnerships = [
+  partnership({ partnershipRecordId: "sally-phil", partnerAId: "sally", partnerBId: "step-phil" }),
+]
+assert.deepEqual(relationshipLinkLine(henry, linkPeople, linkPartnerships), {
+  label: "Associated partner",
+  value: "Phil (Prior partner)",
+})
+assert.deepEqual(relationshipLinkLine(unlinkedChild, linkPeople, linkPartnerships), {
+  label: "Associated partner",
+  value: "Not linked to a partner",
+})
+assert.deepEqual(relationshipLinkLine(stepPhil, linkPeople, linkPartnerships), {
+  label: "Associated parent",
+  value: "Sally (Mother)",
+})
+assert.deepEqual(relationshipLinkLine(stepSibling, linkPeople, linkPartnerships), {
+  label: "Associated step-parent",
+  value: "Phil (Sally's partner)",
+})
 
 console.log("client background tree and age selftest passed")

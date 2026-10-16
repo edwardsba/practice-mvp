@@ -410,8 +410,10 @@ export function InterviewRelationships({
                 }}
                 disabled={!parentsLink.partnership}
               />
-              <AddButton label="+ Add other primary caregiver" onClick={(event) => openNew("other_caregiver", event)} />
-              <AddButton label="+ Add parent" onClick={(event) => openNew("parent", event)} />
+              <div className="flex flex-col items-start gap-2">
+                <AddButton label="+ Add parent" onClick={(event) => openNew("parent", event)} />
+                <AddButton label="+ Add other primary caregiver" onClick={(event) => openNew("other_caregiver", event)} />
+              </div>
             </Group>
             <Group title="Siblings">
               {layout.siblings.map((person) => (

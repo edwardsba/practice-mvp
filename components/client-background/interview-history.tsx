@@ -15,18 +15,19 @@ import { AddButton, ClientAnswer, SelectField } from "@/components/client-backgr
 import { HistoryPanel, historyEntryLines } from "@/components/client-background/history-section"
 import { AutosaveFields, type SavePhase } from "@/components/client-background/interview-autosave"
 import { StressorsFields } from "@/components/client-background/medication-stressors"
+import { WorthCheckingLinks } from "@/components/client-background/worth-checking"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import type { ClientBackgroundSuggestions } from "@/lib/background-questionnaire/to-client-background"
+import type { BackgroundCheck } from "@/lib/client-background/checks"
 import {
   HISTORY_QUESTION_GROUPS,
   HISTORY_QUESTIONS,
@@ -53,6 +54,8 @@ export function InterviewHistory({
   onPhase,
   registerFlush,
   registerComplete,
+  getChecks,
+  onJumpToCheck,
 }: {
   clientId: string
   dateOfBirth: string | null
@@ -68,6 +71,13 @@ export function InterviewHistory({
   onPhase: (id: string, phase: SavePhase, retry: (() => void) | null) => void
   registerFlush: (flush: () => Promise<void>) => () => void
   registerComplete: (open: () => void) => void
+  getChecks: (current: {
+    screening: ScreeningAnswers
+    events: EventRecord[]
+    stressors: StressorsRecord
+    medication: MedicationRecord
+  }) => BackgroundCheck[]
+  onJumpToCheck: (check: BackgroundCheck) => void
 }) {
   const [answers, setAnswers] = useState(screening)
   const [entries, setEntries] = useState(events)
@@ -76,6 +86,7 @@ export function InterviewHistory({
   const [error, setError] = useState<string | null>(null)
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [unanswered, setUnanswered] = useState<string[]>([])
+  const [checks, setChecks] = useState<BackgroundCheck[]>([])
   const [completing, setCompleting] = useState(false)
   const [completeError, setCompleteError] = useState<string | null>(null)
   const router = useRouter()
@@ -101,10 +112,18 @@ export function InterviewHistory({
           stressorsRef.current
         )
       )
+      setChecks(
+        getChecks({
+          screening: answersRef.current,
+          events: entriesRef.current,
+          stressors: stressorsRef.current,
+          medication: medicationRef.current,
+        })
+      )
       setCompleteError(null)
       setConfirmOpen(true)
     })
-  }, [dateOfBirth, registerComplete])
+  }, [dateOfBirth, getChecks, registerComplete])
 
   useEffect(() => {
     return registerFlush(async () => {
@@ -260,7 +279,7 @@ export function InterviewHistory({
               const shown: ScreeningAnswer | null = locked ? "yes" : answers[key] ?? null
               const suggestion = historyClient?.[key]
               return (
-                <div key={key} className="space-y-2 border-b pb-4 last:border-b-0 last:pb-0">
+                <div key={key} id={`check-history-${key}`} className="scroll-mt-28 space-y-2 border-b pb-4 last:border-b-0 last:pb-0">
                   <SelectField
                     id={`history_${key}`}
                     label={question.label}
@@ -382,15 +401,34 @@ export function InterviewHistory({
       </Sheet>
 
       <Dialog open={confirmOpen} onOpenChange={(next) => !completing && setConfirmOpen(next)}>
-        <DialogContent>
+        <DialogContent className="max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Complete background interview</DialogTitle>
-            <DialogDescription>
-              {unanswered.length > 0
-                ? `These will be recorded as Not asked: ${unanswered.join(", ")}.`
-                : "Complete this background interview?"}
-            </DialogDescription>
           </DialogHeader>
+          {unanswered.length > 0 ? (
+            <div className="space-y-1">
+              <p className="text-sm font-medium">Still unanswered</p>
+              <p className="text-sm text-muted-foreground">
+                These will be recorded as Not asked: {unanswered.join(", ")}.
+              </p>
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">Complete this background interview?</p>
+          )}
+          {checks.length > 0 ? (
+            <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-950">
+              <p className="font-medium">Worth checking ({checks.length})</p>
+              <div className="mt-2">
+                <WorthCheckingLinks
+                  checks={checks}
+                  onJump={(check) => {
+                    setConfirmOpen(false)
+                    onJumpToCheck(check)
+                  }}
+                />
+              </div>
+            </div>
+          ) : null}
           {completeError ? <p className="text-sm text-destructive">{completeError}</p> : null}
           <DialogFooter>
             <Button type="button" variant="outline" className="min-h-11" disabled={completing} onClick={() => setConfirmOpen(false)}>

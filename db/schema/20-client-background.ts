@@ -35,6 +35,8 @@ export const clientBackgrounds = pgTable("client_backgrounds", {
   medicationJson: jsonb("medication_json"),
   /** One answer per stressor, plus the main reason for attending. */
   stressorsJson: jsonb("stressors_json"),
+  /** Referral, family involvement, initiative, willingness, and the client's motivation. */
+  reasonForAttendingJson: jsonb("reason_for_attending_json"),
   riskJson: jsonb("risk_json"),
   /** Client's current relationship status. Not a field of any relative. */
   relationshipStatus: text("relationship_status"),

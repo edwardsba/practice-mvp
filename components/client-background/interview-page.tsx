@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 
 import {
@@ -9,6 +9,7 @@ import {
   saveLivingSituationAction,
   saveMedicationAction,
   saveOccupationAction,
+  saveReasonForAttendingAction,
 } from "@/app/clients/[client_id]/background/actions"
 import {
   EducationFieldsEditor,
@@ -20,14 +21,30 @@ import { AutosaveFields, type SavePhase } from "@/components/client-background/i
 import { InterviewHistory } from "@/components/client-background/interview-history"
 import { InterviewRelationships } from "@/components/client-background/interview-relationships"
 import { MedicationFields } from "@/components/client-background/medication-stressors"
+import { ReasonFields } from "@/components/client-background/reason-section"
+import { scrollToBackgroundCheck } from "@/components/client-background/worth-checking"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { backgroundAnswersToClientBackground } from "@/lib/background-questionnaire/to-client-background"
 import type { BackgroundSelfReport } from "@/lib/background-questionnaire/types"
 import { assessAge, displayedAge } from "@/lib/client-background/age"
+import {
+  backgroundChecks,
+  interviewPageForCheck,
+  type BackgroundCheck,
+} from "@/lib/client-background/checks"
+import type { ReasonSupport } from "@/lib/client-background/load"
+import { applyKeptSuggestion } from "@/lib/client-background/reason"
 import { parsePartialDate } from "@/lib/client-background/partial-date"
 import type { ScreeningAnswers } from "@/lib/client-background/interview-history"
-import type { ClientBackgroundData, RelationshipRecord } from "@/lib/client-background/types"
+import type {
+  ClientBackgroundData,
+  EventRecord,
+  MedicationRecord,
+  PartnershipRecord,
+  RelationshipRecord,
+  StressorsRecord,
+} from "@/lib/client-background/types"
 import { todayDateString } from "@/lib/dates/practice-time"
 import { cn } from "@/lib/utils"
 
@@ -40,23 +57,39 @@ function clientAge(dateOfBirth: string | null) {
 
 export function InterviewPage({
   clientId,
+  practiceId,
   clientName,
   initialPage,
   data,
   screening,
   selfReport,
+  reasonSupport,
 }: {
   clientId: string
+  practiceId: string
   clientName: string
   initialPage: InterviewPageId
   data: ClientBackgroundData
   screening: ScreeningAnswers
   selfReport: BackgroundSelfReport | null
+  reasonSupport: ReasonSupport
 }) {
   const router = useRouter()
   const medicationRef = useRef(data.medication)
+  const identityRef = useRef(data.demographics.identity)
+  const occupationRef = useRef(data.demographics.occupation)
+  const livingRef = useRef(data.demographics.livingSituation)
+  const reasonRef = useRef(data.reason)
+  const relationshipsRef = useRef(data.relationships)
+  const partnershipsRef = useRef(data.partnerships)
+  const statusRef = useRef(data.relationshipStatus)
+  const suggestionDismissed = useRef(false)
+  const pendingCheck = useRef<BackgroundCheck | null>(null)
   const [page, setPage] = useState<InterviewPageId>(initialPage)
   const [relationships, setRelationships] = useState(data.relationships)
+  const [professionals, setProfessionals] = useState(reasonSupport.professionals)
+  const [relationshipsOpen, setRelationshipsOpen] = useState(0)
+  const [scrollNonce, setScrollNonce] = useState(0)
   const [phases, setPhases] = useState<Record<string, { phase: SavePhase; retry: (() => void) | null }>>({})
   const flushers = useRef(new Set<() => Promise<void>>())
   const completeRef = useRef<() => void>(() => {})
@@ -76,12 +109,58 @@ export function InterviewPage({
   }, [])
 
   const onRelationships = useCallback((next: RelationshipRecord[]) => {
+    relationshipsRef.current = next
     setRelationships(next)
+  }, [])
+
+  const onPartnerships = useCallback((next: PartnershipRecord[]) => {
+    partnershipsRef.current = next
+  }, [])
+
+  const onRelationshipStatus = useCallback((next: ClientBackgroundData["relationshipStatus"]) => {
+    statusRef.current = next
   }, [])
 
   const registerComplete = useCallback((open: () => void) => {
     completeRef.current = open
   }, [])
+
+  const getChecks = useCallback(
+    (current: {
+      screening: ScreeningAnswers
+      events: EventRecord[]
+      stressors: StressorsRecord
+      medication: MedicationRecord
+    }) =>
+      backgroundChecks({
+        data: {
+          ...data,
+          relationshipStatus: statusRef.current,
+          relationships: relationshipsRef.current,
+          partnerships: partnershipsRef.current,
+          demographics: {
+            ...data.demographics,
+            identity: identityRef.current,
+            livingSituation: livingRef.current,
+            occupation: occupationRef.current,
+          },
+          medication: current.medication,
+          stressors: current.stressors,
+          events: current.events,
+          reason: reasonRef.current,
+        },
+        numberOfChildren: selfReport?.answers.familyHome.numberOfChildren ?? null,
+        screening: current.screening,
+      }),
+    [data, selfReport]
+  )
+
+  useEffect(() => {
+    const check = pendingCheck.current
+    if (!check) return
+    pendingCheck.current = null
+    scrollToBackgroundCheck(check)
+  }, [page, scrollNonce])
 
   const values = Object.values(phases)
   const saving = values.some((item) => item.phase === "saving")
@@ -100,6 +179,21 @@ export function InterviewPage({
         : `/clients/${clientId}/background/interview`
     router.replace(href, { scroll: false })
     window.scrollTo(0, 0)
+  }
+
+  function jumpToCheck(check: BackgroundCheck) {
+    const next = interviewPageForCheck(check.target)
+    if (check.target === "relationships") setRelationshipsOpen((count) => count + 1)
+    pendingCheck.current = check
+    setScrollNonce((count) => count + 1)
+    if (next !== page) {
+      setPage(next)
+      const href =
+        next === "history"
+          ? `/clients/${clientId}/background/interview?page=history`
+          : `/clients/${clientId}/background/interview`
+      router.replace(href, { scroll: false })
+    }
   }
 
   async function leave() {
@@ -163,7 +257,53 @@ export function InterviewPage({
       ) : null}
 
       <div className={cn("space-y-4 py-4", page !== "background" && "hidden")}>
-        <Card>
+        <Card id="check-reason" className="scroll-mt-28">
+          <CardHeader>
+            <CardTitle>Reason for attending</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <AutosaveFields
+              saved={data.reason}
+              save={async (value) => {
+                const next = applyKeptSuggestion(value, {
+                  suggestedProfessionalId: reasonSupport.suggestedProfessionalId,
+                  dismissed: suggestionDismissed.current,
+                })
+                reasonRef.current = next
+                const result = await saveReasonForAttendingAction(clientId, next)
+                if (result.error || !("reason" in result) || !result.reason) {
+                  return { error: result.error ?? "Could not save reason for attending." }
+                }
+                reasonRef.current = result.reason
+                return { value: result.reason }
+              }}
+              onPhase={(phase, retry) => onPhase("reason", phase, retry)}
+              registerFlush={registerFlush}
+            >
+              {(value, onChange, commit) => {
+                reasonRef.current = value
+                return (
+                  <ReasonFields
+                    idPrefix="interview_reason"
+                    practiceId={practiceId}
+                    value={value}
+                    onChange={onChange}
+                    onCommit={commit}
+                    professionals={professionals}
+                    professions={reasonSupport.professions}
+                    organisations={reasonSupport.organisations}
+                    suggestedProfessionalId={reasonSupport.suggestedProfessionalId}
+                    onProfessionalsChange={setProfessionals}
+                    onSuggestionDismissedChange={(dismissed) => {
+                      suggestionDismissed.current = dismissed
+                    }}
+                  />
+                )
+              }}
+            </AutosaveFields>
+          </CardContent>
+        </Card>
+        <Card id="check-identity" className="scroll-mt-28">
           <CardHeader>
             <CardTitle>Identity</CardTitle>
           </CardHeader>
@@ -171,22 +311,27 @@ export function InterviewPage({
             <AutosaveFields
               saved={data.demographics.identity}
               save={async (value) => {
+                identityRef.current = value
                 const result = await saveIdentityAction(clientId, value)
                 if ("error" in result && result.error) return { error: result.error }
                 if (!("identity" in result) || !result.identity) return { error: "Could not save." }
+                identityRef.current = result.identity
                 return { value: result.identity }
               }}
               onPhase={(phase, retry) => onPhase("identity", phase, retry)}
               registerFlush={registerFlush}
             >
-              {(value, onChange, commit) => (
-                <IdentityFieldsEditor
-                  value={value}
-                  onChange={onChange}
-                  onCommit={commit}
-                  client={suggestions?.identity}
-                />
-              )}
+              {(value, onChange, commit) => {
+                identityRef.current = value
+                return (
+                  <IdentityFieldsEditor
+                    value={value}
+                    onChange={onChange}
+                    onCommit={commit}
+                    client={suggestions?.identity}
+                  />
+                )
+              }}
             </AutosaveFields>
           </CardContent>
         </Card>
@@ -217,7 +362,7 @@ export function InterviewPage({
             </AutosaveFields>
           </CardContent>
         </Card>
-        <Card>
+        <Card id="check-occupation" className="scroll-mt-28">
           <CardHeader>
             <CardTitle>Occupation and financial</CardTitle>
           </CardHeader>
@@ -225,22 +370,27 @@ export function InterviewPage({
             <AutosaveFields
               saved={data.demographics.occupation}
               save={async (value) => {
+                occupationRef.current = value
                 const result = await saveOccupationAction(clientId, value)
                 if ("error" in result && result.error) return { error: result.error }
                 if (!("occupation" in result) || !result.occupation) return { error: "Could not save." }
+                occupationRef.current = result.occupation
                 return { value: result.occupation }
               }}
               onPhase={(phase, retry) => onPhase("occupation", phase, retry)}
               registerFlush={registerFlush}
             >
-              {(value, onChange, commit) => (
-                <OccupationFieldsEditor
-                  value={value}
-                  onChange={onChange}
-                  onCommit={commit}
-                  client={suggestions?.occupation}
-                />
-              )}
+              {(value, onChange, commit) => {
+                occupationRef.current = value
+                return (
+                  <OccupationFieldsEditor
+                    value={value}
+                    onChange={onChange}
+                    onCommit={commit}
+                    client={suggestions?.occupation}
+                  />
+                )
+              }}
             </AutosaveFields>
           </CardContent>
         </Card>
@@ -250,12 +400,15 @@ export function InterviewPage({
           partnerships={data.partnerships}
           relationshipStatus={data.relationshipStatus}
           onRelationships={onRelationships}
+          onPartnerships={onPartnerships}
+          onRelationshipStatus={onRelationshipStatus}
+          openRequest={relationshipsOpen}
           onPhase={onPhase}
           registerFlush={registerFlush}
           relationshipClient={suggestions?.relationshipStatus}
           childrenPrompt={suggestions?.numberOfChildren?.label ?? null}
         />
-        <Card>
+        <Card id="check-living" className="scroll-mt-28">
           <CardHeader>
             <CardTitle>Living situation</CardTitle>
           </CardHeader>
@@ -263,27 +416,32 @@ export function InterviewPage({
             <AutosaveFields
               saved={data.demographics.livingSituation}
               save={async (value) => {
+                livingRef.current = value
                 const result = await saveLivingSituationAction(clientId, value)
                 if ("error" in result && result.error) return { error: result.error }
                 if (!("livingSituation" in result) || !result.livingSituation) return { error: "Could not save." }
+                livingRef.current = result.livingSituation
                 return { value: result.livingSituation }
               }}
               onPhase={(phase, retry) => onPhase("living", phase, retry)}
               registerFlush={registerFlush}
             >
-              {(value, onChange, commit) => (
-                <LivingFieldsEditor
-                  value={value}
-                  relationships={relationships}
-                  onChange={onChange}
-                  onCommit={commit}
-                  client={suggestions?.living}
-                />
-              )}
+              {(value, onChange, commit) => {
+                livingRef.current = value
+                return (
+                  <LivingFieldsEditor
+                    value={value}
+                    relationships={relationships}
+                    onChange={onChange}
+                    onCommit={commit}
+                    client={suggestions?.living}
+                  />
+                )
+              }}
             </AutosaveFields>
           </CardContent>
         </Card>
-        <Card>
+        <Card id="check-medication" className="scroll-mt-28">
           <CardHeader>
             <CardTitle>Medication</CardTitle>
           </CardHeader>
@@ -322,7 +480,7 @@ export function InterviewPage({
         </Button>
       </div>
 
-      <div className={cn("py-4", page !== "history" && "hidden")}>
+      <div id="check-history" className={cn("scroll-mt-28 py-4", page !== "history" && "hidden")}>
         <InterviewHistory
           clientId={clientId}
           dateOfBirth={data.dateOfBirth}
@@ -338,6 +496,8 @@ export function InterviewPage({
           onPhase={onPhase}
           registerFlush={registerFlush}
           registerComplete={registerComplete}
+          getChecks={getChecks}
+          onJumpToCheck={jumpToCheck}
         />
       </div>
     </div>

@@ -7,7 +7,7 @@ import { BackButton } from "@/components/ui/back-button"
 import { EntityPageHeader } from "@/components/ui/entity-page-header"
 import { clients } from "@/db/schema"
 import { requirePractitionerContext } from "@/lib/auth"
-import { loadBackgroundInterviewCard, loadClientBackground } from "@/lib/client-background/load"
+import { loadBackgroundInterviewCard, loadClientBackground, loadLatestBackgroundSelfReport, loadReasonSupport } from "@/lib/client-background/load"
 import { ensureFamilyOfOrigin } from "@/lib/client-background/mutations"
 import { db } from "@/lib/db"
 
@@ -44,7 +44,11 @@ export default async function ClientBackgroundRoute({
 
   const data = await loadClientBackground(clientId, context.practiceId)
   if (!data) notFound()
-  const interview = await loadBackgroundInterviewCard(clientId, context.practiceId)
+  const [interview, selfReport, reasonSupport] = await Promise.all([
+    loadBackgroundInterviewCard(clientId, context.practiceId),
+    loadLatestBackgroundSelfReport(clientId, context.practiceId),
+    loadReasonSupport(clientId, context.practiceId, data.reason.referrerProfessionalId),
+  ])
   if (!interview) notFound()
 
   const clientName = `${client.firstName} ${client.lastName}`
@@ -57,9 +61,16 @@ export default async function ClientBackgroundRoute({
       <EntityPageHeader
         kicker="Client Background"
         name={clientName}
-        subheading="Demographics, relationships, history, and risk"
+        subheading="Reason for attending, demographics, relationships, history, and risk"
       />
-      <ClientBackgroundPage clientId={clientId} data={data} interview={interview} />
+      <ClientBackgroundPage
+        clientId={clientId}
+        practiceId={context.practiceId}
+        data={data}
+        interview={interview}
+        numberOfChildren={selfReport?.answers.familyHome.numberOfChildren ?? null}
+        reasonSupport={reasonSupport}
+      />
     </AppShell>
   )
 }

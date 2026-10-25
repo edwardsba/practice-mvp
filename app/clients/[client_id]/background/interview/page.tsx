@@ -5,7 +5,7 @@ import { AppShell } from "@/components/app-shell"
 import { InterviewPage } from "@/components/client-background/interview-page"
 import { clients } from "@/db/schema"
 import { requirePractitionerContext } from "@/lib/auth"
-import { loadClientBackground, loadInProgressInterview, loadLatestBackgroundSelfReport } from "@/lib/client-background/load"
+import { loadClientBackground, loadInProgressInterview, loadLatestBackgroundSelfReport, loadReasonSupport } from "@/lib/client-background/load"
 import { ensureFamilyOfOrigin } from "@/lib/client-background/mutations"
 import { db } from "@/lib/db"
 
@@ -45,17 +45,22 @@ export default async function BackgroundInterviewRoute({
   const data = await loadClientBackground(clientId, context.practiceId)
   if (!data) notFound()
 
-  const selfReport = await loadLatestBackgroundSelfReport(clientId, context.practiceId)
+  const [selfReport, reasonSupport] = await Promise.all([
+    loadLatestBackgroundSelfReport(clientId, context.practiceId),
+    loadReasonSupport(clientId, context.practiceId, data.reason.referrerProfessionalId),
+  ])
 
   return (
     <AppShell>
       <InterviewPage
         clientId={clientId}
+        practiceId={context.practiceId}
         clientName={`${client.firstName} ${client.lastName}`.trim()}
         initialPage={query.page === "history" ? "history" : "background"}
         data={data}
         screening={interview.screening}
         selfReport={selfReport}
+        reasonSupport={reasonSupport}
       />
     </AppShell>
   )

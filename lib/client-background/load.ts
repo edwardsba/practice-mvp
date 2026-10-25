@@ -12,7 +12,11 @@ import {
   clientPartnershipRecords,
   clientRelationshipRecords,
   clients,
+  fundingApprovals,
   practitionerProfiles,
+  professionalOrganisations,
+  professionals,
+  professions,
 } from "@/db/schema"
 import { sanitizeBackgroundAnswers } from "@/lib/background-questionnaire/answers"
 import { BACKGROUND_ASSESSMENT_CODE, type BackgroundSelfReport } from "@/lib/background-questionnaire/types"
@@ -27,13 +31,21 @@ import { toClientRelationshipStatus, toEvent, toPartnership, toRelationship } fr
 import {
   demographicsFromStored,
   sanitizeMedication,
+  sanitizeReasonForAttending,
   sanitizeRisk,
   sanitizeStressors,
 } from "@/lib/client-background/sanitize"
 import {
+  sortProfessionals,
+  type OrganisationOption,
+  type ProfessionOption,
+  type ProfessionalOption,
+} from "@/lib/client-background/professionals"
+import {
   emptyDemographics,
   emptyClientRelationshipStatus,
   emptyMedication,
+  emptyReasonForAttending,
   emptyRisk,
   emptyStressors,
   type ClientBackgroundData,
@@ -122,6 +134,7 @@ export async function loadClientBackground(
       : emptyDemographics(),
     medication: background ? sanitizeMedication(background.medicationJson) : emptyMedication(),
     stressors: background ? sanitizeStressors(background.stressorsJson) : emptyStressors(),
+    reason: background ? sanitizeReasonForAttending(background.reasonForAttendingJson) : emptyReasonForAttending(),
     relationships: relationshipRows.map(toRelationship),
     partnerships: partnershipRows.map(toPartnership),
     events: eventRows.map((row) => settleEventDates(toEvent(row), client.dateOfBirth)),
@@ -351,5 +364,126 @@ export async function loadLatestBackgroundSelfReport(
     resultId: row.resultId,
     assessmentDate: row.assessmentDate.toISOString(),
     answers: sanitizeBackgroundAnswers(row.answers),
+  }
+}
+
+export type ReasonSupport = {
+  professionals: ProfessionalOption[]
+  professions: ProfessionOption[]
+  organisations: OrganisationOption[]
+  suggestedProfessionalId: string | null
+}
+
+function toProfessionalOption(row: {
+  professionalId: string
+  title: string | null
+  firstName: string
+  lastName: string
+  professionName: string | null
+}): ProfessionalOption {
+  return row
+}
+
+/** Active professionals in the practice, plus a saved referrer who is no longer active. */
+export async function loadReasonSupport(
+  clientId: string,
+  practiceId: string,
+  selectedProfessionalId: string | null
+): Promise<ReasonSupport> {
+  const listed = await db
+    .select({
+      professionalId: professionals.professionalId,
+      title: professionals.title,
+      firstName: professionals.firstName,
+      lastName: professionals.lastName,
+      professionName: professions.professionName,
+    })
+    .from(professionals)
+    .leftJoin(professions, eq(professionals.professionId, professions.professionId))
+    .where(and(eq(professionals.practiceId, practiceId), eq(professionals.isActive, true)))
+    .orderBy(asc(professionals.lastName), asc(professionals.firstName))
+
+  let options = listed.map(toProfessionalOption)
+  if (selectedProfessionalId && !options.some((item) => item.professionalId === selectedProfessionalId)) {
+    const [selected] = await db
+      .select({
+        professionalId: professionals.professionalId,
+        title: professionals.title,
+        firstName: professionals.firstName,
+        lastName: professionals.lastName,
+        professionName: professions.professionName,
+      })
+      .from(professionals)
+      .leftJoin(professions, eq(professionals.professionId, professions.professionId))
+      .where(
+        and(eq(professionals.professionalId, selectedProfessionalId), eq(professionals.practiceId, practiceId))
+      )
+      .limit(1)
+    if (selected) options = sortProfessionals([...options, selected])
+  }
+
+  const approvals = await db
+    .select({
+      referrerId: fundingApprovals.referrerId,
+      startDate: fundingApprovals.startDate,
+      createdAt: fundingApprovals.createdAt,
+    })
+    .from(fundingApprovals)
+    .innerJoin(
+      professionals,
+      and(
+        eq(professionals.professionalId, fundingApprovals.referrerId),
+        eq(professionals.practiceId, practiceId),
+        eq(professionals.isActive, true)
+      )
+    )
+    .where(
+      and(
+        eq(fundingApprovals.clientId, clientId),
+        eq(fundingApprovals.practiceId, practiceId),
+        eq(fundingApprovals.isActive, true),
+        eq(fundingApprovals.approvalStatus, "active")
+      )
+    )
+
+  approvals.sort((a, b) => {
+    const aDate = a.startDate?.trim() ?? ""
+    const bDate = b.startDate?.trim() ?? ""
+    if (aDate !== bDate) {
+      if (!aDate) return 1
+      if (!bDate) return -1
+      return bDate.localeCompare(aDate)
+    }
+    return b.createdAt.getTime() - a.createdAt.getTime()
+  })
+  const suggested = approvals[0]?.referrerId ?? null
+  const suggestedProfessionalId =
+    suggested && options.some((item) => item.professionalId === suggested) ? suggested : null
+
+  const professionRows = await db
+    .select({
+      professionId: professions.professionId,
+      professionName: professions.professionName,
+    })
+    .from(professions)
+    .where(and(eq(professions.practiceId, practiceId), eq(professions.isActive, true)))
+    .orderBy(asc(professions.professionName))
+
+  const organisationRows = await db
+    .select({
+      organisationId: professionalOrganisations.organisationId,
+      organisationName: professionalOrganisations.organisationName,
+    })
+    .from(professionalOrganisations)
+    .where(
+      and(eq(professionalOrganisations.practiceId, practiceId), eq(professionalOrganisations.isActive, true))
+    )
+    .orderBy(asc(professionalOrganisations.organisationName))
+
+  return {
+    professionals: options,
+    professions: professionRows,
+    organisations: organisationRows,
+    suggestedProfessionalId,
   }
 }

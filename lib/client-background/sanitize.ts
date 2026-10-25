@@ -49,8 +49,10 @@ import {
   type LivingSituationFields,
   type MedicationRecord,
   type OccupationFields,
+  type ReasonForAttending,
   type StressorsRecord,
   type TriStateAnswer,
+  type WillingnessAnswer,
   type RelationshipRating,
   type WorkStatus,
   type PartnershipRecord,
@@ -264,6 +266,17 @@ function triState(value: unknown): TriStateAnswer | null {
   return value === "yes" || value === "no" || value === "not_asked" ? value : null
 }
 
+function willingness(value: unknown): WillingnessAnswer | null {
+  return value === "yes" || value === "somewhat" || value === "no" || value === "not_asked" ? value : null
+}
+
+const PROFESSIONAL_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+function professionalId(value: unknown): string | null {
+  const text = str(value)
+  return PROFESSIONAL_ID.test(text) ? text : null
+}
+
 export function sanitizeMedication(value: unknown): MedicationRecord {
   const raw = isRecord(value) ? value : {}
   return {
@@ -281,6 +294,25 @@ export function sanitizeStressors(value: unknown): StressorsRecord {
   }
   stressors.mainReason = str(raw.mainReason)
   return stressors
+}
+
+export function sanitizeReasonForAttending(value: unknown): ReasonForAttending {
+  const raw = isRecord(value) ? value : {}
+  const referredByMedicalProfessional = triState(raw.referredByMedicalProfessional)
+  const familyInvolved = triState(raw.familyInvolved)
+  const referred = referredByMedicalProfessional === "yes"
+  const family = familyInvolved === "yes"
+  return {
+    referredByMedicalProfessional,
+    referrerProfessionalId: referred ? professionalId(raw.referrerProfessionalId) : null,
+    referralDate: referred ? canonicalPartialDate(str(raw.referralDate)) : "",
+    referrerConcerns: referred ? str(raw.referrerConcerns) : "",
+    familyInvolved,
+    familyInvolvement: family ? str(raw.familyInvolvement) : "",
+    ownInitiative: triState(raw.ownInitiative),
+    attendedWillingly: willingness(raw.attendedWillingly),
+    clientMotivation: str(raw.clientMotivation),
+  }
 }
 
 export function markUnansweredMedicationAndStressors(

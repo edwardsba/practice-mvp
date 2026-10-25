@@ -1,19 +1,23 @@
 "use client"
 
-import { useState, type ReactNode } from "react"
+import { useMemo, useState, type ReactNode } from "react"
 import { ChevronDown } from "lucide-react"
 
 import { DemographicsSection } from "@/components/client-background/demographics-section"
 import { HistorySection } from "@/components/client-background/history-section"
 import { BackgroundInterviewCard } from "@/components/client-background/interview-card"
 import { BackgroundStressorsSection } from "@/components/client-background/medication-stressors"
+import { ReasonSection } from "@/components/client-background/reason-section"
 import { RelationshipsSection } from "@/components/client-background/relationships-section"
+import { scrollToBackgroundCheck } from "@/components/client-background/worth-checking"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import type { BackgroundInterviewCardData } from "@/lib/client-background/load"
+import { backgroundChecks, backgroundSectionForCheck, type BackgroundCheck } from "@/lib/client-background/checks"
+import type { BackgroundInterviewCardData, ReasonSupport } from "@/lib/client-background/load"
 import type { ClientBackgroundData } from "@/lib/client-background/types"
 import { cn } from "@/lib/utils"
 
 const SECTIONS = [
+  { id: "reason", label: "Reason for attending" },
   { id: "demographics", label: "Demographics" },
   { id: "relationships", label: "Relationships" },
   { id: "history", label: "History" },
@@ -25,29 +29,62 @@ type SectionId = (typeof SECTIONS)[number]["id"]
 
 export function ClientBackgroundPage({
   clientId,
+  practiceId,
   data,
   interview,
+  numberOfChildren,
+  reasonSupport,
 }: {
   clientId: string
+  practiceId: string
   data: ClientBackgroundData
   interview: BackgroundInterviewCardData
+  numberOfChildren: number | null
+  reasonSupport: ReasonSupport
 }) {
   const [open, setOpen] = useState<SectionId | null>(null)
+  const checks = useMemo(
+    () =>
+      backgroundChecks({
+        data,
+        numberOfChildren,
+        screening: interview.latest?.screening ?? null,
+      }),
+    [data, interview.latest, numberOfChildren]
+  )
 
   function toggle(id: SectionId) {
     setOpen((current) => (current === id ? null : id))
   }
 
+  function jump(check: BackgroundCheck) {
+    const section = backgroundSectionForCheck(check.target)
+    setOpen(section)
+    window.setTimeout(() => scrollToBackgroundCheck(check), 50)
+  }
+
   return (
     <div className="min-w-0 max-w-full space-y-4 max-lg:[&_input]:text-base max-lg:[&_select]:text-base max-lg:[&_textarea]:text-base">
-      <BackgroundInterviewCard clientId={clientId} summary={interview} />
+      <BackgroundInterviewCard clientId={clientId} summary={interview} checks={checks} onJump={jump} />
       {SECTIONS.map((item) => (
         <SectionCard
           key={item.id}
+          id={item.id === "demographics" ? undefined : `check-${item.id}`}
           title={item.label}
           open={open === item.id}
           onToggle={() => toggle(item.id)}
         >
+          {item.id === "reason" ? (
+            <ReasonSection
+              clientId={clientId}
+              practiceId={practiceId}
+              reason={data.reason}
+              professionals={reasonSupport.professionals}
+              professions={reasonSupport.professions}
+              organisations={reasonSupport.organisations}
+              suggestedProfessionalId={reasonSupport.suggestedProfessionalId}
+            />
+          ) : null}
           {item.id === "demographics" ? (
             <DemographicsSection
               clientId={clientId}
@@ -88,18 +125,20 @@ export function ClientBackgroundPage({
 }
 
 function SectionCard({
+  id,
   title,
   open,
   onToggle,
   children,
 }: {
+  id?: string
   title: string
   open: boolean
   onToggle: () => void
   children: ReactNode
 }) {
   return (
-    <Card>
+    <Card id={id} className="scroll-mt-24">
       <CardHeader>
         <button
           type="button"

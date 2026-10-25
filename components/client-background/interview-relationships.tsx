@@ -81,6 +81,9 @@ export function InterviewRelationships({
   partnerships,
   relationshipStatus,
   onRelationships,
+  onPartnerships,
+  onRelationshipStatus,
+  openRequest = 0,
   onPhase,
   registerFlush,
   relationshipClient,
@@ -91,6 +94,9 @@ export function InterviewRelationships({
   partnerships: PartnershipRecord[]
   relationshipStatus: ClientRelationshipStatusValue
   onRelationships: (relationships: RelationshipRecord[]) => void
+  onPartnerships?: (partnerships: PartnershipRecord[]) => void
+  onRelationshipStatus?: (status: ClientRelationshipStatusValue) => void
+  openRequest?: number
   onPhase: (id: string, phase: SavePhase, retry: (() => void) | null) => void
   registerFlush: (flush: () => Promise<void>) => () => void
   relationshipClient?: AppliedAnswer<ClientRelationshipStatusValue>
@@ -112,6 +118,18 @@ export function InterviewRelationships({
   useEffect(() => {
     onRelationships(people)
   }, [people, onRelationships])
+
+  useEffect(() => {
+    onPartnerships?.(pairs)
+  }, [pairs, onPartnerships])
+
+  useEffect(() => {
+    onRelationshipStatus?.(clientStatus)
+  }, [clientStatus, onRelationshipStatus])
+
+  useEffect(() => {
+    if (openRequest > 0) setOpen(true)
+  }, [openRequest])
 
   const tree = useMemo(() => buildRelationshipTree(people, pairs), [people, pairs])
   const parentLinks = useMemo(() => originPartnerships(people, pairs), [people, pairs])
@@ -378,7 +396,7 @@ export function InterviewRelationships({
   const partnershipSheet = sheet?.kind === "partnership" ? sheet : null
 
   return (
-    <Card>
+    <Card id="check-relationships" className="scroll-mt-28">
       <CardHeader>
         <button
           type="button"
@@ -407,6 +425,7 @@ export function InterviewRelationships({
                 }
                 setClientStatus(next)
                 setPartnerStatusDraft(next)
+                onRelationshipStatus?.(next)
                 return { value: next }
               }}
               onPhase={(phase, retry) => onPhase("relationship-status", phase, retry)}

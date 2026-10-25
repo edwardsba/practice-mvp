@@ -273,7 +273,7 @@ function StressorsReadOnly({ value }: { value: StressorsRecord }) {
   )
 }
 
-function EditableBlock<T>({
+export function EditableBlock<T>({
   title,
   editLabel = "Edit",
   saved,
@@ -306,11 +306,13 @@ function EditableBlock<T>({
       return
     }
     const next =
-      "medication" in result && result.medication
-        ? (result.medication as T)
-        : "stressors" in result && result.stressors
-          ? (result.stressors as T)
-          : draft
+      "reason" in result && result.reason
+        ? (result.reason as T)
+        : "medication" in result && result.medication
+          ? (result.medication as T)
+          : "stressors" in result && result.stressors
+            ? (result.stressors as T)
+            : draft
     setStored(next)
     setDraft(next)
     setEditing(false)

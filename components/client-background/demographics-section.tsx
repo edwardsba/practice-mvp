@@ -132,19 +132,19 @@ export function DemographicsSection({
             void save()
           }}
         >
-          <Subsection title="Identity">
+          <Subsection title="Identity" id="check-identity">
             <IdentityFieldsEditor value={draft.identity} onChange={updateIdentity} />
           </Subsection>
           <Subsection title="Education" divided>
             <EducationFieldsEditor value={draft.education} onChange={updateEducation} />
           </Subsection>
-          <Subsection title="Occupation and financial" divided>
+          <Subsection title="Occupation and financial" divided id="check-occupation">
             <OccupationFieldsEditor value={draft.occupation} onChange={updateOccupation} />
           </Subsection>
-          <Subsection title="Living situation" divided>
+          <Subsection title="Living situation" divided id="check-living">
             <LivingFieldsEditor value={draft.livingSituation} relationships={relationships} onChange={updateLiving} />
           </Subsection>
-          <Subsection title="Medication" divided>
+          <Subsection title="Medication" divided id="check-medication">
             <MedicationFields idPrefix="demographics_medication" value={medicationDraft} onChange={setMedicationDraft} />
           </Subsection>
           <SaveRow pending={pending} error={error} onSave={() => void save()} />
@@ -160,13 +160,15 @@ function Subsection({
   title,
   divided,
   children,
+  id,
 }: {
   title: string
   divided?: boolean
   children: ReactNode
+  id?: string
 }) {
   return (
-    <section className={cn("space-y-4", divided && "border-t pt-6")}>
+    <section id={id} className={cn("scroll-mt-24 space-y-4", divided && "border-t pt-6")}>
       <h3 className="text-sm font-semibold">{title}</h3>
       {children}
     </section>
@@ -187,7 +189,7 @@ function DemographicsReadOnly({
 
   return (
     <div className="max-w-xl space-y-6">
-      <Subsection title="Identity">
+      <Subsection title="Identity" id="check-identity">
         <ReadOnlyField label="Sex" value={value.identity.sex} />
         <ReadOnlyField label="Gender identity" value={value.identity.genderIdentity} />
         <ReadOnlyField label="Pronouns" value={pronouns} />
@@ -212,7 +214,7 @@ function DemographicsReadOnly({
           value={yesNoText(value.education.disruption, value.education.disruptionDetail)}
         />
       </Subsection>
-      <Subsection title="Occupation and financial" divided>
+      <Subsection title="Occupation and financial" divided id="check-occupation">
         <ReadOnlyField label="Work status" value={workStatusText(value.occupation)} />
         {value.occupation.role.trim() ? <ReadOnlyField label="Role" value={value.occupation.role} /> : null}
         {value.occupation.employer.trim() ? <ReadOnlyField label="Employer" value={value.occupation.employer} /> : null}
@@ -237,13 +239,13 @@ function DemographicsReadOnly({
           value={limited.length ? `Limited: ${limited.map((key) => NECESSITY_LABELS[key]).join(", ")}` : "No limits recorded"}
         />
       </Subsection>
-      <Subsection title="Living situation" divided>
+      <Subsection title="Living situation" divided id="check-living">
         <ReadOnlyField label="Housing type" value={value.livingSituation.housingType} />
         <ReadOnlyField label="Who the client lives with" value={livesWithText(value.livingSituation)} />
         <PeopleLivingWithClient relationships={relationships} />
         <ReadOnlyField label="Housing stability" value={value.livingSituation.housingStability} />
       </Subsection>
-      <Subsection title="Medication" divided>
+      <Subsection title="Medication" divided id="check-medication">
         <MedicationReadOnly value={medication} />
       </Subsection>
     </div>

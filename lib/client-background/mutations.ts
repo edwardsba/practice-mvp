@@ -2,7 +2,7 @@ import "server-only"
 
 import { and, eq, inArray, or } from "drizzle-orm"
 
-import { auditEvents, assessmentDefinitions, assessmentInstances, assessmentResults, clientBackgroundInterviews, clientBackgrounds, clientEventRecords, clientPartnershipRecords, clientRelationshipRecords, clients } from "@/db/schema"
+import { auditEvents, assessmentDefinitions, assessmentInstances, assessmentResults, clientBackgroundInterviews, clientBackgrounds, clientEventRecords, clientPartnershipRecords, clientRelationshipRecords, clients, professionals } from "@/db/schema"
 import { BACKGROUND_ASSESSMENT_CODE } from "@/lib/background-questionnaire/types"
 import { db } from "@/lib/db"
 import { settleEventDates } from "@/lib/client-background/age"
@@ -23,6 +23,7 @@ import {
   sanitizeMedication,
   sanitizeOccupation,
   sanitizePartnership,
+  sanitizeReasonForAttending,
   sanitizeRelationship,
   sanitizeRisk,
   sanitizeStressors,
@@ -44,6 +45,7 @@ import {
   type LivingSituationFields,
   type MedicationRecord,
   type OccupationFields,
+  type ReasonForAttending,
   type StressorsRecord,
   type PartnershipRecord,
   type RelationshipRecord,
@@ -422,6 +424,7 @@ async function upsertBackgroundColumn(
     riskJson: RiskRatings
     medicationJson: MedicationRecord
     stressorsJson: StressorsRecord
+    reasonForAttendingJson: ReasonForAttending
   }>
 ) {
   const client = await assertClient(clientId, practiceId)
@@ -572,6 +575,36 @@ export async function saveStressors(
     return { ...result, stressors }
   } catch {
     return { error: "Could not save stressors." }
+  }
+}
+
+async function professionalBelongsToPractice(professionalId: string, practiceId: string) {
+  const [row] = await db
+    .select({ professionalId: professionals.professionalId })
+    .from(professionals)
+    .where(and(eq(professionals.professionalId, professionalId), eq(professionals.practiceId, practiceId)))
+    .limit(1)
+  return row != null
+}
+
+export async function saveReasonForAttending(input: {
+  clientId: string
+  practiceId: string
+  userId: string
+  reason: unknown
+}) {
+  const reason = sanitizeReasonForAttending(input.reason)
+  if (reason.referrerProfessionalId) {
+    const allowed = await professionalBelongsToPractice(reason.referrerProfessionalId, input.practiceId)
+    if (!allowed) return { error: "Choose a professional from this practice." }
+  }
+  try {
+    const result = await upsertBackgroundColumn(input.clientId, input.practiceId, input.userId, {
+      reasonForAttendingJson: reason,
+    })
+    return { ...result, reason }
+  } catch {
+    return { error: "Could not save reason for attending." }
   }
 }
 
@@ -1780,6 +1813,7 @@ export async function completeBackgroundInterview(input: {
         screening,
         medication: filled.medication,
         stressors: filled.stressors,
+        reason: sanitizeReasonForAttending(background?.reasonForAttendingJson),
       }
 
       await tx

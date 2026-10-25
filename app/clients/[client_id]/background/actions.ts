@@ -17,6 +17,7 @@ import {
   saveMedication,
   saveOccupation,
   saveRisk,
+  saveReasonForAttending,
   saveStressors,
   saveInterviewScreening,
   startBackgroundInterview,
@@ -87,6 +88,18 @@ export async function saveStressorsAction(clientId: string, stressors: unknown) 
     practiceId: context.practiceId,
     userId: context.userId,
     stressors,
+  })
+  if (!result.error) refresh(clientId)
+  return result
+}
+
+export async function saveReasonForAttendingAction(clientId: string, reason: unknown) {
+  const context = await requirePractitionerContext()
+  const result = await saveReasonForAttending({
+    clientId,
+    practiceId: context.practiceId,
+    userId: context.userId,
+    reason,
   })
   if (!result.error) refresh(clientId)
   return result

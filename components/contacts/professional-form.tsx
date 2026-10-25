@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { useActionState, useEffect, useState } from "react"
+import { useActionState, useEffect, useRef, useState } from "react"
 
 import type {
   ContactsFormState,
@@ -65,6 +65,8 @@ export function ProfessionalForm({
   initialValues,
   submitLabel,
   cancelHref,
+  onSaved,
+  onCancel,
 }: {
   action: (
     prevState: ContactsFormState,
@@ -75,10 +77,19 @@ export function ProfessionalForm({
   organisations: OrganisationOption[]
   initialValues?: ProfessionalInitialValues
   submitLabel: string
-  cancelHref: string
+  cancelHref?: string
+  onSaved?: (professional: {
+    professionalId: string
+    title: string | null
+    firstName: string
+    lastName: string
+    professionName: string | null
+  }) => void
+  onCancel?: () => void
 }) {
   const router = useRouter()
   const [state, formAction, pending] = useActionState(action, {})
+  const handledSave = useRef<string | null>(null)
   const [organisationOptions, setOrganisationOptions] =
     useState<OrganisationOption[]>(organisations)
   const [title, setTitle] = useState(initialValues?.title ?? "")
@@ -139,6 +150,14 @@ export function ProfessionalForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  useEffect(() => {
+    const professional = state.professional
+    if (!professional || !onSaved) return
+    if (handledSave.current === professional.professionalId) return
+    handledSave.current = professional.professionalId
+    onSaved(professional)
+  }, [onSaved, state.professional])
+
   const updateLink = (
     index: number,
     field: keyof OrganisationLinkInput,
@@ -184,6 +203,7 @@ export function ProfessionalForm({
         name="organisation_links_json"
         value={JSON.stringify(links.filter((link) => link.organisationId))}
       />
+      {onSaved ? <input type="hidden" name="stay_on_page" value="1" /> : null}
 
       <Card className="max-w-2xl">
         <CardHeader>
@@ -360,9 +380,15 @@ export function ProfessionalForm({
         <Button type="submit" disabled={pending}>
           {pending ? "Saving…" : submitLabel}
         </Button>
-        <Button type="button" variant="outline" asChild>
-          <Link href={cancelHref}>Cancel</Link>
-        </Button>
+        {onCancel ? (
+          <Button type="button" variant="outline" onClick={onCancel}>
+            Cancel
+          </Button>
+        ) : cancelHref ? (
+          <Button type="button" variant="outline" asChild>
+            <Link href={cancelHref}>Cancel</Link>
+          </Button>
+        ) : null}
       </div>
     </form>
   )

@@ -25,9 +25,11 @@ import {
   verifyOrganisationInPractice,
   verifyProfessionalInPractice,
 } from "@/lib/delete/delete-utils"
+import type { ProfessionalOption } from "@/lib/client-background/professionals"
 
 export type ContactsFormState = {
   error?: string
+  professional?: ProfessionalOption
 }
 
 export type OrganisationLinkInput = {
@@ -613,6 +615,29 @@ export async function saveProfessionalAction(
     savedProfessionalId = result.professionalId
   } catch {
     return { error: "Unable to save professional. Please try again." }
+  }
+
+  if (formData.get("stay_on_page") === "1") {
+    if (!savedProfessionalId) return { error: "Unable to save professional. Please try again." }
+    const [professional] = await db
+      .select({
+        professionalId: professionals.professionalId,
+        title: professionals.title,
+        firstName: professionals.firstName,
+        lastName: professionals.lastName,
+        professionName: professions.professionName,
+      })
+      .from(professionals)
+      .leftJoin(professions, eq(professionals.professionId, professions.professionId))
+      .where(
+        and(
+          eq(professionals.professionalId, savedProfessionalId),
+          eq(professionals.practiceId, practiceId)
+        )
+      )
+      .limit(1)
+    if (!professional) return { error: "Unable to save professional. Please try again." }
+    return { professional }
   }
 
   if (returnTo) {

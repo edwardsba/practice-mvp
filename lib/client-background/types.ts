@@ -408,6 +408,10 @@ export type NecessityAccess = Record<NecessityKey, boolean>
 export const TRI_STATE_ANSWERS = ["yes", "no", "not_asked"] as const
 export type TriStateAnswer = (typeof TRI_STATE_ANSWERS)[number]
 
+/** Attended willingly. Somewhat is only used here. */
+export const WILLINGNESS_ANSWERS = ["yes", "somewhat", "no", "not_asked"] as const
+export type WillingnessAnswer = (typeof WILLINGNESS_ANSWERS)[number]
+
 export type MedicationRecord = {
   currentlyTaking: TriStateAnswer | null
   previouslyTaken: TriStateAnswer | null
@@ -430,6 +434,21 @@ export type StressorKey = (typeof STRESSOR_ITEMS)[number]["key"]
 
 export type StressorsRecord = Record<StressorKey, TriStateAnswer | null> & {
   mainReason: string
+}
+
+/** Why the client came. Cleared fields stay empty unless the matching answer is Yes. */
+export type ReasonForAttending = {
+  referredByMedicalProfessional: TriStateAnswer | null
+  /** professionals.professional_id in the same practice, or null. */
+  referrerProfessionalId: string | null
+  /** Partial date: YYYY, YYYY-MM, or YYYY-MM-DD. */
+  referralDate: string
+  referrerConcerns: string
+  familyInvolved: TriStateAnswer | null
+  familyInvolvement: string
+  ownInitiative: TriStateAnswer | null
+  attendedWillingly: WillingnessAnswer | null
+  clientMotivation: string
 }
 
 export type OccupationFields = {
@@ -524,6 +543,7 @@ export type ClientBackgroundData = {
   demographics: Demographics
   medication: MedicationRecord
   stressors: StressorsRecord
+  reason: ReasonForAttending
   relationships: RelationshipRecord[]
   partnerships: PartnershipRecord[]
   events: EventRecord[]
@@ -618,8 +638,30 @@ export function emptyStressors(): StressorsRecord {
   }
 }
 
+export function emptyReasonForAttending(): ReasonForAttending {
+  return {
+    referredByMedicalProfessional: null,
+    referrerProfessionalId: null,
+    referralDate: "",
+    referrerConcerns: "",
+    familyInvolved: null,
+    familyInvolvement: "",
+    ownInitiative: null,
+    attendedWillingly: null,
+    clientMotivation: "",
+  }
+}
+
 export function triStateLabel(value: TriStateAnswer | null): string {
   if (value === "yes") return "Yes"
+  if (value === "no") return "No"
+  if (value === "not_asked") return "Not asked"
+  return "Not recorded"
+}
+
+export function willingnessLabel(value: WillingnessAnswer | null): string {
+  if (value === "yes") return "Yes"
+  if (value === "somewhat") return "Somewhat"
   if (value === "no") return "No"
   if (value === "not_asked") return "Not asked"
   return "Not recorded"

@@ -122,10 +122,10 @@ export function DemographicsSection({
           <Subsection title="Education" divided>
             <EducationFieldsEditor value={draft.education} onChange={updateEducation} />
           </Subsection>
-          <Subsection title="Occupation & Financial Concerns" divided>
+          <Subsection title="Occupation and financial" divided>
             <OccupationFieldsEditor value={draft.occupation} onChange={updateOccupation} />
           </Subsection>
-          <Subsection title="Living Situation" divided>
+          <Subsection title="Living situation" divided>
             <LivingFieldsEditor value={draft.livingSituation} relationships={relationships} onChange={updateLiving} />
           </Subsection>
           <SaveRow pending={pending} error={error} onSave={() => void save()} />
@@ -191,7 +191,7 @@ function DemographicsReadOnly({
           value={yesNoText(value.education.disruption, value.education.disruptionDetail)}
         />
       </Subsection>
-      <Subsection title="Occupation & Financial Concerns" divided>
+      <Subsection title="Occupation and financial" divided>
         <ReadOnlyField label="Work status" value={workStatusText(value.occupation)} />
         {value.occupation.role.trim() ? <ReadOnlyField label="Role" value={value.occupation.role} /> : null}
         {value.occupation.employer.trim() ? <ReadOnlyField label="Employer" value={value.occupation.employer} /> : null}
@@ -216,7 +216,7 @@ function DemographicsReadOnly({
           value={limited.length ? `Limited: ${limited.map((key) => NECESSITY_LABELS[key]).join(", ")}` : "No limits recorded"}
         />
       </Subsection>
-      <Subsection title="Living Situation" divided>
+      <Subsection title="Living situation" divided>
         <ReadOnlyField label="Housing type" value={value.livingSituation.housingType} />
         <ReadOnlyField label="Who the client lives with" value={livesWithText(value.livingSituation)} />
         <PeopleLivingWithClient relationships={relationships} />

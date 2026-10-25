@@ -15,8 +15,9 @@ import {
   TextAreaField,
   TextField,
 } from "@/components/client-background/fields"
-import { MedicationStressorsPanel } from "@/components/client-background/medication-stressors"
+import { MedicationEditor, MedicationStressorsPanel, StressorsEditor } from "@/components/client-background/medication-stressors"
 import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   Dialog,
   DialogContent,
@@ -24,6 +25,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import {
+  HISTORY_QUESTION_GROUPS,
+  HISTORY_QUESTIONS,
+  backgroundInterviewSourceLine,
+  eventsForQuestion,
+  type BackgroundInterviewAnswerSource,
+  type HistoryQuestionKey,
+  type ScreeningAnswer,
+} from "@/lib/client-background/interview-history"
 import {
   compareEventsChronologically,
   describeClientAge,
@@ -36,6 +46,7 @@ import { personName } from "@/lib/client-background/tree"
 import {
   EVENT_TYPES,
   EVENT_TYPE_LABELS,
+  STRESSOR_ITEMS,
   emptyEvent,
   FAMILY_RELATION_PICKS,
   FAMILY_SIDES,
@@ -53,7 +64,7 @@ import {
 } from "@/lib/client-background/types"
 import { cn } from "@/lib/utils"
 
-type HistoryView = "chronological" | "by_type"
+type HistoryView = "chronological" | "interview"
 
 export function HistorySection({
   clientId,
@@ -62,6 +73,7 @@ export function HistorySection({
   relationships,
   medication,
   stressors,
+  interviewSource,
 }: {
   clientId: string
   dateOfBirth: string | null
@@ -69,8 +81,11 @@ export function HistorySection({
   relationships: RelationshipRecord[]
   medication: MedicationRecord
   stressors: StressorsRecord
+  interviewSource: BackgroundInterviewAnswerSource | null
 }) {
   const [entries, setEntries] = useState(events)
+  const [medicationRecord, setMedicationRecord] = useState(medication)
+  const [stressorsRecord, setStressorsRecord] = useState(stressors)
   const [view, setView] = useState<HistoryView>("chronological")
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [mobileScreen, setMobileScreen] = useState<"list" | "detail" | "edit">("list")
@@ -90,14 +105,19 @@ export function HistorySection({
     setError(null)
   }
 
-  function add(eventType: EventType) {
+  function add(eventType: EventType, attribution?: EventRecord["attribution"]) {
     setPickerOpen(false)
     setError(null)
     setIsNew(true)
     setSelectedId(null)
-    setDraft({ ...emptyEvent(eventType, 0), eventRecordId: "" })
+    setDraft({ ...emptyEvent(eventType, 0), eventRecordId: "", ...(attribution ? { attribution } : {}) })
     setEditing(true)
     setMobileScreen("edit")
+  }
+
+  function addForQuestion(key: HistoryQuestionKey) {
+    const question = HISTORY_QUESTIONS[key]
+    add(question.eventType, question.attribution)
   }
 
   async function save() {
@@ -223,38 +243,34 @@ export function HistorySection({
               )}
             </section>
           ) : (
-            EVENT_TYPES.map((eventType) => {
-              const rows = entries.filter((entry) => entry.eventType === eventType)
-              return (
-                <section key={eventType} className="space-y-2">
-                  <h2 className="text-sm font-semibold">{EVENT_TYPE_LABELS[eventType]}</h2>
-                  {rows.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">Nothing recorded</p>
-                  ) : (
-                    <ul className="space-y-1">
-                      {rows.map((entry) => (
-                        <HistoryRow
-                          key={entry.eventRecordId}
-                          entry={entry}
-                          active={entry.eventRecordId === selectedId}
-                          dateOfBirth={dateOfBirth}
-                          relationships={relationships}
-                          onSelect={() => select(entry)}
-                        />
-                      ))}
-                    </ul>
-                  )}
-                  <Button type="button" size="sm" disabled={pending} onClick={() => void add(eventType)}>
-                    + Add entry
-                  </Button>
-                </section>
-              )
-            })
+            <InterviewOrderList
+              clientId={clientId}
+              dateOfBirth={dateOfBirth}
+              entries={entries}
+              relationships={relationships}
+              selectedId={selectedId}
+              pending={pending}
+              interviewSource={interviewSource}
+              medication={medicationRecord}
+              stressors={stressorsRecord}
+              onSelect={select}
+              onAdd={addForQuestion}
+              onMedicationSaved={setMedicationRecord}
+              onStressorsSaved={setStressorsRecord}
+            />
           )}
         </div>
         <div className={mobileScreen === "list" ? "hidden min-w-0 lg:block" : "min-w-0"}>{renderPanel()}</div>
       </div>
-      <MedicationStressorsPanel clientId={clientId} medication={medication} stressors={stressors} />
+      {view === "chronological" ? (
+        <MedicationStressorsPanel
+          clientId={clientId}
+          medication={medicationRecord}
+          stressors={stressorsRecord}
+          onMedicationSaved={setMedicationRecord}
+          onStressorsSaved={setStressorsRecord}
+        />
+      ) : null}
       <Dialog open={pickerOpen} onOpenChange={setPickerOpen}>
         <DialogContent>
           <DialogHeader>
@@ -274,10 +290,143 @@ export function HistorySection({
   )
 }
 
+function InterviewOrderList({
+  clientId,
+  dateOfBirth,
+  entries,
+  relationships,
+  selectedId,
+  pending,
+  interviewSource,
+  medication,
+  stressors,
+  onSelect,
+  onAdd,
+  onMedicationSaved,
+  onStressorsSaved,
+}: {
+  clientId: string
+  dateOfBirth: string | null
+  entries: EventRecord[]
+  relationships: RelationshipRecord[]
+  selectedId: string | null
+  pending: boolean
+  interviewSource: BackgroundInterviewAnswerSource | null
+  medication: MedicationRecord
+  stressors: StressorsRecord
+  onSelect: (entry: EventRecord) => void
+  onAdd: (key: HistoryQuestionKey) => void
+  onMedicationSaved: (value: MedicationRecord) => void
+  onStressorsSaved: (value: StressorsRecord) => void
+}) {
+  const mentalHealthTitle = HISTORY_QUESTION_GROUPS[0]?.title
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-muted-foreground">{backgroundInterviewSourceLine(interviewSource)}</p>
+      {HISTORY_QUESTION_GROUPS.map((group) => (
+        <Card key={group.title}>
+          <CardHeader>
+            <CardTitle>{group.title}</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {group.keys.map((key) => {
+              const question = HISTORY_QUESTIONS[key]
+              const listed = eventsForQuestion(entries, key, dateOfBirth)
+              const shown: ScreeningAnswer | null = listed.length > 0 ? "yes" : interviewSource?.screening[key] ?? null
+              return (
+                <div key={key} className="space-y-2">
+                  <div className="flex items-start justify-between gap-3">
+                    <h3 className="text-sm font-medium">{question.label}</h3>
+                    <AnswerTag answer={shown} />
+                  </div>
+                  {listed.length > 0 ? (
+                    <ul className="space-y-1">
+                      {listed.map((entry) => (
+                        <HistoryRow
+                          key={entry.eventRecordId}
+                          entry={entry}
+                          active={entry.eventRecordId === selectedId}
+                          dateOfBirth={dateOfBirth}
+                          relationships={relationships}
+                          onSelect={() => onSelect(entry)}
+                        />
+                      ))}
+                    </ul>
+                  ) : null}
+                  {shown === "yes" ? (
+                    <Button type="button" size="sm" disabled={pending} onClick={() => onAdd(key)}>
+                      + Add entry
+                    </Button>
+                  ) : null}
+                </div>
+              )
+            })}
+            {group.title === mentalHealthTitle ? (
+              <div className="border-t pt-4">
+                <MedicationEditor
+                  clientId={clientId}
+                  medication={medication}
+                  onSaved={onMedicationSaved}
+                  title=""
+                  editLabel="Edit medication"
+                />
+              </div>
+            ) : null}
+          </CardContent>
+        </Card>
+      ))}
+      <Card>
+        <CardHeader>
+          <CardTitle>Stressors</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <StressorsEditor
+            clientId={clientId}
+            stressors={stressors}
+            onSaved={onStressorsSaved}
+            title=""
+            editLabel="Edit stressors"
+            read={(value) => (
+              <div className="space-y-2">
+                {STRESSOR_ITEMS.map((item) => (
+                  <div key={item.key} className="flex items-start justify-between gap-3">
+                    <span className="text-sm">{item.label}</span>
+                    <AnswerTag answer={value[item.key]} />
+                  </div>
+                ))}
+                <div className="space-y-1 pt-1">
+                  <p className="text-sm font-medium">Main reason for attending</p>
+                  <p className="text-sm whitespace-pre-wrap">{value.mainReason.trim() || "Not recorded"}</p>
+                </div>
+              </div>
+            )}
+          />
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+function AnswerTag({ answer }: { answer: ScreeningAnswer | null }) {
+  if (answer == null) return <span className="text-xs text-muted-foreground">Not answered</span>
+  const label = answer === "yes" ? "Yes" : answer === "no" ? "No" : "Not asked"
+  const tone =
+    answer === "yes"
+      ? "bg-neutral-900 text-white"
+      : answer === "no"
+        ? "bg-neutral-200 text-neutral-700"
+        : "border border-dashed border-neutral-400 text-neutral-600"
+  return (
+    <span className={cn("inline-flex shrink-0 items-center rounded-md px-2 py-0.5 text-xs font-medium", tone)}>
+      {label}
+    </span>
+  )
+}
+
 function HistoryViewSwitch({ view, onChange }: { view: HistoryView; onChange: (view: HistoryView) => void }) {
   const options: { id: HistoryView; label: string }[] = [
     { id: "chronological", label: "Chronological" },
-    { id: "by_type", label: "Event type" },
+    { id: "interview", label: "Interview order" },
   ]
   return (
     <div className="inline-flex rounded-lg bg-muted p-1" role="group" aria-label="History view">

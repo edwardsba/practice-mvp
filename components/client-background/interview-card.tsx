@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation"
 import { startBackgroundInterviewAction } from "@/app/clients/[client_id]/background/actions"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { INTERVIEW_ANSWER_TOTAL } from "@/lib/client-background/interview-history"
 import type { BackgroundInterviewCardData } from "@/lib/client-background/load"
 
 export function BackgroundInterviewCard({
@@ -39,7 +40,7 @@ export function BackgroundInterviewCard({
       <CardContent className="space-y-3">
         {summary.inProgress ? (
           <p className="text-sm">
-            In progress · started {summary.inProgress.startedAt} · History: {summary.inProgress.answered} of 15 answered
+            In progress · started {summary.inProgress.startedAt} · History: {summary.inProgress.answered} of {INTERVIEW_ANSWER_TOTAL} answered
           </p>
         ) : (
           <p className="text-sm">

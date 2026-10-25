@@ -216,6 +216,21 @@ export function sanitizeScreening(value: unknown): ScreeningAnswers {
   return screening
 }
 
+/** History questions, currently taking medication, and the nine stressors. */
+export const INTERVIEW_ANSWER_TOTAL = HISTORY_QUESTION_KEYS.length + 1 + STRESSOR_ITEMS.length
+
+export type BackgroundInterviewAnswerSource = {
+  status: "in_progress" | "completed"
+  dateLabel: string
+  screening: ScreeningAnswers
+}
+
+export function backgroundInterviewSourceLine(source: BackgroundInterviewAnswerSource | null): string {
+  if (!source) return "No background interview yet."
+  const state = source.status === "in_progress" ? "in progress" : "completed"
+  return `Yes / No / Not asked answers are from the background interview of ${source.dateLabel} (${state}). Change them in the interview.`
+}
+
 export function screeningAnsweredCount(
   screening: ScreeningAnswers,
   events: Pick<EventRecord, "eventType" | "attribution" | "startPrecision" | "startValue">[],
@@ -264,4 +279,18 @@ export function unansweredInterviewLabels(
     if (stressors[item.key] == null) labels.push(item.label)
   }
   return labels
+}
+
+/** Answered items, counted the same way {@link unansweredInterviewLabels} leaves gaps. */
+export function answeredInterviewCount(
+  screening: ScreeningAnswers,
+  events: Pick<EventRecord, "eventType" | "attribution" | "startPrecision" | "startValue">[],
+  dateOfBirth: string | null,
+  medication: MedicationRecord,
+  stressors: StressorsRecord
+): number {
+  return (
+    INTERVIEW_ANSWER_TOTAL -
+    unansweredInterviewLabels(screening, events, dateOfBirth, medication, stressors).length
+  )
 }

@@ -69,6 +69,7 @@ export function ClientBackgroundPage({
               relationships={data.relationships}
               medication={data.medication}
               stressors={data.stressors}
+              interviewSource={interview.latest}
             />
           ) : null}
           {item.id === "risk" ? (

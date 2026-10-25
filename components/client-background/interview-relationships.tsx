@@ -27,6 +27,15 @@ import {
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import {
+  RELATIONSHIP_ADD_LABELS,
+  RELATIONSHIP_GROUP_LABELS,
+  childrenByPartner,
+  childrenNotLinkedToPartner,
+  needsLinkingItems,
+  splitPartnerNodes,
+  stepParentRowLabel,
+} from "@/lib/client-background/relationship-groups"
+import {
   buildRelationshipTree,
   canonicalParentsLink,
   familyOfOriginLayout,
@@ -37,7 +46,6 @@ import {
   personName,
   personRoleLabel,
   relationshipLineLabel,
-  stepParentLinkLabel,
   treeLineStatus,
   brokenLinksForRoleChange,
 } from "@/lib/client-background/tree"
@@ -109,19 +117,13 @@ export function InterviewRelationships({
   const parentLinks = useMemo(() => originPartnerships(people, pairs), [people, pairs])
   const parentsLink = useMemo(() => canonicalParentsLink(people, pairs), [people, pairs])
   const layout = useMemo(() => familyOfOriginLayout(tree, parentsLink), [tree, parentsLink])
-  const needsLinking = useMemo(
-    () => [
-      ...tree.unlinkedStepParents.map((person) => ({ person, action: "Choose parent ›" })),
-      ...tree.unlinkedStepSiblings.map((person) => ({ person, action: "Choose step-parent ›" })),
-      ...tree.unlinkedStepChildren.map((person) => ({ person, action: "Choose partner ›" })),
-    ],
-    [tree]
-  )
+  const needsLinking = useMemo(() => needsLinkingItems(tree), [tree])
   const recordedChildren = people.filter(
     (person) => person.relationshipToClient === "child_biological" || person.relationshipToClient === "child_step"
   ).length
-  const currentPartners = tree.partners.filter((item) => item.person.relationshipToClient === "current_partner")
-  const priorPartners = tree.partners.filter((item) => item.person.relationshipToClient === "prior_partner")
+  const { current: currentPartners, prior: priorPartners } = splitPartnerNodes(tree.partners)
+  const partnerChildren = childrenByPartner(tree)
+  const unlinkedPartnerChildren = childrenNotLinkedToPartner(tree)
 
   function remember(event: MouseEvent<HTMLButtonElement>) {
     opener.current = event.currentTarget
@@ -391,7 +393,7 @@ export function InterviewRelationships({
       {open ? (
         <CardContent className="space-y-6">
           <section className="space-y-3">
-            <h3 className="text-sm font-semibold">Partners and children</h3>
+            <h3 className="text-sm font-semibold">{RELATIONSHIP_GROUP_LABELS.partnersAndChildren}</h3>
             <AutosaveFields
               saved={clientStatus}
               save={async (value) => {
@@ -420,7 +422,7 @@ export function InterviewRelationships({
                 />
               )}
             </AutosaveFields>
-            <Group title="Current partner">
+            <Group title={RELATIONSHIP_GROUP_LABELS.currentPartner}>
               {currentPartners.map((partner) => (
                 <RowButton
                   key={partner.person.relationshipRecordId}
@@ -429,10 +431,10 @@ export function InterviewRelationships({
                 />
               ))}
               {currentPartners.length === 0 ? (
-                <AddButton label="+ Add partner" onClick={(event) => openNew("current_partner", event)} />
+                <AddButton label={RELATIONSHIP_ADD_LABELS.partner} onClick={(event) => openNew("current_partner", event)} />
               ) : null}
             </Group>
-            <Group title="Prior partners">
+            <Group title={RELATIONSHIP_GROUP_LABELS.priorPartners}>
               {priorPartners.map((partner) => (
                 <RowButton
                   key={partner.person.relationshipRecordId}
@@ -440,10 +442,10 @@ export function InterviewRelationships({
                   onClick={(event) => openPerson(partner.person, false, event)}
                 />
               ))}
-              <AddButton label="+ Add prior partner" onClick={(event) => openNew("prior_partner", event)} />
+              <AddButton label={RELATIONSHIP_ADD_LABELS.priorPartner} onClick={(event) => openNew("prior_partner", event)} />
             </Group>
             <Group
-              title="Children"
+              title={RELATIONSHIP_GROUP_LABELS.children}
               note={
                 childrenPrompt ? (
                   <p className="px-2 text-sm text-blue-800">
@@ -452,41 +454,32 @@ export function InterviewRelationships({
                 ) : null
               }
             >
-              {tree.partners.map((partner) =>
-                partner.children.length > 0 ? (
-                  <div key={partner.person.relationshipRecordId} className="space-y-1">
-                    <p className="px-2 text-xs text-muted-foreground">{personName(partner.person)}</p>
-                    {partner.children.map((child) => (
-                      <RowButton
-                        key={child.relationshipRecordId}
-                        label={relationshipLineLabel(child)}
-                        onClick={(event) => openPerson(child, false, event)}
-                      />
-                    ))}
-                  </div>
-                ) : null
-              )}
-              {tree.unlinkedChildren.map((child) => (
+              {partnerChildren.map((partner) => (
+                <div key={partner.person.relationshipRecordId} className="space-y-1">
+                  <p className="px-2 text-xs text-muted-foreground">{personName(partner.person)}</p>
+                  {partner.children.map((child) => (
+                    <RowButton
+                      key={child.relationshipRecordId}
+                      label={relationshipLineLabel(child)}
+                      onClick={(event) => openPerson(child, false, event)}
+                    />
+                  ))}
+                </div>
+              ))}
+              {unlinkedPartnerChildren.map((child) => (
                 <RowButton
                   key={child.relationshipRecordId}
                   label={relationshipLineLabel(child)}
                   onClick={(event) => openPerson(child, false, event)}
                 />
               ))}
-              {tree.unlinkedStepChildren.map((child) => (
-                <RowButton
-                  key={child.relationshipRecordId}
-                  label={relationshipLineLabel(child)}
-                  onClick={(event) => openPerson(child, false, event)}
-                />
-              ))}
-              <AddButton label="+ Add child" onClick={(event) => openNew("child_biological", event)} />
+              <AddButton label={RELATIONSHIP_ADD_LABELS.child} onClick={(event) => openNew("child_biological", event)} />
             </Group>
           </section>
 
           <section className="space-y-3">
-            <h3 className="text-sm font-semibold">Family of origin</h3>
-            <Group title="Parents">
+            <h3 className="text-sm font-semibold">{RELATIONSHIP_GROUP_LABELS.familyOfOrigin}</h3>
+            <Group title={RELATIONSHIP_GROUP_LABELS.parents}>
               {layout.parents.map((person) => (
                 <RowButton
                   key={person.relationshipRecordId}
@@ -505,7 +498,7 @@ export function InterviewRelationships({
                 label={
                   parentsLink.partnership
                     ? parentsRelationshipLabel(parentsLink.partnership)
-                    : "Parents' relationship"
+                    : RELATIONSHIP_GROUP_LABELS.parentsRelationship
                 }
                 onClick={(event) => {
                   if (parentsLink.partnership) openPartnership(parentsLink.partnership, event)
@@ -513,11 +506,11 @@ export function InterviewRelationships({
                 disabled={!parentsLink.partnership}
               />
               <div className="flex flex-col items-start gap-2">
-                <AddButton label="+ Add parent" onClick={(event) => openNew("parent", event)} />
-                <AddButton label="+ Add other primary caregiver" onClick={(event) => openNew("other_caregiver", event)} />
+                <AddButton label={RELATIONSHIP_ADD_LABELS.parent} onClick={(event) => openNew("parent", event)} />
+                <AddButton label={RELATIONSHIP_ADD_LABELS.caregiver} onClick={(event) => openNew("other_caregiver", event)} />
               </div>
             </Group>
-            <Group title="Siblings">
+            <Group title={RELATIONSHIP_GROUP_LABELS.siblings}>
               {layout.siblings.map((person) => (
                 <RowButton
                   key={person.relationshipRecordId}
@@ -525,19 +518,19 @@ export function InterviewRelationships({
                   onClick={(event) => openPerson(person, false, event)}
                 />
               ))}
-              <AddButton label="+ Add sibling" onClick={(event) => openNew("sibling_full", event)} />
+              <AddButton label={RELATIONSHIP_ADD_LABELS.sibling} onClick={(event) => openNew("sibling_full", event)} />
             </Group>
-            <Group title="Step-family">
+            <Group title={RELATIONSHIP_GROUP_LABELS.stepFamily}>
               {tree.otherFamily.map((group) => (
                 <div key={group.parent.relationshipRecordId} className="space-y-1">
                   {group.stepParents.map((node) => (
                     <div key={node.person.relationshipRecordId} className="space-y-1">
                       <RowButton
-                        label={`Step-parent – ${stepParentLinkLabel({
+                        label={stepParentRowLabel({
                           stepParent: node.person,
                           parent: group.parent,
                           partnershipRecordId: node.partnership.partnershipRecordId,
-                        })}`}
+                        })}
                         onClick={(event) => openPerson(node.person, false, event)}
                       />
                       <div className="ml-4 space-y-1 border-l pl-3">
@@ -549,7 +542,7 @@ export function InterviewRelationships({
                           />
                         ))}
                         <AddButton
-                          label="+ Add half- or step-sibling"
+                          label={RELATIONSHIP_ADD_LABELS.stepSibling}
                           onClick={(event) =>
                             openNew("sibling_half", event, { partnershipRecordId: node.partnership.partnershipRecordId })
                           }
@@ -559,13 +552,13 @@ export function InterviewRelationships({
                   ))}
                 </div>
               ))}
-              <AddButton label="+ Add step-parent" onClick={(event) => openNew("step_parent", event)} />
+              <AddButton label={RELATIONSHIP_ADD_LABELS.stepParent} onClick={(event) => openNew("step_parent", event)} />
             </Group>
           </section>
 
           {needsLinking.length > 0 ? (
             <section className="space-y-1 rounded-md border border-amber-300 bg-amber-50 p-2 text-amber-950 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100">
-              <h3 className="px-2 text-sm font-semibold">Needs linking</h3>
+              <h3 className="px-2 text-sm font-semibold">{RELATIONSHIP_GROUP_LABELS.needsLinking}</h3>
               {needsLinking.map(({ person, action }) => (
                 <button
                   key={person.relationshipRecordId}

@@ -2,6 +2,9 @@ import assert from "node:assert/strict"
 
 import {
   HISTORY_QUESTION_KEYS,
+  INTERVIEW_ANSWER_TOTAL,
+  answeredInterviewCount,
+  backgroundInterviewSourceLine,
   historyQuestionKeyForEvent,
   unansweredInterviewLabels,
   type HistoryQuestionKey,
@@ -86,5 +89,21 @@ assert.equal(remaining.includes("Family"), false)
 assert.equal(remaining.includes("Financial"), false)
 assert.ok(remaining.includes("Social life"))
 assert.equal(remaining.length, HISTORY_QUESTION_KEYS.length + 7)
+assert.equal(INTERVIEW_ANSWER_TOTAL, 25)
+assert.equal(gaps.length, INTERVIEW_ANSWER_TOTAL)
+assert.equal(answeredInterviewCount({}, [], null, emptyMedication(), emptyStressors()), 0)
+assert.equal(
+  answeredInterviewCount({}, [], null, answeredMedication, answeredStressors),
+  INTERVIEW_ANSWER_TOTAL - remaining.length
+)
+assert.equal(backgroundInterviewSourceLine(null), "No background interview yet.")
+assert.equal(
+  backgroundInterviewSourceLine({ status: "in_progress", dateLabel: "25 Oct 2026", screening: {} }),
+  "Yes / No / Not asked answers are from the background interview of 25 Oct 2026 (in progress). Change them in the interview."
+)
+assert.equal(
+  backgroundInterviewSourceLine({ status: "completed", dateLabel: "1 Jan 2026", screening: {} }),
+  "Yes / No / Not asked answers are from the background interview of 1 Jan 2026 (completed). Change them in the interview."
+)
 
 console.log("background interview history selftest passed")

@@ -13,6 +13,7 @@ import {
   type StressorsRecord,
   type TriStateAnswer,
 } from "@/lib/client-background/types"
+import { cn } from "@/lib/utils"
 
 export function TriStateField({
   id,
@@ -172,31 +173,77 @@ export function StressorsFields({
   )
 }
 
+export function MedicationEditor({
+  clientId,
+  medication,
+  onSaved,
+  title = "Medication",
+  editLabel = "Edit",
+}: {
+  clientId: string
+  medication: MedicationRecord
+  onSaved?: (value: MedicationRecord) => void
+  title?: string
+  editLabel?: string
+}) {
+  return (
+    <EditableBlock
+      title={title}
+      editLabel={editLabel}
+      saved={medication}
+      onSaved={onSaved}
+      save={(value) => saveMedicationAction(clientId, value)}
+      read={(value) => <MedicationReadOnly value={value} />}
+      edit={(value, onChange) => <MedicationFields idPrefix="background_medication" value={value} onChange={onChange} />}
+    />
+  )
+}
+
+export function StressorsEditor({
+  clientId,
+  stressors,
+  onSaved,
+  title = "Stressors",
+  editLabel = "Edit",
+  read,
+}: {
+  clientId: string
+  stressors: StressorsRecord
+  onSaved?: (value: StressorsRecord) => void
+  title?: string
+  editLabel?: string
+  read?: (value: StressorsRecord) => React.ReactNode
+}) {
+  return (
+    <EditableBlock
+      title={title}
+      editLabel={editLabel}
+      saved={stressors}
+      onSaved={onSaved}
+      save={(value) => saveStressorsAction(clientId, value)}
+      read={read ?? ((value) => <StressorsReadOnly value={value} />)}
+      edit={(value, onChange) => <StressorsFields idPrefix="background_stressors" value={value} onChange={onChange} />}
+    />
+  )
+}
+
 export function MedicationStressorsPanel({
   clientId,
   medication,
   stressors,
+  onMedicationSaved,
+  onStressorsSaved,
 }: {
   clientId: string
   medication: MedicationRecord
   stressors: StressorsRecord
+  onMedicationSaved?: (value: MedicationRecord) => void
+  onStressorsSaved?: (value: StressorsRecord) => void
 }) {
   return (
     <div className="grid gap-6 border-t pt-6 lg:grid-cols-2">
-      <EditableBlock
-        title="Medication"
-        saved={medication}
-        save={(value) => saveMedicationAction(clientId, value)}
-        read={(value) => <MedicationReadOnly value={value} />}
-        edit={(value, onChange) => <MedicationFields idPrefix="background_medication" value={value} onChange={onChange} />}
-      />
-      <EditableBlock
-        title="Stressors"
-        saved={stressors}
-        save={(value) => saveStressorsAction(clientId, value)}
-        read={(value) => <StressorsReadOnly value={value} />}
-        edit={(value, onChange) => <StressorsFields idPrefix="background_stressors" value={value} onChange={onChange} />}
-      />
+      <MedicationEditor clientId={clientId} medication={medication} onSaved={onMedicationSaved} />
+      <StressorsEditor clientId={clientId} stressors={stressors} onSaved={onStressorsSaved} />
     </div>
   )
 }
@@ -204,12 +251,10 @@ export function MedicationStressorsPanel({
 function MedicationReadOnly({ value }: { value: MedicationRecord }) {
   return (
     <div className="space-y-3">
-      <ReadOnlyField label="Currently taking" value={triStateLabel(value.currentlyTaking)} />
-      {value.currentlyTaking === "yes" ? (
-        <ReadOnlyField label="Supervised by" value={value.supervisedBy} />
-      ) : null}
+      <ReadOnlyField label="Currently taking medication" value={triStateLabel(value.currentlyTaking)} />
+      {value.supervisedBy.trim() ? <ReadOnlyField label="Supervised by" value={value.supervisedBy} /> : null}
       {value.currentlyTaking === "no" ? (
-        <ReadOnlyField label="Taken in the past" value={triStateLabel(value.previouslyTaken)} />
+        <ReadOnlyField label="Taken medication in the past" value={triStateLabel(value.previouslyTaken)} />
       ) : null}
     </div>
   )
@@ -228,13 +273,17 @@ function StressorsReadOnly({ value }: { value: StressorsRecord }) {
 
 function EditableBlock<T>({
   title,
+  editLabel = "Edit",
   saved,
+  onSaved,
   save,
   read,
   edit,
 }: {
-  title: string
+  title?: string
+  editLabel?: string
   saved: T
+  onSaved?: (value: T) => void
   save: (value: T) => Promise<{ error?: string } & Record<string, unknown>>
   read: (value: T) => React.ReactNode
   edit: (value: T, onChange: (value: T) => void) => React.ReactNode
@@ -263,12 +312,13 @@ function EditableBlock<T>({
     setStored(next)
     setDraft(next)
     setEditing(false)
+    onSaved?.(next)
   }
 
   return (
     <section className="min-w-0 space-y-3">
-      <div className="flex items-center justify-between gap-3">
-        <h3 className="text-sm font-semibold">{title}</h3>
+      <div className={cn("flex items-center gap-3", title ? "justify-between" : "justify-end")}>
+        {title ? <h3 className="text-sm font-semibold">{title}</h3> : null}
         {editing ? (
           <Button
             type="button"
@@ -285,7 +335,7 @@ function EditableBlock<T>({
           </Button>
         ) : (
           <Button type="button" variant="outline" size="sm" onClick={() => setEditing(true)}>
-            Edit
+            {editLabel}
           </Button>
         )}
       </div>

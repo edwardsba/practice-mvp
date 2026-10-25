@@ -18,7 +18,11 @@ import { sanitizeBackgroundAnswers } from "@/lib/background-questionnaire/answer
 import { BACKGROUND_ASSESSMENT_CODE, type BackgroundSelfReport } from "@/lib/background-questionnaire/types"
 import { db } from "@/lib/db"
 import { settleEventDates } from "@/lib/client-background/age"
-import { sanitizeScreening, screeningAnsweredCount } from "@/lib/client-background/interview-history"
+import {
+  answeredInterviewCount,
+  sanitizeScreening,
+  type BackgroundInterviewAnswerSource,
+} from "@/lib/client-background/interview-history"
 import { toClientRelationshipStatus, toEvent, toPartnership, toRelationship } from "@/lib/client-background/map"
 import {
   demographicsFromStored,
@@ -167,6 +171,7 @@ export type BackgroundInterviewCardData = {
   inProgress: { startedAt: string; answered: number } | null
   lastCompletedAt: string | null
   completed: { interviewId: string; completedAt: string; practitionerName: string }[]
+  latest: BackgroundInterviewAnswerSource | null
 }
 
 function interviewDate(value: Date) {
@@ -220,16 +225,43 @@ export async function loadBackgroundInterviewCard(
     .where(and(eq(clientEventRecords.clientId, clientId), eq(clientEventRecords.practiceId, practiceId)))
   const events = eventRows.map((row) => toEvent(row))
 
+  const [background] = await db
+    .select({
+      medicationJson: clientBackgrounds.medicationJson,
+      stressorsJson: clientBackgrounds.stressorsJson,
+    })
+    .from(clientBackgrounds)
+    .where(and(eq(clientBackgrounds.clientId, clientId), eq(clientBackgrounds.practiceId, practiceId)))
+    .limit(1)
+  const medication = sanitizeMedication(background?.medicationJson)
+  const stressors = sanitizeStressors(background?.stressorsJson)
+
   const inProgress = rows.find((row) => row.status === "in_progress") ?? null
   const completed = rows
     .filter((row) => row.status === "completed" && row.completedAt)
     .sort((a, b) => (b.completedAt?.getTime() ?? 0) - (a.completedAt?.getTime() ?? 0))
+  const latestRow = rows.find((row) => row.status === "in_progress" || row.status === "completed") ?? null
 
   return {
     inProgress: inProgress
       ? {
           startedAt: interviewDate(inProgress.startedAt),
-          answered: screeningAnsweredCount(sanitizeScreening(inProgress.screeningJson), events, client.dateOfBirth),
+          answered: answeredInterviewCount(
+            sanitizeScreening(inProgress.screeningJson),
+            events,
+            client.dateOfBirth,
+            medication,
+            stressors
+          ),
+        }
+      : null,
+    latest: latestRow
+      ? {
+          status: latestRow.status === "in_progress" ? "in_progress" : "completed",
+          dateLabel: interviewDate(
+            latestRow.status === "completed" && latestRow.completedAt ? latestRow.completedAt : latestRow.startedAt
+          ),
+          screening: sanitizeScreening(latestRow.screeningJson),
         }
       : null,
     lastCompletedAt: completed[0]?.completedAt ? interviewDate(completed[0].completedAt) : null,

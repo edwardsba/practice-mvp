@@ -66,7 +66,7 @@ export function ClientAnswer({
       <p className="min-w-0 text-sm text-blue-800">Client: {label}</p>
       <button
         type="button"
-        className="shrink-0 rounded-md border border-blue-800 bg-white px-2 py-0.5 text-xs font-medium text-blue-800"
+        className="min-h-11 shrink-0 rounded-md bg-blue-700 px-3 text-sm font-medium text-white hover:bg-blue-800"
         onClick={onUse}
       >
         Use

@@ -34,6 +34,17 @@ import { Label } from "@/components/ui/label"
 import { assessAge, displayedAge, formatPartialDateLabel } from "@/lib/client-background/age"
 import { parsePartialDate } from "@/lib/client-background/partial-date"
 import {
+  RELATIONSHIP_ADD_LABELS,
+  RELATIONSHIP_GROUP_LABELS,
+  childrenByPartner,
+  childrenNotLinkedToPartner,
+  needsLinkingItems,
+  parentPartnersHeading,
+  splitPartnerNodes,
+  stepParentRowLabel,
+  withPartnerHeading,
+} from "@/lib/client-background/relationship-groups"
+import {
   ADDABLE_RELATIONSHIP_GROUPS,
   ADDABLE_RELATIONSHIP_ROLES,
   CLIENT_RELATIONSHIP_STATUS_LABELS,
@@ -135,14 +146,10 @@ export function RelationshipsSection({
   const parentLinks = useMemo(() => originPartnerships(people, pairs), [people, pairs])
   const parentsLink = useMemo(() => canonicalParentsLink(people, pairs), [people, pairs])
   const layout = useMemo(() => familyOfOriginLayout(tree, parentsLink), [tree, parentsLink])
-  const needsLinking = useMemo(
-    () => [
-      ...tree.unlinkedStepParents.map((person) => ({ person, action: "Choose parent ›" })),
-      ...tree.unlinkedStepSiblings.map((person) => ({ person, action: "Choose step-parent ›" })),
-      ...tree.unlinkedStepChildren.map((person) => ({ person, action: "Choose partner ›" })),
-    ],
-    [tree]
-  )
+  const needsLinking = useMemo(() => needsLinkingItems(tree), [tree])
+  const { current: currentPartners, prior: priorPartners } = splitPartnerNodes(tree.partners)
+  const partnerChildren = childrenByPartner(tree)
+  const unlinkedPartnerChildren = childrenNotLinkedToPartner(tree)
 
   function applyClientStatus(next: ClientRelationshipStatusValue) {
     setClientStatus(next)
@@ -384,138 +391,171 @@ export function RelationshipsSection({
   const list = (
     <div className="space-y-4 text-[13px] lg:max-h-[75vh] lg:overflow-y-auto lg:pr-1">
       <Button type="button" size="sm" disabled={pending} onClick={() => setTypeListOpen(true)}>
-        + Add relationship
+        {RELATIONSHIP_ADD_LABELS.relationship}
       </Button>
       {error && !draft && !partnershipDraft ? <p className="text-sm text-destructive">{error}</p> : null}
 
-      <section className="space-y-1">
-        <h2 className="text-sm font-semibold">Family of Origin</h2>
-        {layout.parents.map((person) => (
-          <TreeRow
-            key={person.relationshipRecordId}
-            label={relationshipLineLabel(person, treeLineStatus(person, pairs))}
-            selected={selection?.kind === "person" && selection.id === person.relationshipRecordId}
-            onSelect={() => openPerson(person, pairs)}
-            extra={
-              <AddButton
-                label="+ Add step-parent"
-                disabled={pending}
-                onClick={() => openNew("step_parent", { associatedParentId: person.relationshipRecordId })}
-              />
-            }
-          />
-        ))}
-        {parentsLink.partnership ? (
-          <TreeRow
-            label={parentsRelationshipLabel(parentsLink.partnership)}
-            selected={selection?.kind === "partnership" && selection.id === parentsLink.partnership.partnershipRecordId}
-            onSelect={() => openPartnership(parentsLink.partnership!)}
-          />
-        ) : (
-          <p className="px-2 text-muted-foreground">Parents&apos; relationship</p>
-        )}
-        {layout.caregivers.map((person) => (
-          <TreeRow
-            key={person.relationshipRecordId}
-            label={relationshipLineLabel(person, treeLineStatus(person, pairs))}
-            selected={selection?.kind === "person" && selection.id === person.relationshipRecordId}
-            onSelect={() => openPerson(person, pairs)}
-          />
-        ))}
-        {layout.siblings.map((person) => (
-          <TreeRow
-            key={person.relationshipRecordId}
-            label={relationshipLineLabel(person)}
-            selected={selection?.kind === "person" && selection.id === person.relationshipRecordId}
-            onSelect={() => openPerson(person, pairs)}
-          />
-        ))}
-        <div className="pt-1">
-          <AddButton label="+ Add sibling" disabled={pending} onClick={() => openNew("sibling_full")} />
-        </div>
-      </section>
-
-      <section className="space-y-2 border-t pt-4">
-        <h2 className="text-sm font-semibold">Extended Family</h2>
-        {tree.otherFamily.length === 0 ? <p className="text-muted-foreground">Nothing recorded</p> : null}
-        {tree.otherFamily.map((group) => (
-          <div key={group.parent.relationshipRecordId} className="space-y-1">
-            <p className="font-medium">{personName(group.parent)}</p>
-            {group.stepParents.map((node) => (
-              <div key={node.person.relationshipRecordId} className="ml-3 space-y-1 border-l pl-3">
-                <TreeRow
-                  label={relationshipLineLabel(node.person, treeLineStatus(node.person, pairs))}
-                  selected={selection?.kind === "person" && selection.id === node.person.relationshipRecordId}
-                  onSelect={() => openPerson(node.person, pairs)}
-                />
-                {node.siblings.map((sibling) => (
-                  <div key={sibling.relationshipRecordId} className="ml-3">
-                    <TreeRow
-                      label={relationshipLineLabel(sibling)}
-                      selected={selection?.kind === "person" && selection.id === sibling.relationshipRecordId}
-                      onSelect={() => openPerson(sibling, pairs)}
-                    />
-                  </div>
-                ))}
-                <AddButton
-                  label="+ Add step-sibling"
-                  disabled={pending}
-                  onClick={() =>
-                    openNew("sibling_step", { partnershipRecordId: node.partnership.partnershipRecordId })
-                  }
-                />
-              </div>
-            ))}
-          </div>
-        ))}
-      </section>
-
-      <section className="space-y-2 border-t pt-4">
-        <h2 className="text-sm font-semibold">Partners and Children</h2>
+      <section className="space-y-3">
+        <h2 className="text-sm font-semibold">{RELATIONSHIP_GROUP_LABELS.partnersAndChildren}</h2>
         <ClientRelationshipStatusPanel clientId={clientId} value={clientStatus} onSaved={applyClientStatus} />
-        {tree.partners.map((node) => (
-          <div key={node.person.relationshipRecordId} className="space-y-1">
+        <div className="space-y-1">
+          <h3 className="px-2 text-sm font-medium">{RELATIONSHIP_GROUP_LABELS.currentPartner}</h3>
+          {currentPartners.map((partner) => (
             <TreeRow
-              label={relationshipLineLabel(node.person, treeLineStatus(node.person, pairs))}
-              selected={selection?.kind === "person" && selection.id === node.person.relationshipRecordId}
-              onSelect={() => openPerson(node.person, pairs)}
+              key={partner.person.relationshipRecordId}
+              label={relationshipLineLabel(partner.person, treeLineStatus(partner.person, pairs))}
+              selected={selection?.kind === "person" && selection.id === partner.person.relationshipRecordId}
+              onSelect={() => openPerson(partner.person, pairs)}
             />
-            {node.children.map((child) => (
-              <div key={child.relationshipRecordId} className="ml-3">
+          ))}
+          <AddButton label={RELATIONSHIP_ADD_LABELS.partner} disabled={pending} onClick={() => openNew("current_partner")} />
+        </div>
+        <div className="space-y-1">
+          <h3 className="px-2 text-sm font-medium">{RELATIONSHIP_GROUP_LABELS.priorPartners}</h3>
+          {priorPartners.map((partner) => (
+            <TreeRow
+              key={partner.person.relationshipRecordId}
+              label={relationshipLineLabel(partner.person, treeLineStatus(partner.person, pairs))}
+              selected={selection?.kind === "person" && selection.id === partner.person.relationshipRecordId}
+              onSelect={() => openPerson(partner.person, pairs)}
+            />
+          ))}
+          <AddButton
+            label={RELATIONSHIP_ADD_LABELS.priorPartner}
+            disabled={pending}
+            onClick={() => openNew("prior_partner")}
+          />
+        </div>
+        <div className="space-y-1">
+          <h3 className="px-2 text-sm font-medium">{RELATIONSHIP_GROUP_LABELS.children}</h3>
+          {partnerChildren.map((partner) => (
+            <div key={partner.person.relationshipRecordId} className="space-y-1">
+              <p className="px-2 text-xs text-muted-foreground">{withPartnerHeading(partner.person)}</p>
+              <div className="ml-4 space-y-1 border-l pl-3">
+                {partner.children.map((child) => (
+                  <TreeRow
+                    key={child.relationshipRecordId}
+                    label={relationshipLineLabel(child)}
+                    selected={selection?.kind === "person" && selection.id === child.relationshipRecordId}
+                    onSelect={() => openPerson(child, pairs)}
+                  />
+                ))}
+              </div>
+            </div>
+          ))}
+          <div className="space-y-1">
+            <p className="px-2 text-xs text-muted-foreground">{RELATIONSHIP_GROUP_LABELS.unlinkedChildren}</p>
+            {unlinkedPartnerChildren.length === 0 ? (
+              <p className="px-2 text-sm text-muted-foreground">{RELATIONSHIP_GROUP_LABELS.none}</p>
+            ) : (
+              unlinkedPartnerChildren.map((child) => (
                 <TreeRow
+                  key={child.relationshipRecordId}
                   label={relationshipLineLabel(child)}
                   selected={selection?.kind === "person" && selection.id === child.relationshipRecordId}
                   onSelect={() => openPerson(child, pairs)}
                 />
-              </div>
-            ))}
-            <div className="ml-3">
-              <AddButton
-                label="+ Add child"
-                disabled={pending}
-                onClick={() => openNew("child_biological", { linkedPartnerRecordId: node.person.relationshipRecordId })}
-              />
-            </div>
+              ))
+            )}
           </div>
-        ))}
-        <AddButton label="+ Add partner" disabled={pending} onClick={() => openNew("current_partner")} />
+          <AddButton label={RELATIONSHIP_ADD_LABELS.child} disabled={pending} onClick={() => openNew("child_biological")} />
+        </div>
+      </section>
+
+      <section className="space-y-3 border-t pt-4">
+        <h2 className="text-sm font-semibold">{RELATIONSHIP_GROUP_LABELS.familyOfOrigin}</h2>
         <div className="space-y-1">
-          <p className="font-medium">Children not linked to a listed partner</p>
-          {tree.unlinkedChildren.map((child) => (
+          <h3 className="px-2 text-sm font-medium">{RELATIONSHIP_GROUP_LABELS.parents}</h3>
+          {layout.parents.map((person) => (
             <TreeRow
-              key={child.relationshipRecordId}
-              label={relationshipLineLabel(child)}
-              selected={selection?.kind === "person" && selection.id === child.relationshipRecordId}
-              onSelect={() => openPerson(child, pairs)}
+              key={person.relationshipRecordId}
+              label={relationshipLineLabel(person, treeLineStatus(person, pairs))}
+              selected={selection?.kind === "person" && selection.id === person.relationshipRecordId}
+              onSelect={() => openPerson(person, pairs)}
             />
           ))}
-          <AddButton label="+ Add child" disabled={pending} onClick={() => openNew("child_biological")} />
+          {parentsLink.partnership ? (
+            <TreeRow
+              label={parentsRelationshipLabel(parentsLink.partnership)}
+              selected={selection?.kind === "partnership" && selection.id === parentsLink.partnership.partnershipRecordId}
+              onSelect={() => openPartnership(parentsLink.partnership!)}
+            />
+          ) : (
+            <p className="px-2 text-muted-foreground">{RELATIONSHIP_GROUP_LABELS.parentsRelationship}</p>
+          )}
+          {layout.caregivers.map((person) => (
+            <TreeRow
+              key={person.relationshipRecordId}
+              label={relationshipLineLabel(person, treeLineStatus(person, pairs))}
+              selected={selection?.kind === "person" && selection.id === person.relationshipRecordId}
+              onSelect={() => openPerson(person, pairs)}
+            />
+          ))}
+          <div className="flex flex-col items-start gap-2 pt-1">
+            <AddButton label={RELATIONSHIP_ADD_LABELS.parent} disabled={pending} onClick={() => openNew("parent")} />
+            <AddButton
+              label={RELATIONSHIP_ADD_LABELS.caregiver}
+              disabled={pending}
+              onClick={() => openNew("other_caregiver")}
+            />
+          </div>
+        </div>
+        <div className="space-y-1">
+          <h3 className="px-2 text-sm font-medium">{RELATIONSHIP_GROUP_LABELS.siblings}</h3>
+          {layout.siblings.map((person) => (
+            <TreeRow
+              key={person.relationshipRecordId}
+              label={relationshipLineLabel(person)}
+              selected={selection?.kind === "person" && selection.id === person.relationshipRecordId}
+              onSelect={() => openPerson(person, pairs)}
+            />
+          ))}
+          <AddButton label={RELATIONSHIP_ADD_LABELS.sibling} disabled={pending} onClick={() => openNew("sibling_full")} />
+        </div>
+        <div className="space-y-2">
+          <h3 className="px-2 text-sm font-medium">{RELATIONSHIP_GROUP_LABELS.stepFamily}</h3>
+          {tree.otherFamily.map((group) => (
+            <div key={group.parent.relationshipRecordId} className="space-y-1">
+              <p className="px-2 text-xs text-muted-foreground">{parentPartnersHeading(group.parent)}</p>
+              {group.stepParents.map((node) => (
+                <div key={node.person.relationshipRecordId} className="space-y-1">
+                  <TreeRow
+                    label={stepParentRowLabel({
+                      stepParent: node.person,
+                      parent: group.parent,
+                      partnershipRecordId: node.partnership.partnershipRecordId,
+                    })}
+                    selected={selection?.kind === "person" && selection.id === node.person.relationshipRecordId}
+                    onSelect={() => openPerson(node.person, pairs)}
+                  />
+                  <div className="ml-4 space-y-1 border-l pl-3">
+                    {node.siblings.map((sibling) => (
+                      <TreeRow
+                        key={sibling.relationshipRecordId}
+                        label={relationshipLineLabel(sibling)}
+                        selected={selection?.kind === "person" && selection.id === sibling.relationshipRecordId}
+                        onSelect={() => openPerson(sibling, pairs)}
+                      />
+                    ))}
+                    <AddButton
+                      label={RELATIONSHIP_ADD_LABELS.stepSibling}
+                      disabled={pending}
+                      onClick={() =>
+                        openNew("sibling_half", { partnershipRecordId: node.partnership.partnershipRecordId })
+                      }
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ))}
+          <AddButton label={RELATIONSHIP_ADD_LABELS.stepParent} disabled={pending} onClick={() => openNew("step_parent")} />
         </div>
       </section>
 
       {needsLinking.length > 0 ? (
         <section className="space-y-1 rounded-md border border-amber-300 bg-amber-50 p-2 text-amber-950 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100">
-          <h2 className="px-2 text-sm font-semibold">Needs linking</h2>
+          <h2 className="px-2 text-sm font-semibold">{RELATIONSHIP_GROUP_LABELS.needsLinking}</h2>
           {needsLinking.map(({ person, action }) => {
             const name = person.givenName.trim() || "Not recorded"
             const selected = selection?.kind === "person" && selection.id === person.relationshipRecordId
@@ -1230,7 +1270,7 @@ function AssociationFields({
             <option value="">No partner recorded</option>
           </SelectField>
           <AddButton
-            label="+ Add partner"
+            label={RELATIONSHIP_ADD_LABELS.partner}
             disabled={pending}
             onClick={() => onReplaceWithNew("current_partner")}
           />

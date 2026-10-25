@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useState, type MouseEvent } from "react"
+import { useEffect, useRef, useState, type MouseEvent, type RefObject } from "react"
 import { useRouter } from "next/navigation"
 
 import {
@@ -8,14 +8,13 @@ import {
   createEventAction,
   deleteEventAction,
   saveInterviewScreeningAction,
-  saveMedicationAction,
   saveStressorsAction,
   updateEventAction,
 } from "@/app/clients/[client_id]/background/actions"
 import { AddButton, ClientAnswer, SelectField } from "@/components/client-background/fields"
 import { HistoryPanel, historyEntryLines } from "@/components/client-background/history-section"
 import { AutosaveFields, type SavePhase } from "@/components/client-background/interview-autosave"
-import { MedicationFields, StressorsFields } from "@/components/client-background/medication-stressors"
+import { StressorsFields } from "@/components/client-background/medication-stressors"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
@@ -45,11 +44,10 @@ export function InterviewHistory({
   events,
   relationships,
   screening,
-  medication,
+  medicationRef,
   stressors,
   selfReportId,
   historyClient,
-  medicationClient,
   stressorsClient,
   onEvents,
   onPhase,
@@ -61,11 +59,10 @@ export function InterviewHistory({
   events: EventRecord[]
   relationships: RelationshipRecord[]
   screening: ScreeningAnswers
-  medication: MedicationRecord
+  medicationRef: RefObject<MedicationRecord>
   stressors: StressorsRecord
   selfReportId: string | null
   historyClient?: ClientBackgroundSuggestions["history"]
-  medicationClient?: ClientBackgroundSuggestions["medication"]
   stressorsClient?: ClientBackgroundSuggestions["stressors"]
   onEvents: (events: EventRecord[]) => void
   onPhase: (id: string, phase: SavePhase, retry: (() => void) | null) => void
@@ -86,13 +83,11 @@ export function InterviewHistory({
   const scrollY = useRef(0)
   const answersRef = useRef(answers)
   const entriesRef = useRef(entries)
-  const medicationRef = useRef(medication)
   const stressorsRef = useRef(stressors)
   const token = useRef(0)
   const inflight = useRef<Promise<void> | null>(null)
   answersRef.current = answers
   entriesRef.current = entries
-  medicationRef.current = medication
   stressorsRef.current = stressors
 
   useEffect(() => {
@@ -320,37 +315,6 @@ export function InterviewHistory({
                 </div>
               )
             })}
-            {group.title === "Client: mental health" ? (
-              <div className="border-t pt-4">
-                <AutosaveFields
-                  saved={medication}
-                  save={async (value) => {
-                    medicationRef.current = value
-                    const result = await saveMedicationAction(clientId, value)
-                    if (result.error || !("medication" in result) || !result.medication) {
-                      return { error: result.error ?? "Could not save medication." }
-                    }
-                    medicationRef.current = result.medication
-                    return { value: result.medication }
-                  }}
-                  onPhase={(phase, retry) => onPhase("medication", phase, retry)}
-                  registerFlush={registerFlush}
-                >
-                  {(value, onChange, commit) => {
-                    medicationRef.current = value
-                    return (
-                      <MedicationFields
-                        idPrefix="interview_medication"
-                        value={value}
-                        onChange={onChange}
-                        onCommit={commit}
-                        client={medicationClient}
-                      />
-                    )
-                  }}
-                </AutosaveFields>
-              </div>
-            ) : null}
           </CardContent>
         </Card>
       ))}

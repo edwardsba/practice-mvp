@@ -6,6 +6,7 @@ import { ChevronDown } from "lucide-react"
 import { DemographicsSection } from "@/components/client-background/demographics-section"
 import { HistorySection } from "@/components/client-background/history-section"
 import { BackgroundInterviewCard } from "@/components/client-background/interview-card"
+import { BackgroundStressorsSection } from "@/components/client-background/medication-stressors"
 import { RelationshipsSection } from "@/components/client-background/relationships-section"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import type { BackgroundInterviewCardData } from "@/lib/client-background/load"
@@ -16,6 +17,7 @@ const SECTIONS = [
   { id: "demographics", label: "Demographics" },
   { id: "relationships", label: "Relationships" },
   { id: "history", label: "History" },
+  { id: "stressors", label: "Stressors" },
   { id: "risk", label: "Risk" },
 ] as const
 
@@ -51,6 +53,7 @@ export function ClientBackgroundPage({
               clientId={clientId}
               demographics={data.demographics}
               relationships={data.relationships}
+              medication={data.medication}
             />
           ) : null}
           {item.id === "relationships" ? (
@@ -67,10 +70,11 @@ export function ClientBackgroundPage({
               dateOfBirth={data.dateOfBirth}
               events={data.events}
               relationships={data.relationships}
-              medication={data.medication}
-              stressors={data.stressors}
               interviewSource={interview.latest}
             />
+          ) : null}
+          {item.id === "stressors" ? (
+            <BackgroundStressorsSection clientId={clientId} stressors={data.stressors} />
           ) : null}
           {item.id === "risk" ? (
             <p className="text-sm text-muted-foreground">

@@ -265,7 +265,7 @@ export function unansweredQuestionLabels(
   )
 }
 
-/** Screening gaps, plus medication and stressors that are still empty. */
+/** Unanswered items in page order: Background, then History, then Stressors. */
 export function unansweredInterviewLabels(
   screening: ScreeningAnswers,
   events: Pick<EventRecord, "eventType" | "attribution" | "startPrecision" | "startValue">[],
@@ -273,8 +273,9 @@ export function unansweredInterviewLabels(
   medication: MedicationRecord,
   stressors: StressorsRecord
 ): string[] {
-  const labels = unansweredQuestionLabels(screening, events, dateOfBirth)
+  const labels: string[] = []
   if (medication.currentlyTaking == null) labels.push("Currently taking medication")
+  labels.push(...unansweredQuestionLabels(screening, events, dateOfBirth))
   for (const item of STRESSOR_ITEMS) {
     if (stressors[item.key] == null) labels.push(item.label)
   }

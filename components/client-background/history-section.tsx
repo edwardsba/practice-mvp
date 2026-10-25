@@ -15,7 +15,7 @@ import {
   TextAreaField,
   TextField,
 } from "@/components/client-background/fields"
-import { MedicationEditor, MedicationStressorsPanel, StressorsEditor } from "@/components/client-background/medication-stressors"
+import { AnswerTag } from "@/components/client-background/medication-stressors"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
@@ -46,7 +46,6 @@ import { personName } from "@/lib/client-background/tree"
 import {
   EVENT_TYPES,
   EVENT_TYPE_LABELS,
-  STRESSOR_ITEMS,
   emptyEvent,
   FAMILY_RELATION_PICKS,
   FAMILY_SIDES,
@@ -58,9 +57,7 @@ import {
   SUBSTANCE_STATUS_LABELS,
   type EventRecord,
   type EventType,
-  type MedicationRecord,
   type RelationshipRecord,
-  type StressorsRecord,
 } from "@/lib/client-background/types"
 import { cn } from "@/lib/utils"
 
@@ -71,21 +68,15 @@ export function HistorySection({
   dateOfBirth,
   events,
   relationships,
-  medication,
-  stressors,
   interviewSource,
 }: {
   clientId: string
   dateOfBirth: string | null
   events: EventRecord[]
   relationships: RelationshipRecord[]
-  medication: MedicationRecord
-  stressors: StressorsRecord
   interviewSource: BackgroundInterviewAnswerSource | null
 }) {
   const [entries, setEntries] = useState(events)
-  const [medicationRecord, setMedicationRecord] = useState(medication)
-  const [stressorsRecord, setStressorsRecord] = useState(stressors)
   const [view, setView] = useState<HistoryView>("chronological")
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [mobileScreen, setMobileScreen] = useState<"list" | "detail" | "edit">("list")
@@ -244,33 +235,19 @@ export function HistorySection({
             </section>
           ) : (
             <InterviewOrderList
-              clientId={clientId}
               dateOfBirth={dateOfBirth}
               entries={entries}
               relationships={relationships}
               selectedId={selectedId}
               pending={pending}
               interviewSource={interviewSource}
-              medication={medicationRecord}
-              stressors={stressorsRecord}
               onSelect={select}
               onAdd={addForQuestion}
-              onMedicationSaved={setMedicationRecord}
-              onStressorsSaved={setStressorsRecord}
             />
           )}
         </div>
         <div className={mobileScreen === "list" ? "hidden min-w-0 lg:block" : "min-w-0"}>{renderPanel()}</div>
       </div>
-      {view === "chronological" ? (
-        <MedicationStressorsPanel
-          clientId={clientId}
-          medication={medicationRecord}
-          stressors={stressorsRecord}
-          onMedicationSaved={setMedicationRecord}
-          onStressorsSaved={setStressorsRecord}
-        />
-      ) : null}
       <Dialog open={pickerOpen} onOpenChange={setPickerOpen}>
         <DialogContent>
           <DialogHeader>
@@ -291,35 +268,24 @@ export function HistorySection({
 }
 
 function InterviewOrderList({
-  clientId,
   dateOfBirth,
   entries,
   relationships,
   selectedId,
   pending,
   interviewSource,
-  medication,
-  stressors,
   onSelect,
   onAdd,
-  onMedicationSaved,
-  onStressorsSaved,
 }: {
-  clientId: string
   dateOfBirth: string | null
   entries: EventRecord[]
   relationships: RelationshipRecord[]
   selectedId: string | null
   pending: boolean
   interviewSource: BackgroundInterviewAnswerSource | null
-  medication: MedicationRecord
-  stressors: StressorsRecord
   onSelect: (entry: EventRecord) => void
   onAdd: (key: HistoryQuestionKey) => void
-  onMedicationSaved: (value: MedicationRecord) => void
-  onStressorsSaved: (value: StressorsRecord) => void
 }) {
-  const mentalHealthTitle = HISTORY_QUESTION_GROUPS[0]?.title
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">{backgroundInterviewSourceLine(interviewSource)}</p>
@@ -332,7 +298,7 @@ function InterviewOrderList({
             {group.keys.map((key) => {
               const question = HISTORY_QUESTIONS[key]
               const listed = eventsForQuestion(entries, key, dateOfBirth)
-              const shown: ScreeningAnswer | null = listed.length > 0 ? "yes" : interviewSource?.screening[key] ?? null
+              const shown: ScreeningAnswer | null = listed.length > 0 ? "yes" : (interviewSource?.screening[key] ?? null)
               return (
                 <div key={key} className="space-y-2">
                   <div className="flex items-start justify-between gap-3">
@@ -361,65 +327,10 @@ function InterviewOrderList({
                 </div>
               )
             })}
-            {group.title === mentalHealthTitle ? (
-              <div className="border-t pt-4">
-                <MedicationEditor
-                  clientId={clientId}
-                  medication={medication}
-                  onSaved={onMedicationSaved}
-                  title=""
-                  editLabel="Edit medication"
-                />
-              </div>
-            ) : null}
           </CardContent>
         </Card>
       ))}
-      <Card>
-        <CardHeader>
-          <CardTitle>Stressors</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <StressorsEditor
-            clientId={clientId}
-            stressors={stressors}
-            onSaved={onStressorsSaved}
-            title=""
-            editLabel="Edit stressors"
-            read={(value) => (
-              <div className="space-y-2">
-                {STRESSOR_ITEMS.map((item) => (
-                  <div key={item.key} className="flex items-start justify-between gap-3">
-                    <span className="text-sm">{item.label}</span>
-                    <AnswerTag answer={value[item.key]} />
-                  </div>
-                ))}
-                <div className="space-y-1 pt-1">
-                  <p className="text-sm font-medium">Main reason for attending</p>
-                  <p className="text-sm whitespace-pre-wrap">{value.mainReason.trim() || "Not recorded"}</p>
-                </div>
-              </div>
-            )}
-          />
-        </CardContent>
-      </Card>
     </div>
-  )
-}
-
-function AnswerTag({ answer }: { answer: ScreeningAnswer | null }) {
-  if (answer == null) return <span className="text-xs text-muted-foreground">Not answered</span>
-  const label = answer === "yes" ? "Yes" : answer === "no" ? "No" : "Not asked"
-  const tone =
-    answer === "yes"
-      ? "bg-neutral-900 text-white"
-      : answer === "no"
-        ? "bg-neutral-200 text-neutral-700"
-        : "border border-dashed border-neutral-400 text-neutral-600"
-  return (
-    <span className={cn("inline-flex shrink-0 items-center rounded-md px-2 py-0.5 text-xs font-medium", tone)}>
-      {label}
-    </span>
   )
 }
 

@@ -40,7 +40,7 @@ export function BackgroundInterviewCard({
       <CardContent className="space-y-3">
         {summary.inProgress ? (
           <p className="text-sm">
-            In progress · started {summary.inProgress.startedAt} · History: {summary.inProgress.answered} of {INTERVIEW_ANSWER_TOTAL} answered
+            In progress · started {summary.inProgress.startedAt} · Interview: {summary.inProgress.answered} of {INTERVIEW_ANSWER_TOTAL} answered
           </p>
         ) : (
           <p className="text-sm">

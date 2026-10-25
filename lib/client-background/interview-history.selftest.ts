@@ -75,7 +75,9 @@ for (const item of expected) {
 assert.equal(seen.size, HISTORY_QUESTION_KEYS.length)
 
 const gaps = unansweredInterviewLabels({}, [], null, emptyMedication(), emptyStressors())
-assert.equal(gaps[0], "Emotional problems")
+assert.equal(gaps[0], "Currently taking medication")
+assert.equal(gaps[1], "Emotional problems")
+assert.ok(gaps.indexOf("Family") > gaps.indexOf("Emotional problems"))
 assert.equal(gaps.at(-1), "Legal matters, police or accidents")
 assert.ok(gaps.includes("Currently taking medication"))
 assert.equal(gaps.filter((label) => label === "Family").length, 1)
@@ -84,6 +86,7 @@ assert.equal(gaps.length, HISTORY_QUESTION_KEYS.length + 1 + 9)
 const answeredMedication: MedicationRecord = { ...emptyMedication(), currentlyTaking: "not_asked" }
 const answeredStressors: StressorsRecord = { ...emptyStressors(), family: "yes", financial: "no" }
 const remaining = unansweredInterviewLabels({}, [], null, answeredMedication, answeredStressors)
+assert.equal(remaining[0], "Emotional problems")
 assert.equal(remaining.includes("Currently taking medication"), false)
 assert.equal(remaining.includes("Family"), false)
 assert.equal(remaining.includes("Financial"), false)

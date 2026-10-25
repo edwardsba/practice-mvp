@@ -2,11 +2,12 @@
 
 import { useState, type ReactNode } from "react"
 
-import { saveDemographicsAction } from "@/app/clients/[client_id]/background/actions"
+import { saveDemographicsAction, saveMedicationAction } from "@/app/clients/[client_id]/background/actions"
 import { AddButton, ClientAnswer, PartialDatePicker, ReadOnlyField, SaveRow, SelectField, TextField, YesNoDetail } from "@/components/client-background/fields"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
+import { MedicationFields, MedicationReadOnly } from "@/components/client-background/medication-stressors"
 import { livingWithClientLines } from "@/lib/client-background/tree"
 import {
   EDUCATION_LEVEL_OPTIONS,
@@ -25,6 +26,7 @@ import {
   type IdentityFields,
   type LivesWith,
   type LivingSituationFields,
+  type MedicationRecord,
   type OccupationFields,
   type PreviousJob,
   type RelationshipRecord,
@@ -38,13 +40,17 @@ export function DemographicsSection({
   clientId,
   demographics,
   relationships,
+  medication,
 }: {
   clientId: string
   demographics: Demographics
   relationships: RelationshipRecord[]
+  medication: MedicationRecord
 }) {
   const [saved, setSaved] = useState(demographics)
   const [draft, setDraft] = useState(demographics)
+  const [savedMedication, setSavedMedication] = useState(medication)
+  const [medicationDraft, setMedicationDraft] = useState(medication)
   const [editing, setEditing] = useState(false)
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -65,14 +71,22 @@ export function DemographicsSection({
   async function save() {
     setPending(true)
     setError(null)
-    const result = await saveDemographicsAction(clientId, draft)
-    setPending(false)
-    if (result.error || !("demographics" in result) || !result.demographics) {
-      setError(result.error ?? "Could not save demographics.")
+    const demographicsResult = await saveDemographicsAction(clientId, draft)
+    if (demographicsResult.error || !("demographics" in demographicsResult) || !demographicsResult.demographics) {
+      setPending(false)
+      setError(demographicsResult.error ?? "Could not save demographics.")
       return
     }
-    setSaved(result.demographics)
-    setDraft(result.demographics)
+    setSaved(demographicsResult.demographics)
+    setDraft(demographicsResult.demographics)
+    const medicationResult = await saveMedicationAction(clientId, medicationDraft)
+    setPending(false)
+    if (medicationResult.error || !("medication" in medicationResult) || !medicationResult.medication) {
+      setError(medicationResult.error ?? "Could not save medication.")
+      return
+    }
+    setSavedMedication(medicationResult.medication)
+    setMedicationDraft(medicationResult.medication)
     setEditing(false)
   }
 
@@ -87,6 +101,7 @@ export function DemographicsSection({
             disabled={pending}
             onClick={() => {
               setDraft(saved)
+              setMedicationDraft(savedMedication)
               setError(null)
               setEditing(false)
             }}
@@ -100,6 +115,7 @@ export function DemographicsSection({
             size="sm"
             onClick={() => {
               setDraft(saved)
+              setMedicationDraft(savedMedication)
               setError(null)
               setEditing(true)
             }}
@@ -128,10 +144,13 @@ export function DemographicsSection({
           <Subsection title="Living situation" divided>
             <LivingFieldsEditor value={draft.livingSituation} relationships={relationships} onChange={updateLiving} />
           </Subsection>
+          <Subsection title="Medication" divided>
+            <MedicationFields idPrefix="demographics_medication" value={medicationDraft} onChange={setMedicationDraft} />
+          </Subsection>
           <SaveRow pending={pending} error={error} onSave={() => void save()} />
         </form>
       ) : (
-        <DemographicsReadOnly value={saved} relationships={relationships} />
+        <DemographicsReadOnly value={saved} relationships={relationships} medication={savedMedication} />
       )}
     </div>
   )
@@ -157,9 +176,11 @@ function Subsection({
 function DemographicsReadOnly({
   value,
   relationships,
+  medication,
 }: {
   value: Demographics
   relationships: RelationshipRecord[]
+  medication: MedicationRecord
 }) {
   const pronouns = value.identity.pronouns
   const limited = NECESSITY_KEYS.filter((key) => value.occupation.necessities[key])
@@ -221,6 +242,9 @@ function DemographicsReadOnly({
         <ReadOnlyField label="Who the client lives with" value={livesWithText(value.livingSituation)} />
         <PeopleLivingWithClient relationships={relationships} />
         <ReadOnlyField label="Housing stability" value={value.livingSituation.housingStability} />
+      </Subsection>
+      <Subsection title="Medication" divided>
+        <MedicationReadOnly value={medication} />
       </Subsection>
     </div>
   )

@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 
-import { saveMedicationAction, saveStressorsAction } from "@/app/clients/[client_id]/background/actions"
+import { saveStressorsAction } from "@/app/clients/[client_id]/background/actions"
 import { ClientAnswer, ReadOnlyField, SaveRow, SelectField, TextAreaField, TextField } from "@/components/client-background/fields"
 import { Button } from "@/components/ui/button"
 import type { ClientBackgroundSuggestions } from "@/lib/background-questionnaire/to-client-background"
@@ -14,6 +14,22 @@ import {
   type TriStateAnswer,
 } from "@/lib/client-background/types"
 import { cn } from "@/lib/utils"
+
+export function AnswerTag({ answer }: { answer: TriStateAnswer | null }) {
+  if (answer == null) return <span className="text-xs text-muted-foreground">Not answered</span>
+  const label = answer === "yes" ? "Yes" : answer === "no" ? "No" : "Not asked"
+  const tone =
+    answer === "yes"
+      ? "bg-neutral-900 text-white"
+      : answer === "no"
+        ? "bg-neutral-200 text-neutral-700"
+        : "border border-dashed border-neutral-400 text-neutral-600"
+  return (
+    <span className={cn("inline-flex shrink-0 items-center rounded-md px-2 py-0.5 text-xs font-medium", tone)}>
+      {label}
+    </span>
+  )
+}
 
 export function TriStateField({
   id,
@@ -173,32 +189,6 @@ export function StressorsFields({
   )
 }
 
-export function MedicationEditor({
-  clientId,
-  medication,
-  onSaved,
-  title = "Medication",
-  editLabel = "Edit",
-}: {
-  clientId: string
-  medication: MedicationRecord
-  onSaved?: (value: MedicationRecord) => void
-  title?: string
-  editLabel?: string
-}) {
-  return (
-    <EditableBlock
-      title={title}
-      editLabel={editLabel}
-      saved={medication}
-      onSaved={onSaved}
-      save={(value) => saveMedicationAction(clientId, value)}
-      read={(value) => <MedicationReadOnly value={value} />}
-      edit={(value, onChange) => <MedicationFields idPrefix="background_medication" value={value} onChange={onChange} />}
-    />
-  )
-}
-
 export function StressorsEditor({
   clientId,
   stressors,
@@ -227,32 +217,44 @@ export function StressorsEditor({
   )
 }
 
-export function MedicationStressorsPanel({
+export function BackgroundStressorsSection({
   clientId,
-  medication,
   stressors,
-  onMedicationSaved,
-  onStressorsSaved,
 }: {
   clientId: string
-  medication: MedicationRecord
   stressors: StressorsRecord
-  onMedicationSaved?: (value: MedicationRecord) => void
-  onStressorsSaved?: (value: StressorsRecord) => void
 }) {
   return (
-    <div className="grid gap-6 border-t pt-6 lg:grid-cols-2">
-      <MedicationEditor clientId={clientId} medication={medication} onSaved={onMedicationSaved} />
-      <StressorsEditor clientId={clientId} stressors={stressors} onSaved={onStressorsSaved} />
-    </div>
+    <StressorsEditor
+      clientId={clientId}
+      stressors={stressors}
+      title=""
+      editLabel="Edit"
+      read={(value) => (
+        <div className="space-y-2">
+          {STRESSOR_ITEMS.map((item) => (
+            <div key={item.key} className="flex items-start justify-between gap-3">
+              <span className="text-sm">{item.label}</span>
+              <AnswerTag answer={value[item.key]} />
+            </div>
+          ))}
+          <div className="space-y-1 pt-1">
+            <p className="text-sm font-medium">Main reason for attending</p>
+            <p className="text-sm whitespace-pre-wrap">{value.mainReason.trim() || "Not recorded"}</p>
+          </div>
+        </div>
+      )}
+    />
   )
 }
 
-function MedicationReadOnly({ value }: { value: MedicationRecord }) {
+export function MedicationReadOnly({ value }: { value: MedicationRecord }) {
   return (
     <div className="space-y-3">
       <ReadOnlyField label="Currently taking medication" value={triStateLabel(value.currentlyTaking)} />
-      {value.supervisedBy.trim() ? <ReadOnlyField label="Supervised by" value={value.supervisedBy} /> : null}
+      {value.currentlyTaking === "yes" && value.supervisedBy.trim() ? (
+        <ReadOnlyField label="Supervised by" value={value.supervisedBy} />
+      ) : null}
       {value.currentlyTaking === "no" ? (
         <ReadOnlyField label="Taken medication in the past" value={triStateLabel(value.previouslyTaken)} />
       ) : null}

@@ -1,10 +1,74 @@
 import { and, eq } from "drizzle-orm"
 
-import { auditEvents, treatmentPlans } from "@/db/schema"
+import { auditEvents, clientBackgrounds, treatmentPlans } from "@/db/schema"
+import { medicationAfterPlanSave } from "@/lib/client-background/medication"
+import { sanitizeMedication } from "@/lib/client-background/sanitize"
 import { db } from "@/lib/db"
 import { formValuesToDbColumns } from "@/lib/treatment-plans/parse-form"
 import { loadTreatmentPlanForPractice } from "@/lib/treatment-plans/load"
-import type { TreatmentPlanFormValues } from "@/lib/treatment-plans/types"
+import type { MedicationSupervisionJson, TreatmentPlanFormValues } from "@/lib/treatment-plans/types"
+
+type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0]
+
+async function syncMedicationSupervision(
+  tx: Tx,
+  input: {
+    clientId: string
+    practiceId: string
+    userId: string
+    supervision: MedicationSupervisionJson
+    now: Date
+  }
+) {
+  const [existing] = await tx
+    .select({
+      clientBackgroundId: clientBackgrounds.clientBackgroundId,
+      practiceId: clientBackgrounds.practiceId,
+      medicationJson: clientBackgrounds.medicationJson,
+    })
+    .from(clientBackgrounds)
+    .where(eq(clientBackgrounds.clientId, input.clientId))
+    .limit(1)
+
+  if (existing && existing.practiceId !== input.practiceId) {
+    throw new Error("Client background belongs to another practice.")
+  }
+
+  const medication = medicationAfterPlanSave(sanitizeMedication(existing?.medicationJson), input.supervision)
+  let entityId = ""
+  if (!existing) {
+    const [created] = await tx
+      .insert(clientBackgrounds)
+      .values({
+        clientId: input.clientId,
+        practiceId: input.practiceId,
+        medicationJson: medication,
+        updatedAt: input.now,
+      })
+      .returning({ clientBackgroundId: clientBackgrounds.clientBackgroundId })
+    entityId = created.clientBackgroundId
+  } else {
+    entityId = existing.clientBackgroundId
+    await tx
+      .update(clientBackgrounds)
+      .set({ medicationJson: medication, updatedAt: input.now })
+      .where(
+        and(
+          eq(clientBackgrounds.clientBackgroundId, existing.clientBackgroundId),
+          eq(clientBackgrounds.practiceId, input.practiceId)
+        )
+      )
+  }
+
+  await tx.insert(auditEvents).values({
+    practiceId: input.practiceId,
+    userId: input.userId,
+    clientId: input.clientId,
+    eventType: "client_background.updated",
+    entityType: "client_background",
+    entityId,
+  })
+}
 
 function dayBeforeDateString(dateString: string): string {
   const date = new Date(`${dateString}T00:00:00`)
@@ -56,6 +120,14 @@ export async function commitTreatmentPlan({
         eventType: "treatment_plan.created",
         entityType: "treatment_plan",
         entityId: plan.treatmentPlanId,
+      })
+
+      await syncMedicationSupervision(tx, {
+        clientId,
+        practiceId,
+        userId,
+        supervision: values.medicationSupervision,
+        now,
       })
     })
 
@@ -117,6 +189,14 @@ export async function commitTreatmentPlan({
       eventType: "treatment_plan.updated",
       entityType: "treatment_plan",
       entityId: plan.treatmentPlanId,
+    })
+
+    await syncMedicationSupervision(tx, {
+      clientId,
+      practiceId,
+      userId,
+      supervision: values.medicationSupervision,
+      now,
     })
   })
 

@@ -11,6 +11,7 @@ import {
 } from "@/app/clients/[client_id]/background/actions"
 import {
   AddButton,
+  ClientAnswer,
   mobileControlClassName,
   PartialDatePicker,
   ReadOnlyField,
@@ -57,6 +58,7 @@ import {
   type RelationshipRelink,
   type RelationshipToClient,
 } from "@/lib/client-background/types"
+import type { AppliedAnswer } from "@/lib/background-questionnaire/to-client-background"
 import { todayDateString } from "@/lib/dates/practice-time"
 import {
   brokenLinksForRoleChange,
@@ -1522,17 +1524,38 @@ export function ClientRelationshipStatusFields({
   idPrefix,
   value,
   onChange,
+  onCommit,
+  client,
 }: {
   idPrefix: string
   value: ClientRelationshipStatusValue
   onChange: (value: ClientRelationshipStatusValue) => void
+  onCommit?: () => void
+  client?: AppliedAnswer<ClientRelationshipStatusValue>
 }) {
+  function apply(next: ClientRelationshipStatusValue) {
+    onChange(next)
+    onCommit?.()
+  }
   return (
     <>
       <SelectField
         id={`${idPrefix}_relationship_status`}
         label="Current relationship status"
         value={value.relationshipStatus}
+        client={
+          client ? (
+            <ClientAnswer
+              label={client.label}
+              matches={
+                value.relationshipStatus === client.apply.relationshipStatus &&
+                (client.apply.relationshipStatus !== "other" ||
+                  value.relationshipStatusOther === client.apply.relationshipStatusOther)
+              }
+              onUse={() => apply(client.apply)}
+            />
+          ) : undefined
+        }
         onChange={(relationshipStatus) =>
           onChange({
             relationshipStatus: relationshipStatus as ClientRelationshipStatus | "",

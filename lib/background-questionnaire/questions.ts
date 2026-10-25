@@ -459,7 +459,7 @@ export function backgroundQuestionLabel(text: string, optional?: boolean) {
 
 export type BackgroundResultSection = {
   title: string
-  rows: { question: string; answer: string }[]
+  rows: { question: string; answer: string; heading?: string }[]
 }
 
 function formatStoredAnswer(
@@ -512,6 +512,7 @@ export function backgroundResultSections(
           readBackgroundField(answers, part.key, question.field),
           question.options
         ),
+        heading: question.sectionHeading,
       })
       for (const conditional of question.conditionals ?? []) {
         const value = readBackgroundField(answers, part.key, conditional.field)

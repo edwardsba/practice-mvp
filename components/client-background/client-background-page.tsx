@@ -67,6 +67,8 @@ export function ClientBackgroundPage({
               dateOfBirth={data.dateOfBirth}
               events={data.events}
               relationships={data.relationships}
+              medication={data.medication}
+              stressors={data.stressors}
             />
           ) : null}
           {item.id === "risk" ? (

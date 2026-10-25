@@ -255,6 +255,7 @@ export default async function AssessmentResultDetailPage({
               <CardContent className="space-y-5">
                 {section.rows.map((row, index) => (
                   <div key={`${section.title}-${index}`}>
+                    {row.heading ? <h3 className="mb-3 text-sm font-semibold">{row.heading}</h3> : null}
                     <p className="text-sm font-medium">{row.question}</p>
                     <p className="mt-1 text-sm whitespace-pre-wrap text-muted-foreground">
                       {row.answer}

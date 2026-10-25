@@ -3,6 +3,9 @@ import "server-only"
 import { and, asc, desc, eq, sql } from "drizzle-orm"
 
 import {
+  assessmentDefinitions,
+  assessmentInstances,
+  assessmentResults,
   clientBackgroundInterviews,
   clientBackgrounds,
   clientEventRecords,
@@ -11,19 +14,26 @@ import {
   clients,
   practitionerProfiles,
 } from "@/db/schema"
+import { sanitizeBackgroundAnswers } from "@/lib/background-questionnaire/answers"
+import { BACKGROUND_ASSESSMENT_CODE, type BackgroundSelfReport } from "@/lib/background-questionnaire/types"
 import { db } from "@/lib/db"
 import { settleEventDates } from "@/lib/client-background/age"
 import { sanitizeScreening, screeningAnsweredCount } from "@/lib/client-background/interview-history"
 import { toClientRelationshipStatus, toEvent, toPartnership, toRelationship } from "@/lib/client-background/map"
 import {
   demographicsFromStored,
+  sanitizeMedication,
   sanitizeRisk,
+  sanitizeStressors,
 } from "@/lib/client-background/sanitize"
 import {
   emptyDemographics,
   emptyClientRelationshipStatus,
+  emptyMedication,
   emptyRisk,
+  emptyStressors,
   type ClientBackgroundData,
+  type MedicationRecord,
 } from "@/lib/client-background/types"
 
 async function clientInPractice(clientId: string, practiceId: string) {
@@ -106,6 +116,8 @@ export async function loadClientBackground(
     demographics: background
       ? demographicsFromStored(background)
       : emptyDemographics(),
+    medication: background ? sanitizeMedication(background.medicationJson) : emptyMedication(),
+    stressors: background ? sanitizeStressors(background.stressorsJson) : emptyStressors(),
     relationships: relationshipRows.map(toRelationship),
     partnerships: partnershipRows.map(toPartnership),
     events: eventRows.map((row) => settleEventDates(toEvent(row), client.dateOfBirth)),
@@ -254,4 +266,58 @@ export async function loadInProgressInterview(clientId: string, practiceId: stri
     .limit(1)
   if (!row) return null
   return { interviewId: row.interviewId, screening: sanitizeScreening(row.screeningJson) }
+}
+
+export async function loadMedicationRecord(
+  clientId: string,
+  practiceId: string
+): Promise<MedicationRecord | null> {
+  const client = await clientInPractice(clientId, practiceId)
+  if (!client) return null
+  const [background] = await db
+    .select({ medicationJson: clientBackgrounds.medicationJson })
+    .from(clientBackgrounds)
+    .where(and(eq(clientBackgrounds.clientId, clientId), eq(clientBackgrounds.practiceId, practiceId)))
+    .limit(1)
+  return sanitizeMedication(background?.medicationJson)
+}
+
+/** The client's most recent BACKGROUND_SR result, or null when they have none. */
+export async function loadLatestBackgroundSelfReport(
+  clientId: string,
+  practiceId: string
+): Promise<BackgroundSelfReport | null> {
+  const client = await clientInPractice(clientId, practiceId)
+  if (!client) return null
+  const [row] = await db
+    .select({
+      resultId: assessmentResults.assessmentResultId,
+      assessmentDate: assessmentResults.assessmentDate,
+      answers: assessmentResults.structuredScoreJson,
+    })
+    .from(assessmentResults)
+    .innerJoin(
+      assessmentInstances,
+      eq(assessmentInstances.assessmentInstanceId, assessmentResults.assessmentInstanceId)
+    )
+    .innerJoin(
+      assessmentDefinitions,
+      eq(assessmentDefinitions.assessmentDefinitionId, assessmentInstances.assessmentDefinitionId)
+    )
+    .where(
+      and(
+        eq(assessmentResults.clientId, clientId),
+        eq(assessmentResults.practiceId, practiceId),
+        eq(assessmentInstances.practiceId, practiceId),
+        eq(assessmentDefinitions.assessmentCode, BACKGROUND_ASSESSMENT_CODE)
+      )
+    )
+    .orderBy(desc(assessmentResults.assessmentDate), desc(assessmentResults.createdAt))
+    .limit(1)
+  if (!row) return null
+  return {
+    resultId: row.resultId,
+    assessmentDate: row.assessmentDate.toISOString(),
+    answers: sanitizeBackgroundAnswers(row.answers),
+  }
 }

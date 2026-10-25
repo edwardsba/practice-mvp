@@ -20,6 +20,8 @@ import { InterviewHistory } from "@/components/client-background/interview-histo
 import { InterviewRelationships } from "@/components/client-background/interview-relationships"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { backgroundAnswersToClientBackground } from "@/lib/background-questionnaire/to-client-background"
+import type { BackgroundSelfReport } from "@/lib/background-questionnaire/types"
 import { assessAge, displayedAge } from "@/lib/client-background/age"
 import { parsePartialDate } from "@/lib/client-background/partial-date"
 import type { ScreeningAnswers } from "@/lib/client-background/interview-history"
@@ -40,12 +42,14 @@ export function InterviewPage({
   initialPage,
   data,
   screening,
+  selfReport,
 }: {
   clientId: string
   clientName: string
   initialPage: InterviewPageId
   data: ClientBackgroundData
   screening: ScreeningAnswers
+  selfReport: BackgroundSelfReport | null
 }) {
   const router = useRouter()
   const [page, setPage] = useState<InterviewPageId>(initialPage)
@@ -54,6 +58,8 @@ export function InterviewPage({
   const flushers = useRef(new Set<() => Promise<void>>())
   const completeRef = useRef<() => void>(() => {})
   const age = clientAge(data.dateOfBirth)
+  const suggestions = selfReport ? backgroundAnswersToClientBackground(selfReport.answers) : null
+  const received = selfReport ? formatReceived(selfReport.assessmentDate) : ""
 
   const onPhase = useCallback((id: string, phase: SavePhase, retry: (() => void) | null) => {
     setPhases((current) => ({ ...current, [id]: { phase, retry } }))
@@ -146,6 +152,13 @@ export function InterviewPage({
         </div>
       </header>
 
+      {selfReport ? (
+        <p className="mt-4 rounded-md bg-blue-50 px-3 py-2 text-sm text-blue-800">
+          Self-report received {received}. Blue lines show the client&apos;s answers; items without one aren&apos;t in
+          the self-report. &quot;Use&quot; copies an answer into the field; nothing is filled in automatically.
+        </p>
+      ) : null}
+
       <div className={cn("space-y-4 py-4", page !== "background" && "hidden")}>
         <Card>
           <CardHeader>
@@ -163,7 +176,14 @@ export function InterviewPage({
               onPhase={(phase, retry) => onPhase("identity", phase, retry)}
               registerFlush={registerFlush}
             >
-              {(value, onChange) => <IdentityFieldsEditor value={value} onChange={onChange} />}
+              {(value, onChange, commit) => (
+                <IdentityFieldsEditor
+                  value={value}
+                  onChange={onChange}
+                  onCommit={commit}
+                  client={suggestions?.identity}
+                />
+              )}
             </AutosaveFields>
           </CardContent>
         </Card>
@@ -183,7 +203,14 @@ export function InterviewPage({
               onPhase={(phase, retry) => onPhase("education", phase, retry)}
               registerFlush={registerFlush}
             >
-              {(value, onChange) => <EducationFieldsEditor value={value} onChange={onChange} />}
+              {(value, onChange, commit) => (
+                <EducationFieldsEditor
+                  value={value}
+                  onChange={onChange}
+                  onCommit={commit}
+                  client={suggestions?.education}
+                />
+              )}
             </AutosaveFields>
           </CardContent>
         </Card>
@@ -204,7 +231,12 @@ export function InterviewPage({
               registerFlush={registerFlush}
             >
               {(value, onChange, commit) => (
-                <OccupationFieldsEditor value={value} onChange={onChange} onCommit={commit} />
+                <OccupationFieldsEditor
+                  value={value}
+                  onChange={onChange}
+                  onCommit={commit}
+                  client={suggestions?.occupation}
+                />
               )}
             </AutosaveFields>
           </CardContent>
@@ -217,6 +249,8 @@ export function InterviewPage({
           onRelationships={onRelationships}
           onPhase={onPhase}
           registerFlush={registerFlush}
+          relationshipClient={suggestions?.relationshipStatus}
+          childrenPrompt={suggestions?.numberOfChildren?.label ?? null}
         />
         <Card>
           <CardHeader>
@@ -234,8 +268,14 @@ export function InterviewPage({
               onPhase={(phase, retry) => onPhase("living", phase, retry)}
               registerFlush={registerFlush}
             >
-              {(value, onChange) => (
-                <LivingFieldsEditor value={value} relationships={relationships} onChange={onChange} />
+              {(value, onChange, commit) => (
+                <LivingFieldsEditor
+                  value={value}
+                  relationships={relationships}
+                  onChange={onChange}
+                  onCommit={commit}
+                  client={suggestions?.living}
+                />
               )}
             </AutosaveFields>
           </CardContent>
@@ -252,6 +292,12 @@ export function InterviewPage({
           events={data.events}
           relationships={relationships}
           screening={screening}
+          medication={data.medication}
+          stressors={data.stressors}
+          selfReportId={selfReport?.resultId ?? null}
+          historyClient={suggestions?.history}
+          medicationClient={suggestions?.medication}
+          stressorsClient={suggestions?.stressors}
           onEvents={() => {}}
           onPhase={onPhase}
           registerFlush={registerFlush}
@@ -260,6 +306,17 @@ export function InterviewPage({
       </div>
     </div>
   )
+}
+
+function formatReceived(iso: string) {
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return iso
+  return date.toLocaleDateString("en-AU", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    timeZone: "Australia/Sydney",
+  })
 }
 
 function PageButton({

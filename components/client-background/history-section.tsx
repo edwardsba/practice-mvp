@@ -15,6 +15,7 @@ import {
   TextAreaField,
   TextField,
 } from "@/components/client-background/fields"
+import { MedicationStressorsPanel } from "@/components/client-background/medication-stressors"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -46,7 +47,9 @@ import {
   SUBSTANCE_STATUS_LABELS,
   type EventRecord,
   type EventType,
+  type MedicationRecord,
   type RelationshipRecord,
+  type StressorsRecord,
 } from "@/lib/client-background/types"
 import { cn } from "@/lib/utils"
 
@@ -57,11 +60,15 @@ export function HistorySection({
   dateOfBirth,
   events,
   relationships,
+  medication,
+  stressors,
 }: {
   clientId: string
   dateOfBirth: string | null
   events: EventRecord[]
   relationships: RelationshipRecord[]
+  medication: MedicationRecord
+  stressors: StressorsRecord
 }) {
   const [entries, setEntries] = useState(events)
   const [view, setView] = useState<HistoryView>("chronological")
@@ -247,6 +254,7 @@ export function HistorySection({
         </div>
         <div className={mobileScreen === "list" ? "hidden min-w-0 lg:block" : "min-w-0"}>{renderPanel()}</div>
       </div>
+      <MedicationStressorsPanel clientId={clientId} medication={medication} stressors={stressors} />
       <Dialog open={pickerOpen} onOpenChange={setPickerOpen}>
         <DialogContent>
           <DialogHeader>

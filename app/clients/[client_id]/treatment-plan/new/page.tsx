@@ -8,6 +8,9 @@ import { EntityPageHeader } from "@/components/ui/entity-page-header"
 import { verifyClientInPractice } from "@/lib/treatment-plans/load"
 import { loadActiveCrisisPlanSummary } from "@/lib/crisis-plans/load"
 import { requirePractitionerContext } from "@/lib/auth"
+import { loadMedicationRecord } from "@/lib/client-background/load"
+import { medicationSupervisionFromRecord } from "@/lib/client-background/medication"
+import { emptyMedication } from "@/lib/client-background/types"
 
 export default async function NewTreatmentPlanPage({
   params,
@@ -26,6 +29,7 @@ export default async function NewTreatmentPlanPage({
     clientId,
     context.practiceId
   )
+  const medication = (await loadMedicationRecord(clientId, context.practiceId)) ?? emptyMedication()
 
   const clientName = `${client.firstName} ${client.lastName}`
 
@@ -48,6 +52,7 @@ export default async function NewTreatmentPlanPage({
         sourcePlanId={null}
         cancelHref={`/clients/${clientId}`}
         crisisPlanSummary={crisisPlanSummary}
+        medicationSupervision={medicationSupervisionFromRecord(medication)}
       />
     </AppShell>
   )

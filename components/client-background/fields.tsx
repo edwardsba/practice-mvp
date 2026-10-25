@@ -27,20 +27,50 @@ export function Field({
   htmlFor,
   hint,
   error,
+  client,
   children,
 }: {
   label: string
   htmlFor?: string
   hint?: string
   error?: string | null
+  client?: ReactNode
   children: ReactNode
 }) {
   return (
     <div className="space-y-1.5">
       <Label htmlFor={htmlFor}>{label}</Label>
+      {client}
       {children}
       {hint ? <p className="text-xs text-muted-foreground">{hint}</p> : null}
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
+    </div>
+  )
+}
+
+/** Blue client line under a field label. Use writes through the field's onChange. */
+export function ClientAnswer({
+  label,
+  matches,
+  onUse,
+}: {
+  label: string
+  matches: boolean
+  onUse?: () => void
+}) {
+  if (matches || !onUse) {
+    return <p className="text-sm text-blue-800">Client: {label}</p>
+  }
+  return (
+    <div className="flex items-center justify-between gap-2 rounded-md bg-blue-50 px-2.5 py-1.5">
+      <p className="min-w-0 text-sm text-blue-800">Client: {label}</p>
+      <button
+        type="button"
+        className="shrink-0 rounded-md border border-blue-800 bg-white px-2 py-0.5 text-xs font-medium text-blue-800"
+        onClick={onUse}
+      >
+        Use
+      </button>
     </div>
   )
 }
@@ -52,6 +82,7 @@ export function TextField({
   onChange,
   placeholder,
   hint,
+  client,
 }: {
   id: string
   label: string
@@ -59,9 +90,10 @@ export function TextField({
   onChange: (value: string) => void
   placeholder?: string
   hint?: string
+  client?: ReactNode
 }) {
   return (
-    <Field label={label} htmlFor={id} hint={hint}>
+    <Field label={label} htmlFor={id} hint={hint} client={client}>
       <Input
         id={id}
         className={mobileControlClassName}
@@ -79,15 +111,17 @@ export function TextAreaField({
   value,
   onChange,
   placeholder,
+  client,
 }: {
   id: string
   label: string
   value: string
   onChange: (value: string) => void
   placeholder?: string
+  client?: ReactNode
 }) {
   return (
-    <Field label={label} htmlFor={id}>
+    <Field label={label} htmlFor={id} client={client}>
       <Textarea
         id={id}
         className={mobileControlClassName}
@@ -108,6 +142,7 @@ export function SelectField({
   hint,
   error,
   disabled,
+  client,
 }: {
   id: string
   label: string
@@ -117,9 +152,10 @@ export function SelectField({
   hint?: string
   error?: string | null
   disabled?: boolean
+  client?: ReactNode
 }) {
   return (
-    <Field label={label} htmlFor={id} hint={hint} error={error}>
+    <Field label={label} htmlFor={id} hint={hint} error={error} client={client}>
       <select
         id={id}
         className={cn(selectClassName, "disabled:cursor-not-allowed disabled:opacity-50")}
@@ -152,6 +188,7 @@ export function YesNoDetail({
   detailLabel = "Detail",
   onChange,
   onDetail,
+  client,
 }: {
   id: string
   label: string
@@ -160,6 +197,7 @@ export function YesNoDetail({
   detailLabel?: string
   onChange: (value: boolean | null) => void
   onDetail: (detail: string) => void
+  client?: ReactNode
 }) {
   const selected = value === true ? "yes" : value === false ? "no" : ""
   return (
@@ -168,6 +206,7 @@ export function YesNoDetail({
         id={id}
         label={label}
         value={selected}
+        client={client}
         onChange={(next) => onChange(next === "yes" ? true : next === "no" ? false : null)}
       >
         <option value="">Not recorded</option>

@@ -42,6 +42,7 @@ import {
   brokenLinksForRoleChange,
 } from "@/lib/client-background/tree"
 import { applyRelationshipVisibilityDefaults } from "@/lib/client-background/visibility"
+import type { AppliedAnswer } from "@/lib/background-questionnaire/to-client-background"
 import type {
   ClientRelationshipStatusValue,
   PartnershipRecord,
@@ -74,6 +75,8 @@ export function InterviewRelationships({
   onRelationships,
   onPhase,
   registerFlush,
+  relationshipClient,
+  childrenPrompt,
 }: {
   clientId: string
   relationships: RelationshipRecord[]
@@ -82,6 +85,8 @@ export function InterviewRelationships({
   onRelationships: (relationships: RelationshipRecord[]) => void
   onPhase: (id: string, phase: SavePhase, retry: (() => void) | null) => void
   registerFlush: (flush: () => Promise<void>) => () => void
+  relationshipClient?: AppliedAnswer<ClientRelationshipStatusValue>
+  childrenPrompt?: string | null
 }) {
   const [open, setOpen] = useState(true)
   const [people, setPeople] = useState(relationships)
@@ -112,6 +117,9 @@ export function InterviewRelationships({
     ],
     [tree]
   )
+  const recordedChildren = people.filter(
+    (person) => person.relationshipToClient === "child_biological" || person.relationshipToClient === "child_step"
+  ).length
   const currentPartners = tree.partners.filter((item) => item.person.relationshipToClient === "current_partner")
   const priorPartners = tree.partners.filter((item) => item.person.relationshipToClient === "prior_partner")
 
@@ -383,7 +391,101 @@ export function InterviewRelationships({
       {open ? (
         <CardContent className="space-y-6">
           <section className="space-y-3">
-            <h3 className="text-sm font-semibold">Family</h3>
+            <h3 className="text-sm font-semibold">Partners and children</h3>
+            <AutosaveFields
+              saved={clientStatus}
+              save={async (value) => {
+                const result = await saveClientRelationshipStatusAction(clientId, value)
+                if (result.error || result.relationshipStatus === undefined || result.relationshipStatusOther === undefined) {
+                  return { error: result.error ?? "Could not save relationship status." }
+                }
+                const next = {
+                  relationshipStatus: result.relationshipStatus,
+                  relationshipStatusOther: result.relationshipStatusOther,
+                }
+                setClientStatus(next)
+                setPartnerStatusDraft(next)
+                return { value: next }
+              }}
+              onPhase={(phase, retry) => onPhase("relationship-status", phase, retry)}
+              registerFlush={registerFlush}
+            >
+              {(value, onChange, commit) => (
+                <ClientRelationshipStatusFields
+                  idPrefix="interview_status"
+                  value={value}
+                  onChange={onChange}
+                  onCommit={commit}
+                  client={relationshipClient}
+                />
+              )}
+            </AutosaveFields>
+            <Group title="Current partner">
+              {currentPartners.map((partner) => (
+                <RowButton
+                  key={partner.person.relationshipRecordId}
+                  label={relationshipLineLabel(partner.person, treeLineStatus(partner.person, pairs))}
+                  onClick={(event) => openPerson(partner.person, false, event)}
+                />
+              ))}
+              {currentPartners.length === 0 ? (
+                <AddButton label="+ Add partner" onClick={(event) => openNew("current_partner", event)} />
+              ) : null}
+            </Group>
+            <Group title="Prior partners">
+              {priorPartners.map((partner) => (
+                <RowButton
+                  key={partner.person.relationshipRecordId}
+                  label={relationshipLineLabel(partner.person, treeLineStatus(partner.person, pairs))}
+                  onClick={(event) => openPerson(partner.person, false, event)}
+                />
+              ))}
+              <AddButton label="+ Add prior partner" onClick={(event) => openNew("prior_partner", event)} />
+            </Group>
+            <Group
+              title="Children"
+              note={
+                childrenPrompt ? (
+                  <p className="px-2 text-sm text-blue-800">
+                    Client: {childrenPrompt} · {recordedChildren} recorded
+                  </p>
+                ) : null
+              }
+            >
+              {tree.partners.map((partner) =>
+                partner.children.length > 0 ? (
+                  <div key={partner.person.relationshipRecordId} className="space-y-1">
+                    <p className="px-2 text-xs text-muted-foreground">{personName(partner.person)}</p>
+                    {partner.children.map((child) => (
+                      <RowButton
+                        key={child.relationshipRecordId}
+                        label={relationshipLineLabel(child)}
+                        onClick={(event) => openPerson(child, false, event)}
+                      />
+                    ))}
+                  </div>
+                ) : null
+              )}
+              {tree.unlinkedChildren.map((child) => (
+                <RowButton
+                  key={child.relationshipRecordId}
+                  label={relationshipLineLabel(child)}
+                  onClick={(event) => openPerson(child, false, event)}
+                />
+              ))}
+              {tree.unlinkedStepChildren.map((child) => (
+                <RowButton
+                  key={child.relationshipRecordId}
+                  label={relationshipLineLabel(child)}
+                  onClick={(event) => openPerson(child, false, event)}
+                />
+              ))}
+              <AddButton label="+ Add child" onClick={(event) => openNew("child_biological", event)} />
+            </Group>
+          </section>
+
+          <section className="space-y-3">
+            <h3 className="text-sm font-semibold">Family of origin</h3>
             <Group title="Parents">
               {layout.parents.map((person) => (
                 <RowButton
@@ -458,85 +560,6 @@ export function InterviewRelationships({
                 </div>
               ))}
               <AddButton label="+ Add step-parent" onClick={(event) => openNew("step_parent", event)} />
-            </Group>
-          </section>
-
-          <section className="space-y-3">
-            <h3 className="text-sm font-semibold">Partners and children</h3>
-            <AutosaveFields
-              saved={clientStatus}
-              save={async (value) => {
-                const result = await saveClientRelationshipStatusAction(clientId, value)
-                if (result.error || result.relationshipStatus === undefined || result.relationshipStatusOther === undefined) {
-                  return { error: result.error ?? "Could not save relationship status." }
-                }
-                const next = {
-                  relationshipStatus: result.relationshipStatus,
-                  relationshipStatusOther: result.relationshipStatusOther,
-                }
-                setClientStatus(next)
-                setPartnerStatusDraft(next)
-                return { value: next }
-              }}
-              onPhase={(phase, retry) => onPhase("relationship-status", phase, retry)}
-              registerFlush={registerFlush}
-            >
-              {(value, onChange) => (
-                <ClientRelationshipStatusFields idPrefix="interview_status" value={value} onChange={onChange} />
-              )}
-            </AutosaveFields>
-            <Group title="Current partner">
-              {currentPartners.map((partner) => (
-                <RowButton
-                  key={partner.person.relationshipRecordId}
-                  label={relationshipLineLabel(partner.person, treeLineStatus(partner.person, pairs))}
-                  onClick={(event) => openPerson(partner.person, false, event)}
-                />
-              ))}
-              {currentPartners.length === 0 ? (
-                <AddButton label="+ Add partner" onClick={(event) => openNew("current_partner", event)} />
-              ) : null}
-            </Group>
-            <Group title="Prior partners">
-              {priorPartners.map((partner) => (
-                <RowButton
-                  key={partner.person.relationshipRecordId}
-                  label={relationshipLineLabel(partner.person, treeLineStatus(partner.person, pairs))}
-                  onClick={(event) => openPerson(partner.person, false, event)}
-                />
-              ))}
-              <AddButton label="+ Add prior partner" onClick={(event) => openNew("prior_partner", event)} />
-            </Group>
-            <Group title="Children">
-              {tree.partners.map((partner) =>
-                partner.children.length > 0 ? (
-                  <div key={partner.person.relationshipRecordId} className="space-y-1">
-                    <p className="px-2 text-xs text-muted-foreground">{personName(partner.person)}</p>
-                    {partner.children.map((child) => (
-                      <RowButton
-                        key={child.relationshipRecordId}
-                        label={relationshipLineLabel(child)}
-                        onClick={(event) => openPerson(child, false, event)}
-                      />
-                    ))}
-                  </div>
-                ) : null
-              )}
-              {tree.unlinkedChildren.map((child) => (
-                <RowButton
-                  key={child.relationshipRecordId}
-                  label={relationshipLineLabel(child)}
-                  onClick={(event) => openPerson(child, false, event)}
-                />
-              ))}
-              {tree.unlinkedStepChildren.map((child) => (
-                <RowButton
-                  key={child.relationshipRecordId}
-                  label={relationshipLineLabel(child)}
-                  onClick={(event) => openPerson(child, false, event)}
-                />
-              ))}
-              <AddButton label="+ Add child" onClick={(event) => openNew("child_biological", event)} />
             </Group>
           </section>
 
@@ -636,10 +659,19 @@ export function InterviewRelationships({
   )
 }
 
-function Group({ title, children }: { title: string; children: React.ReactNode }) {
+function Group({
+  title,
+  note,
+  children,
+}: {
+  title: string
+  note?: React.ReactNode
+  children: React.ReactNode
+}) {
   return (
     <div className="space-y-1">
       <h4 className="px-2 text-sm font-medium">{title}</h4>
+      {note}
       {children}
     </div>
   )

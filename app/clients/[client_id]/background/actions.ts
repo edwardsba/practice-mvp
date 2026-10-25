@@ -14,8 +14,10 @@ import {
   saveEducation,
   saveIdentity,
   saveLivingSituation,
+  saveMedication,
   saveOccupation,
   saveRisk,
+  saveStressors,
   saveInterviewScreening,
   startBackgroundInterview,
   updateEvent,
@@ -61,6 +63,30 @@ export async function saveEducationAction(clientId: string, education: unknown) 
     practiceId: context.practiceId,
     userId: context.userId,
     education,
+  })
+  if (!result.error) refresh(clientId)
+  return result
+}
+
+export async function saveMedicationAction(clientId: string, medication: unknown) {
+  const context = await requirePractitionerContext()
+  const result = await saveMedication({
+    clientId,
+    practiceId: context.practiceId,
+    userId: context.userId,
+    medication,
+  })
+  if (!result.error) refresh(clientId)
+  return result
+}
+
+export async function saveStressorsAction(clientId: string, stressors: unknown) {
+  const context = await requirePractitionerContext()
+  const result = await saveStressors({
+    clientId,
+    practiceId: context.practiceId,
+    userId: context.userId,
+    stressors,
   })
   if (!result.error) refresh(clientId)
   return result
@@ -225,12 +251,13 @@ export async function saveInterviewScreeningAction(clientId: string, screening: 
   return result
 }
 
-export async function completeBackgroundInterviewAction(clientId: string) {
+export async function completeBackgroundInterviewAction(clientId: string, selfReportId: string | null) {
   const context = await requirePractitionerContext()
   const result = await completeBackgroundInterview({
     clientId,
     practiceId: context.practiceId,
     userId: context.userId,
+    selfReportId,
   })
   if (!result.error) refresh(clientId)
   return result

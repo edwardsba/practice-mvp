@@ -31,6 +31,10 @@ export const clientBackgrounds = pgTable("client_backgrounds", {
   livingSituationJson: jsonb("living_situation_json"),
   educationJson: jsonb("education_json"),
   occupationJson: jsonb("occupation_json"),
+  /** Currently taking and previously taken medication, plus who supervises it. */
+  medicationJson: jsonb("medication_json"),
+  /** One answer per stressor, plus the main reason for attending. */
+  stressorsJson: jsonb("stressors_json"),
   riskJson: jsonb("risk_json"),
   /** Client's current relationship status. Not a field of any relative. */
   relationshipStatus: text("relationship_status"),
@@ -143,7 +147,8 @@ export const clientEventRecords = pgTable("client_event_records", {
 /**
  * A clinician-led background interview. Field values live on Client Background.
  * This row stores who ran it, the history screening answers, and a completion snapshot.
- * self_report_id is reserved for a future client self-report and is unused.
+ * self_report_id is the BACKGROUND_SR assessment result that was on screen when the
+ * interview was completed, or null when the client had no self-report.
  */
 export const clientBackgroundInterviews = pgTable(
   "client_background_interviews",

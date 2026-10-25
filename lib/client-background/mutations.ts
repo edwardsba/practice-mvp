@@ -2,7 +2,8 @@ import "server-only"
 
 import { and, eq, inArray, or } from "drizzle-orm"
 
-import { auditEvents, clientBackgroundInterviews, clientBackgrounds, clientEventRecords, clientPartnershipRecords, clientRelationshipRecords, clients } from "@/db/schema"
+import { auditEvents, assessmentDefinitions, assessmentInstances, assessmentResults, clientBackgroundInterviews, clientBackgrounds, clientEventRecords, clientPartnershipRecords, clientRelationshipRecords, clients } from "@/db/schema"
+import { BACKGROUND_ASSESSMENT_CODE } from "@/lib/background-questionnaire/types"
 import { db } from "@/lib/db"
 import { settleEventDates } from "@/lib/client-background/age"
 import { toClientRelationshipStatus, toEvent, toPartnership, toRelationship } from "@/lib/client-background/map"
@@ -14,14 +15,17 @@ import {
 import {
   demographicsFromStored,
   sanitizeClientRelationshipStatus,
+  markUnansweredMedicationAndStressors,
   sanitizeEducation,
   sanitizeEvent,
   sanitizeIdentity,
   sanitizeLivingSituation,
+  sanitizeMedication,
   sanitizeOccupation,
   sanitizePartnership,
   sanitizeRelationship,
   sanitizeRisk,
+  sanitizeStressors,
 } from "@/lib/client-background/sanitize"
 import {
   brokenLinksForRoleChange,
@@ -38,7 +42,9 @@ import {
   type EventRecord,
   type IdentityFields,
   type LivingSituationFields,
+  type MedicationRecord,
   type OccupationFields,
+  type StressorsRecord,
   type PartnershipRecord,
   type RelationshipRecord,
   type RelationshipRelink,
@@ -414,6 +420,8 @@ async function upsertBackgroundColumn(
     educationJson: EducationFields
     occupationJson: OccupationFields
     riskJson: RiskRatings
+    medicationJson: MedicationRecord
+    stressorsJson: StressorsRecord
   }>
 ) {
   const client = await assertClient(clientId, practiceId)
@@ -536,6 +544,34 @@ export async function saveDemographics(input: {
     }
   } catch {
     return { error: "Could not save demographics." }
+  }
+}
+
+export async function saveMedication(
+  input: { clientId: string; practiceId: string; userId: string; medication: unknown }
+) {
+  const medication = sanitizeMedication(input.medication)
+  try {
+    const result = await upsertBackgroundColumn(input.clientId, input.practiceId, input.userId, {
+      medicationJson: medication,
+    })
+    return { ...result, medication }
+  } catch {
+    return { error: "Could not save medication." }
+  }
+}
+
+export async function saveStressors(
+  input: { clientId: string; practiceId: string; userId: string; stressors: unknown }
+) {
+  const stressors = sanitizeStressors(input.stressors)
+  try {
+    const result = await upsertBackgroundColumn(input.clientId, input.practiceId, input.userId, {
+      stressorsJson: stressors,
+    })
+    return { ...result, stressors }
+  } catch {
+    return { error: "Could not save stressors." }
   }
 }
 
@@ -1619,10 +1655,42 @@ export async function saveInterviewScreening(input: {
   }
 }
 
+async function verifiedSelfReportId(
+  tx: Tx,
+  clientId: string,
+  practiceId: string,
+  selfReportId: string | null
+): Promise<string | null> {
+  if (!selfReportId) return null
+  const [row] = await tx
+    .select({ id: assessmentResults.assessmentResultId })
+    .from(assessmentResults)
+    .innerJoin(
+      assessmentInstances,
+      eq(assessmentInstances.assessmentInstanceId, assessmentResults.assessmentInstanceId)
+    )
+    .innerJoin(
+      assessmentDefinitions,
+      eq(assessmentDefinitions.assessmentDefinitionId, assessmentInstances.assessmentDefinitionId)
+    )
+    .where(
+      and(
+        eq(assessmentResults.assessmentResultId, selfReportId),
+        eq(assessmentResults.clientId, clientId),
+        eq(assessmentResults.practiceId, practiceId),
+        eq(assessmentInstances.practiceId, practiceId),
+        eq(assessmentDefinitions.assessmentCode, BACKGROUND_ASSESSMENT_CODE)
+      )
+    )
+    .limit(1)
+  return row?.id ?? null
+}
+
 export async function completeBackgroundInterview(input: {
   clientId: string
   practiceId: string
   userId: string
+  selfReportId: string | null
 }): Promise<{ error?: string }> {
   const client = await assertClient(input.clientId, input.practiceId)
   if (!client) return { error: "Client was not found." }
@@ -1668,6 +1736,41 @@ export async function completeBackgroundInterview(input: {
       const screening = finalScreeningAnswers(sanitizeScreening(interview.screeningJson), events, dateOfBirth)
       const completedAt = new Date()
       const demographics = background ? demographicsFromStored(background) : emptyDemographics()
+      const filled = markUnansweredMedicationAndStressors(
+        sanitizeMedication(background?.medicationJson),
+        sanitizeStressors(background?.stressorsJson)
+      )
+      if (filled.changed) {
+        if (background) {
+          await tx
+            .update(clientBackgrounds)
+            .set({
+              medicationJson: filled.medication,
+              stressorsJson: filled.stressors,
+              updatedAt: completedAt,
+            })
+            .where(
+              and(
+                eq(clientBackgrounds.clientBackgroundId, background.clientBackgroundId),
+                eq(clientBackgrounds.practiceId, input.practiceId)
+              )
+            )
+        } else {
+          await tx.insert(clientBackgrounds).values({
+            clientId: input.clientId,
+            practiceId: input.practiceId,
+            medicationJson: filled.medication,
+            stressorsJson: filled.stressors,
+            updatedAt: completedAt,
+          })
+        }
+      }
+      const selfReportId = await verifiedSelfReportId(
+        tx,
+        input.clientId,
+        input.practiceId,
+        input.selfReportId
+      )
       const snapshot = {
         demographics,
         relationshipStatus: toClientRelationshipStatus(background ?? null),
@@ -1675,6 +1778,8 @@ export async function completeBackgroundInterview(input: {
         partnerships: family.partnerships,
         events,
         screening,
+        medication: filled.medication,
+        stressors: filled.stressors,
       }
 
       await tx
@@ -1684,6 +1789,7 @@ export async function completeBackgroundInterview(input: {
           completedAt,
           screeningJson: screening,
           snapshotJson: snapshot,
+          selfReportId,
           updatedAt: completedAt,
         })
         .where(eq(clientBackgroundInterviews.clientBackgroundInterviewId, interview.clientBackgroundInterviewId))

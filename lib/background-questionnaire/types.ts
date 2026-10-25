@@ -93,3 +93,9 @@ export type BackgroundAnswers = {
 }
 
 export type BackgroundPartKey = keyof Omit<BackgroundAnswers, "version">
+
+export type BackgroundSelfReport = {
+  resultId: string
+  assessmentDate: string
+  answers: BackgroundAnswers
+}

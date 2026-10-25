@@ -15,6 +15,7 @@ import {
   RESOLVED_OR_ONGOING,
   SELF_HARM_TYPES,
   SEX_OPTIONS,
+  STRESSOR_ITEMS,
   START_PRECISIONS,
   SUBSTANCE_STATUSES,
   CLIENT_RELATIONSHIP_STATUSES,
@@ -28,6 +29,8 @@ import {
   emptyEvent,
   emptyIdentity,
   emptyLivingSituation,
+  emptyMedication,
+  emptyStressors,
   emptyNecessities,
   emptyOccupation,
   emptyRisk,
@@ -44,7 +47,10 @@ import {
   type IdentityFields,
   type LivesWith,
   type LivingSituationFields,
+  type MedicationRecord,
   type OccupationFields,
+  type StressorsRecord,
+  type TriStateAnswer,
   type RelationshipRating,
   type WorkStatus,
   type PartnershipRecord,
@@ -146,7 +152,7 @@ export function sanitizeIdentity(value: unknown): IdentityFields {
     genderDiffersFromSex: genderIdentity.length > 0,
     genderIdentity,
     pronouns: str(raw.pronouns),
-    pronounsOther: str(raw.pronouns) === "Other" ? str(raw.pronounsOther) : "",
+    pronounsOther: "",
     raceEthnicity: str(raw.raceEthnicity),
     religion: str(raw.religion),
     primaryLanguage: str(raw.primaryLanguage),
@@ -252,6 +258,49 @@ export function sanitizeOccupation(value: unknown): OccupationFields {
     financialConcernsDetail: financialConcerns === true ? str(raw.financialConcernsDetail) : "",
     necessities,
   }
+}
+
+function triState(value: unknown): TriStateAnswer | null {
+  return value === "yes" || value === "no" || value === "not_asked" ? value : null
+}
+
+export function sanitizeMedication(value: unknown): MedicationRecord {
+  const raw = isRecord(value) ? value : {}
+  return {
+    currentlyTaking: triState(raw.currentlyTaking),
+    previouslyTaken: triState(raw.previouslyTaken),
+    supervisedBy: str(raw.supervisedBy),
+  }
+}
+
+export function sanitizeStressors(value: unknown): StressorsRecord {
+  const raw = isRecord(value) ? value : {}
+  const stressors = emptyStressors()
+  for (const item of STRESSOR_ITEMS) {
+    stressors[item.key] = triState(raw[item.key])
+  }
+  stressors.mainReason = str(raw.mainReason)
+  return stressors
+}
+
+export function markUnansweredMedicationAndStressors(
+  medication: MedicationRecord,
+  stressors: StressorsRecord
+): { medication: MedicationRecord; stressors: StressorsRecord; changed: boolean } {
+  let changed = false
+  const nextMedication = { ...medication }
+  const nextStressors = { ...stressors }
+  if (nextMedication.currentlyTaking == null) {
+    nextMedication.currentlyTaking = "not_asked"
+    changed = true
+  }
+  for (const item of STRESSOR_ITEMS) {
+    if (nextStressors[item.key] == null) {
+      nextStressors[item.key] = "not_asked"
+      changed = true
+    }
+  }
+  return { medication: nextMedication, stressors: nextStressors, changed }
 }
 
 export function sanitizeDemographics(value: unknown): Demographics {

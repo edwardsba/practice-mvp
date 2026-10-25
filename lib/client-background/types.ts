@@ -193,7 +193,6 @@ export const RELATIONSHIP_LIVING_SITUATION_LABELS: Record<RelationshipLivingSitu
   previously_lived_with_client: "Previously lived with client, not currently",
   unknown: "Unknown / not recorded",
 }
-export const PRONOUN_OPTIONS = ["she/her", "he/him", "they/them", "Other"]
 export const EDUCATION_LEVEL_OPTIONS = [
   "Did not complete secondary",
   "Secondary",
@@ -300,12 +299,12 @@ export const LIVES_WITH_LABELS: Record<LivesWith, string> = {
   other: "Other",
 }
 export const HOUSING_TYPE_OPTIONS = [
-  "Owner-occupied",
+  "Own home",
   "Private rental",
-  "Social / community housing",
-  "Living with family",
+  "Social or community housing",
+  "Parent's home",
   "Shared housing",
-  "Temporary / unstable",
+  "Temporary housing",
   "Other",
 ]
 export const HOUSING_STABILITY_OPTIONS = ["Stable", "Some concern", "Unstable"]
@@ -405,6 +404,34 @@ export type PreviousJob = {
 
 export type NecessityAccess = Record<NecessityKey, boolean>
 
+/** Screening answer stored for medication and stressors. Null means not answered yet. */
+export const TRI_STATE_ANSWERS = ["yes", "no", "not_asked"] as const
+export type TriStateAnswer = (typeof TRI_STATE_ANSWERS)[number]
+
+export type MedicationRecord = {
+  currentlyTaking: TriStateAnswer | null
+  previouslyTaken: TriStateAnswer | null
+  supervisedBy: string
+}
+
+export const STRESSOR_ITEMS = [
+  { key: "family", label: "Family" },
+  { key: "socialLife", label: "Social life" },
+  { key: "intimateRelationships", label: "Intimate relationships" },
+  { key: "workStudy", label: "Work or study" },
+  { key: "financial", label: "Financial" },
+  { key: "ownHealth", label: "Your health" },
+  { key: "othersHealth", label: "Health of significant others" },
+  { key: "lossOfLovedOne", label: "Loss of a loved one" },
+  { key: "legalPoliceAccidents", label: "Legal matters, police or accidents" },
+] as const
+
+export type StressorKey = (typeof STRESSOR_ITEMS)[number]["key"]
+
+export type StressorsRecord = Record<StressorKey, TriStateAnswer | null> & {
+  mainReason: string
+}
+
 export type OccupationFields = {
   workStatus: WorkStatus | ""
   workStatusOther: string
@@ -495,6 +522,8 @@ export type ClientBackgroundData = {
   backgroundCapturedAt: string | null
   relationshipStatus: ClientRelationshipStatusValue
   demographics: Demographics
+  medication: MedicationRecord
+  stressors: StressorsRecord
   relationships: RelationshipRecord[]
   partnerships: PartnershipRecord[]
   events: EventRecord[]
@@ -564,6 +593,36 @@ export function emptyNecessities(): NecessityAccess {
     leisure: false,
     phoneInternet: false,
   }
+}
+
+export function emptyMedication(): MedicationRecord {
+  return {
+    currentlyTaking: null,
+    previouslyTaken: null,
+    supervisedBy: "",
+  }
+}
+
+export function emptyStressors(): StressorsRecord {
+  return {
+    family: null,
+    socialLife: null,
+    intimateRelationships: null,
+    workStudy: null,
+    financial: null,
+    ownHealth: null,
+    othersHealth: null,
+    lossOfLovedOne: null,
+    legalPoliceAccidents: null,
+    mainReason: "",
+  }
+}
+
+export function triStateLabel(value: TriStateAnswer | null): string {
+  if (value === "yes") return "Yes"
+  if (value === "no") return "No"
+  if (value === "not_asked") return "Not asked"
+  return "Not recorded"
 }
 
 export function emptyOccupation(): OccupationFields {

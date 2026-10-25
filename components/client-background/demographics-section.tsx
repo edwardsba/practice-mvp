@@ -3,7 +3,7 @@
 import { useState, type ReactNode } from "react"
 
 import { saveDemographicsAction } from "@/app/clients/[client_id]/background/actions"
-import { AddButton, PartialDatePicker, ReadOnlyField, SaveRow, SelectField, TextField, YesNoDetail } from "@/components/client-background/fields"
+import { AddButton, ClientAnswer, PartialDatePicker, ReadOnlyField, SaveRow, SelectField, TextField, YesNoDetail } from "@/components/client-background/fields"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
@@ -17,7 +17,6 @@ import {
   LIVES_WITH_OPTIONS,
   NECESSITY_KEYS,
   NECESSITY_LABELS,
-  PRONOUN_OPTIONS,
   SEX_OPTIONS,
   WORK_STATUS_LABELS,
   WORK_STATUSES,
@@ -32,6 +31,7 @@ import {
   type WorkStatus,
 } from "@/lib/client-background/types"
 import { formatPartialDateLabel } from "@/lib/client-background/age"
+import type { ClientBackgroundSuggestions } from "@/lib/background-questionnaire/to-client-background"
 import { cn } from "@/lib/utils"
 
 export function DemographicsSection({
@@ -161,10 +161,7 @@ function DemographicsReadOnly({
   value: Demographics
   relationships: RelationshipRecord[]
 }) {
-  const pronouns =
-    value.identity.pronouns === "Other"
-      ? value.identity.pronounsOther || "Other"
-      : value.identity.pronouns
+  const pronouns = value.identity.pronouns
   const limited = NECESSITY_KEYS.filter((key) => value.occupation.necessities[key])
 
   return (
@@ -296,13 +293,36 @@ function PeopleLivingWithClient({ relationships }: { relationships: Relationship
 export function IdentityFieldsEditor({
   value,
   onChange,
+  onCommit,
+  client,
 }: {
   value: IdentityFields
   onChange: (value: IdentityFields) => void
+  onCommit?: () => void
+  client?: ClientBackgroundSuggestions["identity"]
 }) {
+  function apply(next: IdentityFields) {
+    onChange(next)
+    onCommit?.()
+  }
+  const disability = client?.disability
   return (
     <>
-      <SelectField id="sex" label="Sex" value={value.sex} onChange={(sex) => onChange({ ...value, sex })}>
+      <SelectField
+        id="sex"
+        label="Sex"
+        value={value.sex}
+        client={
+          client?.sex ? (
+            <ClientAnswer
+              label={client.sex.label}
+              matches={value.sex === client.sex.apply}
+              onUse={() => apply({ ...value, sex: client.sex!.apply })}
+            />
+          ) : undefined
+        }
+        onChange={(sex) => onChange({ ...value, sex })}
+      >
         <option value="">Not recorded</option>
         {SEX_OPTIONS.map((option) => (
           <option key={option} value={option}>
@@ -315,40 +335,75 @@ export function IdentityFieldsEditor({
         label="Gender identity"
         value={value.genderIdentity}
         placeholder="if relevant"
+        client={
+          client?.genderIdentity ? (
+            <ClientAnswer
+              label={client.genderIdentity.label}
+              matches={value.genderIdentity === client.genderIdentity.apply}
+              onUse={() => apply({ ...value, genderIdentity: client.genderIdentity!.apply })}
+            />
+          ) : undefined
+        }
         onChange={(genderIdentity) => onChange({ ...value, genderIdentity })}
       />
-      <SelectField
+      <TextField
         id="pronouns"
         label="Pronouns"
         value={value.pronouns}
-        onChange={(pronouns) => onChange({ ...value, pronouns, pronounsOther: pronouns === "Other" ? value.pronounsOther : "" })}
-      >
-        <option value="">Not recorded</option>
-        {PRONOUN_OPTIONS.map((option) => (
-          <option key={option} value={option}>
-            {option}
-          </option>
-        ))}
-      </SelectField>
-      {value.pronouns === "Other" ? (
-        <TextField
-          id="pronouns_other"
-          label="Pronouns detail"
-          value={value.pronounsOther}
-          onChange={(pronounsOther) => onChange({ ...value, pronounsOther })}
-        />
-      ) : null}
+        client={
+          client?.pronouns ? (
+            <ClientAnswer
+              label={client.pronouns.label}
+              matches={value.pronouns === client.pronouns.apply}
+              onUse={() => apply({ ...value, pronouns: client.pronouns!.apply })}
+            />
+          ) : undefined
+        }
+        onChange={(pronouns) => onChange({ ...value, pronouns })}
+      />
       <TextField
         id="race_ethnicity"
         label="Race/Ethnicity"
         value={value.raceEthnicity}
+        client={
+          client?.raceEthnicity ? (
+            <ClientAnswer
+              label={client.raceEthnicity.label}
+              matches={value.raceEthnicity === client.raceEthnicity.apply}
+              onUse={() => apply({ ...value, raceEthnicity: client.raceEthnicity!.apply })}
+            />
+          ) : undefined
+        }
         onChange={(raceEthnicity) => onChange({ ...value, raceEthnicity })}
       />
-      <TextField id="religion" label="Religion" value={value.religion} onChange={(religion) => onChange({ ...value, religion })} />
+      <TextField
+        id="religion"
+        label="Religion"
+        value={value.religion}
+        client={
+          client?.religion ? (
+            <ClientAnswer
+              label={client.religion.label}
+              matches={value.religion === client.religion.apply}
+              onUse={() => apply({ ...value, religion: client.religion!.apply })}
+            />
+          ) : undefined
+        }
+        onChange={(religion) => onChange({ ...value, religion })}
+      />
       <TextField
         id="primary_language"
         label="Primary language"
         value={value.primaryLanguage}
+        client={
+          client?.primaryLanguage ? (
+            <ClientAnswer
+              label={client.primaryLanguage.label}
+              matches={value.primaryLanguage === client.primaryLanguage.apply}
+              onUse={() => apply({ ...value, primaryLanguage: client.primaryLanguage!.apply })}
+            />
+          ) : undefined
+        }
         onChange={(primaryLanguage) => onChange({ ...value, primaryLanguage })}
       />
       <YesNoDetail
@@ -356,7 +411,25 @@ export function IdentityFieldsEditor({
         label="Disability"
         value={value.disability}
         detail={value.disabilityDetail}
-        onChange={(disability) => onChange({ ...value, disability })}
+        client={
+          disability ? (
+            <ClientAnswer
+              label={disability.label}
+              matches={
+                value.disability === disability.apply.value &&
+                (disability.apply.value === false || value.disabilityDetail === disability.apply.detail)
+              }
+              onUse={() =>
+                apply({
+                  ...value,
+                  disability: disability.apply.value,
+                  disabilityDetail: disability.apply.detail,
+                })
+              }
+            />
+          ) : undefined
+        }
+        onChange={(disabilityValue) => onChange({ ...value, disability: disabilityValue })}
         onDetail={(disabilityDetail) => onChange({ ...value, disabilityDetail })}
       />
       <TextField
@@ -373,18 +446,38 @@ export function LivingFieldsEditor({
   value,
   relationships,
   onChange,
+  onCommit,
+  client,
 }: {
   value: LivingSituationFields
   relationships: RelationshipRecord[]
   onChange: (value: LivingSituationFields) => void
+  onCommit?: () => void
+  client?: ClientBackgroundSuggestions["living"]
 }) {
+  function apply(next: LivingSituationFields) {
+    onChange(next)
+    onCommit?.()
+  }
+  const housingType = client?.housingType
+  const livesWith = client?.livesWith
+  const housingStability = client?.housingStability
   return (
     <>
       <SelectField
         id="housing_type"
         label="Housing type"
         value={value.housingType}
-        onChange={(housingType) => onChange({ ...value, housingType })}
+        client={
+          housingType ? (
+            <ClientAnswer
+              label={housingType.label}
+              matches={value.housingType === housingType.apply}
+              onUse={() => apply({ ...value, housingType: housingType.apply })}
+            />
+          ) : undefined
+        }
+        onChange={(next) => onChange({ ...value, housingType: next })}
       >
         <option value="">Not recorded</option>
         {HOUSING_TYPE_OPTIONS.map((option) => (
@@ -397,11 +490,29 @@ export function LivingFieldsEditor({
         id="lives_with"
         label="Who the client lives with"
         value={value.livesWith}
-        onChange={(livesWith) =>
+        client={
+          livesWith ? (
+            <ClientAnswer
+              label={livesWith.label}
+              matches={
+                value.livesWith === livesWith.apply.livesWith &&
+                (livesWith.apply.livesWith !== "other" || value.livesWithOther === livesWith.apply.livesWithOther)
+              }
+              onUse={() =>
+                apply({
+                  ...value,
+                  livesWith: livesWith.apply.livesWith,
+                  livesWithOther: livesWith.apply.livesWithOther,
+                })
+              }
+            />
+          ) : undefined
+        }
+        onChange={(next) =>
           onChange({
             ...value,
-            livesWith: livesWith as LivesWith | "",
-            livesWithOther: livesWith === "other" ? value.livesWithOther : "",
+            livesWith: next as LivesWith | "",
+            livesWithOther: next === "other" ? value.livesWithOther : "",
           })
         }
       >
@@ -425,7 +536,16 @@ export function LivingFieldsEditor({
         id="housing_stability"
         label="Housing stability"
         value={value.housingStability}
-        onChange={(housingStability) => onChange({ ...value, housingStability })}
+        client={
+          housingStability ? (
+            <ClientAnswer
+              label={housingStability.label}
+              matches={value.housingStability === housingStability.apply}
+              onUse={() => apply({ ...value, housingStability: housingStability.apply })}
+            />
+          ) : undefined
+        }
+        onChange={(next) => onChange({ ...value, housingStability: next })}
       >
         <option value="">Not recorded</option>
         {HOUSING_STABILITY_OPTIONS.map((option) => (
@@ -441,17 +561,38 @@ export function LivingFieldsEditor({
 export function EducationFieldsEditor({
   value,
   onChange,
+  onCommit,
+  client,
 }: {
   value: EducationFields
   onChange: (value: EducationFields) => void
+  onCommit?: () => void
+  client?: ClientBackgroundSuggestions["education"]
 }) {
+  function apply(next: EducationFields) {
+    onChange(next)
+    onCommit?.()
+  }
+  const level = client?.level
+  const fieldOfStudy = client?.fieldOfStudy
+  const currentlyStudying = client?.currentlyStudying
+  const disruption = client?.disruption
   return (
     <>
       <SelectField
         id="education_level"
         label="Level of education"
         value={value.level}
-        onChange={(level) => onChange({ ...value, level })}
+        client={
+          level ? (
+            <ClientAnswer
+              label={level.label}
+              matches={value.level === level.apply}
+              onUse={() => apply({ ...value, level: level.apply })}
+            />
+          ) : undefined
+        }
+        onChange={(next) => onChange({ ...value, level: next })}
       >
         <option value="">Not recorded</option>
         {EDUCATION_LEVEL_OPTIONS.map((option) => (
@@ -465,21 +606,67 @@ export function EducationFieldsEditor({
         label="Currently studying"
         value={value.currentlyStudying}
         detail={value.currentlyStudyingDetail}
-        onChange={(currentlyStudying) => onChange({ ...value, currentlyStudying })}
+        client={
+          currentlyStudying ? (
+            <ClientAnswer
+              label={currentlyStudying.label}
+              matches={
+                value.currentlyStudying === currentlyStudying.apply.value &&
+                (currentlyStudying.apply.value === false ||
+                  value.currentlyStudyingDetail === currentlyStudying.apply.detail)
+              }
+              onUse={() =>
+                apply({
+                  ...value,
+                  currentlyStudying: currentlyStudying.apply.value,
+                  currentlyStudyingDetail: currentlyStudying.apply.detail,
+                })
+              }
+            />
+          ) : undefined
+        }
+        onChange={(next) => onChange({ ...value, currentlyStudying: next })}
         onDetail={(currentlyStudyingDetail) => onChange({ ...value, currentlyStudyingDetail })}
       />
       <TextField
         id="field_of_study"
         label="Field of study"
         value={value.fieldOfStudy}
-        onChange={(fieldOfStudy) => onChange({ ...value, fieldOfStudy })}
+        client={
+          fieldOfStudy ? (
+            <ClientAnswer
+              label={fieldOfStudy.label}
+              matches={value.fieldOfStudy === fieldOfStudy.apply}
+              onUse={() => apply({ ...value, fieldOfStudy: fieldOfStudy.apply })}
+            />
+          ) : undefined
+        }
+        onChange={(next) => onChange({ ...value, fieldOfStudy: next })}
       />
       <YesNoDetail
         id="disruption"
         label="Disruption to education"
         value={value.disruption}
         detail={value.disruptionDetail}
-        onChange={(disruption) => onChange({ ...value, disruption })}
+        client={
+          disruption ? (
+            <ClientAnswer
+              label={disruption.label}
+              matches={
+                value.disruption === disruption.apply.value &&
+                (disruption.apply.value === false || value.disruptionDetail === disruption.apply.detail)
+              }
+              onUse={() =>
+                apply({
+                  ...value,
+                  disruption: disruption.apply.value,
+                  disruptionDetail: disruption.apply.detail,
+                })
+              }
+            />
+          ) : undefined
+        }
+        onChange={(next) => onChange({ ...value, disruption: next })}
         onDetail={(disruptionDetail) => onChange({ ...value, disruptionDetail })}
       />
     </>
@@ -490,10 +677,12 @@ export function OccupationFieldsEditor({
   value,
   onChange,
   onCommit,
+  client,
 }: {
   value: OccupationFields
   onChange: (value: OccupationFields) => void
   onCommit?: () => void
+  client?: ClientBackgroundSuggestions["occupation"]
 }) {
   function updateJob(id: string, patch: Partial<PreviousJob>) {
     onChange({
@@ -502,13 +691,46 @@ export function OccupationFieldsEditor({
     })
   }
 
+  function apply(next: OccupationFields) {
+    onChange(next)
+    onCommit?.()
+  }
+
+  const workStatus = client?.workStatus
+  const role = client?.role
+  const employer = client?.employer
+  const previousJob = client?.previousJob
+  const necessities = client?.necessities
+  const previousJobMatches =
+    previousJob != null &&
+    value.previousJobs.some(
+      (job) => job.role === previousJob.apply.role && job.employer === previousJob.apply.employer
+    )
+
   return (
     <>
       <SelectField
         id="work_status"
         label="Work status"
         value={value.workStatus}
-        onChange={(workStatus) => onChange(withWorkStatus(value, workStatus as WorkStatus | ""))}
+        client={
+          workStatus ? (
+            <ClientAnswer
+              label={workStatus.label}
+              matches={
+                value.workStatus === workStatus.apply.workStatus &&
+                value.workStatusOther === workStatus.apply.workStatusOther
+              }
+              onUse={() =>
+                apply({
+                  ...withWorkStatus(value, workStatus.apply.workStatus),
+                  workStatusOther: workStatus.apply.workStatusOther,
+                })
+              }
+            />
+          ) : undefined
+        }
+        onChange={(next) => onChange(withWorkStatus(value, next as WorkStatus | ""))}
       >
         <option value="">Not recorded</option>
         {WORK_STATUSES.map((option) => (
@@ -519,12 +741,35 @@ export function OccupationFieldsEditor({
       </SelectField>
       {employedWorkStatus(value.workStatus) ? (
         <>
-          <TextField id="work_role" label="Role" value={value.role} onChange={(role) => onChange({ ...value, role })} />
+          <TextField
+            id="work_role"
+            label="Role"
+            value={value.role}
+            client={
+              role ? (
+                <ClientAnswer
+                  label={role.label}
+                  matches={value.role === role.apply}
+                  onUse={() => apply({ ...value, role: role.apply })}
+                />
+              ) : undefined
+            }
+            onChange={(next) => onChange({ ...value, role: next })}
+          />
           <TextField
             id="work_employer"
             label="Employer"
             value={value.employer}
-            onChange={(employer) => onChange({ ...value, employer })}
+            client={
+              employer ? (
+                <ClientAnswer
+                  label={employer.label}
+                  matches={value.employer === employer.apply}
+                  onUse={() => apply({ ...value, employer: employer.apply })}
+                />
+              ) : undefined
+            }
+            onChange={(next) => onChange({ ...value, employer: next })}
           />
         </>
       ) : null}
@@ -537,7 +782,33 @@ export function OccupationFieldsEditor({
         />
       ) : null}
       <div className="space-y-4">
-        <p className="text-sm font-medium">Previous jobs</p>
+        <div className="space-y-1.5">
+          <p className="text-sm font-medium">Previous jobs</p>
+          {previousJob ? (
+            <ClientAnswer
+              label={previousJob.label}
+              matches={previousJobMatches}
+              onUse={
+                previousJobMatches
+                  ? undefined
+                  : () =>
+                      apply({
+                        ...value,
+                        previousJobs: [
+                          ...value.previousJobs,
+                          {
+                            id: crypto.randomUUID(),
+                            role: previousJob.apply.role,
+                            employer: previousJob.apply.employer,
+                            started: "",
+                            ended: "",
+                          },
+                        ],
+                      })
+              }
+            />
+          ) : null}
+        </div>
         {value.previousJobs.map((job, index) => (
           <div key={job.id} className="space-y-4 rounded-md border p-4">
             <TextField id={`job_role_${job.id}`} label="Role" value={job.role} onChange={(role) => updateJob(job.id, { role })} />
@@ -594,7 +865,16 @@ export function OccupationFieldsEditor({
         onDetail={(financialConcernsDetail) => onChange({ ...value, financialConcernsDetail })}
       />
       <div className="space-y-2">
-        <p className="text-sm font-medium">Access to necessities</p>
+        <div className="space-y-1.5">
+          <p className="text-sm font-medium">Access to necessities</p>
+          {necessities ? (
+            <ClientAnswer
+              label={necessities.label}
+              matches={NECESSITY_KEYS.every((key) => value.necessities[key] === necessities.apply[key])}
+              onUse={() => apply({ ...value, necessities: necessities.apply })}
+            />
+          ) : null}
+        </div>
         <p className="text-xs text-muted-foreground">Tick any area where access is limited.</p>
         {NECESSITY_KEYS.map((key) => (
           <div key={key} className="flex items-start gap-3">

@@ -124,6 +124,7 @@ export async function saveTreatmentPlan(
   }
 
   revalidatePath(`/clients/${clientId}`)
+  revalidatePath(`/clients/${clientId}/background`)
   if (sourcePlanId) {
     revalidatePath(`/clients/${clientId}/treatment-plan/${sourcePlanId}`)
   }
@@ -191,6 +192,8 @@ export async function saveTreatmentPlanAndDownload(
     }
   }
 
+  revalidatePath(`/clients/${clientId}/background`)
+
   const buffer = await generateTreatmentPlanPdf(plan, client)
   const filename = buildTreatmentPlanFilename(
     plan.versionNumber,
@@ -247,6 +250,7 @@ export async function saveTreatmentPlanAndSend(
   }
 
   revalidatePath(`/clients/${clientId}`)
+  revalidatePath(`/clients/${clientId}/background`)
   if (sourcePlanId) {
     revalidatePath(`/clients/${clientId}/treatment-plan/${sourcePlanId}`)
   }

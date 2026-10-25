@@ -3,9 +3,18 @@ import assert from "node:assert/strict"
 import {
   HISTORY_QUESTION_KEYS,
   historyQuestionKeyForEvent,
+  unansweredInterviewLabels,
   type HistoryQuestionKey,
 } from "@/lib/client-background/interview-history"
-import { emptyEvent, type EventRecord, type EventType } from "@/lib/client-background/types"
+import {
+  emptyEvent,
+  emptyMedication,
+  emptyStressors,
+  type EventRecord,
+  type EventType,
+  type MedicationRecord,
+  type StressorsRecord,
+} from "@/lib/client-background/types"
 
 const BIRTH = "2000-06-15"
 
@@ -61,5 +70,21 @@ for (const item of expected) {
 }
 
 assert.equal(seen.size, HISTORY_QUESTION_KEYS.length)
+
+const gaps = unansweredInterviewLabels({}, [], null, emptyMedication(), emptyStressors())
+assert.equal(gaps[0], "Emotional problems")
+assert.equal(gaps.at(-1), "Legal matters, police or accidents")
+assert.ok(gaps.includes("Currently taking medication"))
+assert.equal(gaps.filter((label) => label === "Family").length, 1)
+assert.equal(gaps.length, HISTORY_QUESTION_KEYS.length + 1 + 9)
+
+const answeredMedication: MedicationRecord = { ...emptyMedication(), currentlyTaking: "not_asked" }
+const answeredStressors: StressorsRecord = { ...emptyStressors(), family: "yes", financial: "no" }
+const remaining = unansweredInterviewLabels({}, [], null, answeredMedication, answeredStressors)
+assert.equal(remaining.includes("Currently taking medication"), false)
+assert.equal(remaining.includes("Family"), false)
+assert.equal(remaining.includes("Financial"), false)
+assert.ok(remaining.includes("Social life"))
+assert.equal(remaining.length, HISTORY_QUESTION_KEYS.length + 7)
 
 console.log("background interview history selftest passed")

@@ -1,5 +1,5 @@
 import { lifeStageAtStart } from "@/lib/client-background/age"
-import type { EventRecord, EventType } from "@/lib/client-background/types"
+import { STRESSOR_ITEMS, type EventRecord, type EventType, type MedicationRecord, type StressorsRecord } from "@/lib/client-background/types"
 
 export const HISTORY_QUESTION_KEYS = [
   "emotional_problems",
@@ -248,4 +248,20 @@ export function unansweredQuestionLabels(
   return HISTORY_QUESTION_KEYS.filter((key) => !withEntries.has(key) && screening[key] == null).map(
     (key) => HISTORY_QUESTIONS[key].label
   )
+}
+
+/** Screening gaps, plus medication and stressors that are still empty. */
+export function unansweredInterviewLabels(
+  screening: ScreeningAnswers,
+  events: Pick<EventRecord, "eventType" | "attribution" | "startPrecision" | "startValue">[],
+  dateOfBirth: string | null,
+  medication: MedicationRecord,
+  stressors: StressorsRecord
+): string[] {
+  const labels = unansweredQuestionLabels(screening, events, dateOfBirth)
+  if (medication.currentlyTaking == null) labels.push("Currently taking medication")
+  for (const item of STRESSOR_ITEMS) {
+    if (stressors[item.key] == null) labels.push(item.label)
+  }
+  return labels
 }

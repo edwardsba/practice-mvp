@@ -14,6 +14,9 @@ import {
 } from "@/lib/treatment-plans/load"
 import { loadActiveCrisisPlanSummary } from "@/lib/crisis-plans/load"
 import { requirePractitionerContext } from "@/lib/auth"
+import { loadMedicationRecord } from "@/lib/client-background/load"
+import { medicationSupervisionFromRecord } from "@/lib/client-background/medication"
+import { emptyMedication } from "@/lib/client-background/types"
 
 export default async function EditTreatmentPlanPage({
   params,
@@ -45,6 +48,7 @@ export default async function EditTreatmentPlanPage({
     clientId,
     context.practiceId
   )
+  const medication = (await loadMedicationRecord(clientId, context.practiceId)) ?? emptyMedication()
 
   const clientName = `${client.firstName} ${client.lastName}`
 
@@ -70,6 +74,7 @@ export default async function EditTreatmentPlanPage({
         isNewVersion
         cancelHref={`/clients/${clientId}/treatment-plan/${planId}`}
         crisisPlanSummary={crisisPlanSummary}
+        medicationSupervision={medicationSupervisionFromRecord(medication)}
       />
 
       <EntityDeleteSection

@@ -8,11 +8,14 @@ import {
   createEventAction,
   deleteEventAction,
   saveInterviewScreeningAction,
+  saveMedicationAction,
+  saveStressorsAction,
   updateEventAction,
 } from "@/app/clients/[client_id]/background/actions"
-import { AddButton } from "@/components/client-background/fields"
+import { AddButton, ClientAnswer, SelectField } from "@/components/client-background/fields"
 import { HistoryPanel, historyEntryLines } from "@/components/client-background/history-section"
-import type { SavePhase } from "@/components/client-background/interview-autosave"
+import { AutosaveFields, type SavePhase } from "@/components/client-background/interview-autosave"
+import { MedicationFields, StressorsFields } from "@/components/client-background/medication-stressors"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
@@ -24,23 +27,17 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
+import type { ClientBackgroundSuggestions } from "@/lib/background-questionnaire/to-client-background"
 import {
   HISTORY_QUESTION_GROUPS,
   HISTORY_QUESTIONS,
   eventsForQuestion,
-  unansweredQuestionLabels,
+  unansweredInterviewLabels,
   type HistoryQuestionKey,
   type ScreeningAnswer,
   type ScreeningAnswers,
 } from "@/lib/client-background/interview-history"
-import { emptyEvent, type EventRecord, type RelationshipRecord } from "@/lib/client-background/types"
-import { cn } from "@/lib/utils"
-
-const ANSWERS: { value: ScreeningAnswer; label: string }[] = [
-  { value: "yes", label: "Yes" },
-  { value: "no", label: "No" },
-  { value: "not_asked", label: "Not asked" },
-]
+import { emptyEvent, type EventRecord, type MedicationRecord, type RelationshipRecord, type StressorsRecord } from "@/lib/client-background/types"
 
 export function InterviewHistory({
   clientId,
@@ -48,6 +45,12 @@ export function InterviewHistory({
   events,
   relationships,
   screening,
+  medication,
+  stressors,
+  selfReportId,
+  historyClient,
+  medicationClient,
+  stressorsClient,
   onEvents,
   onPhase,
   registerFlush,
@@ -58,6 +61,12 @@ export function InterviewHistory({
   events: EventRecord[]
   relationships: RelationshipRecord[]
   screening: ScreeningAnswers
+  medication: MedicationRecord
+  stressors: StressorsRecord
+  selfReportId: string | null
+  historyClient?: ClientBackgroundSuggestions["history"]
+  medicationClient?: ClientBackgroundSuggestions["medication"]
+  stressorsClient?: ClientBackgroundSuggestions["stressors"]
   onEvents: (events: EventRecord[]) => void
   onPhase: (id: string, phase: SavePhase, retry: (() => void) | null) => void
   registerFlush: (flush: () => Promise<void>) => () => void
@@ -77,14 +86,26 @@ export function InterviewHistory({
   const scrollY = useRef(0)
   const answersRef = useRef(answers)
   const entriesRef = useRef(entries)
+  const medicationRef = useRef(medication)
+  const stressorsRef = useRef(stressors)
   const token = useRef(0)
   const inflight = useRef<Promise<void> | null>(null)
   answersRef.current = answers
   entriesRef.current = entries
+  medicationRef.current = medication
+  stressorsRef.current = stressors
 
   useEffect(() => {
     registerComplete(() => {
-      setUnanswered(unansweredQuestionLabels(answersRef.current, entriesRef.current, dateOfBirth))
+      setUnanswered(
+        unansweredInterviewLabels(
+          answersRef.current,
+          entriesRef.current,
+          dateOfBirth,
+          medicationRef.current,
+          stressorsRef.current
+        )
+      )
       setCompleteError(null)
       setConfirmOpen(true)
     })
@@ -118,8 +139,10 @@ export function InterviewHistory({
     onEvents(next)
   }
 
-  async function choose(key: HistoryQuestionKey, answer: ScreeningAnswer) {
-    const next = { ...answersRef.current, [key]: answer }
+  async function choose(key: HistoryQuestionKey, answer: ScreeningAnswer | "") {
+    const next = { ...answersRef.current }
+    if (answer === "") delete next[key]
+    else next[key] = answer
     answersRef.current = next
     setAnswers(next)
     const current = ++token.current
@@ -218,7 +241,7 @@ export function InterviewHistory({
   async function complete() {
     setCompleting(true)
     setCompleteError(null)
-    const result = await completeBackgroundInterviewAction(clientId)
+    const result = await completeBackgroundInterviewAction(clientId, selfReportId)
     if (result.error) {
       setCompleting(false)
       setCompleteError(result.error)
@@ -240,28 +263,36 @@ export function InterviewHistory({
               const listed = eventsForQuestion(entries, key, dateOfBirth)
               const locked = listed.length > 0
               const shown: ScreeningAnswer | null = locked ? "yes" : answers[key] ?? null
+              const suggestion = historyClient?.[key]
               return (
                 <div key={key} className="space-y-2 border-b pb-4 last:border-b-0 last:pb-0">
-                  <div className="flex min-h-11 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                    <p className="text-sm font-medium">{question.label}</p>
-                    <div role="group" aria-label={question.label} className="flex flex-wrap gap-1">
-                      {ANSWERS.map((answer) => (
-                        <button
-                          key={answer.value}
-                          type="button"
-                          aria-pressed={shown === answer.value}
-                          disabled={locked && answer.value !== "yes"}
-                          className={cn(
-                            "min-h-9 rounded-md border px-3 text-sm",
-                            shown === answer.value && "bg-primary text-primary-foreground"
-                          )}
-                          onClick={() => void choose(key, answer.value)}
-                        >
-                          {answer.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
+                  <SelectField
+                    id={`history_${key}`}
+                    label={question.label}
+                    value={shown ?? ""}
+                    disabled={locked}
+                    client={
+                      suggestion ? (
+                        <ClientAnswer
+                          label={suggestion.label}
+                          matches={shown === suggestion.apply}
+                          onUse={locked ? undefined : () => void choose(key, suggestion.apply)}
+                        />
+                      ) : undefined
+                    }
+                    onChange={(next) => {
+                      if (locked) return
+                      void choose(
+                        key,
+                        next === "yes" || next === "no" || next === "not_asked" ? next : ""
+                      )
+                    }}
+                  >
+                    <option value="">Select…</option>
+                    <option value="yes">Yes</option>
+                    <option value="no">No</option>
+                    <option value="not_asked">Not asked</option>
+                  </SelectField>
                   {locked ? <p className="text-xs text-muted-foreground">Entries recorded</p> : null}
                   {shown === "yes" ? (
                     <div className="space-y-1">
@@ -289,9 +320,75 @@ export function InterviewHistory({
                 </div>
               )
             })}
+            {group.title === "Client: mental health" ? (
+              <div className="border-t pt-4">
+                <AutosaveFields
+                  saved={medication}
+                  save={async (value) => {
+                    medicationRef.current = value
+                    const result = await saveMedicationAction(clientId, value)
+                    if (result.error || !("medication" in result) || !result.medication) {
+                      return { error: result.error ?? "Could not save medication." }
+                    }
+                    medicationRef.current = result.medication
+                    return { value: result.medication }
+                  }}
+                  onPhase={(phase, retry) => onPhase("medication", phase, retry)}
+                  registerFlush={registerFlush}
+                >
+                  {(value, onChange, commit) => {
+                    medicationRef.current = value
+                    return (
+                      <MedicationFields
+                        idPrefix="interview_medication"
+                        value={value}
+                        onChange={onChange}
+                        onCommit={commit}
+                        client={medicationClient}
+                      />
+                    )
+                  }}
+                </AutosaveFields>
+              </div>
+            ) : null}
           </CardContent>
         </Card>
       ))}
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Stressors</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <AutosaveFields
+            saved={stressors}
+            save={async (value) => {
+              stressorsRef.current = value
+              const result = await saveStressorsAction(clientId, value)
+              if (result.error || !("stressors" in result) || !result.stressors) {
+                return { error: result.error ?? "Could not save stressors." }
+              }
+              stressorsRef.current = result.stressors
+              return { value: result.stressors }
+            }}
+            onPhase={(phase, retry) => onPhase("stressors", phase, retry)}
+            registerFlush={registerFlush}
+          >
+            {(value, onChange, commit) => {
+              stressorsRef.current = value
+              return (
+                <StressorsFields
+                  idPrefix="interview_stressors"
+                  value={value}
+                  onChange={onChange}
+                  onCommit={commit}
+                  client={stressorsClient}
+                />
+              )
+            }}
+          </AutosaveFields>
+        </CardContent>
+      </Card>
 
       <Sheet open={sheet != null} onOpenChange={(next) => !next && closeSheet()}>
         <SheetContent className="h-full w-full overflow-y-auto sm:max-w-xl">

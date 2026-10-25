@@ -122,7 +122,7 @@ export function backgroundChecks(input: BackgroundCheckInput): BackgroundCheck[]
   if (livesWith && kinds && !data.relationships.some((person) => kinds.includes(person.relationshipToClient) && markedLivingWith(person))) {
     checks.push({
       id: "lives-with",
-      message: `Lives with ${LIVES_WITH_LABELS[livesWith]}, but no one is marked as living with the client.`,
+      message: `Lives with ${LIVES_WITH_LABELS[livesWith].replace(/^With /, "")}, but no one is marked as living with the client.`,
       target: "living",
     })
   }

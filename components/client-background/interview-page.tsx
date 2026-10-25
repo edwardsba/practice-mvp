@@ -488,6 +488,7 @@ export function InterviewPage({
           relationships={relationships}
           screening={screening}
           medicationRef={medicationRef}
+          reasonRef={reasonRef}
           stressors={data.stressors}
           selfReportId={selfReport?.resultId ?? null}
           historyClient={suggestions?.history}

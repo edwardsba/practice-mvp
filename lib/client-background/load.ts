@@ -242,12 +242,14 @@ export async function loadBackgroundInterviewCard(
     .select({
       medicationJson: clientBackgrounds.medicationJson,
       stressorsJson: clientBackgrounds.stressorsJson,
+      reasonForAttendingJson: clientBackgrounds.reasonForAttendingJson,
     })
     .from(clientBackgrounds)
     .where(and(eq(clientBackgrounds.clientId, clientId), eq(clientBackgrounds.practiceId, practiceId)))
     .limit(1)
   const medication = sanitizeMedication(background?.medicationJson)
   const stressors = sanitizeStressors(background?.stressorsJson)
+  const reason = sanitizeReasonForAttending(background?.reasonForAttendingJson)
 
   const inProgress = rows.find((row) => row.status === "in_progress") ?? null
   const completed = rows
@@ -264,7 +266,8 @@ export async function loadBackgroundInterviewCard(
             events,
             client.dateOfBirth,
             medication,
-            stressors
+            stressors,
+            reason
           ),
         }
       : null,

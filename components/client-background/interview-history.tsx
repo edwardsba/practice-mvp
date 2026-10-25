@@ -37,7 +37,7 @@ import {
   type ScreeningAnswer,
   type ScreeningAnswers,
 } from "@/lib/client-background/interview-history"
-import { emptyEvent, type EventRecord, type MedicationRecord, type RelationshipRecord, type StressorsRecord } from "@/lib/client-background/types"
+import { emptyEvent, type EventRecord, type MedicationRecord, type ReasonForAttending, type RelationshipRecord, type StressorsRecord } from "@/lib/client-background/types"
 
 export function InterviewHistory({
   clientId,
@@ -46,6 +46,7 @@ export function InterviewHistory({
   relationships,
   screening,
   medicationRef,
+  reasonRef,
   stressors,
   selfReportId,
   historyClient,
@@ -63,6 +64,7 @@ export function InterviewHistory({
   relationships: RelationshipRecord[]
   screening: ScreeningAnswers
   medicationRef: RefObject<MedicationRecord>
+  reasonRef: RefObject<ReasonForAttending>
   stressors: StressorsRecord
   selfReportId: string | null
   historyClient?: ClientBackgroundSuggestions["history"]
@@ -109,7 +111,8 @@ export function InterviewHistory({
           entriesRef.current,
           dateOfBirth,
           medicationRef.current,
-          stressorsRef.current
+          stressorsRef.current,
+          reasonRef.current
         )
       )
       setChecks(
@@ -123,7 +126,7 @@ export function InterviewHistory({
       setCompleteError(null)
       setConfirmOpen(true)
     })
-  }, [dateOfBirth, getChecks, registerComplete])
+  }, [dateOfBirth, getChecks, medicationRef, reasonRef, registerComplete])
 
   useEffect(() => {
     return registerFlush(async () => {

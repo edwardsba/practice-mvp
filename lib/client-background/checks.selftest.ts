@@ -204,8 +204,25 @@ const livesWith = backgroundChecks(
     }),
   })
 )
-assert.equal(livesWith[0]?.message, "Lives with With partner, but no one is marked as living with the client.")
+assert.equal(livesWith[0]?.message, "Lives with partner, but no one is marked as living with the client.")
 assert.equal(livesWith[0]?.target, "living")
+for (const [livesWithOption, message] of [
+  ["with_partner_and_children", "Lives with partner and children, but no one is marked as living with the client."],
+  ["with_children_sole_parent", "Lives with children (sole parent), but no one is marked as living with the client."],
+  ["with_parents", "Lives with parents, but no one is marked as living with the client."],
+] as const) {
+  const found = backgroundChecks(
+    input({
+      data: data({
+        demographics: {
+          ...emptyDemographics(),
+          livingSituation: { ...emptyDemographics().livingSituation, livesWith: livesWithOption },
+        },
+      }),
+    })
+  )
+  assert.equal(found[0]?.message, message)
+}
 assert.deepEqual(
   ids({
     data: data({

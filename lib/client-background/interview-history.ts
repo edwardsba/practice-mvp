@@ -1,5 +1,12 @@
 import { lifeStageAtStart } from "@/lib/client-background/age"
-import { STRESSOR_ITEMS, type EventRecord, type EventType, type MedicationRecord, type StressorsRecord } from "@/lib/client-background/types"
+import {
+  STRESSOR_ITEMS,
+  type EventRecord,
+  type EventType,
+  type MedicationRecord,
+  type ReasonForAttending,
+  type StressorsRecord,
+} from "@/lib/client-background/types"
 
 export const HISTORY_QUESTION_KEYS = [
   "emotional_problems",
@@ -216,8 +223,17 @@ export function sanitizeScreening(value: unknown): ScreeningAnswers {
   return screening
 }
 
-/** History questions, currently taking medication, and the nine stressors. */
-export const INTERVIEW_ANSWER_TOTAL = HISTORY_QUESTION_KEYS.length + 1 + STRESSOR_ITEMS.length
+/** The four counted Reason for attending questions. Client's motivation is optional and is not one of them. */
+const REASON_ANSWER_FIELDS = [
+  ["referredByMedicalProfessional", "Referred by a medical professional"],
+  ["familyInvolved", "Family involved in them attending"],
+  ["ownInitiative", "Came on their own initiative"],
+  ["attendedWillingly", "Attended willingly"],
+] as const satisfies readonly (readonly [keyof ReasonForAttending, string])[]
+
+/** Reason for attending, history questions, currently taking medication, and the nine stressors. */
+export const INTERVIEW_ANSWER_TOTAL =
+  REASON_ANSWER_FIELDS.length + HISTORY_QUESTION_KEYS.length + 1 + STRESSOR_ITEMS.length
 
 export type BackgroundInterviewAnswerSource = {
   status: "in_progress" | "completed"
@@ -265,15 +281,20 @@ export function unansweredQuestionLabels(
   )
 }
 
-/** Unanswered items in page order: Background, then History, then Stressors. */
+function unansweredReasonLabels(reason: ReasonForAttending): string[] {
+  return REASON_ANSWER_FIELDS.filter(([key]) => reason[key] == null).map(([, label]) => label)
+}
+
+/** Unanswered items in page order: Reason for attending, then the rest of Background, then History, then Stressors. */
 export function unansweredInterviewLabels(
   screening: ScreeningAnswers,
   events: Pick<EventRecord, "eventType" | "attribution" | "startPrecision" | "startValue">[],
   dateOfBirth: string | null,
   medication: MedicationRecord,
-  stressors: StressorsRecord
+  stressors: StressorsRecord,
+  reason: ReasonForAttending
 ): string[] {
-  const labels: string[] = []
+  const labels: string[] = unansweredReasonLabels(reason)
   if (medication.currentlyTaking == null) labels.push("Currently taking medication")
   labels.push(...unansweredQuestionLabels(screening, events, dateOfBirth))
   for (const item of STRESSOR_ITEMS) {
@@ -288,10 +309,11 @@ export function answeredInterviewCount(
   events: Pick<EventRecord, "eventType" | "attribution" | "startPrecision" | "startValue">[],
   dateOfBirth: string | null,
   medication: MedicationRecord,
-  stressors: StressorsRecord
+  stressors: StressorsRecord,
+  reason: ReasonForAttending
 ): number {
   return (
     INTERVIEW_ANSWER_TOTAL -
-    unansweredInterviewLabels(screening, events, dateOfBirth, medication, stressors).length
+    unansweredInterviewLabels(screening, events, dateOfBirth, medication, stressors, reason).length
   )
 }

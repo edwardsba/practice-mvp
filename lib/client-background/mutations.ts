@@ -16,6 +16,7 @@ import {
   demographicsFromStored,
   sanitizeClientRelationshipStatus,
   markUnansweredMedicationAndStressors,
+  markUnansweredReason,
   sanitizeEducation,
   sanitizeEvent,
   sanitizeIdentity,
@@ -1773,13 +1774,15 @@ export async function completeBackgroundInterview(input: {
         sanitizeMedication(background?.medicationJson),
         sanitizeStressors(background?.stressorsJson)
       )
-      if (filled.changed) {
+      const reasonFilled = markUnansweredReason(sanitizeReasonForAttending(background?.reasonForAttendingJson))
+      if (filled.changed || reasonFilled.changed) {
         if (background) {
           await tx
             .update(clientBackgrounds)
             .set({
               medicationJson: filled.medication,
               stressorsJson: filled.stressors,
+              reasonForAttendingJson: reasonFilled.reason,
               updatedAt: completedAt,
             })
             .where(
@@ -1794,6 +1797,7 @@ export async function completeBackgroundInterview(input: {
             practiceId: input.practiceId,
             medicationJson: filled.medication,
             stressorsJson: filled.stressors,
+            reasonForAttendingJson: reasonFilled.reason,
             updatedAt: completedAt,
           })
         }
@@ -1813,7 +1817,7 @@ export async function completeBackgroundInterview(input: {
         screening,
         medication: filled.medication,
         stressors: filled.stressors,
-        reason: sanitizeReasonForAttending(background?.reasonForAttendingJson),
+        reason: reasonFilled.reason,
       }
 
       await tx

@@ -315,6 +315,29 @@ export function sanitizeReasonForAttending(value: unknown): ReasonForAttending {
   }
 }
 
+/** Blank Reason for attending answers become Not asked. Client's motivation stays optional. */
+export function markUnansweredReason(reason: ReasonForAttending): { reason: ReasonForAttending; changed: boolean } {
+  const next = { ...reason }
+  let changed = false
+  if (next.referredByMedicalProfessional == null) {
+    next.referredByMedicalProfessional = "not_asked"
+    changed = true
+  }
+  if (next.familyInvolved == null) {
+    next.familyInvolved = "not_asked"
+    changed = true
+  }
+  if (next.ownInitiative == null) {
+    next.ownInitiative = "not_asked"
+    changed = true
+  }
+  if (next.attendedWillingly == null) {
+    next.attendedWillingly = "not_asked"
+    changed = true
+  }
+  return { reason: next, changed }
+}
+
 export function markUnansweredMedicationAndStressors(
   medication: MedicationRecord,
   stressors: StressorsRecord

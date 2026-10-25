@@ -71,9 +71,9 @@ export function ReasonFields({
     suggestedProfessionalId != null && professionals.some((item) => item.professionalId === suggestedProfessionalId)
   const showSuggestion =
     value.referredByMedicalProfessional === "yes" &&
-    !value.referrerProfessionalId &&
     !dismissed &&
-    suggestionKnown
+    suggestionKnown &&
+    (value.referrerProfessionalId == null || value.referrerProfessionalId === suggestedProfessionalId)
   const selectedId = value.referrerProfessionalId || (showSuggestion ? suggestedProfessionalId : "") || ""
 
   function dismiss(next: boolean) {

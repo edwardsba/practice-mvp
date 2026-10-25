@@ -22,6 +22,7 @@ import {
 } from "@/lib/actions/email-templates"
 import {
   APPOINTMENT_CONTEXT_EXCLUDED_TEMPLATE_KEYS,
+  BACKGROUND_QUESTIONNAIRE_TEMPLATE_KEY,
   EMAIL_TEMPLATE_VARIABLE_CHIPS,
   NO_ACTION_BUTTON_TEMPLATE_KEYS,
   PROTECTED_TEMPLATE_KEYS,
@@ -73,6 +74,8 @@ function getSystemTemplateNote(
   switch (templateKey) {
     case "send_assessment":
       return "This is the Send Assessment template — special behaviour (assessment link creation, assessment selection) is built into the system and cannot be changed here."
+    case BACKGROUND_QUESTIONNAIRE_TEMPLATE_KEY:
+      return "This is the Background Questionnaire template. The questionnaire link is created when the email is sent and inserted via {questionnaire_link}."
     case "pre_session_questionnaire":
       return "This is the Pre-Session Questionnaire template, sent automatically the day before each appointment. The questionnaire link is generated automatically by the system and inserted via {questionnaire_link}."
     case "post_session":

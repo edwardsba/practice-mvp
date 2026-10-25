@@ -23,9 +23,12 @@ import {
   type BatteryAssessmentChip,
 } from "@/lib/assessments/battery-defaults"
 import type { QuestionnaireLinkApiResponse } from "@/lib/email/link-response"
+import { BACKGROUND_ASSESSMENT_CODE } from "@/lib/background-questionnaire/types"
 import {
+  BACKGROUND_QUESTIONNAIRE_TEMPLATE_KEY,
   buildAdHocHtmlEmailBody,
   buildResolvedEmailBodies,
+  DEFAULT_BACKGROUND_QUESTIONNAIRE_BUTTON_LABEL,
   EMAIL_TEMPLATE_VARIABLE_CHIPS,
   formatQuestionnaireExpiryDate,
   QUESTIONNAIRE_LINK_VARIABLE,
@@ -33,6 +36,14 @@ import {
   type QuestionnaireEmailTemplateVariables,
 } from "@/lib/email/templates"
 import { cn } from "@/lib/utils"
+
+function templateKeepsQuestionnaireLink(templateKey: string | null) {
+  return (
+    templateKey === "send_assessment" ||
+    templateKey === "diagnostic_battery" ||
+    templateKey === BACKGROUND_QUESTIONNAIRE_TEMPLATE_KEY
+  )
+}
 
 type AssessmentChip = {
   code: string
@@ -162,36 +173,20 @@ export function SendCommunicationModal({
       actionButtonLabel: template.actionButtonLabel,
     })
 
-    if (
-      template.templateKey === "send_assessment" ||
-      template.templateKey === "diagnostic_battery"
-    ) {
-      setSubject(
-        resolveTemplate(template.subject, {
-          ...templateVariables,
-          questionnaire_link: "",
-        })
-      )
-      setMessage(
-        resolveTemplate(template.message, {
-          ...templateVariables,
-          questionnaire_link: QUESTIONNAIRE_LINK_VARIABLE,
-        })
-      )
-    } else {
-      setSubject(
-        resolveTemplate(template.subject, {
-          ...templateVariables,
-          questionnaire_link: "",
-        })
-      )
-      setMessage(
-        resolveTemplate(template.message, {
-          ...templateVariables,
-          questionnaire_link: "",
-        })
-      )
-    }
+    setSubject(
+      resolveTemplate(template.subject, {
+        ...templateVariables,
+        questionnaire_link: "",
+      })
+    )
+    setMessage(
+      resolveTemplate(template.message, {
+        ...templateVariables,
+        questionnaire_link: templateKeepsQuestionnaireLink(template.templateKey)
+          ? QUESTIONNAIRE_LINK_VARIABLE
+          : "",
+      })
+    )
 
     setCc(template.defaultCc?.trim() ?? "")
     setBcc(template.defaultBcc?.trim() ?? "")
@@ -258,6 +253,83 @@ export function SendCommunicationModal({
     return data
   }
 
+  async function createBackgroundQuestionnaireLink(): Promise<QuestionnaireLinkApiResponse> {
+    const response = await fetch("/api/assessments/create-link", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        client_id: clientId,
+        practitioner_profile_id: practitionerProfileId,
+        assessment_code: BACKGROUND_ASSESSMENT_CODE,
+      }),
+    })
+    const data = (await response.json()) as QuestionnaireLinkApiResponse & {
+      error?: string
+    }
+    if (!response.ok) {
+      throw new Error(
+        data.error ?? "Unable to create background questionnaire link."
+      )
+    }
+    return data
+  }
+
+  async function sendWithQuestionnaireLink(
+    linkData: QuestionnaireLinkApiResponse,
+    fallbackButtonLabel: string
+  ): Promise<boolean> {
+    if (!loadedTemplate) return false
+
+    const resolvedVariables: QuestionnaireEmailTemplateVariables = {
+      ...linkData.templateVariables,
+      expiry_date: formatQuestionnaireExpiryDate(new Date(linkData.expires_at)),
+    }
+
+    const buttonLabel =
+      loadedTemplate.actionButtonLabel?.trim() || fallbackButtonLabel
+
+    const {
+      subject: resolvedSubject,
+      htmlBody,
+      textBody,
+    } = buildResolvedEmailBodies(
+      message,
+      subject,
+      linkData.link,
+      resolvedVariables,
+      buttonLabel
+    )
+
+    const response = await fetch("/api/email/send", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        to: toEmail,
+        cc: cc.trim() || undefined,
+        bcc: bcc.trim() || undefined,
+        subject: resolvedSubject,
+        htmlBody,
+        textBody,
+        messageText: message,
+        templateType: loadedTemplate.templateKey ?? "generic",
+        assessmentAccessLinkId: linkData.assessmentAccessLinkId,
+      }),
+    })
+
+    const data = (await response.json()) as {
+      sent?: boolean
+      error?: string
+    }
+
+    if (!response.ok || !data.sent) {
+      setSendError(data.error ?? "Unable to send email.")
+      onSendComplete({ sent: false, email: toEmail })
+      return false
+    }
+
+    return true
+  }
+
   async function createDiagnosticBatteryLink(): Promise<QuestionnaireLinkApiResponse> {
     const response = await fetch("/api/assessments/create-diagnostic-battery", {
       method: "POST",
@@ -288,110 +360,28 @@ export function SendCommunicationModal({
 
     try {
       if (templateKey === "send_assessment") {
-        const linkData = await createQuestionnaireLink()
-        const resolvedVariables: QuestionnaireEmailTemplateVariables = {
-          ...linkData.templateVariables,
-          expiry_date: formatQuestionnaireExpiryDate(
-            new Date(linkData.expires_at)
-          ),
-        }
-
-        const buttonLabel =
-          loadedTemplate.actionButtonLabel?.trim() || "Complete Questionnaire"
-
-        const {
-          subject: resolvedSubject,
-          htmlBody,
-          textBody,
-        } = buildResolvedEmailBodies(
-          message,
-          subject,
-          linkData.link,
-          resolvedVariables,
-          buttonLabel
+        const sent = await sendWithQuestionnaireLink(
+          await createQuestionnaireLink(),
+          "Complete Questionnaire"
         )
-
-        const response = await fetch("/api/email/send", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            to: toEmail,
-            cc: cc.trim() || undefined,
-            bcc: bcc.trim() || undefined,
-            subject: resolvedSubject,
-            htmlBody,
-            textBody,
-            messageText: message,
-            templateType,
-            assessmentAccessLinkId: linkData.assessmentAccessLinkId,
-          }),
-        })
-
-        const data = (await response.json()) as {
-          sent?: boolean
-          error?: string
-        }
-
-        if (!response.ok || !data.sent) {
-          setSendError(data.error ?? "Unable to send email.")
-          onSendComplete({ sent: false, email: toEmail })
-          return
-        }
+        if (!sent) return
       } else if (templateKey === "diagnostic_battery") {
-        const linkData = await createDiagnosticBatteryLink()
-        const resolvedVariables: QuestionnaireEmailTemplateVariables = {
-          ...linkData.templateVariables,
-          expiry_date: formatQuestionnaireExpiryDate(
-            new Date(linkData.expires_at)
-          ),
-        }
-
-        const buttonLabel =
-          loadedTemplate.actionButtonLabel?.trim() ||
+        const sent = await sendWithQuestionnaireLink(
+          await createDiagnosticBatteryLink(),
           "Complete Diagnostic Assessment"
-
-        const {
-          subject: resolvedSubject,
-          htmlBody,
-          textBody,
-        } = buildResolvedEmailBodies(
-          message,
-          subject,
-          linkData.link,
-          resolvedVariables,
-          buttonLabel
         )
-
-        const response = await fetch("/api/email/send", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            to: toEmail,
-            cc: cc.trim() || undefined,
-            bcc: bcc.trim() || undefined,
-            subject: resolvedSubject,
-            htmlBody,
-            textBody,
-            messageText: message,
-            templateType,
-            assessmentAccessLinkId: linkData.assessmentAccessLinkId,
-          }),
-        })
-
-        const data = (await response.json()) as {
-          sent?: boolean
-          error?: string
-        }
-
-        if (!response.ok || !data.sent) {
-          setSendError(data.error ?? "Unable to send email.")
-          onSendComplete({ sent: false, email: toEmail })
-          return
-        }
+        if (!sent) return
+      } else if (templateKey === BACKGROUND_QUESTIONNAIRE_TEMPLATE_KEY) {
+        const sent = await sendWithQuestionnaireLink(
+          await createBackgroundQuestionnaireLink(),
+          DEFAULT_BACKGROUND_QUESTIONNAIRE_BUTTON_LABEL
+        )
+        if (!sent) return
       } else if (
         loadedTemplate.hasActionButton &&
         templateKey !== "send_assessment" &&
-        templateKey !== "diagnostic_battery"
+        templateKey !== "diagnostic_battery" &&
+        templateKey !== BACKGROUND_QUESTIONNAIRE_TEMPLATE_KEY
       ) {
         // TODO: Generic action-button templates need a link source wired in code.
         const resolvedSubject = resolveTemplate(subject, {

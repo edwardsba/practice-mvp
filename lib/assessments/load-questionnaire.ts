@@ -332,3 +332,88 @@ export async function loadQuestionnaireForToken(
     },
   }
 }
+
+async function findUsableAccessLink(
+  rawToken: string,
+  loadOptions?: { allowSubmitted?: boolean }
+) {
+  const tokenHash = hashAssessmentToken(rawToken)
+
+  const [accessLink] = await db
+    .select()
+    .from(assessmentAccessLinks)
+    .where(eq(assessmentAccessLinks.tokenHash, tokenHash))
+    .limit(1)
+
+  if (
+    !accessLink ||
+    !isLinkUsable(
+      accessLink.accessStatus,
+      accessLink.expiresAt,
+      loadOptions?.allowSubmitted
+    )
+  ) {
+    return null
+  }
+
+  return accessLink
+}
+
+export async function loadAssessmentCodeForToken(
+  rawToken: string,
+  loadOptions?: { allowSubmitted?: boolean }
+): Promise<{ ok: true; assessmentCode: string } | { ok: false }> {
+  const accessLink = await findUsableAccessLink(rawToken, loadOptions)
+  if (!accessLink) return { ok: false }
+
+  const [instance] = await db
+    .select({
+      assessmentDefinitionId: assessmentInstances.assessmentDefinitionId,
+    })
+    .from(assessmentInstances)
+    .where(eq(assessmentInstances.assessmentInstanceId, accessLink.assessmentInstanceId))
+    .limit(1)
+
+  if (!instance) return { ok: false }
+
+  const [definition] = await db
+    .select({ assessmentCode: assessmentDefinitions.assessmentCode })
+    .from(assessmentDefinitions)
+    .where(
+      eq(assessmentDefinitions.assessmentDefinitionId, instance.assessmentDefinitionId)
+    )
+    .limit(1)
+
+  if (!definition) return { ok: false }
+
+  return { ok: true, assessmentCode: definition.assessmentCode }
+}
+
+export async function recordQuestionnaireOpened(
+  rawToken: string,
+  loadOptions?: { allowSubmitted?: boolean }
+): Promise<boolean> {
+  const accessLink = await findUsableAccessLink(rawToken, loadOptions)
+  if (!accessLink) return false
+  if (accessLink.openedAt) return true
+
+  await db.transaction(async (tx) => {
+    await tx
+      .update(assessmentAccessLinks)
+      .set({
+        openedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(assessmentAccessLinks.assessmentAccessLinkId, accessLink.assessmentAccessLinkId))
+
+    await tx.insert(auditEvents).values({
+      practiceId: accessLink.practiceId,
+      clientId: accessLink.clientId,
+      eventType: "assessment_link.opened",
+      entityType: "assessment_access_link",
+      entityId: accessLink.assessmentAccessLinkId,
+    })
+  })
+
+  return true
+}

@@ -49,6 +49,9 @@ import type { SageSrBackgroundParsedResult } from "@/lib/sage-sr/parse-backgroun
 import type { SageSrBackgroundResponseParsedResult } from "@/lib/sage-sr/parse-background-response"
 import type { SageSrPersonalityResponseParsedResult } from "@/lib/sage-sr/parse-personality-response"
 import { scoreSageSrPersonalityCriteria } from "@/lib/sage-sr/score-personality-criteria"
+import { sanitizeBackgroundAnswers } from "@/lib/background-questionnaire/answers"
+import { backgroundResultSections } from "@/lib/background-questionnaire/questions"
+import { BACKGROUND_ASSESSMENT_CODE } from "@/lib/background-questionnaire/types"
 
 /** Shape of assessmentResults.structuredScoreJson for a SAGE_SR_CORE instance, as
  *  written by lib/sage-sr/import-sage-sr-report.ts. Either key may be absent if only
@@ -179,6 +182,7 @@ export default async function AssessmentResultDetailPage({
   const isPsf = result.assessmentCode === "PSF"
   const isSageSrCore = result.assessmentCode === "SAGE_SR_CORE"
   const isSageSrBackground = result.assessmentCode === "SAGE_SR_BACKGROUND"
+  const isBackgroundSr = result.assessmentCode === BACKGROUND_ASSESSMENT_CODE
   const isSageSrPersonality = result.assessmentCode === "SAGE_SR_PERSONALITY"
 
   const responses = await db
@@ -215,6 +219,55 @@ export default async function AssessmentResultDetailPage({
     .orderBy(asc(assessmentElements.displayOrder))
 
   const clientName = `${client.firstName} ${client.lastName}`
+
+  if (isBackgroundSr) {
+    const sections = backgroundResultSections(
+      sanitizeBackgroundAnswers(result.structuredScoreJson)
+    )
+
+    return (
+      <AppShell>
+        <div className="mb-6">
+          <BackButton
+            fallbackHref={`/clients/${clientId}`}
+            label="← Back to client"
+          />
+        </div>
+        <EntityPageHeader
+          kicker={result.assessmentName}
+          name={clientName}
+          subheading={`Completed ${formatDate(result.assessmentDate)}`}
+          action={
+            <MarkReviewedButton
+              clientId={clientId}
+              resultId={resultId}
+              status={result.status}
+            />
+          }
+        />
+
+        <div className="space-y-6">
+          {sections.map((section) => (
+            <Card key={section.title}>
+              <CardHeader>
+                <CardTitle>{section.title}</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-5">
+                {section.rows.map((row, index) => (
+                  <div key={`${section.title}-${index}`}>
+                    <p className="text-sm font-medium">{row.question}</p>
+                    <p className="mt-1 text-sm whitespace-pre-wrap text-muted-foreground">
+                      {row.answer}
+                    </p>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </AppShell>
+    )
+  }
 
   if (isSageSrCore) {
     const sageSrData = (result.structuredScoreJson ?? {}) as SageSrCoreStructuredData

@@ -30,6 +30,7 @@ const ASSESSMENT_TYPE_LABELS: Record<string, string> = {
   ASQ: "ASQ",
   BTP: "BTP",
   PSF: "Post-Session Feedback",
+  BACKGROUND_SR: "Background questionnaire",
 }
 
 type AssessmentResultRow = {
@@ -57,6 +58,7 @@ function formatAssessmentType(code: string, name: string) {
 }
 
 function formatScore(result: AssessmentResultRow) {
+  if (result.assessmentCode === "BACKGROUND_SR") return "—"
   if (result.score === null) return "—"
   if (result.assessmentCode === "PSF") {
     return result.score > 0 ? `+${result.score}` : String(result.score)
@@ -65,6 +67,7 @@ function formatScore(result: AssessmentResultRow) {
 }
 
 function formatSeverityOrRisk(result: AssessmentResultRow) {
+  if (result.assessmentCode === "BACKGROUND_SR") return "—"
   if (result.assessmentCode === "ASQ") {
     return result.severity ?? "—"
   }

@@ -10,11 +10,17 @@ import {
 import { getPractitionerContext } from "@/lib/auth"
 import { db } from "@/lib/db"
 import { sendQuestionnaireEmail } from "@/lib/email/send-questionnaire-link"
+import { BACKGROUND_QUESTIONNAIRE_TEMPLATE_KEY } from "@/lib/email/templates"
 
 // Template types whose send flow is backed by an assessment_access_links row
-// (a single assessment or a full battery) rather than a plain client-scoped
-// message. These get the access-link communications record + audit event.
-const ASSESSMENT_LINK_TEMPLATE_TYPES = ["send_assessment", "diagnostic_battery"]
+// (a single assessment, the background questionnaire, or a full battery) rather
+// than a plain client-scoped message. These get the access-link communications
+// record + audit event.
+const ASSESSMENT_LINK_TEMPLATE_TYPES = [
+  "send_assessment",
+  "diagnostic_battery",
+  BACKGROUND_QUESTIONNAIRE_TEMPLATE_KEY,
+]
 
 type SendEmailBody = {
   to?: string

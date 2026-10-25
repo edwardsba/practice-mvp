@@ -1,10 +1,32 @@
 export const QUESTIONNAIRE_LINK_VARIABLE = "{questionnaire_link}"
 
+export const BACKGROUND_QUESTIONNAIRE_TEMPLATE_KEY = "background_questionnaire"
+
+export const DEFAULT_BACKGROUND_QUESTIONNAIRE_NAME = "Background Questionnaire"
+
+export const DEFAULT_BACKGROUND_QUESTIONNAIRE_BUTTON_LABEL =
+  "Start Background Questionnaire"
+
+export const DEFAULT_BACKGROUND_QUESTIONNAIRE_SUBJECT =
+  "Background questionnaire — {practice_name}"
+
+export const DEFAULT_BACKGROUND_QUESTIONNAIRE_MESSAGE = `Hi {client_first_name},
+
+Before your assessment, please complete a short background questionnaire. It takes about 10 minutes and every question can be skipped.
+
+{questionnaire_link}
+
+This link expires on {expiry_date}.
+
+{practitioner_name}
+{practice_name}`
+
 export const SYSTEM_LINK_TEMPLATE_KEYS: string[] = [
   "send_assessment",
   "pre_session_questionnaire",
   "post_session",
   "diagnostic_battery",
+  BACKGROUND_QUESTIONNAIRE_TEMPLATE_KEY,
 ]
 
 export const NO_ACTION_BUTTON_TEMPLATE_KEYS: string[] = [
@@ -18,6 +40,7 @@ export const PROTECTED_TEMPLATE_KEYS: string[] = [
   "pre_session_questionnaire",
   "post_session",
   "diagnostic_battery",
+  BACKGROUND_QUESTIONNAIRE_TEMPLATE_KEY,
 ]
 
 export const EXCLUDED_FROM_MANUAL_SEND_TEMPLATE_KEYS: string[] = [

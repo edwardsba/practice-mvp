@@ -4,10 +4,6 @@ import { drizzle } from "drizzle-orm/node-postgres"
 import { Pool } from "pg"
 
 import {
-  DEFAULT_QUESTIONNAIRE_MESSAGE,
-  DEFAULT_QUESTIONNAIRE_SUBJECT,
-} from "../lib/email/templates"
-import {
   DEFAULT_CRISIS_PLAN_MESSAGE,
   DEFAULT_CRISIS_PLAN_SUBJECT,
 } from "../lib/email/crisis-plan-templates"
@@ -23,6 +19,15 @@ import {
   DEFAULT_DIAGNOSTIC_BATTERY_MESSAGE,
   DEFAULT_DIAGNOSTIC_BATTERY_SUBJECT,
 } from "../lib/email/diagnostic-battery-templates"
+import {
+  BACKGROUND_QUESTIONNAIRE_TEMPLATE_KEY,
+  DEFAULT_BACKGROUND_QUESTIONNAIRE_BUTTON_LABEL,
+  DEFAULT_BACKGROUND_QUESTIONNAIRE_MESSAGE,
+  DEFAULT_BACKGROUND_QUESTIONNAIRE_NAME,
+  DEFAULT_BACKGROUND_QUESTIONNAIRE_SUBJECT,
+  DEFAULT_QUESTIONNAIRE_MESSAGE,
+  DEFAULT_QUESTIONNAIRE_SUBJECT,
+} from "../lib/email/templates"
 import { emailTemplates, practices } from "./schema"
 
 config({ path: ".env.local" })
@@ -82,6 +87,16 @@ This is a reminder that you have an appointment on {appointment_date} at {appoin
     defaultBcc: null as string | null,
     hasActionButton: true,
     actionButtonLabel: "Complete Diagnostic Assessment",
+  },
+  {
+    templateKey: BACKGROUND_QUESTIONNAIRE_TEMPLATE_KEY,
+    name: DEFAULT_BACKGROUND_QUESTIONNAIRE_NAME,
+    subject: DEFAULT_BACKGROUND_QUESTIONNAIRE_SUBJECT,
+    message: DEFAULT_BACKGROUND_QUESTIONNAIRE_MESSAGE,
+    defaultCc: null as string | null,
+    defaultBcc: null as string | null,
+    hasActionButton: true,
+    actionButtonLabel: DEFAULT_BACKGROUND_QUESTIONNAIRE_BUTTON_LABEL,
   },
   {
     templateKey: "post_session",

@@ -28,6 +28,7 @@ export async function proxy(request: NextRequest) {
     pathname === "/login" ||
     pathname.startsWith("/q/") ||
     pathname === "/api/assessments/submit" ||
+    pathname === "/api/assessments/submit-background" ||
     pathname.startsWith("/api/cron/")
   const isApi = pathname.startsWith("/api/")
   if (!user && !isPublic) {

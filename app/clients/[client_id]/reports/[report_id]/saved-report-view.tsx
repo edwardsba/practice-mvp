@@ -101,7 +101,9 @@ export function SavedReportView({
         </CardContent>
       </Card>
 
-      <AssessmentSummaryMethodologyNote />
+      {snapshot.templateKey === "background_report" ? null : (
+        <AssessmentSummaryMethodologyNote />
+      )}
 
       <div id="report-print-area" className="report-print-area">
         <ReportDocument

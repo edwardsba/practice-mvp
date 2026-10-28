@@ -16,6 +16,7 @@ import { db } from "@/lib/db"
 import { commitReportDraft, commitReportFinalise } from "@/lib/reports/commit"
 import { buildReportFilename } from "@/lib/reports/filename"
 import { generateReportPdf } from "@/lib/reports/generate-pdf"
+import { attachBackgroundReport } from "@/lib/reports/prepare-background-report"
 import {
   attachLetterBodyToSnapshot,
   resolveLetterBodyJson,
@@ -57,6 +58,25 @@ async function buildReportValues(
   )
   if (parsed.error || !parsed.values) {
     return parsed
+  }
+
+  if (parsed.values.snapshot.templateKey === "background_report") {
+    const snapshot = await attachBackgroundReport({
+      snapshot: parsed.values.snapshot,
+      practiceId,
+      clientId,
+      practitionerProfileId,
+      existingDraftReportId,
+      previousVersionId,
+      formLetterBodyJson: formData.get("letter_body_json"),
+    })
+    return {
+      values: {
+        ...parsed.values,
+        letterBodyJson: snapshot.letterBodyJson,
+        snapshot,
+      },
+    }
   }
 
   const letterBodyJson = await resolveLetterBodyJson({
@@ -114,6 +134,66 @@ async function parseReportForm(
       : recipientTypeRaw === "client"
         ? "client"
         : "none"
+
+  if (templateKey === "background_report") {
+    let recipient: ReportRecipient = {
+      type: "none",
+      name: null,
+      title: null,
+      firstName: null,
+      lastName: null,
+      organisationName: null,
+      streetAddress: null,
+      postalAddress: null,
+    }
+    if (recipientType === "client") {
+      recipient = { ...recipient, type: "client" }
+    } else if (recipientType === "referrer" && fundingApprovalId) {
+      recipient = await buildReferrerRecipient(clientId, practiceId, fundingApprovalId)
+    }
+
+    const snapshot = await buildSnapshot(
+      clientId,
+      context,
+      reportDate,
+      reportDate,
+      [],
+      [],
+      [],
+      [],
+      [],
+      [],
+      clinicalSummaryText,
+      null,
+      recipient,
+      fundingApprovalId,
+      reportRequirementId,
+      [],
+      reportTitle,
+      templateKey,
+      reportDate
+    )
+    if (!snapshot) {
+      return { error: "Unable to save report. Client or practice not found." }
+    }
+
+    return {
+      values: {
+        reportType: "background_report",
+        reportTypeId,
+        reportDate,
+        dateRangeStart: reportDate,
+        dateRangeEnd: reportDate,
+        snapshot,
+        clinicalSummaryText,
+        recommendationsText: null,
+        letterBodyJson: null,
+        recipientType: recipientType === "none" ? null : recipientType,
+        fundingApprovalId,
+        reportRequirementId,
+      },
+    }
+  }
 
   if (templateKey === "referral_acknowledgement") {
     if (!fundingApprovalId) {

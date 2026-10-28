@@ -50,9 +50,14 @@ export async function resolveLetterBodyJson({
     }
   }
 
-  return resolveTemplateKey(templateKey) === "referral_acknowledgement"
-    ? generateReferralAcknowledgementLetterBody(snapshot)
-    : generateLetterBody(snapshot)
+  const key = resolveTemplateKey(templateKey)
+  if (key === "referral_acknowledgement") {
+    return generateReferralAcknowledgementLetterBody(snapshot)
+  }
+  if (key === "background_report") {
+    return null
+  }
+  return generateLetterBody(snapshot)
 }
 
 export function attachLetterBodyToSnapshot(

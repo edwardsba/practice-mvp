@@ -8,6 +8,9 @@ export const REPORT_TEMPLATE_KEYS = [
   // <option> per REPORT_TEMPLATE_KEYS entry already — no change needed there) and is
   // what report-form.tsx's isSageDiagnostic branch checks for.
   "sage_sr_diagnostic",
+  // Background Report is a simple_reports letter, like Progress Report. The
+  // Settings report type is created in the app; this key is what that form offers.
+  "background_report",
 ] as const
 
 export type ReportTemplateKey = (typeof REPORT_TEMPLATE_KEYS)[number]
@@ -16,6 +19,7 @@ export const REPORT_TEMPLATE_LABELS: Record<ReportTemplateKey, string> = {
   progress_report: "Progress Report",
   referral_acknowledgement: "Referral Acknowledgement",
   sage_sr_diagnostic: "SAGE-SR Diagnostic Report",
+  background_report: "Background Report",
 }
 
 export const DEFAULT_TEMPLATE_KEY: ReportTemplateKey = "progress_report"

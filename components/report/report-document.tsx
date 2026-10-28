@@ -1,6 +1,7 @@
 import { ReportBtpResultsTable } from "@/components/report/btp-results-table"
 import { EditableParagraph } from "@/components/report/editable-paragraph"
 import { LetterBodyEditor } from "@/components/report/letter-body-editor"
+import type { ReactNode } from "react"
 import type { ReportSnapshot } from "@/lib/reports/snapshot"
 import {
   getAsqResultsFromSnapshot,
@@ -153,6 +154,7 @@ function SignatureBlock({ snapshot }: { snapshot: ReportSnapshot }) {
 }
 
 function ProgressReportFixedHeader({ snapshot }: { snapshot: ReportSnapshot }) {
+  const showProgressChrome = snapshot.templateKey !== "background_report"
   return (
     <>
       <section className="report-client-details space-y-0.5 text-sm">
@@ -166,7 +168,7 @@ function ProgressReportFixedHeader({ snapshot }: { snapshot: ReportSnapshot }) {
         </p>
       </section>
 
-      {snapshot.fundingApproval ? (
+      {showProgressChrome && snapshot.fundingApproval ? (
         <section className="report-funding-approval space-y-0.5 text-sm">
           <p>Approval type: {snapshot.fundingApproval.approvalTypeName}</p>
           {snapshot.fundingApproval.startDate ? (
@@ -183,7 +185,8 @@ function ProgressReportFixedHeader({ snapshot }: { snapshot: ReportSnapshot }) {
         </section>
       ) : null}
 
-      {!snapshot.fundingApproval &&
+      {showProgressChrome &&
+      !snapshot.fundingApproval &&
       snapshot.dateRangeStart &&
       snapshot.dateRangeEnd ? (
         <section className="report-period text-sm">
@@ -492,16 +495,19 @@ function RichTextProgressReportBody({
   letterBodyPending = false,
   onLetterBodyChange,
   omitEmptySections = false,
+  beforeLetter = null,
 }: {
   snapshot: ReportSnapshot
   editable?: boolean
   letterBodyPending?: boolean
   onLetterBodyChange?: (value: LetterBodyDoc) => void
   omitEmptySections?: boolean
+  beforeLetter?: ReactNode
 }) {
   return (
     <div className="space-y-4">
       <ProgressReportFixedHeader snapshot={snapshot} />
+      {beforeLetter}
 
       {letterBodyPending ? (
         <p className="text-sm text-muted-foreground">
@@ -636,6 +642,7 @@ export function ReportDocument({
   editable = false,
   letterBodyPending = false,
   useLegacyProgressBody = false,
+  beforeLetter = null,
   onClinicalSummaryChange,
   onRecommendationsChange,
   onLetterBodyChange,
@@ -646,6 +653,7 @@ export function ReportDocument({
   editable?: boolean
   letterBodyPending?: boolean
   useLegacyProgressBody?: boolean
+  beforeLetter?: ReactNode
   onClinicalSummaryChange?: (value: string) => void
   onRecommendationsChange?: (value: string) => void
   onLetterBodyChange?: (value: LetterBodyDoc) => void
@@ -677,6 +685,7 @@ export function ReportDocument({
             letterBodyPending={letterBodyPending}
             onLetterBodyChange={onLetterBodyChange}
             omitEmptySections={omitEmptySections}
+            beforeLetter={beforeLetter}
           />
         )
       ) : isReferralAcknowledgement ? (

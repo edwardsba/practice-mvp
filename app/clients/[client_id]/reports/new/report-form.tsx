@@ -27,6 +27,7 @@ import {
 } from "@/app/clients/[client_id]/reports/sage-sr-diagnostic-report-actions"
 import { DocumentPreviewModal } from "@/components/documents/document-preview-modal"
 import { AssessmentSummaryMethodologyNote } from "@/components/report/assessment-summary-methodology-note"
+import { BackgroundWorthChecking } from "@/components/report/background-worth-checking"
 import { ReportDocument } from "@/components/report/report-document"
 import { SageSrDiagnosticReportContentView } from "@/components/report/sage-sr-diagnostic-report-content-view"
 import { AsqStatusBadge } from "@/components/session-notes/asq-status-badge"
@@ -48,6 +49,7 @@ import {
   todayDateString,
 } from "@/lib/appointments/format"
 import type { SageSrDiagnosticReportContent } from "@/lib/assessment-summary/load-sage-sr-diagnostic-report"
+import { backgroundChecks } from "@/lib/client-background/checks"
 import type {
   SageSrDiagnosticReportInstanceOption,
   SageSrDiagnosticReportInstanceOptions,
@@ -256,6 +258,7 @@ export function ReportForm({
   const reportTitle = selectedReportType?.name ?? "Progress Report"
   const isReferralAck = templateKey === "referral_acknowledgement"
   const isSageDiagnostic = templateKey === "sage_sr_diagnostic"
+  const isBackground = templateKey === "background_report"
 
   // --- SAGE-SR Diagnostic Report composer state -------------------------------------
   // Entirely separate from the simple_reports state above (funding/appointments/letter
@@ -465,10 +468,14 @@ export function ReportForm({
   ])
 
   useEffect(() => {
+    if (isBackground || isReferralAck || isSageDiagnostic) return
     if (selectedApproval) {
       loadPreview(selectedAppointmentIds, derivedDateRangeStart, derivedDateRangeEnd)
     }
   }, [
+    isBackground,
+    isReferralAck,
+    isSageDiagnostic,
     selectedApproval,
     selectedAppointmentIds,
     derivedDateRangeStart,
@@ -477,10 +484,19 @@ export function ReportForm({
   ])
 
   useEffect(() => {
+    if (isBackground || isReferralAck || isSageDiagnostic) return
     if (!selectedApproval) {
       loadPreview([], dateRangeStart, dateRangeEnd)
     }
-  }, [selectedApproval, dateRangeStart, dateRangeEnd, loadPreview])
+  }, [
+    isBackground,
+    isReferralAck,
+    isSageDiagnostic,
+    selectedApproval,
+    dateRangeStart,
+    dateRangeEnd,
+    loadPreview,
+  ])
 
   useEffect(() => {
     if (
@@ -580,7 +596,34 @@ export function ReportForm({
           crisisPlanDate,
         }
       : null
-    : effectiveDateRangeStart && effectiveDateRangeEnd
+    : isBackground
+      ? {
+          ...initialSnapshot,
+          reportTitle,
+          templateKey,
+          reportDate,
+          generatedAt: new Date().toISOString(),
+          dateRangeStart: reportDate,
+          dateRangeEnd: reportDate,
+          phq9Results: [],
+          gad7Results: [],
+          asqResults: [],
+          mseResults: [],
+          assistResults: [],
+          btpResults: [],
+          clinicalSummaryText: null,
+          recommendationsText: null,
+          letterBodyJson,
+          recipient,
+          fundingApproval: null,
+          selectedAppointmentIds: [],
+          therapeuticTarget: therapeuticTarget ?? initialSnapshot.therapeuticTarget ?? null,
+          behaviouralTargets,
+          assistEnabled,
+          suicideAttempts,
+          crisisPlanDate,
+        }
+      : effectiveDateRangeStart && effectiveDateRangeEnd
       ? {
           ...initialSnapshot,
           reportTitle,
@@ -609,11 +652,35 @@ export function ReportForm({
         }
       : null
 
-  const hasPreviewSource = isReferralAck
-    ? Boolean(fundingApprovalId)
+  const hasPreviewSource = isBackground
+    ? true
+    : isReferralAck
+      ? Boolean(fundingApprovalId)
+      : selectedApproval
+        ? selectedAppointmentIds.length > 0
+        : Boolean(dateRangeStart && dateRangeEnd)
+
+  const scheduleReady = isBackground
+    ? true
     : selectedApproval
-      ? selectedAppointmentIds.length > 0
+      ? Boolean(
+          derivedDateRangeStart &&
+            derivedDateRangeEnd &&
+            selectedAppointmentIds.length > 0
+        )
       : Boolean(dateRangeStart && dateRangeEnd)
+
+  const backgroundNotice =
+    isBackground && initialSnapshot.background
+      ? {
+          checks: backgroundChecks({
+            data: initialSnapshot.background.data,
+            numberOfChildren: initialSnapshot.background.numberOfChildren,
+            screening: initialSnapshot.background.screening,
+          }),
+          omissions: initialSnapshot.backgroundOmissions ?? [],
+        }
+      : null
 
   const previewLoading = isPendingPreview && hasPreviewSource
 
@@ -622,17 +689,29 @@ export function ReportForm({
       <input
         type="hidden"
         name="date_range_start"
-        value={selectedApproval ? derivedDateRangeStart : dateRangeStart}
+        value={
+          isBackground
+            ? reportDate
+            : selectedApproval
+              ? derivedDateRangeStart
+              : dateRangeStart
+        }
       />
       <input
         type="hidden"
         name="date_range_end"
-        value={selectedApproval ? derivedDateRangeEnd : dateRangeEnd}
+        value={
+          isBackground
+            ? reportDate
+            : selectedApproval
+              ? derivedDateRangeEnd
+              : dateRangeEnd
+        }
       />
       <input
         type="hidden"
         name="appointment_ids"
-        value={isReferralAck ? "" : selectedAppointmentIds.join(",")}
+        value={isReferralAck || isBackground ? "" : selectedAppointmentIds.join(",")}
       />
       <input
         type="hidden"
@@ -765,7 +844,7 @@ export function ReportForm({
           </CardContent>
         </Card>
 
-        {isSageDiagnostic ? null : <AssessmentSummaryMethodologyNote />}
+        {isSageDiagnostic || isBackground ? null : <AssessmentSummaryMethodologyNote />}
 
         {isSageDiagnostic ? (
           <Card>
@@ -802,7 +881,7 @@ export function ReportForm({
               ) : null}
             </CardContent>
           </Card>
-        ) : isReferralAck ? null : (
+        ) : isReferralAck || isBackground ? null : (
           <>
             {selectedApproval ? (
               <Card>
@@ -1042,6 +1121,16 @@ export function ReportForm({
                 snapshot={previewSnapshot}
                 editable
                 letterBodyPending={letterBodyPending}
+                omitEmptySections={isBackground}
+                beforeLetter={
+                  backgroundNotice ? (
+                    <BackgroundWorthChecking
+                      clientId={clientId}
+                      checks={backgroundNotice.checks}
+                      omissions={backgroundNotice.omissions}
+                    />
+                  ) : null
+                }
                 onClinicalSummaryChange={setClinicalSummary}
                 onRecommendationsChange={setRecommendations}
                 onLetterBodyChange={setLetterBodyJson}
@@ -1071,15 +1160,7 @@ export function ReportForm({
             <Button
               type="submit"
               variant="outline"
-              disabled={
-                savePending ||
-                !reportTypeId ||
-                (selectedApproval
-                  ? !derivedDateRangeStart ||
-                    !derivedDateRangeEnd ||
-                    selectedAppointmentIds.length === 0
-                  : !dateRangeStart || !dateRangeEnd)
-              }
+              disabled={savePending || !reportTypeId || !scheduleReady}
             >
               {savePending ? "Saving…" : "Save Draft"}
             </Button>
@@ -1087,15 +1168,7 @@ export function ReportForm({
               type="submit"
               formAction={previewFormAction}
               onClick={() => setPreviewDismissed(false)}
-              disabled={
-                previewPending ||
-                !reportTypeId ||
-                (selectedApproval
-                  ? !derivedDateRangeStart ||
-                    !derivedDateRangeEnd ||
-                    selectedAppointmentIds.length === 0
-                  : !dateRangeStart || !dateRangeEnd)
-              }
+              disabled={previewPending || !reportTypeId || !scheduleReady}
             >
               {previewPending ? "Generating preview…" : "Review and Finalise"}
             </Button>
@@ -1110,9 +1183,17 @@ export function ReportForm({
           pdfBase64={previewState.pdfBase64!}
           onCancel={() => setPreviewDismissed(true)}
           hiddenFields={{
-            date_range_start: selectedApproval ? derivedDateRangeStart : dateRangeStart,
-            date_range_end: selectedApproval ? derivedDateRangeEnd : dateRangeEnd,
-            appointment_ids: isReferralAck ? "" : selectedAppointmentIds.join(","),
+            date_range_start: isBackground
+              ? reportDate
+              : selectedApproval
+                ? derivedDateRangeStart
+                : dateRangeStart,
+            date_range_end: isBackground
+              ? reportDate
+              : selectedApproval
+                ? derivedDateRangeEnd
+                : dateRangeEnd,
+            appointment_ids: isReferralAck || isBackground ? "" : selectedAppointmentIds.join(","),
             recipient_type: recipientType === "referrer" ? "referrer" : recipientType,
             funding_approval_id: fundingApprovalId,
             report_requirement_id: requirementId,

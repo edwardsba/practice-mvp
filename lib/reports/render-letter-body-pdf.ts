@@ -29,14 +29,41 @@ function renderInlineText(
   }
 }
 
+function hangingLine(
+  doc: PDFKit.PDFDocument,
+  label: string,
+  text: string,
+  labelWidth: number,
+  boldText: boolean
+) {
+  const left = doc.page.margins.left
+  const width = doc.page.width - doc.page.margins.left - doc.page.margins.right
+  doc.moveDown(0.35)
+  const y = doc.y
+  doc.font("Helvetica-Bold").fontSize(10).fillColor("#111111")
+  doc.text(label, left, y, { width: labelWidth, lineGap: 4 })
+  const labelBottom = doc.y
+  doc.font(boldText ? "Helvetica-Bold" : "Helvetica").fontSize(10).fillColor("#111111")
+  doc.text(text, left + labelWidth, y, { width: width - labelWidth, lineGap: 4 })
+  if (doc.y < labelBottom) doc.y = labelBottom
+  doc.x = left
+}
+
 export function renderLetterBodyPdf(
   doc: PDFKit.PDFDocument,
   letterBody: LetterBodyDoc,
   helpers: PdfTextHelpers
 ) {
+  let section = 0
+
   for (const node of letterBody.content) {
     if (node.type === "heading") {
-      helpers.groupHeading(doc, nodeText(node))
+      if (node.attrs?.numbered) {
+        section += 1
+        hangingLine(doc, `${section}.`, nodeText(node), 28, true)
+      } else {
+        helpers.groupHeading(doc, nodeText(node))
+      }
       continue
     }
 
@@ -58,6 +85,19 @@ export function renderLetterBodyPdf(
         if (itemText) {
           helpers.bodyText(doc, `• ${itemText}`)
         }
+      }
+      continue
+    }
+
+    if (node.type === "orderedList") {
+      let item = 0
+      for (const child of node.content ?? []) {
+        if (child.type !== "listItem") continue
+        item += 1
+        const itemText = nodeText(child)
+        if (!itemText) continue
+        const label = section > 0 ? `${section}.${item}.` : `${item}.`
+        hangingLine(doc, label, itemText, 36, false)
       }
     }
   }

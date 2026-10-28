@@ -1,3 +1,7 @@
+import type {
+  BackgroundReportOmission,
+  BackgroundReportSource,
+} from "@/lib/reports/generate-background-report"
 import type { LetterBodyDoc } from "@/lib/reports/letter-body-types"
 import { isLetterBodyDoc } from "@/lib/reports/letter-body-types"
 import type { SuicideAttemptRecord } from "@/lib/treatment-plans/types"
@@ -98,6 +102,10 @@ export type ReportSnapshot = {
   suicideAttempts: SuicideAttemptRecord[]
   crisisPlanDate: string | null
   selectedAppointmentIds?: string[]
+  /** Frozen inputs the Background report was written from. */
+  background?: BackgroundReportSource | null
+  /** Gaps the generator left out of that letter. */
+  backgroundOmissions?: BackgroundReportOmission[]
 }
 
 export function getPhq9ResultsFromSnapshot(snapshot: ReportSnapshot): ReportResultRow[] {
@@ -199,5 +207,26 @@ export function parseReportSnapshot(value: unknown): ReportSnapshot | null {
     crisisPlanDate: raw.crisisPlanDate ?? null,
     letterBodyJson: isLetterBodyDoc(raw.letterBodyJson) ? raw.letterBodyJson : null,
     selectedAppointmentIds: raw.selectedAppointmentIds ?? [],
+    background: parseBackgroundSource(raw.background),
+    backgroundOmissions: parseBackgroundOmissions(raw.backgroundOmissions),
   }
+}
+
+function parseBackgroundSource(value: unknown): BackgroundReportSource | null {
+  if (!value || typeof value !== "object") return null
+  const source = value as BackgroundReportSource
+  if (!source.data || typeof source.clientFirstName !== "string") return null
+  return source
+}
+
+function parseBackgroundOmissions(value: unknown): BackgroundReportOmission[] {
+  if (!Array.isArray(value)) return []
+  return value.filter(
+    (item): item is BackgroundReportOmission =>
+      Boolean(item) &&
+      typeof item === "object" &&
+      typeof (item as BackgroundReportOmission).id === "string" &&
+      typeof (item as BackgroundReportOmission).message === "string" &&
+      typeof (item as BackgroundReportOmission).target === "string"
+  )
 }

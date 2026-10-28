@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState, type ReactNode } from "react"
+import { useEffect, useMemo, useState, type ReactNode } from "react"
 import { ChevronDown } from "lucide-react"
 
 import { DemographicsSection } from "@/components/client-background/demographics-section"
@@ -43,6 +43,26 @@ export function ClientBackgroundPage({
   reasonSupport: ReasonSupport
 }) {
   const [open, setOpen] = useState<SectionId | null>(null)
+  useEffect(() => {
+    const hash = window.location.hash.replace(/^#/, "")
+    if (!hash.startsWith("check-")) return
+    const target = hash.slice("check-".length)
+    const section: SectionId =
+      target === "reason" ||
+      target === "stressors" ||
+      target === "relationships" ||
+      target === "history" ||
+      target === "risk"
+        ? target
+        : target.startsWith("history")
+          ? "history"
+          : "demographics"
+    setOpen(section)
+    window.setTimeout(() => {
+      document.getElementById(hash)?.scrollIntoView({ behavior: "smooth", block: "start" })
+    }, 50)
+  }, [])
+
   const checks = useMemo(
     () =>
       backgroundChecks({
@@ -69,7 +89,7 @@ export function ClientBackgroundPage({
       {SECTIONS.map((item) => (
         <SectionCard
           key={item.id}
-          id={item.id === "demographics" ? undefined : `check-${item.id}`}
+          id={`check-${item.id}`}
           title={item.label}
           open={open === item.id}
           onToggle={() => toggle(item.id)}

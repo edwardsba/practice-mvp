@@ -468,6 +468,31 @@ function drawAssessmentDataTables(
   }
 }
 
+function drawBackgroundReportBody(doc: PDFKit.PDFDocument, snapshot: ReportSnapshot) {
+  doc.font("Helvetica").fontSize(BASE_FONT_SIZE).fillColor(TEXT_COLOR)
+  doc.text(
+    `Client name: ${snapshot.client.firstName} ${snapshot.client.lastName}`,
+    PAGE_MARGIN,
+    doc.y,
+    { lineGap: LINE_GAP }
+  )
+  if (snapshot.client.dateOfBirth) {
+    doc.text(`Date of birth: ${formatDisplayDate(snapshot.client.dateOfBirth)}`, {
+      lineGap: LINE_GAP,
+    })
+  }
+  doc.x = PAGE_MARGIN
+  doc.y = doc.y + SECTION_GAP
+
+  if (isLetterBodyDoc(snapshot.letterBodyJson)) {
+    renderLetterBodyPdf(doc, snapshot.letterBodyJson, {
+      groupHeading,
+      bodyText: (pdfDoc, text) => bodyText(pdfDoc, text, { width: CONTENT_WIDTH }),
+    })
+  }
+  drawSignature(doc, snapshot)
+}
+
 function drawProgressReportBody(doc: PDFKit.PDFDocument, snapshot: ReportSnapshot) {
   if (isLetterBodyDoc(snapshot.letterBodyJson)) {
     drawProgressReportFixedHeader(doc, snapshot)
@@ -811,6 +836,8 @@ export function generateReportPdf(snapshot: ReportSnapshot): Promise<Buffer> {
 
     if (templateKey === "referral_acknowledgement") {
       drawReferralAcknowledgementBody(doc, snapshot)
+    } else if (templateKey === "background_report") {
+      drawBackgroundReportBody(doc, snapshot)
     } else {
       drawProgressReportBody(doc, snapshot)
     }

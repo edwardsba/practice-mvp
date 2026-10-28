@@ -449,8 +449,9 @@ export function InterviewPage({
             <AutosaveFields
               saved={data.medication}
               save={async (value) => {
-                medicationRef.current = value
-                const result = await saveMedicationAction(clientId, value)
+                const next = { ...value, previouslyTaken: medicationRef.current.previouslyTaken }
+                medicationRef.current = next
+                const result = await saveMedicationAction(clientId, next)
                 if (result.error || !("medication" in result) || !result.medication) {
                   return { error: result.error ?? "Could not save medication." }
                 }
@@ -461,7 +462,7 @@ export function InterviewPage({
               registerFlush={registerFlush}
             >
               {(value, onChange, commit) => {
-                medicationRef.current = value
+                medicationRef.current = { ...value, previouslyTaken: medicationRef.current.previouslyTaken }
                 return (
                   <MedicationFields
                     idPrefix="interview_medication"

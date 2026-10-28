@@ -318,6 +318,14 @@ assert.deepEqual(
   }),
   []
 )
+assert.deepEqual(
+  backgroundChecks(
+    input({
+      data: data({ medication: { currentlyTaking: "no", previouslyTaken: "yes", supervisedBy: "" } }),
+    })
+  ).map((check) => check.id),
+  []
+)
 
 const disability = backgroundChecks(
   input({

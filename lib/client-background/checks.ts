@@ -1,4 +1,4 @@
-import { eventsForQuestion, HISTORY_QUESTION_KEYS, HISTORY_QUESTIONS, type ScreeningAnswers } from "@/lib/client-background/interview-history"
+import { eventsForQuestion, historyQuestionAcceptsEntries, HISTORY_QUESTION_KEYS, HISTORY_QUESTIONS, type ScreeningAnswers } from "@/lib/client-background/interview-history"
 import { needsLinkingItems } from "@/lib/client-background/relationship-groups"
 import { buildRelationshipTree, personRoleLabel } from "@/lib/client-background/tree"
 import {
@@ -149,6 +149,7 @@ export function backgroundChecks(input: BackgroundCheckInput): BackgroundCheck[]
 
   if (input.screening) {
     for (const key of HISTORY_QUESTION_KEYS) {
+      if (!historyQuestionAcceptsEntries(key)) continue
       if (input.screening[key] !== "yes") continue
       if (eventsForQuestion(data.events, key, data.dateOfBirth).length > 0) continue
       checks.push({

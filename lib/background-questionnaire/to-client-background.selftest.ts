@@ -142,11 +142,13 @@ assert.deepEqual(Object.keys(historyMapped.history).sort(), [
   "family_emotional_problems",
   "family_psychiatric_admission",
   "family_substance_use",
+  "medication_history",
   "previous_therapy",
   "psychiatric_admission",
 ])
 assert.deepEqual(historyMapped.medication.currentlyTaking, { label: "No", apply: "no" })
-assert.deepEqual(historyMapped.medication.previouslyTaken, { label: "Yes", apply: "yes" })
+assert.equal(historyMapped.medication.previouslyTaken, undefined)
+assert.deepEqual(historyMapped.history.medication_history, { label: "Yes", apply: "yes" })
 assert.deepEqual(historyMapped.history.family_emotional_problems, { label: "Yes", apply: "yes" })
 assert.deepEqual(historyMapped.history.family_substance_use, { label: "No", apply: "no" })
 assert.deepEqual(historyMapped.history.family_psychiatric_admission, { label: "Yes", apply: "yes" })

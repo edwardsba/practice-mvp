@@ -8,6 +8,7 @@ import {
   createEventAction,
   deleteEventAction,
   saveInterviewScreeningAction,
+  saveMedicationAction,
   saveStressorsAction,
   updateEventAction,
 } from "@/app/clients/[client_id]/background/actions"
@@ -32,12 +33,13 @@ import {
   HISTORY_QUESTION_GROUPS,
   HISTORY_QUESTIONS,
   eventsForQuestion,
+  historyQuestionAcceptsEntries,
   unansweredInterviewLabels,
   type HistoryQuestionKey,
   type ScreeningAnswer,
   type ScreeningAnswers,
 } from "@/lib/client-background/interview-history"
-import { emptyEvent, type EventRecord, type MedicationRecord, type ReasonForAttending, type RelationshipRecord, type StressorsRecord } from "@/lib/client-background/types"
+import { emptyEvent, type EventRecord, type MedicationRecord, type ReasonForAttending, type RelationshipRecord, type StressorsRecord, type TriStateAnswer } from "@/lib/client-background/types"
 
 export function InterviewHistory({
   clientId,
@@ -82,6 +84,7 @@ export function InterviewHistory({
   onJumpToCheck: (check: BackgroundCheck) => void
 }) {
   const [answers, setAnswers] = useState(screening)
+  const [previouslyTaken, setPreviouslyTaken] = useState<TriStateAnswer | null>(medicationRef.current.previouslyTaken)
   const [entries, setEntries] = useState(events)
   const [sheet, setSheet] = useState<{ draft: EventRecord; editing: boolean; isNew: boolean } | null>(null)
   const [pending, setPending] = useState(false)
@@ -157,6 +160,7 @@ export function InterviewHistory({
   }
 
   async function choose(key: HistoryQuestionKey, answer: ScreeningAnswer | "") {
+    if (!historyQuestionAcceptsEntries(key)) return
     const next = { ...answersRef.current }
     if (answer === "") delete next[key]
     else next[key] = answer
@@ -183,9 +187,35 @@ export function InterviewHistory({
     }
   }
 
+  async function chooseMedicationHistory(answer: TriStateAnswer | null) {
+    const next = { ...medicationRef.current, previouslyTaken: answer }
+    medicationRef.current = next
+    setPreviouslyTaken(answer)
+    const current = ++token.current
+    onPhase("medication", "saving", null)
+    const work = (async () => {
+      const result = await saveMedicationAction(clientId, next)
+      if (current !== token.current) return
+      if (result.error || !("medication" in result) || !result.medication) {
+        onPhase("medication", "error", () => void chooseMedicationHistory(answer))
+        return
+      }
+      medicationRef.current = result.medication
+      setPreviouslyTaken(result.medication.previouslyTaken)
+      onPhase("medication", "saved", null)
+    })()
+    inflight.current = work
+    try {
+      await work
+    } finally {
+      if (inflight.current === work) inflight.current = null
+    }
+  }
+
   function addEntry(key: HistoryQuestionKey, event: MouseEvent<HTMLButtonElement>) {
     remember(event)
     const question = HISTORY_QUESTIONS[key]
+    if (!question.eventType || !question.attribution) return
     setError(null)
     setSheet({
       draft: {
@@ -277,10 +307,38 @@ export function InterviewHistory({
           <CardContent className="space-y-4">
             {group.keys.map((key) => {
               const question = HISTORY_QUESTIONS[key]
+              const suggestion = historyClient?.[key]
+              if (key === "medication_history") {
+                return (
+                  <div key={key} id={`check-history-${key}`} className="scroll-mt-28 space-y-2 border-b pb-4 last:border-b-0 last:pb-0">
+                    <SelectField
+                      id={`history_${key}`}
+                      label={question.label}
+                      value={previouslyTaken ?? ""}
+                      client={
+                        suggestion ? (
+                          <ClientAnswer
+                            label={suggestion.label}
+                            matches={previouslyTaken === suggestion.apply}
+                            onUse={() => void chooseMedicationHistory(suggestion.apply)}
+                          />
+                        ) : undefined
+                      }
+                      onChange={(next) => {
+                        void chooseMedicationHistory(next === "yes" || next === "no" || next === "not_asked" ? next : null)
+                      }}
+                    >
+                      <option value="">Select…</option>
+                      <option value="yes">Yes</option>
+                      <option value="no">No</option>
+                      <option value="not_asked">Not asked</option>
+                    </SelectField>
+                  </div>
+                )
+              }
               const listed = eventsForQuestion(entries, key, dateOfBirth)
               const locked = listed.length > 0
               const shown: ScreeningAnswer | null = locked ? "yes" : answers[key] ?? null
-              const suggestion = historyClient?.[key]
               return (
                 <div key={key} id={`check-history-${key}`} className="scroll-mt-28 space-y-2 border-b pb-4 last:border-b-0 last:pb-0">
                   <SelectField

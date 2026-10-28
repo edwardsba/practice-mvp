@@ -81,7 +81,6 @@ export function MedicationFields({
     onCommit?.()
   }
   const current = client?.currentlyTaking
-  const previous = client?.previouslyTaken
   return (
     <>
       <TriStateField
@@ -106,23 +105,6 @@ export function MedicationFields({
           value={value.supervisedBy}
           placeholder="e.g. Dr Patel (GP)"
           onChange={(supervisedBy) => onChange({ ...value, supervisedBy })}
-        />
-      ) : null}
-      {value.currentlyTaking === "no" ? (
-        <TriStateField
-          id={`${idPrefix}_previously_taken`}
-          label="Taken medication in the past"
-          value={value.previouslyTaken}
-          client={
-            previous ? (
-              <ClientAnswer
-                label={previous.label}
-                matches={value.previouslyTaken === previous.apply}
-                onUse={() => apply({ ...value, previouslyTaken: previous.apply })}
-              />
-            ) : undefined
-          }
-          onChange={(previouslyTaken) => onChange({ ...value, previouslyTaken })}
         />
       ) : null}
     </>
@@ -254,9 +236,6 @@ export function MedicationReadOnly({ value }: { value: MedicationRecord }) {
       <ReadOnlyField label="Currently taking medication" value={triStateLabel(value.currentlyTaking)} />
       {value.currentlyTaking === "yes" && value.supervisedBy.trim() ? (
         <ReadOnlyField label="Supervised by" value={value.supervisedBy} />
-      ) : null}
-      {value.currentlyTaking === "no" ? (
-        <ReadOnlyField label="Taken medication in the past" value={triStateLabel(value.previouslyTaken)} />
       ) : null}
     </div>
   )

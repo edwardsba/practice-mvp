@@ -60,7 +60,7 @@ export const EVENT_TYPES = [
   "emotional_problems",
   "family_events",
   "significant_history",
-  "abuse",
+  "traumatic_event",
 ] as const
 export type EventType = (typeof EVENT_TYPES)[number]
 
@@ -147,7 +147,7 @@ export const EVENT_TYPE_LABELS: Record<EventType, string> = {
   emotional_problems: "Emotional problems",
   family_events: "Family events",
   significant_history: "Significant history",
-  abuse: "Abuse",
+  traumatic_event: "Traumatic event",
 }
 
 export const SELF_HARM_TYPE_LABELS: Record<SelfHarmType, string> = {

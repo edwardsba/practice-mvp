@@ -277,7 +277,7 @@ export function backgroundAnswersToClientBackground(
   const currentlyTaking = yesNo(treatment.currentMedication)
   if (currentlyTaking) medication.currentlyTaking = currentlyTaking
   const previouslyTaken = yesNo(treatment.everTakenMedication)
-  if (previouslyTaken) medication.previouslyTaken = previouslyTaken
+  if (previouslyTaken) history.medication_history = previouslyTaken
 
   const stressorSuggestions: ClientBackgroundSuggestions["stressors"] = {}
   for (const item of STRESSOR_TARGETS) {

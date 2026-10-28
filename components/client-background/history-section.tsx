@@ -58,6 +58,7 @@ import {
   type EventRecord,
   type EventType,
   type RelationshipRecord,
+  type TriStateAnswer,
 } from "@/lib/client-background/types"
 import { cn } from "@/lib/utils"
 
@@ -69,12 +70,14 @@ export function HistorySection({
   events,
   relationships,
   interviewSource,
+  previouslyTaken,
 }: {
   clientId: string
   dateOfBirth: string | null
   events: EventRecord[]
   relationships: RelationshipRecord[]
   interviewSource: BackgroundInterviewAnswerSource | null
+  previouslyTaken: TriStateAnswer | null
 }) {
   const [entries, setEntries] = useState(events)
   const [view, setView] = useState<HistoryView>("chronological")
@@ -108,6 +111,7 @@ export function HistorySection({
 
   function addForQuestion(key: HistoryQuestionKey) {
     const question = HISTORY_QUESTIONS[key]
+    if (!question.eventType || !question.attribution) return
     add(question.eventType, question.attribution)
   }
 
@@ -241,6 +245,7 @@ export function HistorySection({
               selectedId={selectedId}
               pending={pending}
               interviewSource={interviewSource}
+              previouslyTaken={previouslyTaken}
               onSelect={select}
               onAdd={addForQuestion}
             />
@@ -274,6 +279,7 @@ function InterviewOrderList({
   selectedId,
   pending,
   interviewSource,
+  previouslyTaken,
   onSelect,
   onAdd,
 }: {
@@ -283,6 +289,7 @@ function InterviewOrderList({
   selectedId: string | null
   pending: boolean
   interviewSource: BackgroundInterviewAnswerSource | null
+  previouslyTaken: TriStateAnswer | null
   onSelect: (entry: EventRecord) => void
   onAdd: (key: HistoryQuestionKey) => void
 }) {
@@ -297,6 +304,16 @@ function InterviewOrderList({
           <CardContent className="space-y-4">
             {group.keys.map((key) => {
               const question = HISTORY_QUESTIONS[key]
+              if (key === "medication_history") {
+                return (
+                  <div key={key} className="space-y-2">
+                    <div className="flex items-start justify-between gap-3">
+                      <h3 className="text-sm font-medium">{question.label}</h3>
+                      <AnswerTag answer={previouslyTaken} />
+                    </div>
+                  </div>
+                )
+              }
               const listed = eventsForQuestion(entries, key, dateOfBirth)
               const shown: ScreeningAnswer | null = listed.length > 0 ? "yes" : (interviewSource?.screening[key] ?? null)
               return (
@@ -319,7 +336,7 @@ function InterviewOrderList({
                       ))}
                     </ul>
                   ) : null}
-                  {shown === "yes" ? (
+                  {question.eventType && shown === "yes" ? (
                     <Button type="button" size="sm" disabled={pending} onClick={() => onAdd(key)}>
                       + Add entry
                     </Button>

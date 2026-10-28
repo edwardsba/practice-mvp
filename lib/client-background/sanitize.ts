@@ -349,6 +349,10 @@ export function markUnansweredMedicationAndStressors(
     nextMedication.currentlyTaking = "not_asked"
     changed = true
   }
+  if (nextMedication.previouslyTaken == null) {
+    nextMedication.previouslyTaken = "not_asked"
+    changed = true
+  }
   for (const item of STRESSOR_ITEMS) {
     if (nextStressors[item.key] == null) {
       nextStressors[item.key] = "not_asked"

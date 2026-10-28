@@ -108,6 +108,7 @@ export function ClientBackgroundPage({
               events={data.events}
               relationships={data.relationships}
               interviewSource={interview.latest}
+              previouslyTaken={data.medication.previouslyTaken}
             />
           ) : null}
           {item.id === "stressors" ? (

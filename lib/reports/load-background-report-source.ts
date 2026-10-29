@@ -13,7 +13,7 @@ import {
 import { sanitizeScreening } from "@/lib/client-background/interview-history"
 import { loadClientBackground, loadLatestBackgroundSelfReport } from "@/lib/client-background/load"
 import { db } from "@/lib/db"
-import type { BackgroundReportSource } from "@/lib/reports/generate-background-report"
+import { chooseReportInterviews, type BackgroundReportSource } from "@/lib/reports/generate-background-report"
 
 function isoDate(value: Date): string {
   return value.toLocaleDateString("en-CA", { timeZone: "Australia/Sydney" })
@@ -73,13 +73,24 @@ export async function loadBackgroundReportSource({
     )
     .orderBy(asc(clientBackgroundInterviews.startedAt))
 
-  const usable = interviewRows.filter((row) => row.status === "completed" || row.status === "in_progress")
-  const latestInterview = usable[usable.length - 1] ?? null
-  const screening = latestInterview ? sanitizeScreening(latestInterview.screeningJson) : null
-  const interviews = usable.flatMap((row) => {
+  const candidates = interviewRows.flatMap((row) => {
+    if (row.status !== "completed" && row.status !== "in_progress") return []
     const at = row.status === "completed" && row.completedAt ? row.completedAt : row.startedAt
-    return at ? [{ date: isoDate(at) }] : []
+    if (!at) return []
+    return [
+      {
+        status: row.status,
+        startedAt: row.startedAt.toISOString(),
+        completedAt: row.completedAt ? row.completedAt.toISOString() : null,
+        date: isoDate(at),
+        screeningJson: row.screeningJson,
+      },
+    ]
   })
+  const chosen = chooseReportInterviews(candidates)
+  const chosenRow = chosen.answerIndex == null ? null : candidates[chosen.answerIndex]
+  const screening = chosenRow ? sanitizeScreening(chosenRow.screeningJson) : null
+  const interviews = chosen.dates.map((date) => ({ date }))
 
   const selfReport = await loadLatestBackgroundSelfReport(clientId, practiceId)
 
@@ -124,6 +135,7 @@ export async function loadBackgroundReportSource({
     practitionerReportIntroduction: practitioner?.reportIntroduction ?? null,
     data,
     screening,
+    screeningFromIncomplete: chosen.writtenFromIncomplete,
     interviews,
     selfReportDate: selfReport ? isoDate(new Date(selfReport.assessmentDate)) : null,
     numberOfChildren: selfReport?.answers.familyHome.numberOfChildren ?? null,

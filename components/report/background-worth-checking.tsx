@@ -8,6 +8,7 @@ import type {
 
 function hrefFor(clientId: string, target: BackgroundCheck["target"] | BackgroundReportOmissionTarget): string {
   if (target === "practitioner") return `/practitioner/edit`
+  if (target === "interview") return `/clients/${clientId}/background/interview`
   return `/clients/${clientId}/background#check-${target}`
 }
 

@@ -17,6 +17,7 @@ import {
 import {
   generateBackgroundReport,
   numberedLetterOutline,
+  chooseReportInterviews,
   type BackgroundReportSource,
 } from "@/lib/reports/generate-background-report"
 import type { LetterBodyNode } from "@/lib/reports/letter-body-types"
@@ -364,7 +365,7 @@ assert.match(demographics, /His father died when Ben01 was 23\./)
 assert.match(demographics, /He has two siblings, aged 48 and 45, and one step-sibling, aged 28\./)
 assert.match(
   demographics,
-  /He lives with his wife and children, in private rental, and describes his housing as stable\./
+  /He lives with his wife and children in a private rental and describes his housing as stable\./
 )
 assert.match(
   demographics,
@@ -399,6 +400,8 @@ assert.match(outline.find((line) => line.startsWith("5.5.")) ?? "", /\[Alcohol a
 assert.match(body, /\[Risk assessment — to be added \(LRAMP\)\.\]/)
 assert.match(body, /\[Summary — practitioner to write\.\]/)
 assert.doesNotMatch(body, /reported experiencing traumatic|family history of substance/)
+assert.doesNotMatch(body, /including \./)
+assert.doesNotMatch(body, /including at\b/)
 
 assert.ok(draft.omitted.some((item) => item.message === "Traumatic events is Yes, with no entries."))
 assert.ok(draft.omitted.some((item) => item.message === "Emotional problems not asked"))
@@ -504,11 +507,237 @@ function emptySource(): BackgroundReportSource {
 }
 
 const noInterview = generateBackgroundReport(emptySource())
+const blankOutline = numberedLetterOutline(noInterview.document)
 assert.equal(noInterview.document.type, "doc")
 assert.equal(noInterview.document.content[0]?.type, "heading")
+assert.deepEqual(
+  blankOutline.filter((line) => /^\d+ /.test(line)),
+  [
+    "1 Purpose and Scope",
+    "2 Sources",
+    "3 Presenting Problem",
+    "4 Demographics",
+    "5 Relevant History",
+    "6 Risk Assessment",
+    "7 Summary",
+  ]
+)
+assert.match(blankOutline.join("\n"), /\[Presenting problem — not yet recorded\.\]/)
+assert.match(blankOutline.join("\n"), /\[Demographics — not yet recorded\.\]/)
+assert.match(blankOutline.join("\n"), /\[Relevant history — not yet recorded\.\]/)
+assert.match(blankOutline.join("\n"), /\[Alcohol and other drugs — to be added \(ASSIST\)\.\]/)
+assert.equal(blankOutline.includes("Client history"), false)
+assert.equal(blankOutline.includes("Family history"), false)
 assert.equal(
-  numberedLetterOutline(noInterview.document).some((line) => line.includes("Clinical interview")),
+  blankOutline.some((line) => line.includes("Clinical interview")),
   false
 )
+assert.doesNotMatch(blankOutline.join("\n"), /including \.|including at\b/)
+
+const kept = chooseReportInterviews([
+  {
+    status: "completed",
+    startedAt: "2026-10-15T01:00:00.000Z",
+    completedAt: "2026-10-15T02:00:00.000Z",
+    date: "2026-10-15",
+  },
+  {
+    status: "completed",
+    startedAt: "2026-10-15T03:00:00.000Z",
+    completedAt: "2026-10-15T04:00:00.000Z",
+    date: "2026-10-15",
+  },
+  {
+    status: "in_progress",
+    startedAt: "2026-10-20T01:00:00.000Z",
+    completedAt: null,
+    date: "2026-10-20",
+  },
+])
+assert.equal(kept.answerIndex, 1)
+assert.deepEqual(kept.dates, ["2026-10-15"])
+assert.equal(kept.writtenFromIncomplete, false)
+
+const fallback = chooseReportInterviews([
+  { status: "in_progress", startedAt: "2026-10-01T00:00:00.000Z", completedAt: null, date: "2026-10-01" },
+  { status: "in_progress", startedAt: "2026-10-20T00:00:00.000Z", completedAt: null, date: "2026-10-20" },
+])
+assert.equal(fallback.answerIndex, 1)
+assert.deepEqual(fallback.dates, ["2026-10-20"])
+assert.equal(fallback.writtenFromIncomplete, true)
+
+const duplicateDates = benSource()
+duplicateDates.interviews = [{ date: "2026-10-15" }, { date: "2026-10-15" }]
+const duplicateSources = numberedLetterOutline(generateBackgroundReport(duplicateDates).document).filter((line) =>
+  line.includes("Clinical interview")
+)
+assert.deepEqual(duplicateSources, ["2.2. Clinical interview, 15 October 2026."])
+
+const incomplete = benSource()
+incomplete.screeningFromIncomplete = true
+assert.ok(
+  generateBackgroundReport(incomplete).omitted.some(
+    (item) => item.message === "Report written from an interview that is not yet completed" && item.target === "interview"
+  )
+)
+
+const december = emptySource()
+december.clientFirstName = "Alex"
+december.dateOfBirth = "1974-12-15"
+december.data.dateOfBirth = "1974-12-15"
+december.data.demographics.identity.pronouns = "they/them"
+december.data.demographics.identity.sex = "Female"
+december.reportDate = "2027-03-01"
+december.screening = {
+  illness_injury: "yes",
+  traumatic_events: "yes",
+  emotional_problems: "yes",
+  substance_use: "yes",
+  other_significant_events: "yes",
+}
+december.data.events = [
+  event({
+    eventRecordId: "blank-illness",
+    eventType: "illness_injury",
+    title: "",
+    startPrecision: "",
+    startValue: "",
+  }),
+  event({
+    eventRecordId: "fall",
+    eventType: "illness_injury",
+    title: "A fall",
+    startPrecision: "",
+    startValue: "",
+    displayOrder: 2,
+  }),
+  event({
+    eventRecordId: "untitled-illness-year",
+    eventType: "illness_injury",
+    title: "",
+    startPrecision: "year",
+    startValue: "2020",
+    displayOrder: 3,
+  }),
+  event({
+    eventRecordId: "trauma-2026",
+    eventType: "traumatic_event",
+    title: "",
+    startPrecision: "year",
+    startValue: "2026",
+    attribution: "self",
+  }),
+  event({
+    eventRecordId: "emotion-2005",
+    eventType: "emotional_problems",
+    title: "",
+    startPrecision: "year",
+    startValue: "2005",
+  }),
+  event({
+    eventRecordId: "substance-2020",
+    eventType: "substance_use",
+    title: "",
+    startPrecision: "year",
+    startValue: "2020",
+  }),
+  event({
+    eventRecordId: "blank-other",
+    eventType: "significant_history",
+    title: "",
+    startPrecision: "",
+    startValue: "",
+    attribution: "self",
+  }),
+]
+december.data.relationships = [
+  person({
+    relationshipRecordId: "mother",
+    relationshipToClient: "mother",
+    healthStatus: "good",
+  }),
+  person({
+    relationshipRecordId: "father",
+    relationshipToClient: "father",
+    healthStatus: "deceased",
+    deceased: true,
+    dateOfDeath: "2026",
+  }),
+]
+december.data.partnerships = [
+  {
+    partnershipRecordId: "parents",
+    partnerAId: "mother",
+    partnerBId: "father",
+    relationshipStatus: "divorced",
+    started: "",
+    ended: "2026",
+    qualityOfRelationship: "",
+  },
+]
+const decemberText = numberedLetterOutline(generateBackgroundReport(december).document).join("\n")
+assert.match(decemberText, /experiencing traumatic events, at around age 51 \(2026\)/)
+assert.match(decemberText, /a history of emotional problems, at around age 30 \(2005\)/)
+assert.match(decemberText, /a history of substance use, from around age 45 \(2020\)/)
+assert.match(decemberText, /reported other significant life events\./)
+assert.match(decemberText, /including a fall and at around age 45 \(2020\)/)
+assert.match(decemberText, /parents divorced when they were 51/)
+assert.match(decemberText, /father died when Alex was 51/)
+assert.doesNotMatch(decemberText, /including \./)
+assert.doesNotMatch(decemberText, /including at\b/)
+
+function siblingLine(births: string[]): string {
+  const source = emptySource()
+  source.dateOfBirth = "1970-01-15"
+  source.data.dateOfBirth = "1970-01-15"
+  source.data.demographics.identity.sex = "Male"
+  source.data.demographics.identity.pronouns = "he/him"
+  source.data.relationships = births.map((dateOfBirth, index) =>
+    person({
+      relationshipRecordId: `sib-${index}`,
+      relationshipToClient: "sibling_full",
+      dateOfBirth,
+    })
+  )
+  const text = numberedLetterOutline(generateBackgroundReport(source).document).join("\n")
+  const match = text.match(/has two siblings[^.]*\./)
+  assert.ok(match, text)
+  return match[0]
+}
+assert.equal(siblingLine(["1978-01-01", "1981-06-01"]), "has two siblings, aged 48 and 45.")
+assert.equal(siblingLine(["1978", ""]), "has two siblings, one aged about 48.")
+assert.equal(siblingLine(["", ""]), "has two siblings.")
+
+const wording = emptySource()
+wording.clientFirstName = "Alex"
+wording.dateOfBirth = "1990-01-01"
+wording.data.dateOfBirth = "1990-01-01"
+wording.data.demographics.identity.pronouns = "they/them"
+wording.data.demographics.identity.sex = "Female"
+wording.data.demographics.identity.genderIdentity = "Non-binary"
+wording.data.demographics.identity.disability = true
+wording.data.demographics.identity.disabilityDetail = "Hearing loss, left ear."
+wording.data.demographics.education.level = "Trade apprenticeship"
+wording.data.demographics.education.fieldOfStudy = "Electrical"
+wording.data.demographics.livingSituation.livesWith = "with_partner_and_children"
+wording.data.demographics.livingSituation.housingType = "Private rental"
+wording.data.demographics.livingSituation.housingStability = "Stable"
+wording.data.demographics.occupation.workStatus = "self_employed"
+wording.data.demographics.occupation.role = "electrician"
+const wordingText = numberedLetterOutline(generateBackgroundReport(wording).document).join("\n")
+assert.match(wordingText, /they identify as non-binary/)
+assert.match(wordingText, /in electrical\./)
+assert.match(
+  wordingText,
+  /They live with their partner and children in a private rental and describe their housing as stable\./
+)
+assert.match(wordingText, /They are self-employed as an electrician\./)
+assert.match(wordingText, /They reported a disability: hearing loss, left ear\./)
+assert.doesNotMatch(wordingText, /including \.|including at\b/)
+
+wording.data.demographics.education.fieldOfStudy = "IT"
+const acronymText = numberedLetterOutline(generateBackgroundReport(wording).document).join("\n")
+assert.match(acronymText, /in IT\./)
+assert.doesNotMatch(acronymText, /in iT/)
 
 console.log("generate-background-report self-test passed")

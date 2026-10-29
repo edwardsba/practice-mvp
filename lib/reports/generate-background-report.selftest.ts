@@ -740,4 +740,58 @@ const acronymText = numberedLetterOutline(generateBackgroundReport(wording).docu
 assert.match(acronymText, /in IT\./)
 assert.doesNotMatch(acronymText, /in iT/)
 
+function ownHomeText(pronouns: string, sex: string, firstName: string): string {
+  const source = emptySource()
+  source.clientFirstName = firstName
+  source.dateOfBirth = "1970-01-15"
+  source.data.dateOfBirth = "1970-01-15"
+  source.data.demographics.identity.pronouns = pronouns
+  source.data.demographics.identity.sex = sex
+  source.data.relationshipStatus.relationshipStatus = "married"
+  source.data.relationships = [
+    person({
+      relationshipRecordId: "partner",
+      relationshipToClient: "current_partner",
+      sex: sex === "Female" ? "Male" : "Female",
+    }),
+  ]
+  source.data.demographics.livingSituation.livesWith = "with_partner_and_children"
+  source.data.demographics.livingSituation.housingType = "Own home"
+  source.data.demographics.livingSituation.housingStability = "Stable"
+  return numberedLetterOutline(generateBackgroundReport(source).document).join("\n")
+}
+
+const hisHome = ownHomeText("he/him", "Male", "Ben01")
+const herHome = ownHomeText("she/her", "Female", "Ben01")
+const theirHome = ownHomeText("they/them", "Female", "Alex")
+assert.match(hisHome, /in his own home and describes his housing as stable\./)
+assert.match(herHome, /in her own home and describes her housing as stable\./)
+assert.match(theirHome, /in their own home and describe their housing as stable\./)
+assert.doesNotMatch(`${hisHome}\n${herHome}`, /a home they own/)
+
+const namedHome = emptySource()
+namedHome.clientFirstName = "Ben01"
+namedHome.data.demographics.identity.sex = ""
+namedHome.data.demographics.identity.pronouns = ""
+namedHome.data.demographics.livingSituation.livesWith = "with_partner_and_children"
+namedHome.data.demographics.livingSituation.housingType = "Own home"
+namedHome.data.demographics.livingSituation.housingStability = "Stable"
+assert.match(
+  numberedLetterOutline(generateBackgroundReport(namedHome).document).join("\n"),
+  /in Ben01's own home/
+)
+
+function dutiesText(pronouns: string, sex: string, firstName: string): string {
+  const source = emptySource()
+  source.clientFirstName = firstName
+  source.dateOfBirth = "1970-01-15"
+  source.data.dateOfBirth = "1970-01-15"
+  source.data.demographics.identity.pronouns = pronouns
+  source.data.demographics.identity.sex = sex
+  source.data.demographics.occupation.workStatus = "home_duties_or_carer"
+  return numberedLetterOutline(generateBackgroundReport(source).document).join("\n")
+}
+assert.match(dutiesText("he/him", "Male", "Ben01"), /He has home duties or caring responsibilities\./)
+assert.match(dutiesText("they/them", "Female", "Alex"), /They have home duties or caring responsibilities\./)
+
 console.log("generate-background-report self-test passed")

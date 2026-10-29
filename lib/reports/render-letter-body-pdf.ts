@@ -29,6 +29,44 @@ function renderInlineText(
   }
 }
 
+function contentBottom(doc: PDFKit.PDFDocument): number {
+  return doc.page.height - doc.page.margins.bottom
+}
+
+function pageBodyHeight(doc: PDFKit.PDFDocument): number {
+  return contentBottom(doc) - doc.page.margins.top
+}
+
+function measureText(doc: PDFKit.PDFDocument, text: string, textWidth: number, font: string): number {
+  const y = doc.y
+  const x = doc.x
+  doc.font(font).fontSize(10)
+  const height = doc.heightOfString(text.trim() ? text : " ", { width: textWidth, lineGap: 4 })
+  doc.x = x
+  doc.y = y
+  return height
+}
+
+function itemGap(doc: PDFKit.PDFDocument): number {
+  const y = doc.y
+  const x = doc.x
+  doc.font("Helvetica").fontSize(10)
+  const gap = doc.currentLineHeight(true) * 0.35
+  doc.x = x
+  doc.y = y
+  return gap
+}
+
+function atTopOfPage(doc: PDFKit.PDFDocument): boolean {
+  return doc.y <= doc.page.margins.top + 1
+}
+
+function startNewPage(doc: PDFKit.PDFDocument) {
+  doc.addPage()
+  doc.x = doc.page.margins.left
+  doc.y = doc.page.margins.top
+}
+
 function hangingLine(
   doc: PDFKit.PDFDocument,
   label: string,
@@ -38,15 +76,61 @@ function hangingLine(
 ) {
   const left = doc.page.margins.left
   const width = doc.page.width - doc.page.margins.left - doc.page.margins.right
-  doc.moveDown(0.35)
-  const y = doc.y
+  const textWidth = width - labelWidth
+  const font = boldText ? "Helvetica-Bold" : "Helvetica"
+  const textHeight = measureText(doc, text, textWidth, font)
+  const firstLineHeight = measureText(doc, "Ag", textWidth, font)
+  const gap = itemGap(doc)
+  let y = doc.y + gap
+  const fitsOnOnePage = textHeight <= pageBodyHeight(doc)
+  const needed = fitsOnOnePage ? textHeight : firstLineHeight
+  if (y + needed > contentBottom(doc) && !atTopOfPage(doc)) {
+    startNewPage(doc)
+    y = doc.y
+  } else {
+    doc.moveDown(0.35)
+    y = doc.y
+  }
   doc.font("Helvetica-Bold").fontSize(10).fillColor("#111111")
   doc.text(label, left, y, { width: labelWidth, lineGap: 4 })
   const labelBottom = doc.y
-  doc.font(boldText ? "Helvetica-Bold" : "Helvetica").fontSize(10).fillColor("#111111")
-  doc.text(text, left + labelWidth, y, { width: width - labelWidth, lineGap: 4 })
+  doc.font(font).fontSize(10).fillColor("#111111")
+  doc.text(text, left + labelWidth, y, { width: textWidth, lineGap: 4 })
   if (doc.y < labelBottom) doc.y = labelBottom
   doc.x = left
+}
+
+function firstNumberedItemText(nodes: LetterBodyNode[], from: number): { leadIn: string[]; item: string } {
+  const leadIn: string[] = []
+  for (let index = from; index < nodes.length; index += 1) {
+    const node = nodes[index]
+    if (node.type === "heading") break
+    if (node.type === "paragraph") {
+      const text = nodeText(node)
+      if (text) leadIn.push(text)
+      continue
+    }
+    if (node.type !== "orderedList") continue
+    for (const child of node.content ?? []) {
+      if (child.type !== "listItem") continue
+      const text = nodeText(child)
+      if (text) return { leadIn, item: text }
+    }
+  }
+  return { leadIn, item: "" }
+}
+
+/** A numbered heading stays with the first line of its first item. */
+function headingFitsWithFirstItem(doc: PDFKit.PDFDocument, heading: string, leadIn: string[], item: string): boolean {
+  if (!item) return true
+  const width = doc.page.width - doc.page.margins.left - doc.page.margins.right
+  const gap = itemGap(doc)
+  let height = gap + measureText(doc, heading, width - 28, "Helvetica-Bold")
+  for (const paragraph of leadIn) {
+    height += measureText(doc, paragraph, width, "Helvetica") + itemGap(doc)
+  }
+  height += gap + measureText(doc, "Ag", width - 36, "Helvetica")
+  return doc.y + height <= contentBottom(doc)
 }
 
 export function renderLetterBodyPdf(
@@ -57,12 +141,18 @@ export function renderLetterBodyPdf(
   let section = 0
   let item = 0
 
-  for (const node of letterBody.content) {
+  for (let index = 0; index < letterBody.content.length; index += 1) {
+    const node = letterBody.content[index]
     if (node.type === "heading") {
       if (node.attrs?.numbered) {
         section += 1
         item = 0
-        hangingLine(doc, `${section}.`, nodeText(node), 28, true)
+        const heading = nodeText(node)
+        const following = firstNumberedItemText(letterBody.content, index + 1)
+        if (!headingFitsWithFirstItem(doc, heading, following.leadIn, following.item) && !atTopOfPage(doc)) {
+          startNewPage(doc)
+        }
+        hangingLine(doc, `${section}.`, heading, 28, true)
       } else {
         helpers.groupHeading(doc, nodeText(node))
       }

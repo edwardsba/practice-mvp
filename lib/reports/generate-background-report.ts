@@ -139,9 +139,8 @@ const PARENT_ROLES: readonly RelationshipToClient[] = ["mother", "father", "pare
 const CHILD_ROLES: readonly RelationshipToClient[] = ["child_biological", "child_step"]
 const COUNT_WORDS = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"]
 
-/** Housing labels as they read after "in". */
+/** Housing labels as they read after "in". Own home is built from the client's voice. */
 const HOUSING_PHRASES: Record<string, string> = {
-  "Own home": "a home they own",
   "Private rental": "a private rental",
   "Social or community housing": "social or community housing",
   "Parent's home": "a parent's home",
@@ -817,7 +816,12 @@ function livingItem(source: BackgroundReportSource, voice: Voice, who: Speaker):
     home = `${who.text} ${lives} with ${voice.possessive} ${whoWith}`
   }
   const housingLabel = living.housingType.trim()
-  const housing = housingLabel ? HOUSING_PHRASES[housingLabel] ?? withArticle(housingLabel) : ""
+  const housing =
+    housingLabel === "Own home"
+      ? `${voice.possessive} own home`
+      : housingLabel
+        ? (HOUSING_PHRASES[housingLabel] ?? withArticle(housingLabel))
+        : ""
   const stability =
     living.housingStability === "Stable"
       ? "stable"
@@ -888,7 +892,7 @@ function workItem(source: BackgroundReportSource, who: Speaker): string | null {
     case "retired":
       return `${who.text} ${is} retired${previousClause}.`
     case "home_duties_or_carer":
-      return `${who.text} ${is} a full-time carer.`
+      return `${who.text} ${verb(who.plural, "has", "have")} home duties or caring responsibilities.`
     case "unable_to_work":
       return `${who.text} ${is} unable to work${previousClause}.`
     case "unemployed":

@@ -483,6 +483,8 @@ export type RelationshipRecord = {
   healthStatus: HealthStatus | ""
   deceased: boolean
   ageAtDeath: number | null
+  /** Partial date: YYYY, YYYY-MM, or YYYY-MM-DD. Cleared unless the person is deceased. */
+  dateOfDeath: string
   healthOrCauseOfDeath: string
   lengthOfRelationship: string
   /** Prior partner: how the relationship ended. Cleared for every other role. */

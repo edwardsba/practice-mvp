@@ -96,6 +96,12 @@ export default async function PractitionerPage() {
                 {displayValue(profile.reportSignature)}
               </dd>
             </div>
+            <div className="sm:col-span-2">
+              <dt className="text-sm text-muted-foreground">Report introduction</dt>
+              <dd className="font-medium whitespace-pre-line">
+                {displayValue(profile.reportIntroduction)}
+              </dd>
+            </div>
           </dl>
         </CardContent>
       </Card>

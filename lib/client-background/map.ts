@@ -27,6 +27,7 @@ export function toRelationship(row: {
   healthStatus: string | null
   deceased: boolean
   ageAtDeath: number | null
+  dateOfDeath: string | null
   healthOrCauseOfDeath: string | null
   lengthOfRelationship: string | null
   relationshipStatus: string | null
@@ -51,6 +52,7 @@ export function toRelationship(row: {
     dateOfBirth: row.dateOfBirth ?? "",
     approximateAge: row.approximateAge,
     approximateAgeRecordedOn: row.approximateAgeRecordedOn ?? "",
+    dateOfDeath: row.dateOfDeath ?? "",
     healthOrCauseOfDeath: row.healthOrCauseOfDeath ?? "",
     lengthOfRelationship: row.lengthOfRelationship ?? "",
     relationshipStatus: row.relationshipStatus ?? "",

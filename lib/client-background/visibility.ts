@@ -86,6 +86,12 @@ export function applyRelationshipVisibilityDefaults(record: RelationshipRecord):
     next.healthStatus = ""
     next.deceased = false
     next.ageAtDeath = null
+    next.dateOfDeath = ""
+    next.healthOrCauseOfDeath = ""
+  } else if (next.healthStatus !== "deceased") {
+    next.deceased = false
+    next.ageAtDeath = null
+    next.dateOfDeath = ""
     next.healthOrCauseOfDeath = ""
   }
   if (!visibility.lengthOfRelationship) next.lengthOfRelationship = ""

@@ -674,6 +674,7 @@ export function blankRelationship(role: RelationshipToClient): RelationshipRecor
     healthStatus: "",
     deceased: false,
     ageAtDeath: null,
+    dateOfDeath: "",
     healthOrCauseOfDeath: "",
     lengthOfRelationship: "",
     relationshipStatus: "",
@@ -935,6 +936,14 @@ function BirthEditor({
   )
 }
 
+function healthStatusText(record: RelationshipRecord): string {
+  if (record.healthStatus !== "deceased") {
+    return record.healthStatus ? HEALTH_STATUS_LABELS[record.healthStatus] : ""
+  }
+  const year = parsePartialDate(record.dateOfDeath).year
+  return year ? `Died ${year}` : "Deceased"
+}
+
 function BirthReadOnly({ record }: { record: RelationshipRecord }) {
   const age =
     record.healthStatus === "deceased"
@@ -1041,7 +1050,19 @@ export function PersonDetail({
                 label="Health status"
                 value={draft.healthStatus}
                 hint="Select 'Deceased' if this person has passed away."
-                onChange={(healthStatus) => onPatch({ healthStatus: healthStatus as RelationshipRecord["healthStatus"] })}
+                onChange={(healthStatus) =>
+                  onPatch(
+                    healthStatus === "deceased"
+                      ? { healthStatus: "deceased", deceased: true }
+                      : {
+                          healthStatus: healthStatus as RelationshipRecord["healthStatus"],
+                          deceased: false,
+                          ageAtDeath: null,
+                          dateOfDeath: "",
+                          healthOrCauseOfDeath: "",
+                        }
+                  )
+                }
               >
                 <option value="">Not recorded</option>
                 {HEALTH_STATUSES.map((status) => (
@@ -1052,6 +1073,13 @@ export function PersonDetail({
               </SelectField>
               {draft.healthStatus === "deceased" ? (
                 <>
+                  <PartialDatePicker
+                    id="rel_death"
+                    dateLabel="Year of death"
+                    mode="date-only"
+                    value={draft.dateOfDeath}
+                    onChange={(dateOfDeath) => onPatch({ dateOfDeath })}
+                  />
                   <div className="space-y-1.5">
                     <Label htmlFor="rel_age_death">Age at death</Label>
                     <Input
@@ -1363,10 +1391,7 @@ function PersonReadOnly({
       {visibility.dateOfBirth ? <BirthReadOnly record={record} /> : null}
       {visibility.health ? (
         <>
-          <ReadOnlyField
-            label="Health status"
-            value={record.healthStatus ? HEALTH_STATUS_LABELS[record.healthStatus] : ""}
-          />
+          <ReadOnlyField label="Health status" value={healthStatusText(record)} />
           {record.healthStatus === "deceased" ? (
             <>
               <ReadOnlyField label="Age at death" value={record.ageAtDeath == null ? "" : String(record.ageAtDeath)} />

@@ -49,7 +49,7 @@ import {
   todayDateString,
 } from "@/lib/appointments/format"
 import type { SageSrDiagnosticReportContent } from "@/lib/assessment-summary/load-sage-sr-diagnostic-report"
-import { backgroundChecks } from "@/lib/client-background/checks"
+import { backgroundChecks, type BackgroundCheckInput } from "@/lib/client-background/checks"
 import type {
   SageSrDiagnosticReportInstanceOption,
   SageSrDiagnosticReportInstanceOptions,
@@ -96,6 +96,8 @@ export function ReportForm({
   suicideAttempts = [],
   crisisPlanDate = null,
   cancelHref,
+  backgroundCheckInput = null,
+  showBackgroundNotice = true,
 }: {
   clientId: string
   fundingApprovals: Awaited<
@@ -140,6 +142,10 @@ export function ReportForm({
   suicideAttempts?: ReportSnapshot["suicideAttempts"]
   crisisPlanDate?: string | null
   cancelHref: string
+  /** Current Client Background. Checks use this; omissions stay the stored list. */
+  backgroundCheckInput?: BackgroundCheckInput | null
+  /** Draft background reports only. A finalised report keeps this off. */
+  showBackgroundNotice?: boolean
 }) {
   const validInitialApprovalId =
     initialFundingApprovalId &&
@@ -670,14 +676,17 @@ export function ReportForm({
         )
       : Boolean(dateRangeStart && dateRangeEnd)
 
+  const storedBackground = initialSnapshot.background
   const backgroundNotice =
-    isBackground && initialSnapshot.background
+    showBackgroundNotice && isBackground && (backgroundCheckInput || storedBackground)
       ? {
-          checks: backgroundChecks({
-            data: initialSnapshot.background.data,
-            numberOfChildren: initialSnapshot.background.numberOfChildren,
-            screening: initialSnapshot.background.screening,
-          }),
+          checks: backgroundChecks(
+            backgroundCheckInput ?? {
+              data: storedBackground!.data,
+              numberOfChildren: storedBackground!.numberOfChildren,
+              screening: storedBackground!.screening,
+            }
+          ),
           omissions: initialSnapshot.backgroundOmissions ?? [],
         }
       : null

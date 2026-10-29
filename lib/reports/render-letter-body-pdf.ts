@@ -55,11 +55,13 @@ export function renderLetterBodyPdf(
   helpers: PdfTextHelpers
 ) {
   let section = 0
+  let item = 0
 
   for (const node of letterBody.content) {
     if (node.type === "heading") {
       if (node.attrs?.numbered) {
         section += 1
+        item = 0
         hangingLine(doc, `${section}.`, nodeText(node), 28, true)
       } else {
         helpers.groupHeading(doc, nodeText(node))
@@ -90,7 +92,6 @@ export function renderLetterBodyPdf(
     }
 
     if (node.type === "orderedList") {
-      let item = 0
       for (const child of node.content ?? []) {
         if (child.type !== "listItem") continue
         item += 1

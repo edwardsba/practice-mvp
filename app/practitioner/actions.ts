@@ -56,6 +56,8 @@ export async function updatePractitionerProfile(
   const email = String(formData.get("email") ?? "").trim() || null
   const reportSignature =
     String(formData.get("report_signature") ?? "").trim() || null
+  const reportIntroduction =
+    String(formData.get("report_introduction") ?? "").trim() || null
   const calendarStartTimeRaw = String(
     formData.get("calendar_start_time") ?? ""
   ).trim()
@@ -102,6 +104,7 @@ export async function updatePractitionerProfile(
       phone,
       email,
       reportSignature,
+      reportIntroduction,
       calendarStartTime,
       calendarEndTime,
       calendarIntervalMinutes,

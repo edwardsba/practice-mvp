@@ -96,6 +96,7 @@
     "db:client-background-self-report": "tsx db/apply-client-background-self-report-migration.ts",
     "db:client-background-reason": "tsx db/apply-client-background-reason-migration.ts",
     "db:history-restructure": "tsx db/apply-history-restructure-migration.ts",
+    "db:report-intro-year-of-death": "tsx db/apply-report-intro-year-of-death-migration.ts",
     "db:letter-body": "tsx db/apply-letter-body-migration.ts",
     "db:report-versioning": "tsx db/apply-report-versioning-migration.ts",
     "db:session-note-versioning": "tsx db/apply-session-note-versioning-migration.ts",

@@ -65,6 +65,8 @@ export const clientRelationshipRecords = pgTable("client_relationship_records", 
   deceased: boolean("deceased").notNull().default(false),
   healthStatus: text("health_status"),
   ageAtDeath: integer("age_at_death"),
+  /** Partial date: YYYY, YYYY-MM, or YYYY-MM-DD. A year is enough. */
+  dateOfDeath: text("date_of_death"),
   healthOrCauseOfDeath: text("health_or_cause_of_death"),
   lengthOfRelationship: text("length_of_relationship"),
   /** Prior partner: how the relationship ended. Current partners leave this null. */

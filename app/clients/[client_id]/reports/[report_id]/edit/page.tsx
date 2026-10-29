@@ -18,6 +18,12 @@ import { getClientFundingApprovalsForReport } from "@/lib/actions/funding"
 import { getReportTypes } from "@/lib/actions/report-types"
 import { requirePractitionerContext } from "@/lib/auth"
 import { db } from "@/lib/db"
+import {
+  loadBackgroundInterviewCard,
+  loadClientBackground,
+  loadLatestBackgroundSelfReport,
+} from "@/lib/client-background/load"
+import type { BackgroundCheckInput } from "@/lib/client-background/checks"
 import { parseReportSnapshot } from "@/lib/reports/snapshot"
 import { parseLetterBodyJson } from "@/lib/reports/letter-body-types"
 import { loadActiveCrisisPlanSummary } from "@/lib/crisis-plans/load"
@@ -176,6 +182,22 @@ export default async function EditReportPage({
   const isFinalised = report.reportStatus === "finalised"
   const existingDraftReportId = isFinalised ? null : reportId
   const previousVersionId = isFinalised ? reportId : report.previousVersionId
+  const showBackgroundNotice = !isFinalised && snapshot.templateKey === "background_report"
+  let backgroundCheckInput: BackgroundCheckInput | null = null
+  if (showBackgroundNotice) {
+    const [background, interview, selfReport] = await Promise.all([
+      loadClientBackground(clientId, context.practiceId),
+      loadBackgroundInterviewCard(clientId, context.practiceId),
+      loadLatestBackgroundSelfReport(clientId, context.practiceId),
+    ])
+    if (background) {
+      backgroundCheckInput = {
+        data: background,
+        numberOfChildren: selfReport?.answers.familyHome.numberOfChildren ?? null,
+        screening: interview?.latest?.screening ?? null,
+      }
+    }
+  }
 
   return (
     <AppShell>
@@ -235,7 +257,11 @@ export default async function EditReportPage({
           assistEnabled: snapshotForForm.assistEnabled ?? false,
           suicideAttempts: snapshotForForm.suicideAttempts ?? [],
           crisisPlanDate: snapshotForForm.crisisPlanDate ?? null,
+          background: snapshot.background,
+          backgroundOmissions: snapshot.backgroundOmissions ?? [],
         }}
+        backgroundCheckInput={backgroundCheckInput}
+        showBackgroundNotice={showBackgroundNotice}
         existingDraftReportId={existingDraftReportId}
         previousVersionId={previousVersionId}
         therapeuticTarget={therapeuticTarget}

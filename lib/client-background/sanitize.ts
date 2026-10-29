@@ -441,6 +441,7 @@ export function sanitizeRelationship(value: unknown, fallbackId = ""): Relations
     healthStatus,
     deceased,
     ageAtDeath: deceased ? intOrNull(raw.ageAtDeath) : null,
+    dateOfDeath: deceased ? canonicalPartialDate(str(raw.dateOfDeath)) : "",
     healthOrCauseOfDeath: deceased ? str(raw.healthOrCauseOfDeath) : "",
     lengthOfRelationship: str(raw.lengthOfRelationship),
     relationshipStatus: str(raw.relationshipStatus),
@@ -456,6 +457,7 @@ export function sanitizeRelationship(value: unknown, fallbackId = ""): Relations
   }
   if (!record.deceased) {
     record.ageAtDeath = null
+    record.dateOfDeath = ""
     record.healthOrCauseOfDeath = ""
   }
   return applyRelationshipVisibilityDefaults(record)

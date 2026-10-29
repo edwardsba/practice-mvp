@@ -39,6 +39,7 @@ type Profile = {
   phone: string | null
   email: string | null
   reportSignature: string | null
+  reportIntroduction: string | null
   signatureImagePath: string | null
   calendarStartTime: string
   calendarEndTime: string
@@ -183,6 +184,18 @@ export function PractitionerForm({ profile }: { profile: Profile }) {
               />
               <p className="text-xs text-muted-foreground">
                 Used in report footers e.g. Benjamin Edwards MAPS FCCLP
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="report_introduction">Report introduction</Label>
+              <Textarea
+                id="report_introduction"
+                name="report_introduction"
+                rows={5}
+                defaultValue={profile.reportIntroduction ?? ""}
+              />
+              <p className="text-xs text-muted-foreground">
+                Used at the start of reports. Each line becomes its own numbered paragraph. For example: I am Benjamin Edwards, a registered psychologist. / I have been registered as a psychologist since 2014. / My principal therapeutic modalities include …
               </p>
             </div>
             <div className="space-y-2">

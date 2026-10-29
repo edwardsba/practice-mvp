@@ -44,6 +44,8 @@ export const practitionerProfiles = pgTable('practitioner_profiles', {
   phone: text('phone'),
   email: citext('email'),
   reportSignature: text('report_signature'),
+  /** Opening lines of a report. Each line is one numbered paragraph. */
+  reportIntroduction: text('report_introduction'),
   signatureImagePath: text('signature_image_path'),
   calendarStartTime: time('calendar_start_time').notNull().default('07:00'),
   calendarEndTime: time('calendar_end_time').notNull().default('20:00'),

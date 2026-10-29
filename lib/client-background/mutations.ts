@@ -152,6 +152,7 @@ function relationshipColumns(record: RelationshipRecord) {
     deceased: record.healthStatus === "deceased",
     healthStatus: record.healthStatus || null,
     ageAtDeath: record.ageAtDeath,
+    dateOfDeath: record.dateOfDeath || null,
     healthOrCauseOfDeath: record.healthOrCauseOfDeath || null,
     lengthOfRelationship: record.lengthOfRelationship || null,
     relationshipStatus: record.relationshipStatus || null,

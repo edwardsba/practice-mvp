@@ -30,6 +30,7 @@ function person(
     healthStatus: "",
     deceased: false,
     ageAtDeath: null,
+    dateOfDeath: "",
     healthOrCauseOfDeath: "",
     lengthOfRelationship: "",
     relationshipStatus: "",

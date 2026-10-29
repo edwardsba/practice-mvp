@@ -1,5 +1,6 @@
 import assert from "node:assert/strict"
 
+import type { ScreeningAnswers } from "@/lib/client-background/interview-history"
 import {
   emptyClientRelationshipStatus,
   emptyDemographics,
@@ -10,6 +11,7 @@ import {
   emptyStressors,
   type ClientBackgroundData,
   type EventRecord,
+  type PartnershipRecord,
   type RelationshipRecord,
 } from "@/lib/client-background/types"
 import {
@@ -17,6 +19,7 @@ import {
   numberedLetterOutline,
   type BackgroundReportSource,
 } from "@/lib/reports/generate-background-report"
+import type { LetterBodyNode } from "@/lib/reports/letter-body-types"
 
 function person(
   partial: Partial<RelationshipRecord> & Pick<RelationshipRecord, "relationshipRecordId" | "relationshipToClient">
@@ -31,6 +34,7 @@ function person(
     healthStatus: "",
     deceased: false,
     ageAtDeath: null,
+    dateOfDeath: "",
     healthOrCauseOfDeath: "",
     lengthOfRelationship: "",
     relationshipStatus: "",
@@ -49,29 +53,55 @@ function person(
 
 function event(partial: Partial<EventRecord> & Pick<EventRecord, "eventType">): EventRecord {
   return {
-    ...emptyEvent(partial.eventType, 0),
+    ...emptyEvent(partial.eventType, partial.displayOrder ?? 0),
     eventRecordId: partial.eventRecordId ?? "event-1",
-    attribution: "self",
     ...partial,
   }
 }
 
-function benSource(overrides: Partial<BackgroundReportSource> = {}): BackgroundReportSource {
+function benSource(): BackgroundReportSource {
   const demographics = emptyDemographics()
-  demographics.identity.pronouns = "he/him"
   demographics.identity.sex = "Male"
+  demographics.identity.pronouns = "he/him"
+  demographics.identity.raceEthnicity = "Australian"
   demographics.identity.primaryLanguage = "English"
+  demographics.identity.religion = "Catholic"
+  demographics.identity.disability = false
+  demographics.education.level = "Trade apprenticeship"
+  demographics.education.fieldOfStudy = "carpentry"
+  demographics.education.currentlyStudying = true
+  demographics.education.currentlyStudyingDetail = "a certificate IV"
+  demographics.occupation.workStatus = "full_time"
+  demographics.occupation.role = "carpenter"
+  demographics.occupation.necessities.food = true
+  demographics.occupation.necessities.transport = true
+  demographics.livingSituation.livesWith = "with_partner_and_children"
+  demographics.livingSituation.housingType = "Private rental"
+  demographics.livingSituation.housingStability = "Stable"
+
   const data: ClientBackgroundData = {
-    dateOfBirth: "1974-01-01",
+    dateOfBirth: "1970-01-15",
     backgroundCapturedAt: null,
-    relationshipStatus: { ...emptyClientRelationshipStatus(), relationshipStatus: "defacto" },
+    relationshipStatus: { ...emptyClientRelationshipStatus(), relationshipStatus: "married" },
     demographics,
-    medication: { ...emptyMedication(), previouslyTaken: "yes", currentlyTaking: "no" },
-    stressors: emptyStressors(),
+    medication: { ...emptyMedication(), currentlyTaking: "no", previouslyTaken: "yes" },
+    stressors: {
+      ...emptyStressors(),
+      family: "yes",
+      socialLife: "no",
+      intimateRelationships: "no",
+      workStudy: "no",
+      financial: "yes",
+      ownHealth: "no",
+      othersHealth: "no",
+      lossOfLovedOne: "no",
+      legalPoliceAccidents: "no",
+      mainReason: "I can't switch off",
+    },
     reason: {
       ...emptyReasonForAttending(),
       referredByMedicalProfessional: "yes",
-      referrerConcerns: "low mood and worry",
+      referrerConcerns: "low mood",
       familyInvolved: "yes",
       familyInvolvement: "His partner came to the first appointment.",
       ownInitiative: "yes",
@@ -80,114 +110,200 @@ function benSource(overrides: Partial<BackgroundReportSource> = {}): BackgroundR
     },
     relationships: [
       person({
-        relationshipRecordId: "partner",
+        relationshipRecordId: "wife",
         relationshipToClient: "current_partner",
-        givenName: "Pat",
+        sex: "Female",
+        givenName: "Should Not Appear",
+        lengthOfRelationship: "12 years",
       }),
+      person({ relationshipRecordId: "prior-1", relationshipToClient: "prior_partner", givenName: "Pat" }),
+      person({ relationshipRecordId: "prior-2", relationshipToClient: "prior_partner", givenName: "Jo" }),
       person({
-        relationshipRecordId: "child",
+        relationshipRecordId: "child-1",
         relationshipToClient: "child_biological",
-        givenName: "Ari",
-        dateOfBirth: "2016-04-02",
+        givenName: "Child One",
+        dateOfBirth: "2017-05-01",
       }),
       person({
-        relationshipRecordId: "sibling",
-        relationshipToClient: "sibling_full",
-        givenName: "Sam",
-        dateOfBirth: "1990",
+        relationshipRecordId: "child-2",
+        relationshipToClient: "child_biological",
+        givenName: "Child Two",
+        dateOfBirth: "2019-03-01",
+      }),
+      person({
+        relationshipRecordId: "child-3",
+        relationshipToClient: "child_biological",
+        givenName: "Child Three",
+        dateOfBirth: "2020-04-01",
       }),
       person({
         relationshipRecordId: "mother",
         relationshipToClient: "mother",
-        givenName: "Joan",
-        dateOfBirth: "1950-05-01",
+        givenName: "Margaret",
+        healthStatus: "good",
+      }),
+      person({
+        relationshipRecordId: "father",
+        relationshipToClient: "father",
+        givenName: "John",
+        healthStatus: "deceased",
+        deceased: true,
+        dateOfDeath: "1993",
+      }),
+      person({
+        relationshipRecordId: "sib-1",
+        relationshipToClient: "sibling_full",
+        givenName: "Sibling One",
+        dateOfBirth: "1978-01-01",
+      }),
+      person({
+        relationshipRecordId: "sib-2",
+        relationshipToClient: "sibling_full",
+        givenName: "Sibling Two",
+        dateOfBirth: "1981-06-01",
+      }),
+      person({
+        relationshipRecordId: "step-sib",
+        relationshipToClient: "sibling_step",
+        givenName: "Step Sibling",
+        dateOfBirth: "1998-03-01",
       }),
     ],
-    partnerships: [],
+    partnerships: [
+      {
+        partnershipRecordId: "parents",
+        partnerAId: "mother",
+        partnerBId: "father",
+        relationshipStatus: "divorced",
+        started: "1968",
+        ended: "1978-06-01",
+        qualityOfRelationship: "",
+      } satisfies PartnershipRecord,
+    ],
     events: [
       event({
-        eventRecordId: "sh-1",
-        eventType: "self_harm",
-        title: "self-harm",
+        eventRecordId: "leg",
+        eventType: "illness_injury",
+        title: "A broken leg",
+        description: "SECRET DESCRIPTION must not appear",
         startPrecision: "year",
-        startValue: "1986",
+        startValue: "1982",
         displayOrder: 1,
       }),
       event({
-        eventRecordId: "sh-2",
-        eventType: "self_harm",
-        title: "self-harm",
-        startPrecision: "year",
-        startValue: "1992",
+        eventRecordId: "depression",
+        eventType: "illness_injury",
+        title: "Depression",
+        description: "Another secret description",
+        startPrecision: "date",
+        startValue: "2000-06-01",
         displayOrder: 2,
       }),
       event({
-        eventRecordId: "sh-3",
+        eventRecordId: "harm-1",
         eventType: "self_harm",
-        title: "an overdose",
+        title: "Cutting episode",
+        description: "Harm description must not appear",
         startPrecision: "date",
-        startValue: "2026-10-01",
+        startValue: "1984-06-01",
         displayOrder: 3,
+      }),
+      event({
+        eventRecordId: "harm-2",
+        eventType: "self_harm",
+        title: "Overdose",
+        startPrecision: "date",
+        startValue: "1988-03-01",
+        displayOrder: 4,
+      }),
+      event({
+        eventRecordId: "mother-mood",
+        eventType: "emotional_problems",
+        attribution: "family",
+        title: "Margaret anxiety",
+        description: "Family description must not appear",
+        relationshipRecordId: "mother",
+        startPrecision: "year",
+        startValue: "1990",
+        displayOrder: 5,
+      }),
+      event({
+        eventRecordId: "brother-mood",
+        eventType: "emotional_problems",
+        attribution: "family",
+        title: "Brother low mood",
+        familyRelation: "Brother",
+        startPrecision: "year",
+        startValue: "2001",
+        displayOrder: 6,
       }),
     ],
     risk: emptyRisk(),
   }
 
+  const screening: ScreeningAnswers = {
+    illness_injury: "yes",
+    traumatic_events: "yes",
+    emotional_problems: "not_asked",
+    substance_use: "no",
+    self_harm: "yes",
+    psychiatric_admission: "no",
+    previous_therapy: "no",
+    other_significant_events: "no",
+    family_illness: "no",
+    family_emotional_problems: "yes",
+    family_substance_use: "no",
+    family_self_harm: "no",
+    family_psychiatric_admission: "no",
+    family_significant_events: "no",
+  }
+
   return {
     reportDate: "2026-10-29",
-    clientFirstName: "Ben",
-    clientLastName: "Example",
-    dateOfBirth: "1974-01-01",
-    practitionerName: "Dr Alex Nguyen",
-    profession: null,
-    yearRegistered: null,
+    clientFirstName: "Ben01",
+    clientLastName: "Lee",
+    dateOfBirth: "1970-01-15",
+    practitionerName: "Ben Edwards",
+    practitionerReportIntroduction: [
+      "I am Benjamin Edwards, a registered psychologist.",
+      "",
+      "I have been registered as a psychologist since 2014.",
+      "   ",
+      "My principal therapeutic modalities include CBT.",
+    ].join("\n"),
     data,
-    screening: {
-      illness_injury: "no",
-      traumatic_events: "yes",
-      emotional_problems: "not_asked",
-      substance_use: "no",
-      self_harm: "yes",
-      psychiatric_admission: "no",
-      previous_therapy: "no",
-      other_significant_events: "no",
-    },
-    interviewDate: "2026-08-11",
-    selfReportDate: "2026-08-09",
-    numberOfChildren: 1,
-    sageModules: [
-      { name: "Core", date: "2026-08-09" },
-      { name: "Background", date: "2026-08-10" },
-      { name: "Personality", date: "2026-08-11" },
-    ],
-    questionnaires: [
-      {
-        fullName: "Patient Health Questionnaire",
-        abbreviation: "PHQ-9",
-        dates: ["2026-03-03"],
-      },
-      {
-        fullName: "Generalised Anxiety Disorder scale",
-        abbreviation: "GAD-7",
-        dates: ["2026-03-03", "2026-06-02"],
-      },
-    ],
-    firstAttendedAppointment: "2026-08-01",
+    screening,
+    interviews: [{ date: "2026-10-01" }],
+    selfReportDate: "2026-09-01",
+    numberOfChildren: 3,
     referral: {
       title: "Dr",
       firstName: "Harry",
       lastName: "Nguyen",
-      profession: "General Practitioner",
+      profession: "General practitioner",
       date: "2026-07-20",
     },
-    ...overrides,
   }
+}
+
+function textOf(node: LetterBodyNode): string {
+  if (node.text) return node.text
+  return (node.content ?? []).map(textOf).join("")
 }
 
 const draft = generateBackgroundReport(benSource())
 const outline = numberedLetterOutline(draft.document)
-const text = outline.join("\n")
-const messages = draft.omitted.map((item) => item.message)
+const body = outline.join("\n")
+
+assert.equal(draft.document.content[0]?.type, "heading")
+assert.equal(textOf(draft.document.content[0]), "Purpose and Scope")
+assert.equal(draft.document.content.at(-1)?.type, "paragraph")
+assert.equal(textOf(draft.document.content.at(-1)!), "Yours sincerely,")
+assert.doesNotMatch(body, /BACKGROUND REPORT/i)
+assert.doesNotMatch(body, /29 October 2026/)
+assert.doesNotMatch(body, /\bdenied\b/i)
+assert.doesNotMatch(body, /SECRET|Cutting episode|Overdose|Margaret|John|Should Not Appear|Child One|Sibling One/i)
+assert.doesNotMatch(body, /SAGE|PHQ|questionnaire|treatment commenced|mental state|\bMSE\b/i)
 
 assert.deepEqual(
   outline.filter((line) => /^\d+ /.test(line)),
@@ -202,77 +318,197 @@ assert.deepEqual(
   ]
 )
 
-assert.match(text, /2\.1\. The SAGE-SR Core, Background and Personality modules completed 9–11 August 2026\./)
+assert.deepEqual(
+  outline.filter((line) => line.startsWith("1.")),
+  [
+    "1.1. I am Benjamin Edwards, a registered psychologist.",
+    "1.2. I have been registered as a psychologist since 2014.",
+    "1.3. My principal therapeutic modalities include CBT.",
+    "1.4. This report summarises my background assessment of Ben01 Lee.",
+    "1.5. The report addresses Ben01's presenting problem, demographics, relevant history and risk.",
+  ]
+)
+assert.equal(
+  draft.omitted.some((item) => item.id === "report-introduction"),
+  false
+)
+
+assert.deepEqual(
+  outline.filter((line) => line.startsWith("2.")),
+  [
+    "2.1. Referral from Dr Harry Nguyen, general practitioner, 20 July 2026.",
+    "2.2. Clinical interview, 1 October 2026.",
+  ]
+)
+
+const presenting = outline.filter((line) => line.startsWith("3.")).join("\n")
+assert.match(presenting, /Ben01 was referred by his general practitioner, Dr Harry Nguyen, on 20 July 2026, with concerns about low mood\./)
+assert.match(presenting, /His partner came to the first appointment\./)
+assert.match(presenting, /Ben01 reported current difficulties with family and financial\./)
+assert.doesNotMatch(presenting, /social life|work or study|denied/i)
+assert.match(presenting, /He described the main problem as "I can't switch off"\./)
+assert.match(presenting, /He attended on his own initiative and willingly\./)
+assert.match(presenting, /He wants to feel more like himself\./)
+
+const demographics = outline.filter((line) => line.startsWith("4.")).join("\n")
+assert.match(demographics, /Ben01 is a 56-year-old male \(he\/him\)\./)
+assert.match(demographics, /He identifies as Australian, speaks English at home and is Catholic\./)
 assert.match(
-  text,
-  /2\.2\. The Patient Health Questionnaire \(PHQ-9\) completed 3 March 2026, the Generalised Anxiety Disorder scale \(GAD-7\) completed between March 2026 and June 2026 and the background self-report questionnaire completed 9 August 2026\./
+  demographics,
+  /He has been married to his wife for 12 years, and has had two previous significant relationships\./
+)
+assert.match(demographics, /He has three children, aged 9, 7 and 6\./)
+assert.doesNotMatch(demographics, /three children, aged nine|has 3 children/)
+assert.match(demographics, /His parents divorced when he was 8\./)
+assert.match(demographics, /His father died when Ben01 was 23\./)
+assert.match(demographics, /He has two siblings, aged 48 and 45, and one step-sibling, aged 28\./)
+assert.match(
+  demographics,
+  /He lives with his wife and children, in private rental, and describes his housing as stable\./
 )
 assert.match(
-  text,
-  /2\.3\. Clinical interviews and treatment commenced in August 2026, including a background interview on 11 August 2026\./
+  demographics,
+  /His highest level of education is a trade apprenticeship in carpentry\. He is currently studying a certificate IV\./
+)
+assert.match(demographics, /He works full-time as a carpenter\./)
+assert.match(demographics, /He reported difficulty affording food and transport\./)
+assert.match(demographics, /He reported no disability\./)
+assert.match(demographics, /He is not currently taking medication for emotional problems\./)
+
+assert.ok(outline.includes("Client history"))
+assert.ok(outline.includes("Family history"))
+const medicationAt = outline.findIndex((line) => line.startsWith("5.3."))
+const familyHeadingAt = outline.indexOf("Family history")
+const familyItemAt = outline.findIndex((line) => line.startsWith("5.4."))
+assert.ok(outline.indexOf("Client history") < outline.findIndex((line) => line.startsWith("5.1.")))
+assert.ok(medicationAt < familyHeadingAt && familyHeadingAt < familyItemAt)
+assert.match(outline.find((line) => line.startsWith("5.1.")) ?? "", /Ben01 reported a history of illness or injury, including a broken leg at around age 12 \(1982\) and depression at age 30 \(2000\)\./)
+assert.match(
+  outline.find((line) => line.startsWith("5.2.")) ?? "",
+  /He reported a history of self-harm, at age 14 \(1984\) and age 18 \(1988\)\./
 )
 assert.match(
-  text,
-  /2\.4\. A referral from his general practitioner, Dr Harry Nguyen, dated 20 July 2026\./
+  outline.find((line) => line.startsWith("5.3.")) ?? "",
+  /He has previously taken medication for emotional problems\./
 )
-
-assert.match(text, /4\.\d+\. He is 52 years old and male\./)
-assert.match(text, /has 1 child, aged 10/)
-assert.match(text, /has 1 sibling, aged about 36/)
-assert.doesNotMatch(text, /\bAri\b|\bSam\b|\bPat\b|\bJoan\b/)
-
-const history = outline.filter((line) => line.startsWith("5."))
-const traumatic = history.findIndex((line) => line.includes("history of traumatic events"))
-const selfHarm = history.findIndex((line) => line.includes("self-harm at around age 12 (1986)"))
-const medication = history.findIndex((line) => line.includes("previously taken medication"))
-const denied = history.findIndex((line) => line.includes("denied any"))
-assert.ok(traumatic >= 0 && selfHarm > traumatic && medication > selfHarm && denied > medication)
 assert.match(
-  history[selfHarm],
-  /He reported self-harm at around age 12 \(1986\) and around age 18 \(1992\), and an overdose at age 52 \(1 October 2026\)\./
+  outline.find((line) => line.startsWith("5.4.")) ?? "",
+  /He reported a family history of emotional problems \(his mother and brother\)\./
 )
-assert.match(history[denied], /denied any significant illness or injury/)
-assert.match(history[denied], /previous individual or group therapy/)
-assert.doesNotMatch(history[denied], /emotional problems|self-harm|traumatic events|medication/)
-assert.doesNotMatch(text, /Emotional problems/)
-assert.match(history[history.length - 1], /\[Alcohol and other drugs — to be added \(ASSIST\)\.\]/)
+assert.match(outline.find((line) => line.startsWith("5.5.")) ?? "", /\[Alcohol and other drugs — to be added \(ASSIST\)\.\]/)
+assert.match(body, /\[Risk assessment — to be added \(LRAMP\)\.\]/)
+assert.match(body, /\[Summary — practitioner to write\.\]/)
+assert.doesNotMatch(body, /reported experiencing traumatic|family history of substance/)
 
-assert.ok(messages.includes("Emotional problems not asked"))
-assert.ok(messages.includes("Family history not assessed"))
-assert.ok(messages.includes("Current stressors not assessed"))
-assert.ok(messages.includes("Client's own description of the problem not recorded"))
-assert.ok(messages.includes("Years together not recorded"))
-assert.ok(messages.includes("Parents' health not recorded"))
-assert.doesNotMatch(text, /not asked|not recorded|Not asked/)
+assert.ok(draft.omitted.some((item) => item.message === "Traumatic events is Yes, with no entries."))
+assert.ok(draft.omitted.some((item) => item.message === "Emotional problems not asked"))
+assert.equal(
+  draft.omitted.some((item) => item.message === "Medication history is Yes, with no entries."),
+  false
+)
 
-assert.match(text, /He attended on his own initiative and willingly\./)
-assert.doesNotMatch(text, /\bShe\b|\bher\b/)
+const clearNecessities = benSource()
+for (const key of Object.keys(clearNecessities.data.demographics.occupation.necessities) as Array<
+  keyof typeof clearNecessities.data.demographics.occupation.necessities
+>) {
+  clearNecessities.data.demographics.occupation.necessities[key] = false
+}
+const clearText = numberedLetterOutline(generateBackgroundReport(clearNecessities).document).join("\n")
+assert.match(clearText, /He reported no difficulty affording basic necessities\./)
+assert.doesNotMatch(clearText, /difficulty affording food/)
 
-const headings = draft.document.content.filter((node) => node.type === "heading" && node.attrs?.numbered)
-assert.equal(headings.length, 7)
-assert.equal(JSON.stringify(headings).includes("1 Purpose"), false)
+const unknownNecessities = benSource()
+unknownNecessities.selfReportDate = null
+unknownNecessities.data.demographics.occupation.workStatus = ""
+unknownNecessities.data.demographics.occupation.role = ""
+unknownNecessities.data.demographics.occupation.previousJobs = []
+for (const key of Object.keys(unknownNecessities.data.demographics.occupation.necessities) as Array<
+  keyof typeof unknownNecessities.data.demographics.occupation.necessities
+>) {
+  unknownNecessities.data.demographics.occupation.necessities[key] = false
+}
+assert.doesNotMatch(
+  numberedLetterOutline(generateBackgroundReport(unknownNecessities).document).join("\n"),
+  /basic necessities/
+)
 
-const noInterview = generateBackgroundReport(
-  benSource({
-    screening: null,
-    interviewDate: null,
-    selfReportDate: null,
-    sageModules: [],
-    questionnaires: [],
-    firstAttendedAppointment: null,
-    referral: null,
+const emptyIntro = benSource()
+emptyIntro.practitionerReportIntroduction = "\n  \n"
+const emptyIntroDraft = generateBackgroundReport(emptyIntro)
+const emptyIntroLines = numberedLetterOutline(emptyIntroDraft.document).filter((line) => line.startsWith("1."))
+assert.equal(emptyIntroLines[0], "1.1. I am Ben Edwards.")
+assert.ok(
+  emptyIntroDraft.omitted.some(
+    (item) =>
+      item.message === "Your report introduction is empty — add it in your practitioner profile" &&
+      item.target === "practitioner"
+  )
+)
+
+const missingDeath = benSource()
+const father = missingDeath.data.relationships.find((row) => row.relationshipToClient === "father")
+assert.ok(father)
+father.dateOfDeath = ""
+const missingDeathDraft = generateBackgroundReport(missingDeath)
+assert.match(numberedLetterOutline(missingDeathDraft.document).join("\n"), /His father is deceased\./)
+assert.ok(missingDeathDraft.omitted.some((item) => item.message === "Father's year of death not recorded"))
+
+const openParents = benSource()
+openParents.data.partnerships[0].ended = ""
+const openParentsDraft = generateBackgroundReport(openParents)
+assert.match(numberedLetterOutline(openParentsDraft.document).join("\n"), /His parents are divorced\./)
+assert.ok(openParentsDraft.omitted.some((item) => item.message === "When his parents separated not recorded"))
+
+const theySource = benSource()
+theySource.clientFirstName = "Alex"
+theySource.data.demographics.identity.pronouns = "they/them"
+theySource.data.demographics.identity.sex = "Female"
+const theyText = numberedLetterOutline(generateBackgroundReport(theySource).document).join("\n")
+assert.doesNotMatch(theyText, /\bthey is\b/i)
+assert.doesNotMatch(theyText, /\bthey has\b/i)
+assert.doesNotMatch(theyText, /\bthey was\b/i)
+assert.match(theyText, /Alex is a 56-year-old female \(they\/them\)\./)
+assert.match(theyText, /They have been married to their wife for 12 years/)
+assert.match(theyText, /They have three children/)
+assert.match(theyText, /when they were 8/)
+assert.match(theyText, /died when Alex was 23/)
+assert.match(theyText, /They are not currently taking medication/)
+
+function emptySource(): BackgroundReportSource {
+  return {
+    reportDate: "2026-10-29",
+    clientFirstName: "Ben01",
+    clientLastName: "Lee",
+    dateOfBirth: null,
+    practitionerName: "Ben Edwards",
+    practitionerReportIntroduction: "I am Ben Edwards.",
     data: {
-      ...benSource().data,
-      events: [],
+      dateOfBirth: null,
+      backgroundCapturedAt: null,
+      relationshipStatus: emptyClientRelationshipStatus(),
+      demographics: emptyDemographics(),
       medication: emptyMedication(),
+      stressors: emptyStressors(),
       reason: emptyReasonForAttending(),
       relationships: [],
-      relationshipStatus: emptyClientRelationshipStatus(),
+      partnerships: [],
+      events: [],
+      risk: emptyRisk(),
     },
-  })
-)
-assert.equal(noInterview.document.type, "doc")
-assert.ok(numberedLetterOutline(noInterview.document).some((line) => line.startsWith("1 Purpose")))
-assert.ok(noInterview.omitted.some((item) => item.message === "Family history not assessed"))
+    screening: null,
+    interviews: [],
+    selfReportDate: null,
+    numberOfChildren: null,
+    referral: null,
+  }
+}
 
-console.log("generate-background-report.selftest: ok")
+const noInterview = generateBackgroundReport(emptySource())
+assert.equal(noInterview.document.type, "doc")
+assert.equal(noInterview.document.content[0]?.type, "heading")
+assert.equal(
+  numberedLetterOutline(noInterview.document).some((line) => line.includes("Clinical interview")),
+  false
+)
+
+console.log("generate-background-report self-test passed")

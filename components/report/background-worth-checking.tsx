@@ -7,7 +7,7 @@ import type {
 } from "@/lib/reports/generate-background-report"
 
 function hrefFor(clientId: string, target: BackgroundCheck["target"] | BackgroundReportOmissionTarget): string {
-  if (target === "practitioner") return `/clients/${clientId}/background`
+  if (target === "practitioner") return `/practitioner/edit`
   return `/clients/${clientId}/background#check-${target}`
 }
 
@@ -20,6 +20,7 @@ export function BackgroundWorthChecking({
   checks: BackgroundCheck[]
   omissions: BackgroundReportOmission[]
 }) {
+  const seen = new Set<string>()
   const items = [
     ...checks.map((check) => ({
       id: `check-${check.id}`,
@@ -31,7 +32,11 @@ export function BackgroundWorthChecking({
       message: item.message,
       href: hrefFor(clientId, item.target),
     })),
-  ]
+  ].filter((item) => {
+    if (seen.has(item.message)) return false
+    seen.add(item.message)
+    return true
+  })
   if (items.length === 0) return null
 
   return (

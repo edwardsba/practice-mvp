@@ -1,4 +1,6 @@
 import { assessAge, clientAgeAtStart, compareEventsChronologically } from "@/lib/client-background/age"
+import { backgroundChecks } from "@/lib/client-background/checks"
+import type { ProfessionalOption } from "@/lib/client-background/professionals"
 import {
   HISTORY_QUESTION_GROUPS,
   HISTORY_QUESTIONS,
@@ -21,7 +23,18 @@ import {
   type RelationshipToClient,
   type StartPrecision,
 } from "@/lib/client-background/types"
+import {
+  conditionParagraph,
+  currentMedicationParagraph,
+  familyOriginsParagraph,
+  lowerKeepingTypedCase,
+  relationshipsParagraph,
+  unlinkedTreatmentsParagraph,
+  type ReportVoice,
+} from "@/lib/reports/background-report-prose"
 import type { LetterBodyDoc, LetterBodyNode } from "@/lib/reports/letter-body-types"
+
+export { lowerKeepingTypedCase }
 
 export type BackgroundReportOmissionTarget =
   | "reason"
@@ -128,6 +141,8 @@ export type BackgroundReportSource = {
   /** Self-report children count, for the existing consistency checks. */
   numberOfChildren: number | null
   referral: BackgroundReportReferral | null
+  /** Professionals named on medication entries. */
+  professionals?: ProfessionalOption[]
 }
 
 export type BackgroundReportDraft = {
@@ -212,21 +227,6 @@ function sentence(text: string): string {
   const trimmed = text.trim()
   if (!trimmed) return ""
   return /[.!?]"?$/.test(trimmed) ? trimmed : `${trimmed}.`
-}
-
-/**
- * Lower-cases prose one letter-run at a time.
- * A run of two or more letters that is entirely capitals stays as typed
- * (digits and punctuation such as / - . are left in place and ignored).
- * A mixed-case run with a capital after its first letter stays as typed.
- * Every other run is lower-cased.
- */
-export function lowerKeepingTypedCase(value: string): string {
-  return value.replace(/[A-Za-z]+/g, (word) => {
-    if (word.length >= 2 && word === word.toUpperCase()) return word
-    if (/[A-Z]/.test(word.slice(1))) return word
-    return word.toLowerCase()
-  })
 }
 
 function lowerFirst(value: string): string {
@@ -353,7 +353,6 @@ export function numberedLetterOutline(doc: LetterBodyDoc): string[] {
 }
 
 function answerFor(source: BackgroundReportSource, key: HistoryQuestionKey): "yes" | "no" | "not_asked" | null {
-  if (key === "medication_history") return source.data.medication.previouslyTaken
   return source.screening?.[key] ?? null
 }
 
@@ -412,6 +411,36 @@ function historyEntryPhrase(events: EventRecord[], dateOfBirth: string | null, n
   return `${noun}, including ${joinList(parts, "and")}`
 }
 
+function familyHistoryLine(
+  key: HistoryQuestionKey,
+  events: EventRecord[],
+  relationships: RelationshipRecord[],
+  voice: Voice,
+  leadName: string | null
+): string {
+  const sorted = [...events].sort((a, b) => compareEventsChronologically(a, b, null))
+  return sorted
+    .map((event, index) => {
+      let role = ""
+      if (event.relationshipRecordId) {
+        const person = relationships.find((row) => row.relationshipRecordId === event.relationshipRecordId)
+        if (person) role = lowerKeepingTypedCase(personRoleLabel(person))
+      }
+      if (!role) role = lowerKeepingTypedCase(event.familyRelation.trim())
+      if (!role) role = "family member"
+      const owner = index === 0 && leadName ? `${leadName}'s` : voice.Possessive
+      const title = event.title.trim()
+      if (/^(died|was|has|had)\b/i.test(title)) return `${owner} ${role} ${title.replace(/\.$/, "")}.`
+      if (key === "family_substance_use") {
+        return `${owner} ${role} had problems with ${lowerKeepingTypedCase(title) || "alcohol or drugs"}.`
+      }
+      const topic =
+        lowerKeepingTypedCase(title) || lowerKeepingTypedCase(HISTORY_QUESTIONS[key].label.replace(/^family\s+/i, ""))
+      return `${owner} ${role} has a history of ${topic}.`
+    })
+    .join(" ")
+}
+
 function historySentence(
   key: HistoryQuestionKey,
   events: EventRecord[],
@@ -422,8 +451,7 @@ function historySentence(
   family: boolean
 ): string {
   if (family) {
-    const topic = lowerKeepingTypedCase(HISTORY_QUESTIONS[key].label.replace(/^family\s+/i, ""))
-    return `${who.text} reported a family history of ${topic} (${familyRoles(events, relationships, voice)}).`
+    return familyHistoryLine(key, events, relationships, voice, null)
   }
   if (key === "medication_history") {
     return `${who.text} ${verb(who.plural, "has", "have")} previously taken medication for emotional problems.`
@@ -461,11 +489,13 @@ function historyItems(
     const recorded = answerFor(source, key)
     const answer = entries.length > 0 ? "yes" : recorded
     const label = HISTORY_QUESTIONS[key].label
-    if (answer === "yes" && (entries.length > 0 || key === "medication_history")) {
+    if (answer === "yes" && entries.length > 0) {
       answered = true
-      const who = speaker(voice, first, !named.value)
-      named.value = true
-      items.push(historySentence(key, entries, source.data.dateOfBirth, who, voice, source.data.relationships, family))
+      if (family) {
+        const lead = !named.value
+        named.value = true
+        items.push(familyHistoryLine(key, entries, source.data.relationships, voice, lead ? first : null))
+      }
     } else if (answer === "yes") {
       answered = true
       omitted.push({ id: `history-${key}`, message: `${label} is Yes, with no entries.`, target: "history" })
@@ -764,23 +794,21 @@ function childrenItem(source: BackgroundReportSource, who: Speaker): string | nu
   return `${who.text} ${verb(who.plural, "has", "have")} ${phrase}.`
 }
 
-function cultureItem(source: BackgroundReportSource, voice: Voice, who: Speaker): string | null {
+function cultureItem(source: BackgroundReportSource, voice: Voice): string | null {
   const identity = source.data.demographics.identity
   const culture = identity.raceEthnicity.trim()
   const language = identity.primaryLanguage.trim()
   const religion = identity.religion.trim()
-  const identify = verb(who.plural, "identifies", "identify")
-  const speak = verb(who.plural, "speaks", "speak")
-  const is = verb(who.plural, "is", "are")
-  if (culture && language && religion) {
-    return `${who.text} ${identify} as ${culture}, ${speak} ${language} at home and ${is} ${religion}.`
-  }
-  if (culture && language) return `${who.text} ${identify} as ${culture} and ${speak} ${language} at home.`
-  if (culture && religion) return `${who.text} ${identify} as ${culture} and ${is} ${religion}.`
-  if (language && religion) return `${who.text} ${speak} ${language} at home and ${is} ${religion}.`
-  if (culture) return `${who.text} ${identify} as ${culture}.`
-  if (language) return `${who.text} ${speak} ${language} at home.`
-  if (religion) return `${who.text} ${is} ${religion}.`
+  const described: string[] = []
+  if (culture) described.push(`${voice.possessive} cultural background as ${culture}`)
+  if (religion) described.push(`${voice.possessive} religion as ${religion}`)
+  const speaks = language
+    ? `${voice.subject} mainly ${verb(voice.kind === "they", "speaks", "speak")} ${language} at home`
+    : ""
+  const describes = verb(voice.kind === "they", "describes", "describe")
+  if (described.length > 0 && speaks) return `${voice.Subject} ${describes} ${joinList(described, "and")}, and ${speaks}.`
+  if (described.length > 0) return `${voice.Subject} ${describes} ${joinList(described, "and")}.`
+  if (speaks) return `${voice.Subject} mainly ${verb(voice.kind === "they", "speaks", "speak")} ${language} at home.`
   return null
 }
 
@@ -864,55 +892,79 @@ function educationItem(source: BackgroundReportSource, voice: Voice, who: Speake
         : `${who.text} ${verb(who.plural, "is", "are")} currently studying.`
     )
   }
+  if (education.disruption === true) {
+    const detail = education.disruptionDetail.trim()
+    parts.push(
+      detail
+        ? `${voice.Possessive} schooling was disrupted ${detail.replace(/\.$/, "")}.`
+        : `${voice.Possessive} schooling was disrupted.`
+    )
+  }
   return parts.length > 0 ? parts.join(" ") : null
 }
 
-function mostRecentRole(source: BackgroundReportSource): string {
-  const jobs = [...source.data.demographics.occupation.previousJobs]
-  jobs.sort((a, b) => (b.ended || b.started).localeCompare(a.ended || a.started))
-  return jobs.find((job) => job.role.trim())?.role.trim() ?? ""
+function previousJobsSentence(source: BackgroundReportSource, who: Speaker): string {
+  const jobs = source.data.demographics.occupation.previousJobs.filter((job) => job.role.trim())
+  const sorted = [...jobs].sort((a, b) => (b.ended || b.started).localeCompare(a.ended || a.started))
+  if (sorted.length === 0) return ""
+  const bits = sorted.map((job) => {
+    const start = /^\d{4}/.exec(job.started)?.[0] ?? ""
+    const end = /^\d{4}/.exec(job.ended)?.[0] ?? ""
+    const years = start && end ? ` (${start}–${end})` : start || end ? ` (${start || end})` : ""
+    return `${withArticle(job.role)}${years}`
+  })
+  return ` ${who.text} previously worked as ${joinList(bits, "and")}.`
 }
 
 function workItem(source: BackgroundReportSource, who: Speaker): string | null {
   const occupation = source.data.demographics.occupation
-  if (!occupation.workStatus) return null
   const is = verb(who.plural, "is", "are")
   const works = verb(who.plural, "works", "work")
   const role = occupation.role.trim()
   const asRole = role ? ` as ${withArticle(role)}` : ""
-  const previous = mostRecentRole(source)
-  const previousClause = previous ? `, and previously worked as ${withArticle(previous)}` : ""
+  let status = ""
   switch (occupation.workStatus) {
     case "full_time":
-      return `${who.text} ${works} full-time${asRole}.`
+      status = `${who.text} ${works} full-time${asRole}.`
+      break
     case "part_time":
-      return `${who.text} ${works} part-time${asRole}.`
+      status = `${who.text} ${works} part-time${asRole}.`
+      break
     case "casual":
-      return `${who.text} ${works} casually${asRole}.`
+      status = `${who.text} ${works} casually${asRole}.`
+      break
     case "self_employed":
-      return `${who.text} ${is} self-employed${asRole}.`
+      status = `${who.text} ${is} self-employed${asRole}.`
+      break
     case "student":
-      return `${who.text} ${is} studying.`
+      status = `${who.text} ${is} studying.`
+      break
     case "retired":
-      return `${who.text} ${is} retired${previousClause}.`
+      status = `${who.text} ${is} retired.`
+      break
     case "home_duties_or_carer":
-      return `${who.text} ${verb(who.plural, "has", "have")} home duties or caring responsibilities.`
+      status = `${who.text} ${verb(who.plural, "has", "have")} home duties or caring responsibilities.`
+      break
     case "unable_to_work":
-      return `${who.text} ${is} unable to work${previousClause}.`
+      status = `${who.text} ${is} unable to work.`
+      break
     case "unemployed":
-      return previous
-        ? `${who.text} ${is} not currently working, and previously worked as ${withArticle(previous)}.`
-        : `${who.text} ${is} not currently working.`
+      status = `${who.text} ${is} currently unemployed.`
+      break
     case "other": {
       const other = lowerFirst(occupation.workStatusOther.trim())
-      if (other && role) return `${who.text} ${is} ${other} and ${works}${asRole}.`
-      if (other) return `${who.text} ${is} ${other}.`
-      if (role) return `${who.text} ${works}${asRole}.`
-      return `${who.text} ${is} in other work.`
+      if (other && role) status = `${who.text} ${is} ${other} and ${works}${asRole}.`
+      else if (other) status = `${who.text} ${is} ${other}.`
+      else if (role) status = `${who.text} ${works}${asRole}.`
+      else status = `${who.text} ${is} in other work.`
+      break
     }
     default:
-      return null
+      status = ""
   }
+  const previous = previousJobsSentence(source, who).trim()
+  const line = [status, previous].filter(Boolean).join(" ")
+  return line || null
 }
 
 function necessitiesKnown(source: BackgroundReportSource): boolean {
@@ -933,28 +985,20 @@ function necessitiesItem(source: BackgroundReportSource, who: Speaker): string |
   return `${who.text} reported difficulty affording ${joinList(ticked, "and")}.`
 }
 
-function disabilityItem(source: BackgroundReportSource, who: Speaker): string | null {
+function disabilityItem(source: BackgroundReportSource, voice: Voice, name: string): string | null {
   const identity = source.data.demographics.identity
-  if (identity.disability === false) return `${who.text} reported no disability.`
-  if (identity.disability === true) {
-    return identity.disabilityDetail.trim()
-      ? `${who.text} reported a disability: ${lowerFirst(identity.disabilityDetail).replace(/\.$/, "")}.`
-      : `${who.text} reported a disability.`
-  }
-  return null
+  if (identity.disability !== true) return null
+  const detail = identity.disabilityDetail.trim()
+  const access = identity.accessibilityNeeds.trim()
+  const lines = [
+    detail ? `${name} has ${lowerFirst(detail).replace(/\.$/, "")}.` : `${name} has a disability.`,
+  ]
+  if (access) lines.push(`${voice.Subject} asked that ${lowerFirst(access).replace(/\.$/, "")}.`)
+  return lines.join(" ")
 }
 
-function medicationItem(source: BackgroundReportSource, who: Speaker): string | null {
-  const taking = source.data.medication.currentlyTaking
-  const is = verb(who.plural, "is", "are")
-  if (taking === "no") return `${who.text} ${is} not currently taking medication for emotional problems.`
-  if (taking === "yes") {
-    const supervisor = source.data.medication.supervisedBy.trim()
-    return supervisor
-      ? `${who.text} ${is} currently taking medication for emotional problems, supervised by ${supervisor}.`
-      : `${who.text} ${is} currently taking medication for emotional problems.`
-  }
-  return null
+function medicationItem(source: BackgroundReportSource, name: string): string | null {
+  return currentMedicationParagraph(source.data.events, name, source.professionals ?? [])
 }
 
 function demographicItems(
@@ -974,25 +1018,68 @@ function demographicItems(
   }
 
   const age = ageItem(source, voice)
-  if (age) {
+  const culture = cultureItem(source, voice)
+  const identity = [age, culture].filter(Boolean).join(" ")
+  if (identity) {
     named = true
-    items.push(age)
+    items.push(identity)
   }
-  next((who) => cultureItem(source, voice, who))
-  next((who) => relationshipItem(source, voice, who))
-  next((who) => childrenItem(source, who))
-  const parents = parentsItem(source, voice, first, omitted)
-  if (parents) {
+  const disability = disabilityItem(source, voice, first)
+  if (disability) {
     named = true
-    items.push(parents)
+    items.push(disability)
   }
-  next((who) => siblingItem(source, who))
+  const relationships = relationshipsParagraph(
+    first,
+    voice as ReportVoice,
+    source.data.relationshipStatus.relationshipStatus,
+    source.data.relationships,
+    source.reportDate
+  )
+  if (relationships) {
+    named = true
+    items.push(relationships)
+  }
+  for (const parent of people(source.data.relationships, ["mother", "father", "parent"])) {
+    if ((parent.healthStatus === "deceased" || parent.deceased) && !parent.dateOfDeath.trim() && !parent.notKnown) {
+      omitted.push({
+        id: `death-${parent.relationshipRecordId}`,
+        message: `${parent.relationshipToClient === "mother" ? "Mother" : parent.relationshipToClient === "father" ? "Father" : "Parent"}'s year of death not recorded`,
+        target: "relationships",
+      })
+    }
+  }
+  for (const partnership of source.data.partnerships) {
+    const status = partnership.relationshipStatus
+    if ((status === "separated" || status === "divorced") && !partnership.ended.trim()) {
+      omitted.push({
+        id: "parents-ended",
+        message: `When ${voice.possessive} parents separated not recorded`,
+        target: "relationships",
+      })
+    }
+  }
+  const family = familyOriginsParagraph(
+    first,
+    voice as ReportVoice,
+    source.dateOfBirth,
+    source.data.relationships,
+    source.data.partnerships,
+    source.reportDate
+  )
+  if (family) {
+    named = true
+    items.push(family)
+  }
   next((who) => livingItem(source, voice, who))
   next((who) => educationItem(source, voice, who))
   next((who) => workItem(source, who))
+  const medication = medicationItem(source, first)
+  if (medication) {
+    named = true
+    items.push(medication)
+  }
   next((who) => necessitiesItem(source, who))
-  next((who) => disabilityItem(source, who))
-  next((who) => medicationItem(source, who))
   return items
 }
 
@@ -1030,15 +1117,27 @@ export function generateBackgroundReport(source: BackgroundReportSource): Backgr
     })
   }
   const named = { value: false }
-  const clientHistory = historyItems(source, voice, first, omitted, false, named)
+  historyItems(source, voice, first, omitted, false, named)
   const familyHistory = historyItems(source, voice, first, omitted, true, named)
-  const historyBlocks: { heading?: string; items: string[] }[] = []
-  if (clientHistory.length > 0) historyBlocks.push({ heading: "Client history", items: clientHistory })
-  if (familyHistory.length > 0) historyBlocks.push({ heading: "Family history", items: familyHistory })
-  if (clientHistory.length === 0 && familyHistory.length === 0) {
-    historyBlocks.push({ items: ["[Relevant history — not yet recorded.]"] })
+  const clientHistory = [
+    conditionParagraph("illness_injury", source.data.events, first, voice as ReportVoice, source.dateOfBirth),
+    conditionParagraph("emotional_problems", source.data.events, first, voice as ReportVoice, source.dateOfBirth),
+    conditionParagraph("substance_use", source.data.events, first, voice as ReportVoice, source.dateOfBirth),
+    conditionParagraph("self_harm", source.data.events, first, voice as ReportVoice, source.dateOfBirth),
+    conditionParagraph("traumatic_event", source.data.events, first, voice as ReportVoice, source.dateOfBirth),
+    conditionParagraph("significant_history", source.data.events, first, voice as ReportVoice, source.dateOfBirth),
+    unlinkedTreatmentsParagraph(source.data.events, first, source.dateOfBirth),
+  ].filter((item): item is string => Boolean(item))
+  const seen = new Set(omitted.map((item) => item.id))
+  for (const check of backgroundChecks({
+    data: source.data,
+    numberOfChildren: source.numberOfChildren,
+    screening: source.screening,
+  })) {
+    if (seen.has(check.id)) continue
+    seen.add(check.id)
+    omitted.push(check)
   }
-  historyBlocks.push({ items: ["[Alcohol and other drugs — to be added (ASSIST).]"] })
   const content: LetterBodyNode[] = []
 
   pushNumberedSection(content, "Purpose and Scope", [
@@ -1046,7 +1145,7 @@ export function generateBackgroundReport(source: BackgroundReportSource): Backgr
       items: [
         ...introductionLines(source, omitted),
         `This report summarises my background assessment of ${full}.`,
-        `The report addresses ${first}'s presenting problem, demographics, relevant history and risk.`,
+        `The report addresses ${first}'s presenting problem, demographics, and client and family history.`,
       ],
     },
   ])
@@ -1063,8 +1162,8 @@ export function generateBackgroundReport(source: BackgroundReportSource): Backgr
     [{ items: demographicItems(source, voice, omitted) }],
     "[Demographics — not yet recorded.]"
   )
-  pushNumberedSection(content, "Relevant History", historyBlocks)
-  pushNumberedSection(content, "Risk Assessment", [{ items: ["[Risk assessment — to be added (LRAMP).]"] }])
+  pushNumberedSection(content, "Client History", [{ items: clientHistory }])
+  pushNumberedSection(content, "Family History", [{ items: familyHistory }])
   pushNumberedSection(content, "Summary", [{ items: ["[Summary — practitioner to write.]"] }])
   content.push(paragraph("Yours sincerely,"))
 

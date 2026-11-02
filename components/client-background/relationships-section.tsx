@@ -1771,7 +1771,7 @@ function RelationshipExtras({
       {visibility.clientRelationshipStatus ? (
         <>
           <p className="text-sm">
-            Type: {clientRelationshipStatusText(clientRelationshipStatus) || "not recorded"} — set by the client's
+            Type: {clientRelationshipStatusText(clientRelationshipStatus) || "not recorded"} — set by the client
             relationship status
           </p>
           <ClientRelationshipStatusFields

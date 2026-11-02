@@ -11,7 +11,7 @@ import {
   professions,
 } from "@/db/schema"
 import { sanitizeScreening } from "@/lib/client-background/interview-history"
-import { loadClientBackground, loadLatestBackgroundSelfReport } from "@/lib/client-background/load"
+import { loadClientBackground, loadLatestBackgroundSelfReport, loadReasonSupport } from "@/lib/client-background/load"
 import { db } from "@/lib/db"
 import { chooseReportInterviews, type BackgroundReportSource } from "@/lib/reports/generate-background-report"
 
@@ -140,5 +140,6 @@ export async function loadBackgroundReportSource({
     selfReportDate: selfReport ? isoDate(new Date(selfReport.assessmentDate)) : null,
     numberOfChildren: selfReport?.answers.familyHome.numberOfChildren ?? null,
     referral,
+    professionals: (await loadReasonSupport(clientId, practiceId, data.reason.referrerProfessionalId)).professionals,
   }
 }

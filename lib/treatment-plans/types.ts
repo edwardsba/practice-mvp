@@ -36,6 +36,12 @@ export type MedicationSupervisionJson = {
   supervisorName: string | null
 }
 
+/** One ongoing medication entry and the professional supervising it. */
+export type MedicationSupervisorAssignment = {
+  eventId: string
+  professionalId: string | null
+}
+
 export type TreatmentPlanFormValues = {
   startDate: string | null
   endDate: string | null
@@ -49,6 +55,7 @@ export type TreatmentPlanFormValues = {
   suicideAttempts: SuicideAttemptsJson
   ongoingAssessments: OngoingAssessmentsJson
   medicationSupervision: MedicationSupervisionJson
+  medicationSupervisors: MedicationSupervisorAssignment[]
   supportServices: MultiSelectSectionJson
   treatmentModel: SingleSelectSectionJson
 }

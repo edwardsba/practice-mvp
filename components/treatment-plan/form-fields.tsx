@@ -11,8 +11,8 @@ import type {
   CheckboxOption,
   SupportServiceOption,
 } from "@/lib/treatment-plans/fields"
+import { professionalOptionLabel, type ProfessionalOption } from "@/lib/client-background/professionals"
 import type {
-  MedicationSupervisionJson,
   MultiSelectSectionJson,
   OngoingAssessmentsJson,
   SingleSelectSectionJson,
@@ -234,38 +234,45 @@ export function SupportServicesFields({
   )
 }
 
-/** Medication Supervision: a checkbox for whether medication is currently being
- * supervised, revealing a text field for the supervising doctor/psychiatrist's
- * name once checked. */
+/** One supervisor dropdown per ongoing medication entry. */
 export function MedicationSupervisionFields({
-  value,
+  medications,
+  professionals,
 }: {
-  value: MedicationSupervisionJson
+  medications: { eventRecordId: string; title: string; prescriberProfessionalId: string | null }[]
+  professionals: ProfessionalOption[]
 }) {
-  const [supervised, setSupervised] = useState(value.supervised)
+  if (medications.length === 0) {
+    return (
+      <p className="text-sm text-muted-foreground">
+        No ongoing medication is recorded. Add it under Medication in Client Background history.
+      </p>
+    )
+  }
 
   return (
-    <div className="space-y-3">
-      <FormCheckboxField
-        id="medication_supervised"
-        name="medication_supervised"
-        label="Medication is being supervised"
-        defaultChecked={value.supervised}
-        onCheckedChangeExtra={setSupervised}
-      />
-      {supervised ? (
-        <div className="ml-7 max-w-sm space-y-2">
-          <Label htmlFor="medication_supervisor_name" className="text-xs">
-            Supervising doctor / psychiatrist
+    <div className="space-y-4">
+      {medications.map((medication) => (
+        <div key={medication.eventRecordId} className="max-w-sm space-y-2">
+          <input type="hidden" name="medication_event_id" value={medication.eventRecordId} />
+          <Label htmlFor={`medication_supervisor_${medication.eventRecordId}`} className="text-xs">
+            {medication.title.trim() || "Medication"}
           </Label>
-          <Input
-            id="medication_supervisor_name"
-            name="medication_supervisor_name"
-            defaultValue={value.supervisorName ?? ""}
-            placeholder="Name"
-          />
+          <select
+            id={`medication_supervisor_${medication.eventRecordId}`}
+            name="medication_supervisor_id"
+            defaultValue={medication.prescriberProfessionalId ?? ""}
+            className="h-9 w-full rounded-md border bg-transparent px-3 text-sm"
+          >
+            <option value="">Not recorded</option>
+            {professionals.map((professional) => (
+              <option key={professional.professionalId} value={professional.professionalId}>
+                {professionalOptionLabel(professional)}
+              </option>
+            ))}
+          </select>
         </div>
-      ) : null}
+      ))}
     </div>
   )
 }

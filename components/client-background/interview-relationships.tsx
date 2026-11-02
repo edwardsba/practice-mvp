@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react"
 import { ChevronDown } from "lucide-react"
 
 import {
+  createParentsPartnershipAction,
   createRelationshipAction,
   deleteRelationshipAction,
   saveClientRelationshipStatusAction,
@@ -15,6 +16,7 @@ import { AutosaveFields, type SavePhase } from "@/components/client-background/i
 import {
   ClientRelationshipStatusFields,
   PartnershipDetail,
+  ParentGroupRows,
   PersonDetail,
   RelinkDialog,
   associationErrorFor,
@@ -204,7 +206,7 @@ export function InterviewRelationships({
     const record = blankRelationship(role)
     if (preset?.partnershipRecordId) record.partnershipRecordId = preset.partnershipRecordId
     if (preset?.linkedPartnerRecordId) record.linkedPartnerRecordId = preset.linkedPartnerRecordId
-    if (role === "sibling_full" && !record.partnershipRecordId && parentLinks.length === 1) {
+    if ((role === "sibling_full" || role === "sibling_adoptive") && !record.partnershipRecordId && parentLinks.length === 1) {
       record.partnershipRecordId = parentLinks[0].partnershipRecordId
     }
     setSheet({
@@ -360,6 +362,28 @@ export function InterviewRelationships({
     closeSheet(true)
   }
 
+  async function addParentsRelationship(event: MouseEvent<HTMLButtonElement>) {
+    remember(event)
+    if (layout.parents.length < 2) {
+      setError("Record two parents before adding their relationship.")
+      return
+    }
+    setPending(true)
+    setError(null)
+    const result = await createParentsPartnershipAction(
+      clientId,
+      layout.parents[0].relationshipRecordId,
+      layout.parents[1].relationshipRecordId
+    )
+    setPending(false)
+    if (result.error || !result.partnership) {
+      setError(result.error ?? "Could not add this relationship.")
+      return
+    }
+    setPairs((current) => mergePartnerships(current, [result.partnership!]))
+    setSheet({ kind: "partnership", editing: true, draft: result.partnership })
+  }
+
   async function removePerson() {
     if (!sheet || sheet.kind !== "person" || sheet.isNew) return
     if (!window.confirm(`Remove ${personName(sheet.draft)} from this client's relationships?`)) return
@@ -499,13 +523,20 @@ export function InterviewRelationships({
           <section className="space-y-3">
             <h3 className="text-sm font-semibold">{RELATIONSHIP_GROUP_LABELS.familyOfOrigin}</h3>
             <Group title={RELATIONSHIP_GROUP_LABELS.parents}>
-              {layout.parents.map((person) => (
+              <ParentGroupRows
+                people={layout.parents}
+                selectedId={null}
+                labelFor={(person) => relationshipLineLabel(person, treeLineStatus(person, pairs))}
+                onSelect={(person) => openPerson(person, false)}
+              />
+              {originPartnerships(people, pairs).map((partnership) => (
                 <RowButton
-                  key={person.relationshipRecordId}
-                  label={relationshipLineLabel(person, treeLineStatus(person, pairs))}
-                  onClick={(event) => openPerson(person, false, event)}
+                  key={partnership.partnershipRecordId}
+                  label={parentsRelationshipLabel(partnership)}
+                  onClick={(event) => openPartnership(partnership, event)}
                 />
               ))}
+              <AddButton label="+ Add parents' relationship" onClick={(event) => void addParentsRelationship(event)} />
               {layout.caregivers.map((person) => (
                 <RowButton
                   key={person.relationshipRecordId}
@@ -513,17 +544,6 @@ export function InterviewRelationships({
                   onClick={(event) => openPerson(person, false, event)}
                 />
               ))}
-              <RowButton
-                label={
-                  parentsLink.partnership
-                    ? parentsRelationshipLabel(parentsLink.partnership)
-                    : RELATIONSHIP_GROUP_LABELS.parentsRelationship
-                }
-                onClick={(event) => {
-                  if (parentsLink.partnership) openPartnership(parentsLink.partnership, event)
-                }}
-                disabled={!parentsLink.partnership}
-              />
               <div className="flex flex-col items-start gap-2">
                 <AddButton label={RELATIONSHIP_ADD_LABELS.parent} onClick={(event) => openNew("parent", event)} />
                 <AddButton label={RELATIONSHIP_ADD_LABELS.caregiver} onClick={(event) => openNew("other_caregiver", event)} />
@@ -639,6 +659,7 @@ export function InterviewRelationships({
           {partnershipSheet ? (
             <PartnershipDetail
               partnership={partnershipSheet.draft}
+              parents={layout.parents}
               editing={partnershipSheet.editing}
               pending={pending}
               error={error}

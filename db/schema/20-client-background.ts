@@ -78,6 +78,23 @@ export const clientRelationshipRecords = pgTable("client_relationship_records", 
   dependency: text("dependency"),
   livingSituation: text("living_situation"),
   caregiverRelationship: text("caregiver_relationship"),
+  /** Free text when caregiver_relationship is other. */
+  caregiverRelationshipDetail: text("caregiver_relationship_detail"),
+  /** Partial date. Partner start, or the date a caregiver began caring for the client. */
+  startedOn: text("started_on"),
+  /** Partial date. Partner end, or the date a caregiver stopped. */
+  endedOn: text("ended_on"),
+  /** Prior partner only: married, defacto, engaged, dating, or other. */
+  partnerType: text("partner_type"),
+  /** Parent records: biological or adoptive. */
+  parentType: text("parent_type"),
+  /** Partial date. Recorded on adoptive parents. */
+  adoptedOn: text("adopted_on"),
+  /** Parent is not known. Other parent fields are hidden while this is set. */
+  notKnown: boolean("not_known").notNull().default(false),
+  /** Biological child whose other parent is not a recorded partner. */
+  otherParentKind: text("other_parent_kind"),
+  otherParentDetail: text("other_parent_detail"),
   linkedPartnerRecordId: uuid("linked_partner_record_id"),
   partnershipRecordId: uuid("partnership_record_id"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -139,6 +156,16 @@ export const clientEventRecords = pgTable("client_event_records", {
     () => clientRelationshipRecords.relationshipRecordId,
     { onDelete: "set null" }
   ),
+  /** Treatment entries: the condition this treatment is for. */
+  conditionEventId: uuid("condition_event_id"),
+  /** Admission entries: psychiatric_inpatient, residential_rehab, medical, or emergency_department. */
+  admissionType: text("admission_type"),
+  facility: text("facility"),
+  /** Admission length when a discharge date was not recorded. */
+  admissionLength: text("admission_length"),
+  prescriberProfessionalId: uuid("prescriber_professional_id"),
+  /** Free-text supervisor carried over from the old medication record. */
+  prescriberName: text("prescriber_name"),
   selfHarmType: text("self_harm_type"),
   substanceStatus: text("substance_status"),
   abstinentSincePrecision: text("abstinent_since_precision"),

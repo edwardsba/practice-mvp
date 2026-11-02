@@ -43,7 +43,8 @@ import {
   TREATMENT_SUMMARY_ITEMS,
 } from "@/lib/treatment-plans/fields"
 import { formatDateForInput, todayDateInput } from "@/lib/dates/practice-time"
-import type { MedicationSupervisionJson, TreatmentPlanRow } from "@/lib/treatment-plans/types"
+import type { ProfessionalOption } from "@/lib/client-background/professionals"
+import type { TreatmentPlanRow } from "@/lib/treatment-plans/types"
 
 function downloadBase64Pdf(pdfBase64: string, filename: string) {
   const byteCharacters = atob(pdfBase64)
@@ -107,14 +108,16 @@ export function TreatmentPlanForm({
   isNewVersion = false,
   cancelHref,
   crisisPlanSummary = null,
-  medicationSupervision,
+  ongoingMedications,
+  professionals,
 }: {
   clientId: string
   sourcePlanId: string | null
   initialPlan?: TreatmentPlanRow
   isNewVersion?: boolean
   cancelHref: string
-  medicationSupervision: MedicationSupervisionJson
+  ongoingMedications: { eventRecordId: string; title: string; prescriberProfessionalId: string | null }[]
+  professionals: ProfessionalOption[]
   crisisPlanSummary?: {
     crisisPlanId: string
     versionNumber: number
@@ -179,7 +182,6 @@ export function TreatmentPlanForm({
   }
   const supportServicesValue = plan?.supportServicesJson ?? emptyMulti
   const treatmentModelValue = plan?.treatmentModelJson ?? { selected: null }
-  const medicationSupervisionValue = medicationSupervision
 
   return (
     <>
@@ -325,7 +327,7 @@ export function TreatmentPlanForm({
             </div>
             <div className="space-y-2">
               <Label>Medication supervision</Label>
-              <MedicationSupervisionFields value={medicationSupervisionValue} />
+              <MedicationSupervisionFields medications={ongoingMedications} professionals={professionals} />
             </div>
             <div className="space-y-2">
               <Label>Crisis plan</Label>

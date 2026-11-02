@@ -37,6 +37,7 @@ const expected: { key: HistoryQuestionKey; event: ReturnType<typeof entry> }[] =
   { key: "substance_use", event: entry("substance_use", { attribution: "self" }) },
   { key: "psychiatric_admission", event: entry("psychiatric_admission", { attribution: "self" }) },
   { key: "previous_therapy", event: entry("previous_therapy", { attribution: "self" }) },
+  { key: "medication_history", event: entry("medication", { attribution: "self" }) },
   { key: "illness_injury", event: entry("illness_injury", { attribution: "self" }) },
   { key: "traumatic_events", event: entry("traumatic_event", { attribution: "self" }) },
   {
@@ -75,8 +76,8 @@ for (const item of expected) {
   seen.add(key)
 }
 
-assert.equal(seen.size, HISTORY_QUESTION_KEYS.length - 1)
-assert.equal(seen.has("medication_history"), false)
+assert.equal(seen.size, HISTORY_QUESTION_KEYS.length)
+assert.equal(seen.has("medication_history"), true)
 assert.deepEqual(
   HISTORY_QUESTION_GROUPS.map((group) => ({ title: group.title, keys: [...group.keys] })),
   [
@@ -109,26 +110,25 @@ assert.deepEqual(
 )
 
 const gaps = unansweredInterviewLabels({}, [], null, emptyMedication(), emptyStressors(), emptyReasonForAttending())
-assert.deepEqual(gaps.slice(0, 4), [
+assert.deepEqual(gaps.slice(0, 3), [
   "Referred by a medical professional",
   "Family involved in them attending",
   "Came on their own initiative",
-  "Currently taking medication",
 ])
-assert.equal(gaps[4], "Illness / injury")
-assert.equal(gaps[5], "Traumatic events")
-assert.ok(gaps.includes("Medication history"))
-assert.ok(gaps.indexOf("Medication history") > gaps.indexOf("Previous therapy"))
-assert.ok(gaps.indexOf("Medication history") < gaps.indexOf("Other significant events"))
+assert.equal(gaps[3], "Illness / injury")
+assert.equal(gaps[4], "Traumatic events")
+assert.ok(gaps.includes("Medication"))
+assert.ok(gaps.indexOf("Medication") > gaps.indexOf("Previous therapy"))
+assert.ok(gaps.indexOf("Medication") < gaps.indexOf("Other significant events"))
 assert.ok(gaps.indexOf("Family illness") < gaps.indexOf("Family emotional problems"))
 assert.equal(gaps.includes("Childhood events"), false)
 assert.equal(gaps.includes("Abuse"), false)
 assert.equal(gaps.includes("Client's motivation"), false)
 assert.ok(gaps.indexOf("Family") > gaps.indexOf("Emotional problems"))
 assert.equal(gaps.at(-1), "Legal matters, police or accidents")
-assert.ok(gaps.includes("Currently taking medication"))
+assert.equal(gaps.includes("Currently taking medication"), false)
 assert.equal(gaps.filter((label) => label === "Family").length, 1)
-assert.equal(gaps.length, HISTORY_QUESTION_KEYS.length + 3 + 1 + 9)
+assert.equal(gaps.length, HISTORY_QUESTION_KEYS.length + 3 + 9)
 
 const answeredMedication: MedicationRecord = { ...emptyMedication(), currentlyTaking: "not_asked" }
 const answeredStressors: StressorsRecord = { ...emptyStressors(), family: "yes", financial: "no" }
@@ -142,7 +142,7 @@ const answeredReason: ReasonForAttending = {
 }
 const remaining = unansweredInterviewLabels({}, [], null, answeredMedication, answeredStressors, answeredReason)
 assert.equal(remaining[0], "Illness / injury")
-assert.equal(remaining.includes("Medication history"), true)
+assert.equal(remaining.includes("Medication"), true)
 assert.equal(remaining.includes("Referred by a medical professional"), false)
 assert.equal(remaining.includes("Attended willingly"), false)
 assert.equal(remaining.includes("Currently taking medication"), false)
@@ -150,7 +150,7 @@ assert.equal(remaining.includes("Family"), false)
 assert.equal(remaining.includes("Financial"), false)
 assert.ok(remaining.includes("Social life"))
 assert.equal(remaining.length, HISTORY_QUESTION_KEYS.length + 7)
-assert.equal(INTERVIEW_ANSWER_TOTAL, 28)
+assert.equal(INTERVIEW_ANSWER_TOTAL, 27)
 assert.equal(gaps.length, INTERVIEW_ANSWER_TOTAL)
 assert.equal(
   answeredInterviewCount({}, [], null, emptyMedication(), emptyStressors(), emptyReasonForAttending()),
@@ -166,10 +166,10 @@ assert.equal(
 )
 assert.equal(
   answeredInterviewCount(
-    {},
+    { medication_history: "yes" },
     [],
     null,
-    { ...emptyMedication(), previouslyTaken: "yes" },
+    emptyMedication(),
     emptyStressors(),
     emptyReasonForAttending()
   ),

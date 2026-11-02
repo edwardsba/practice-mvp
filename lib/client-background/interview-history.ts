@@ -39,8 +39,8 @@ export const HISTORY_QUESTION_KEYS = HISTORY_QUESTION_GROUPS.flatMap((group) => 
 
 export type HistoryQuestionKey = (typeof HISTORY_QUESTION_KEYS)[number]
 
-/** Screening answers. Medication history is stored on medication.previouslyTaken. */
-export type ScreeningQuestionKey = Exclude<HistoryQuestionKey, "medication_history">
+/** Screening answers, including Medication. */
+export type ScreeningQuestionKey = HistoryQuestionKey
 
 export const SCREENING_ANSWERS = ["yes", "no", "not_asked"] as const
 export type ScreeningAnswer = (typeof SCREENING_ANSWERS)[number]
@@ -51,14 +51,11 @@ export type HistoryQuestionGroup = (typeof HISTORY_QUESTION_GROUPS)[number]
 type QuestionDefinition = {
   key: HistoryQuestionKey
   label: string
-  /** Null for Medication history, which has no entries. */
   eventType: EventType | null
   attribution: "self" | "family" | null
 }
 
-const SCREENING_QUESTION_KEYS = HISTORY_QUESTION_KEYS.filter(
-  (key): key is ScreeningQuestionKey => key !== "medication_history"
-)
+const SCREENING_QUESTION_KEYS = HISTORY_QUESTION_KEYS
 
 export const HISTORY_QUESTIONS: Record<HistoryQuestionKey, QuestionDefinition> = {
   emotional_problems: {
@@ -81,7 +78,7 @@ export const HISTORY_QUESTIONS: Record<HistoryQuestionKey, QuestionDefinition> =
   },
   psychiatric_admission: {
     key: "psychiatric_admission",
-    label: "Psychiatric hospital / rehab",
+    label: "Admission",
     eventType: "psychiatric_admission",
     attribution: "self",
   },
@@ -105,9 +102,9 @@ export const HISTORY_QUESTIONS: Record<HistoryQuestionKey, QuestionDefinition> =
   },
   medication_history: {
     key: "medication_history",
-    label: "Medication history",
-    eventType: null,
-    attribution: null,
+    label: "Medication",
+    eventType: "medication",
+    attribution: "self",
   },
   other_significant_events: {
     key: "other_significant_events",
@@ -159,6 +156,7 @@ const SELF_QUESTION: Partial<Record<EventType, HistoryQuestionKey>> = {
   substance_use: "substance_use",
   psychiatric_admission: "psychiatric_admission",
   previous_therapy: "previous_therapy",
+  medication: "medication_history",
   illness_injury: "illness_injury",
   traumatic_event: "traumatic_events",
 }
@@ -175,7 +173,7 @@ const FAMILY_QUESTION: Partial<Record<EventType, HistoryQuestionKey>> = {
  * Every history entry belongs to exactly one screening question.
  * Self significant history, including childhood, school and work, is Other significant events.
  * A family-attributed entry that no specific family row claims lands on family significant events.
- * Medication history has no entries.
+ * Medication entries belong to the Medication heading.
  */
 export function historyQuestionKeyForEvent(
   event: Pick<EventRecord, "eventType" | "attribution" | "startPrecision" | "startValue">,
@@ -228,11 +226,11 @@ const REASON_ANSWER_FIELDS = [
 ] as const satisfies readonly (readonly [keyof ReasonForAttending, string])[]
 
 /**
- * Reason for attending (3), currently taking medication (1), client and family history
- * (15, including medication history), and the nine stressors.
+ * Reason for attending (3), client and family history (15, including Medication),
+ * and the nine stressors.
  */
 export const INTERVIEW_ANSWER_TOTAL =
-  REASON_ANSWER_FIELDS.length + HISTORY_QUESTION_KEYS.length + 1 + STRESSOR_ITEMS.length
+  REASON_ANSWER_FIELDS.length + HISTORY_QUESTION_KEYS.length + STRESSOR_ITEMS.length
 
 export type BackgroundInterviewAnswerSource = {
   status: "in_progress" | "completed"
@@ -273,13 +271,12 @@ export function unansweredQuestionLabels(
   screening: ScreeningAnswers,
   events: Pick<EventRecord, "eventType" | "attribution" | "startPrecision" | "startValue">[],
   dateOfBirth: string | null,
-  medication: MedicationRecord
+  _medication: MedicationRecord
 ): string[] {
   const withEntries = new Set(events.map((event) => historyQuestionKeyForEvent(event, dateOfBirth)))
-  return HISTORY_QUESTION_KEYS.filter((key) => {
-    if (key === "medication_history") return medication.previouslyTaken == null
-    return !withEntries.has(key) && screening[key] == null
-  }).map((key) => HISTORY_QUESTIONS[key].label)
+  return HISTORY_QUESTION_KEYS.filter((key) => !withEntries.has(key) && screening[key] == null).map(
+    (key) => HISTORY_QUESTIONS[key].label
+  )
 }
 
 function unansweredReasonLabels(reason: ReasonForAttending): string[] {
@@ -296,7 +293,6 @@ export function unansweredInterviewLabels(
   reason: ReasonForAttending
 ): string[] {
   const labels: string[] = unansweredReasonLabels(reason)
-  if (medication.currentlyTaking == null) labels.push("Currently taking medication")
   labels.push(...unansweredQuestionLabels(screening, events, dateOfBirth, medication))
   for (const item of STRESSOR_ITEMS) {
     if (stressors[item.key] == null) labels.push(item.label)

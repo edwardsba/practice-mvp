@@ -3,6 +3,7 @@
 import { useMemo, useState, type ReactNode } from "react"
 
 import {
+  createParentsPartnershipAction,
   createRelationshipAction,
   deleteRelationshipAction,
   saveClientRelationshipStatusAction,
@@ -47,12 +48,21 @@ import {
 import {
   ADDABLE_RELATIONSHIP_GROUPS,
   ADDABLE_RELATIONSHIP_ROLES,
+  CAREGIVER_RELATIONSHIP_LABELS,
+  CAREGIVER_RELATIONSHIPS,
   CLIENT_RELATIONSHIP_STATUS_LABELS,
   CLIENT_RELATIONSHIP_STATUSES,
   DEPENDENCY_LABELS,
   DEPENDENCY_VALUES,
   HEALTH_STATUSES,
+  isOneOf,
   HEALTH_STATUS_LABELS,
+  OTHER_PARENT_KIND_LABELS,
+  OTHER_PARENT_KINDS,
+  PARENT_TYPE_LABELS,
+  PARENT_TYPES,
+  PARTNER_TYPE_LABELS,
+  PARTNER_TYPES,
   PARTNERSHIP_STATUSES,
   PARTNERSHIP_STATUS_LABELS,
   RELATIONSHIP_LIVING_SITUATIONS,
@@ -111,8 +121,6 @@ export type RelinkPrompt = {
 
 const STEP_SIBLING_HELPER = "A step-sibling is listed under a step-parent. Add the step-parent first."
 const STEP_CHILD_HELPER = "A step-child is linked to a partner. Add the partner first."
-const CAREGIVER_HINT = "For example: grandparent, aunt, foster carer."
-
 export function RelationshipsSection({
   clientId,
   relationships,
@@ -204,7 +212,7 @@ export function RelationshipsSection({
     const record = blankRelationship(role)
     if (preset?.partnershipRecordId) record.partnershipRecordId = preset.partnershipRecordId
     if (preset?.linkedPartnerRecordId) record.linkedPartnerRecordId = preset.linkedPartnerRecordId
-    if (role === "sibling_full" && !record.partnershipRecordId && parentLinks.length === 1) {
+    if ((role === "sibling_full" || role === "sibling_adoptive") && !record.partnershipRecordId && parentLinks.length === 1) {
       record.partnershipRecordId = parentLinks[0].partnershipRecordId
     }
     setIsNew(true)
@@ -351,6 +359,27 @@ export function RelationshipsSection({
     setMobileScreen("detail")
   }
 
+  async function addParentsRelationship(parents: RelationshipRecord[]) {
+    if (parents.length < 2) {
+      setError("Record two parents before adding their relationship.")
+      return
+    }
+    setPending(true)
+    setError(null)
+    const result = await createParentsPartnershipAction(
+      clientId,
+      parents[0].relationshipRecordId,
+      parents[1].relationshipRecordId
+    )
+    setPending(false)
+    if (result.error || !result.partnership) {
+      setError(result.error ?? "Could not add this relationship.")
+      return
+    }
+    setPairs((current) => mergePartnerships(current, [result.partnership!]))
+    openPartnership(result.partnership, true)
+  }
+
   async function remove() {
     if (!draft || isNew) return
     if (!window.confirm(`Remove ${personName(draft)} from this client's relationships?`)) return
@@ -466,23 +495,25 @@ export function RelationshipsSection({
         <h2 className="text-sm font-semibold">{RELATIONSHIP_GROUP_LABELS.familyOfOrigin}</h2>
         <div className="space-y-1">
           <h3 className="px-2 text-sm font-medium">{RELATIONSHIP_GROUP_LABELS.parents}</h3>
-          {layout.parents.map((person) => (
+          <ParentGroupRows
+            people={layout.parents}
+            selectedId={selection?.kind === "person" ? selection.id : null}
+            labelFor={(person) => relationshipLineLabel(person, treeLineStatus(person, pairs))}
+            onSelect={(person) => openPerson(person, pairs)}
+          />
+          {originPartnerships(people, pairs).map((partnership) => (
             <TreeRow
-              key={person.relationshipRecordId}
-              label={relationshipLineLabel(person, treeLineStatus(person, pairs))}
-              selected={selection?.kind === "person" && selection.id === person.relationshipRecordId}
-              onSelect={() => openPerson(person, pairs)}
+              key={partnership.partnershipRecordId}
+              label={parentsRelationshipLabel(partnership)}
+              selected={selection?.kind === "partnership" && selection.id === partnership.partnershipRecordId}
+              onSelect={() => openPartnership(partnership)}
             />
           ))}
-          {parentsLink.partnership ? (
-            <TreeRow
-              label={parentsRelationshipLabel(parentsLink.partnership)}
-              selected={selection?.kind === "partnership" && selection.id === parentsLink.partnership.partnershipRecordId}
-              onSelect={() => openPartnership(parentsLink.partnership!)}
-            />
-          ) : (
-            <p className="px-2 text-muted-foreground">{RELATIONSHIP_GROUP_LABELS.parentsRelationship}</p>
-          )}
+          <AddButton
+            label="+ Add parents' relationship"
+            disabled={pending}
+            onClick={() => void addParentsRelationship(layout.parents)}
+          />
           {layout.caregivers.map((person) => (
             <TreeRow
               key={person.relationshipRecordId}
@@ -584,6 +615,7 @@ export function RelationshipsSection({
   const detail = partnershipDraft ? (
     <PartnershipDetail
       partnership={partnershipDraft}
+      parents={layout.parents}
       editing={editing}
       pending={pending}
       error={error}
@@ -685,6 +717,15 @@ export function blankRelationship(role: RelationshipToClient): RelationshipRecor
     dependency: "",
     livingSituation: "",
     caregiverRelationship: "",
+    caregiverRelationshipDetail: "",
+    startedOn: "",
+    endedOn: "",
+    partnerType: "",
+    parentType: "",
+    adoptedOn: "",
+    notKnown: false,
+    otherParentKind: "",
+    otherParentDetail: "",
     linkedPartnerRecordId: null,
     partnershipRecordId: null,
   }
@@ -697,13 +738,16 @@ export function withRole(
 ): RelationshipRecord {
   const nested = role === "sibling_half" || role === "sibling_step"
   const wasNested = record.relationshipToClient === "sibling_half" || record.relationshipToClient === "sibling_step"
+  const fullLike = role === "sibling_full" || role === "sibling_adoptive"
+  const wasFullLike =
+    record.relationshipToClient === "sibling_full" || record.relationshipToClient === "sibling_adoptive"
   const child = role === "child_biological" || role === "child_step"
   const wasChild = record.relationshipToClient === "child_biological" || record.relationshipToClient === "child_step"
 
   let partnershipRecordId: string | null = null
   if (nested && wasNested) partnershipRecordId = record.partnershipRecordId
-  if (role === "sibling_full") {
-    if (record.relationshipToClient === "sibling_full" && record.partnershipRecordId) {
+  if (fullLike) {
+    if (wasFullLike && record.partnershipRecordId) {
       partnershipRecordId = record.partnershipRecordId
     } else if (originLinks.length === 1) {
       partnershipRecordId = originLinks[0].partnershipRecordId
@@ -729,7 +773,7 @@ export function associationErrorFor(
   if ((role === "sibling_half" || role === "sibling_step") && !draft.partnershipRecordId) {
     return "Choose an associated step-parent."
   }
-  if (role === "sibling_full" && originLinks.length > 1 && !draft.partnershipRecordId) {
+  if ((role === "sibling_full" || role === "sibling_adoptive") && originLinks.length > 1 && !draft.partnershipRecordId) {
     return "Choose the parents' partnership."
   }
   if (role === "child_step" && !draft.linkedPartnerRecordId) return "Choose an associated partner."
@@ -809,6 +853,7 @@ function DetailHeader({
 
 export function PartnershipDetail({
   partnership,
+  parents,
   editing,
   pending,
   error,
@@ -820,6 +865,7 @@ export function PartnershipDetail({
   backLabel,
 }: {
   partnership: PartnershipRecord
+  parents: RelationshipRecord[]
   editing: boolean
   pending: boolean
   error: string | null
@@ -831,11 +877,15 @@ export function PartnershipDetail({
   backLabel: string
 }) {
   const status = partnership.relationshipStatus ? PARTNERSHIP_STATUS_LABELS[partnership.relationshipStatus] : ""
+  const parentA = parents.find((person) => person.relationshipRecordId === partnership.partnerAId)
+  const parentB = parents.find((person) => person.relationshipRecordId === partnership.partnerBId)
   return (
     <div className="min-w-0 space-y-4 lg:text-[13px] lg:[&_input]:text-[13px] lg:[&_label]:text-[13px] lg:[&_legend]:text-[13px] lg:[&_select]:text-[13px] lg:[&_textarea]:text-[13px]">
       <DetailHeader
         title="Parents' relationship"
-        subtitle="Mother and father"
+        subtitle={
+          parentA && parentB ? `${personName(parentA)} and ${personName(parentB)}` : "Choose the two parents"
+        }
         editing={editing}
         onEdit={onEdit}
         onBack={onBack}
@@ -843,6 +893,32 @@ export function PartnershipDetail({
       />
       {editing ? (
         <>
+          <SelectField
+            id={`parents_a_${partnership.partnershipRecordId}`}
+            label="First parent"
+            value={partnership.partnerAId}
+            onChange={(partnerAId) => onChange({ ...partnership, partnerAId })}
+          >
+            <option value="">Choose a parent</option>
+            {parents.map((person) => (
+              <option key={person.relationshipRecordId} value={person.relationshipRecordId}>
+                {personWithRoleLabel(person)}
+              </option>
+            ))}
+          </SelectField>
+          <SelectField
+            id={`parents_b_${partnership.partnershipRecordId}`}
+            label="Second parent"
+            value={partnership.partnerBId}
+            onChange={(partnerBId) => onChange({ ...partnership, partnerBId })}
+          >
+            <option value="">Choose a parent</option>
+            {parents.map((person) => (
+              <option key={person.relationshipRecordId} value={person.relationshipRecordId}>
+                {personWithRoleLabel(person)}
+              </option>
+            ))}
+          </SelectField>
           <PartnershipFields partnership={partnership} otherLabel="each other" onChange={onChange} />
           <SaveRow
             pending={pending}
@@ -857,6 +933,8 @@ export function PartnershipDetail({
         </>
       ) : (
         <div className="space-y-4">
+          <ReadOnlyField label="First parent" value={parentA ? personWithRoleLabel(parentA) : ""} />
+          <ReadOnlyField label="Second parent" value={parentB ? personWithRoleLabel(parentB) : ""} />
           <ReadOnlyField label="Relationship status" value={status} />
           <ReadOnlyField label="Start" value={formatPartialDateLabel(partnership.started)} />
           <ReadOnlyField label="End" value={formatPartialDateLabel(partnership.ended)} />
@@ -1022,6 +1100,38 @@ export function PersonDetail({
       {editing ? (
         <>
           <RoleSelect record={draft} onChange={onRole} />
+          {visibility.parentType ? (
+            <SelectField
+              id="rel_parent_type"
+              label="Parent type"
+              value={draft.parentType}
+              onChange={(parentType) =>
+                onPatch({
+                  parentType: parentType as RelationshipRecord["parentType"],
+                  adoptedOn: parentType === "adoptive" ? draft.adoptedOn : "",
+                })
+              }
+            >
+              <option value="">Not recorded</option>
+              {PARENT_TYPES.map((option) => (
+                <option key={option} value={option}>
+                  {PARENT_TYPE_LABELS[option]}
+                </option>
+              ))}
+            </SelectField>
+          ) : null}
+          {visibility.notKnown ? (
+            <label className="flex min-h-11 items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={draft.notKnown}
+                onChange={(event) => onPatch({ notKnown: event.target.checked })}
+              />
+              Not known
+            </label>
+          ) : null}
+          {draft.notKnown ? null : (
+          <>
           <TextField id="rel_name" label="Name" value={draft.givenName} onChange={(givenName) => onPatch({ givenName })} />
           <AssociationFields
             draft={draft}
@@ -1111,6 +1221,33 @@ export function PersonDetail({
               onChange={(lengthOfRelationship) => onPatch({ lengthOfRelationship })}
             />
           ) : null}
+          {visibility.adoptedOn && draft.parentType === "adoptive" ? (
+            <PartialDatePicker
+              id="rel_adopted"
+              dateLabel="Adopted"
+              mode="date-only"
+              value={draft.adoptedOn}
+              onChange={(adoptedOn) => onPatch({ adoptedOn })}
+            />
+          ) : null}
+          {visibility.spanDates ? (
+            <>
+              <PartialDatePicker
+                id="rel_started"
+                dateLabel={draft.relationshipToClient === "other_caregiver" ? "Cared for client from" : "Start date"}
+                mode="date-only"
+                value={draft.startedOn}
+                onChange={(startedOn) => onPatch({ startedOn })}
+              />
+              <PartialDatePicker
+                id="rel_ended"
+                dateLabel={draft.relationshipToClient === "other_caregiver" ? "Until" : "End date"}
+                mode="date-only"
+                value={draft.endedOn}
+                onChange={(endedOn) => onPatch({ endedOn })}
+              />
+            </>
+          ) : null}
           <RelationshipExtras
             record={draft}
             clientRelationshipStatus={clientRelationshipStatus}
@@ -1134,6 +1271,8 @@ export function PersonDetail({
               />
             )
           })}
+          </>
+          )}
           <SaveRow
             pending={pending}
             error={error}
@@ -1210,13 +1349,34 @@ function AssociationFields({
 
   if (role === "other_caregiver") {
     return (
-      <TextField
-        id="rel_caregiver"
-        label="Caregiver relationship"
-        hint={CAREGIVER_HINT}
-        value={draft.caregiverRelationship}
-        onChange={(caregiverRelationship) => onPatch({ caregiverRelationship })}
-      />
+      <>
+        <SelectField
+          id="rel_caregiver"
+          label="Caregiver relationship"
+          value={draft.caregiverRelationship}
+          onChange={(caregiverRelationship) =>
+            onPatch({
+              caregiverRelationship,
+              caregiverRelationshipDetail: caregiverRelationship === "other" ? draft.caregiverRelationshipDetail : "",
+            })
+          }
+        >
+          <option value="">Not recorded</option>
+          {CAREGIVER_RELATIONSHIPS.map((option) => (
+            <option key={option} value={option}>
+              {CAREGIVER_RELATIONSHIP_LABELS[option]}
+            </option>
+          ))}
+        </SelectField>
+        {draft.caregiverRelationship === "other" ? (
+          <TextField
+            id="rel_caregiver_detail"
+            label="Describe"
+            value={draft.caregiverRelationshipDetail}
+            onChange={(caregiverRelationshipDetail) => onPatch({ caregiverRelationshipDetail })}
+          />
+        ) : null}
+      </>
     )
   }
 
@@ -1260,7 +1420,7 @@ function AssociationFields({
     )
   }
 
-  if (role === "sibling_full") {
+  if (role === "sibling_full" || role === "sibling_adoptive") {
     const origins = originPartnerships(people, partnerships)
     if (origins.length <= 1) return null
     return (
@@ -1281,9 +1441,59 @@ function AssociationFields({
     )
   }
 
-  if (role === "child_biological" || role === "child_step") {
+  if (role === "child_biological") {
     const partners = partnerOptions(people, selfId)
-    if (role === "child_step" && partners.length === 0) {
+    const selected = draft.otherParentKind || draft.linkedPartnerRecordId || ""
+    return (
+      <div className="space-y-1.5">
+        <SelectField
+          id="rel_other_parent"
+          label="Other parent"
+          value={selected}
+          onChange={(value) => {
+            if (value === "donor_conception" || value === "adopted_sole" || value === "other") {
+              onPatch({
+                otherParentKind: value,
+                linkedPartnerRecordId: null,
+                otherParentDetail: value === "other" ? draft.otherParentDetail : "",
+              })
+              return
+            }
+            onPatch({ otherParentKind: "", otherParentDetail: "", linkedPartnerRecordId: value || null })
+          }}
+        >
+          <option value="">Not recorded</option>
+          {partners.map((person) => (
+            <option key={person.relationshipRecordId} value={person.relationshipRecordId}>
+              {personWithRoleLabel(person)}
+            </option>
+          ))}
+          {OTHER_PARENT_KINDS.map((kind) => (
+            <option key={kind} value={kind}>
+              {OTHER_PARENT_KIND_LABELS[kind]}
+            </option>
+          ))}
+        </SelectField>
+        {draft.otherParentKind === "other" ? (
+          <TextField
+            id="rel_other_parent_detail"
+            label="Describe"
+            value={draft.otherParentDetail}
+            onChange={(otherParentDetail) => onPatch({ otherParentDetail })}
+          />
+        ) : null}
+        <AddButton
+          label={RELATIONSHIP_ADD_LABELS.priorPartner}
+          disabled={pending}
+          onClick={() => onReplaceWithNew("prior_partner")}
+        />
+      </div>
+    )
+  }
+
+  if (role === "child_step") {
+    const partners = partnerOptions(people, selfId)
+    if (partners.length === 0) {
       return (
         <div className="space-y-1.5">
           <SelectField
@@ -1313,11 +1523,7 @@ function AssociationFields({
         error={linkError}
         onChange={(value) => onPatch({ linkedPartnerRecordId: value || null })}
       >
-        {role === "child_biological" ? (
-          <option value="">Not linked to a partner</option>
-        ) : (
-          <option value="">Choose a partner</option>
-        )}
+        <option value="">Choose a partner</option>
         {partners.map((person) => (
           <option key={person.relationshipRecordId} value={person.relationshipRecordId}>
             {personWithRoleLabel(person)}
@@ -1382,9 +1588,18 @@ function PersonReadOnly({
   return (
     <div className="space-y-4">
       <ReadOnlyField label="Relationship to client" value={personRoleLabel(record)} />
+      {visibility.parentType ? (
+        <ReadOnlyField
+          label="Parent type"
+          value={record.parentType ? PARENT_TYPE_LABELS[record.parentType] : ""}
+        />
+      ) : null}
+      {record.notKnown ? <ReadOnlyField label="Not known" value="Yes" /> : null}
+      {record.notKnown ? null : (
+      <>
       <ReadOnlyField label="Name" value={record.givenName} />
       {record.relationshipToClient === "other_caregiver" ? (
-        <ReadOnlyField label="Caregiver relationship" value={record.caregiverRelationship} />
+        <ReadOnlyField label="Caregiver relationship" value={caregiverRelationshipText(record)} />
       ) : null}
       {link ? <ReadOnlyField label={link.label} value={link.value} /> : null}
       <ReadOnlyField label="Sex" value={record.sex} />
@@ -1409,6 +1624,33 @@ function PersonReadOnly({
           value={clientRelationshipStatusText(clientRelationshipStatus)}
         />
       ) : null}
+      {visibility.clientRelationshipStatus ? (
+        <ReadOnlyField
+          label="Type"
+          value={`${clientRelationshipStatusText(clientRelationshipStatus) || "not recorded"} — set by the client's relationship status`}
+        />
+      ) : null}
+      {visibility.partnerType ? (
+        <ReadOnlyField
+          label="Relationship type"
+          value={record.partnerType ? PARTNER_TYPE_LABELS[record.partnerType] : ""}
+        />
+      ) : null}
+      {visibility.spanDates ? (
+        <>
+          <ReadOnlyField
+            label={record.relationshipToClient === "other_caregiver" ? "Cared for client from" : "Start date"}
+            value={formatPartialDateLabel(record.startedOn)}
+          />
+          <ReadOnlyField
+            label={record.relationshipToClient === "other_caregiver" ? "Until" : "End date"}
+            value={formatPartialDateLabel(record.endedOn)}
+          />
+        </>
+      ) : null}
+      {visibility.adoptedOn && record.parentType === "adoptive" ? (
+        <ReadOnlyField label="Adopted" value={formatPartialDateLabel(record.adoptedOn)} />
+      ) : null}
       {visibility.howItEnded ? <ReadOnlyField label="How it ended" value={record.relationshipStatus} /> : null}
       {visibility.timeSinceEnded ? <ReadOnlyField label="Time since ended" value={record.timeSinceEnded} /> : null}
       <ReadOnlyField label="Supportive" value={ratingText(record.supportive)} />
@@ -1425,6 +1667,8 @@ function PersonReadOnly({
           value={record.livingSituation ? RELATIONSHIP_LIVING_SITUATION_LABELS[record.livingSituation] : ""}
         />
       ) : null}
+      </>
+      )}
       {pairs.map((partnership) => {
         const other = otherPersonInPartnership(partnership, record.relationshipRecordId, people)
         const otherLabel = other ? personName(other) : "the other person"
@@ -1441,6 +1685,48 @@ function PersonReadOnly({
       })}
     </div>
   )
+}
+
+export function ParentGroupRows({
+  people,
+  selectedId,
+  labelFor,
+  onSelect,
+}: {
+  people: RelationshipRecord[]
+  selectedId: string | null
+  labelFor: (person: RelationshipRecord) => string
+  onSelect: (person: RelationshipRecord) => void
+}) {
+  const adoptive = people.filter((person) => person.parentType === "adoptive")
+  const birth = people.filter((person) => person.parentType !== "adoptive")
+  const grouped = adoptive.length > 0 && birth.length > 0
+  const rows = (group: RelationshipRecord[]) =>
+    group.map((person) => (
+      <TreeRow
+        key={person.relationshipRecordId}
+        label={labelFor(person)}
+        selected={selectedId === person.relationshipRecordId}
+        onSelect={() => onSelect(person)}
+      />
+    ))
+  if (!grouped) return <>{rows(people)}</>
+  return (
+    <>
+      <p className="px-2 text-xs text-muted-foreground">Adoptive parents</p>
+      {rows(adoptive)}
+      <p className="px-2 text-xs text-muted-foreground">Birth parents</p>
+      {rows(birth)}
+    </>
+  )
+}
+
+function caregiverRelationshipText(record: RelationshipRecord): string {
+  if (!isOneOf(record.caregiverRelationship, CAREGIVER_RELATIONSHIPS)) return record.caregiverRelationship
+  if (record.caregiverRelationship === "other") {
+    return record.caregiverRelationshipDetail.trim() || CAREGIVER_RELATIONSHIP_LABELS.other
+  }
+  return CAREGIVER_RELATIONSHIP_LABELS[record.caregiverRelationship]
 }
 
 function RoleSelect({
@@ -1483,11 +1769,32 @@ function RelationshipExtras({
   return (
     <>
       {visibility.clientRelationshipStatus ? (
-        <ClientRelationshipStatusFields
-          idPrefix="partner_client"
-          value={clientRelationshipStatus}
-          onChange={onClientRelationshipStatus}
-        />
+        <>
+          <p className="text-sm">
+            Type: {clientRelationshipStatusText(clientRelationshipStatus) || "not recorded"} — set by the client's
+            relationship status
+          </p>
+          <ClientRelationshipStatusFields
+            idPrefix="partner_client"
+            value={clientRelationshipStatus}
+            onChange={onClientRelationshipStatus}
+          />
+        </>
+      ) : null}
+      {visibility.partnerType ? (
+        <SelectField
+          id="rel_partner_type"
+          label="Relationship type"
+          value={record.partnerType}
+          onChange={(partnerType) => onChange({ partnerType: partnerType as RelationshipRecord["partnerType"] })}
+        >
+          <option value="">Not recorded</option>
+          {PARTNER_TYPES.map((option) => (
+            <option key={option} value={option}>
+              {PARTNER_TYPE_LABELS[option]}
+            </option>
+          ))}
+        </SelectField>
       ) : null}
       {visibility.howItEnded ? (
         <TextField

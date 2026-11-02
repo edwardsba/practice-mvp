@@ -8,9 +8,8 @@ import { EntityPageHeader } from "@/components/ui/entity-page-header"
 import { verifyClientInPractice } from "@/lib/treatment-plans/load"
 import { loadActiveCrisisPlanSummary } from "@/lib/crisis-plans/load"
 import { requirePractitionerContext } from "@/lib/auth"
-import { loadMedicationRecord } from "@/lib/client-background/load"
-import { medicationSupervisionFromRecord } from "@/lib/client-background/medication"
-import { emptyMedication } from "@/lib/client-background/types"
+import { loadClientBackground, loadReasonSupport } from "@/lib/client-background/load"
+import { ongoingMedicationEvents } from "@/lib/client-background/medication"
 
 export default async function NewTreatmentPlanPage({
   params,
@@ -29,7 +28,15 @@ export default async function NewTreatmentPlanPage({
     clientId,
     context.practiceId
   )
-  const medication = (await loadMedicationRecord(clientId, context.practiceId)) ?? emptyMedication()
+  const [background, reasonSupport] = await Promise.all([
+    loadClientBackground(clientId, context.practiceId),
+    loadReasonSupport(clientId, context.practiceId, null),
+  ])
+  const ongoingMedications = ongoingMedicationEvents(background?.events ?? []).map((event) => ({
+    eventRecordId: event.eventRecordId,
+    title: event.title,
+    prescriberProfessionalId: event.prescriberProfessionalId,
+  }))
 
   const clientName = `${client.firstName} ${client.lastName}`
 
@@ -52,7 +59,8 @@ export default async function NewTreatmentPlanPage({
         sourcePlanId={null}
         cancelHref={`/clients/${clientId}`}
         crisisPlanSummary={crisisPlanSummary}
-        medicationSupervision={medicationSupervisionFromRecord(medication)}
+        ongoingMedications={ongoingMedications}
+        professionals={reasonSupport.professionals}
       />
     </AppShell>
   )

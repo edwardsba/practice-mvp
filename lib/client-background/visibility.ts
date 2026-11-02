@@ -14,16 +14,27 @@ export type RelationshipFieldVisibility = {
   clientRelationshipStatus: boolean
   howItEnded: boolean
   timeSinceEnded: boolean
+  /** Partner start and end, or the dates a caregiver cared for the client. */
+  spanDates: boolean
+  partnerType: boolean
+  parentType: boolean
+  adoptedOn: boolean
+  notKnown: boolean
 }
 
 const LENGTH_OF_RELATIONSHIP_ROLES = new Set<RelationshipToClient>([
-  "other_caregiver",
   "step_parent",
   "sibling_step",
-  "current_partner",
-  "prior_partner",
   "child_step",
 ])
+
+const SPAN_DATE_ROLES = new Set<RelationshipToClient>([
+  "current_partner",
+  "prior_partner",
+  "other_caregiver",
+])
+
+const PARENT_ROLES = new Set<RelationshipToClient>(["mother", "father", "parent"])
 
 type AgeSource = Pick<RelationshipRecord, "dateOfBirth" | "healthStatus">
 
@@ -57,6 +68,7 @@ export function relationshipFieldVisibility(
   const role = record.relationshipToClient
   const priorPartner = role === "prior_partner"
   const deceased = record.healthStatus === "deceased"
+  const parent = PARENT_ROLES.has(role)
 
   return {
     dateOfBirth: !priorPartner,
@@ -68,7 +80,12 @@ export function relationshipFieldVisibility(
     livingSituation: !priorPartner && !deceased,
     clientRelationshipStatus: role === "current_partner",
     howItEnded: priorPartner,
-    timeSinceEnded: priorPartner,
+    timeSinceEnded: false,
+    spanDates: SPAN_DATE_ROLES.has(role),
+    partnerType: priorPartner,
+    parentType: parent,
+    adoptedOn: parent,
+    notKnown: parent,
   }
 }
 
@@ -97,6 +114,14 @@ export function applyRelationshipVisibilityDefaults(record: RelationshipRecord):
   if (!visibility.lengthOfRelationship) next.lengthOfRelationship = ""
   if (!visibility.howItEnded) next.relationshipStatus = ""
   if (!visibility.timeSinceEnded) next.timeSinceEnded = ""
+  if (!visibility.spanDates) {
+    next.startedOn = ""
+    next.endedOn = ""
+  }
+  if (!visibility.partnerType) next.partnerType = ""
+  if (!visibility.parentType) next.parentType = ""
+  if (!visibility.notKnown) next.notKnown = false
+  if (!visibility.adoptedOn || next.parentType !== "adoptive") next.adoptedOn = ""
   if (!visibility.dependency) {
     next.dependency = isMinorChild(record) ? "they_depend_on_me" : ""
   }

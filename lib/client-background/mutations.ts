@@ -7,6 +7,7 @@ import { BACKGROUND_ASSESSMENT_CODE } from "@/lib/background-questionnaire/types
 import { db } from "@/lib/db"
 import { settleEventDates } from "@/lib/client-background/age"
 import { toClientRelationshipStatus, toEvent, toPartnership, toRelationship } from "@/lib/client-background/map"
+import { CONDITION_EVENT_TYPES } from "@/lib/client-background/types"
 import {
   finalScreeningAnswers,
   sanitizeScreening,
@@ -163,6 +164,15 @@ function relationshipColumns(record: RelationshipRecord) {
     dependency: record.dependency || null,
     livingSituation: record.livingSituation || null,
     caregiverRelationship: record.caregiverRelationship || null,
+    caregiverRelationshipDetail: record.caregiverRelationshipDetail || null,
+    startedOn: record.startedOn || null,
+    endedOn: record.endedOn || null,
+    partnerType: record.partnerType || null,
+    parentType: record.parentType || null,
+    adoptedOn: record.adoptedOn || null,
+    notKnown: record.notKnown,
+    otherParentKind: record.otherParentKind || null,
+    otherParentDetail: record.otherParentDetail || null,
     linkedPartnerRecordId: record.linkedPartnerRecordId,
     partnershipRecordId: record.partnershipRecordId,
     updatedAt: new Date(),
@@ -175,10 +185,23 @@ function clearInapplicableLinks(record: RelationshipRecord): RelationshipRecord 
   const keepsPartnershipLink =
     next.relationshipToClient === "sibling_full" ||
     next.relationshipToClient === "sibling_half" ||
-    next.relationshipToClient === "sibling_step"
+    next.relationshipToClient === "sibling_step" ||
+    next.relationshipToClient === "sibling_adoptive"
   if (!isChild) next.linkedPartnerRecordId = null
+  if (next.relationshipToClient === "child_biological" && next.otherParentKind) {
+    next.linkedPartnerRecordId = null
+  }
+  if (next.relationshipToClient !== "child_biological") {
+    next.otherParentKind = ""
+    next.otherParentDetail = ""
+  } else if (next.otherParentKind !== "other") {
+    next.otherParentDetail = ""
+  }
   if (!keepsPartnershipLink) next.partnershipRecordId = null
-  if (next.relationshipToClient !== "other_caregiver") next.caregiverRelationship = ""
+  if (next.relationshipToClient !== "other_caregiver") {
+    next.caregiverRelationship = ""
+    next.caregiverRelationshipDetail = ""
+  }
   return next
 }
 
@@ -705,7 +728,7 @@ function validateRelationshipLinks(input: {
     return { draft, associatedParentId: parentId }
   }
 
-  if (role === "sibling_full") {
+  if (role === "sibling_full" || role === "sibling_adoptive") {
     const origins = originPartnerships(people, partnerships)
     if (draft.partnershipRecordId) {
       const match = origins.some((item) => item.partnershipRecordId === draft.partnershipRecordId)
@@ -1346,10 +1369,14 @@ export async function updatePartnership(input: {
         )
         .limit(1)
       if (!owned) return { error: "That relationship was not found." }
+      const parentError = await parentsPartnershipError(tx, input.clientId, input.practiceId, draft)
+      if (parentError) return { error: parentError }
 
       const [saved] = await tx
         .update(clientPartnershipRecords)
         .set({
+          partnerAId: draft.partnerAId,
+          partnerBId: draft.partnerBId,
           relationshipStatus: draft.relationshipStatus || null,
           started: draft.started || null,
           ended: draft.ended || null,
@@ -1372,6 +1399,76 @@ export async function updatePartnership(input: {
     })
   } catch {
     return { error: "Could not save this relationship." }
+  }
+}
+
+async function parentsPartnershipError(
+  tx: Tx,
+  clientId: string,
+  practiceId: string,
+  draft: PartnershipRecord
+): Promise<string | null> {
+  if (!draft.partnerAId || !draft.partnerBId || draft.partnerAId === draft.partnerBId) {
+    return "Choose the two parents."
+  }
+  const rows = await tx
+    .select({
+      relationshipRecordId: clientRelationshipRecords.relationshipRecordId,
+      relationshipToClient: clientRelationshipRecords.relationshipToClient,
+    })
+    .from(clientRelationshipRecords)
+    .where(
+      and(
+        eq(clientRelationshipRecords.clientId, clientId),
+        eq(clientRelationshipRecords.practiceId, practiceId),
+        inArray(clientRelationshipRecords.relationshipRecordId, [draft.partnerAId, draft.partnerBId])
+      )
+    )
+  if (rows.length !== 2 || rows.some((row) => !isOriginRole(row.relationshipToClient))) {
+    return "Choose two parents."
+  }
+  return null
+}
+
+export async function createParentsPartnership(input: {
+  clientId: string
+  practiceId: string
+  userId: string
+  partnerAId: string
+  partnerBId: string
+}): Promise<MutationResult<{ partnership?: PartnershipRecord }>> {
+  const client = await assertClient(input.clientId, input.practiceId)
+  if (!client) return { error: "Client was not found." }
+  const draft = sanitizePartnership({
+    partnershipRecordId: "new",
+    partnerAId: input.partnerAId,
+    partnerBId: input.partnerBId,
+  })
+  try {
+    return await db.transaction(async (tx) => {
+      const parentError = await parentsPartnershipError(tx, input.clientId, input.practiceId, draft)
+      if (parentError) return { error: parentError }
+      const [created] = await tx
+        .insert(clientPartnershipRecords)
+        .values({
+          clientId: input.clientId,
+          practiceId: input.practiceId,
+          partnerAId: draft.partnerAId,
+          partnerBId: draft.partnerBId,
+        })
+        .returning()
+      await writeAudit(tx, {
+        practiceId: input.practiceId,
+        userId: input.userId,
+        clientId: input.clientId,
+        eventType: "client_partnership.created",
+        entityType: "client_partnership",
+        entityId: created.partnershipRecordId,
+      })
+      return { partnership: toPartnership(created) }
+    })
+  } catch {
+    return { error: "Could not add this relationship." }
   }
 }
 
@@ -1430,6 +1527,33 @@ export async function deleteRelationship(input: {
   }
 }
 
+async function conditionLinkError(
+  tx: Tx,
+  clientId: string,
+  practiceId: string,
+  event: EventRecord
+): Promise<string | null> {
+  if (!event.conditionEventId) return null
+  if (event.eventRecordId && event.conditionEventId === event.eventRecordId) {
+    return "A treatment cannot be linked to itself."
+  }
+  const [row] = await tx
+    .select({ eventType: clientEventRecords.eventType })
+    .from(clientEventRecords)
+    .where(
+      and(
+        eq(clientEventRecords.eventRecordId, event.conditionEventId),
+        eq(clientEventRecords.clientId, clientId),
+        eq(clientEventRecords.practiceId, practiceId)
+      )
+    )
+    .limit(1)
+  if (!row || !(CONDITION_EVENT_TYPES as readonly string[]).includes(row.eventType)) {
+    return "Choose a condition on this client."
+  }
+  return null
+}
+
 function eventColumns(event: EventRecord) {
   return {
     eventType: event.eventType,
@@ -1449,6 +1573,12 @@ function eventColumns(event: EventRecord) {
     familyRelation: event.familyRelation || null,
     familySide: event.familySide || null,
     relationshipRecordId: event.relationshipRecordId,
+    conditionEventId: event.conditionEventId,
+    admissionType: event.admissionType || null,
+    facility: event.facility || null,
+    admissionLength: event.admissionLength || null,
+    prescriberProfessionalId: event.prescriberProfessionalId,
+    prescriberName: event.prescriberName || null,
     selfHarmType: event.selfHarmType || null,
     substanceStatus: event.substanceStatus || null,
     abstinentSincePrecision: event.abstinentSincePrecision || null,
@@ -1470,6 +1600,8 @@ export async function createEvent(input: {
 
   try {
     return await db.transaction(async (tx) => {
+      const linkError = await conditionLinkError(tx, input.clientId, input.practiceId, parsed)
+      if (linkError) return { error: linkError }
       const displayOrder = await nextEventOrder(tx, input.clientId, input.practiceId, parsed.eventType)
       const draft = { ...parsed, eventRecordId: "", displayOrder }
       const [created] = await tx
@@ -1520,6 +1652,8 @@ export async function updateEvent(input: {
         )
         .limit(1)
       if (!existing) return { error: "That entry was not found." }
+      const linkError = await conditionLinkError(tx, input.clientId, input.practiceId, draft)
+      if (linkError) return { error: linkError }
 
       if (draft.relationshipRecordId) {
         const linked = await ownedRelationship(tx, draft.relationshipRecordId, input.clientId, input.practiceId)

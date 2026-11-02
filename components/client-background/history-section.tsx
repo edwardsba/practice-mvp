@@ -42,8 +42,12 @@ import {
   lifeStageAtStart,
 } from "@/lib/client-background/age"
 import { formatPartialDate, parsePartialDate, precisionForPartialDate } from "@/lib/client-background/partial-date"
+import { entryDetailGap, isConditionEvent, isTreatmentEvent, treatmentNeedsLink, treatmentsForCondition } from "@/lib/client-background/history-links"
+import { professionalOptionLabel, type ProfessionalOption } from "@/lib/client-background/professionals"
 import { personName } from "@/lib/client-background/tree"
 import {
+  ADMISSION_TYPES,
+  ADMISSION_TYPE_LABELS,
   EVENT_TYPES,
   EVENT_TYPE_LABELS,
   emptyEvent,
@@ -70,14 +74,14 @@ export function HistorySection({
   events,
   relationships,
   interviewSource,
-  previouslyTaken,
+  professionals,
 }: {
   clientId: string
   dateOfBirth: string | null
   events: EventRecord[]
   relationships: RelationshipRecord[]
   interviewSource: BackgroundInterviewAnswerSource | null
-  previouslyTaken: TriStateAnswer | null
+  professionals: ProfessionalOption[]
 }) {
   const [entries, setEntries] = useState(events)
   const [view, setView] = useState<HistoryView>("chronological")
@@ -185,13 +189,15 @@ export function HistorySection({
 
   function renderPanel() {
     return (
-      <HistoryPanel
+        <HistoryPanel
         draft={draft}
         editing={editing}
         pending={pending}
         error={error}
         dateOfBirth={dateOfBirth}
         relationships={relationships}
+        events={entries}
+        professionals={professionals}
         onEdit={() => {
           setEditing(true)
           setMobileScreen("edit")
@@ -224,15 +230,33 @@ export function HistorySection({
                 <p className="text-sm text-muted-foreground">Nothing recorded</p>
               ) : (
                 <ul className="space-y-1">
-                  {chronological.map((entry) => (
-                    <HistoryRow
-                      key={entry.eventRecordId}
-                      entry={entry}
-                      active={entry.eventRecordId === selectedId}
-                      dateOfBirth={dateOfBirth}
-                      relationships={relationships}
-                      onSelect={() => select(entry)}
-                    />
+                  {chronological
+                    .filter((entry) => !(entry.conditionEventId && isTreatmentEvent(entry.eventType) && entry.attribution === "self"))
+                    .map((entry) => (
+                    <li key={entry.eventRecordId} className="space-y-1">
+                      <HistoryRow
+                        entry={entry}
+                        active={entry.eventRecordId === selectedId}
+                        dateOfBirth={dateOfBirth}
+                        relationships={relationships}
+                        onSelect={() => select(entry)}
+                      />
+                      {isConditionEvent(entry.eventType) ? (
+                        <ul className="ml-4 space-y-1 border-l pl-3">
+                          {treatmentsForCondition(entries, entry.eventRecordId).map((treatment) => (
+                            <li key={treatment.eventRecordId}>
+                              <HistoryRow
+                                entry={treatment}
+                                active={treatment.eventRecordId === selectedId}
+                                dateOfBirth={dateOfBirth}
+                                relationships={relationships}
+                                onSelect={() => select(treatment)}
+                              />
+                            </li>
+                          ))}
+                        </ul>
+                      ) : null}
+                    </li>
                   ))}
                 </ul>
               )}
@@ -245,7 +269,7 @@ export function HistorySection({
               selectedId={selectedId}
               pending={pending}
               interviewSource={interviewSource}
-              previouslyTaken={previouslyTaken}
+              allEntries={entries}
               onSelect={select}
               onAdd={addForQuestion}
             />
@@ -279,7 +303,7 @@ function InterviewOrderList({
   selectedId,
   pending,
   interviewSource,
-  previouslyTaken,
+  allEntries,
   onSelect,
   onAdd,
 }: {
@@ -289,7 +313,7 @@ function InterviewOrderList({
   selectedId: string | null
   pending: boolean
   interviewSource: BackgroundInterviewAnswerSource | null
-  previouslyTaken: TriStateAnswer | null
+  allEntries: EventRecord[]
   onSelect: (entry: EventRecord) => void
   onAdd: (key: HistoryQuestionKey) => void
 }) {
@@ -304,17 +328,10 @@ function InterviewOrderList({
           <CardContent className="space-y-4">
             {group.keys.map((key) => {
               const question = HISTORY_QUESTIONS[key]
-              if (key === "medication_history") {
-                return (
-                  <div key={key} className="space-y-2">
-                    <div className="flex items-start justify-between gap-3">
-                      <h3 className="text-sm font-medium">{question.label}</h3>
-                      <AnswerTag answer={previouslyTaken} />
-                    </div>
-                  </div>
-                )
-              }
-              const listed = eventsForQuestion(entries, key, dateOfBirth)
+              const matched = eventsForQuestion(entries, key, dateOfBirth)
+              const listed = question.eventType && isTreatmentEvent(question.eventType)
+                ? matched.filter((entry) => treatmentNeedsLink(entry))
+                : matched
               const shown: ScreeningAnswer | null = listed.length > 0 ? "yes" : (interviewSource?.screening[key] ?? null)
               return (
                 <div key={key} className="space-y-2">
@@ -325,14 +342,30 @@ function InterviewOrderList({
                   {listed.length > 0 ? (
                     <ul className="space-y-1">
                       {listed.map((entry) => (
-                        <HistoryRow
-                          key={entry.eventRecordId}
-                          entry={entry}
-                          active={entry.eventRecordId === selectedId}
-                          dateOfBirth={dateOfBirth}
-                          relationships={relationships}
-                          onSelect={() => onSelect(entry)}
-                        />
+                        <li key={entry.eventRecordId} className="space-y-1">
+                          <HistoryRow
+                            entry={entry}
+                            active={entry.eventRecordId === selectedId}
+                            dateOfBirth={dateOfBirth}
+                            relationships={relationships}
+                            onSelect={() => onSelect(entry)}
+                          />
+                          {isConditionEvent(entry.eventType) ? (
+                            <ul className="ml-4 space-y-1 border-l pl-3">
+                              {treatmentsForCondition(allEntries, entry.eventRecordId).map((treatment) => (
+                                <li key={treatment.eventRecordId}>
+                                  <HistoryRow
+                                    entry={treatment}
+                                    active={treatment.eventRecordId === selectedId}
+                                    dateOfBirth={dateOfBirth}
+                                    relationships={relationships}
+                                    onSelect={() => onSelect(treatment)}
+                                  />
+                                </li>
+                              ))}
+                            </ul>
+                          ) : null}
+                        </li>
                       ))}
                     </ul>
                   ) : null}
@@ -390,18 +423,19 @@ function HistoryRow({
   onSelect: () => void
 }) {
   return (
-    <li>
       <button
         type="button"
         className={cn("w-full rounded-md px-2 py-1.5 text-left text-sm hover:bg-muted", active && "bg-muted font-medium")}
         onClick={onSelect}
       >
-        <span className="block truncate">{entryListLabel(entry)}</span>
+        <span className="flex items-center gap-2">
+          <span className="block truncate">{entryListLabel(entry)}</span>
+          <HistoryTags entry={entry} />
+        </span>
         <span className="block text-xs text-muted-foreground">
           {rowWhen(entry, dateOfBirth)} · {attributionLabel(entry, relationships)}
         </span>
       </button>
-    </li>
   )
 }
 
@@ -412,6 +446,8 @@ export function HistoryPanel({
   error,
   dateOfBirth,
   relationships,
+  events = [],
+  professionals = [],
   onEdit,
   onCancel,
   onBack,
@@ -428,6 +464,8 @@ export function HistoryPanel({
   error: string | null
   dateOfBirth: string | null
   relationships: RelationshipRecord[]
+  events?: EventRecord[]
+  professionals?: ProfessionalOption[]
   onEdit: () => void
   onCancel: () => void
   onBack: () => void
@@ -464,7 +502,14 @@ export function HistoryPanel({
       </div>
       {editing ? (
         <>
-          <EventEditor draft={draft} dateOfBirth={dateOfBirth} relationships={relationships} onChange={onChange} />
+          <EventEditor
+            draft={draft}
+            dateOfBirth={dateOfBirth}
+            relationships={relationships}
+            events={events}
+            professionals={professionals}
+            onChange={onChange}
+          />
           <SaveRow
             pending={pending}
             error={error}
@@ -488,6 +533,18 @@ export function HistoryPanel({
       )}
       </div>
     </div>
+  )
+}
+
+export function HistoryTags({ entry }: { entry: EventRecord }) {
+  const gap = entryDetailGap(entry)
+  return (
+    <>
+      {gap ? <span className="shrink-0 rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-950">Needs detail</span> : null}
+      {treatmentNeedsLink(entry) ? (
+        <span className="shrink-0 rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-950">Not linked</span>
+      ) : null}
+    </>
   )
 }
 
@@ -619,13 +676,25 @@ function EventEditor({
   draft,
   dateOfBirth,
   relationships,
+  events,
+  professionals,
   onChange,
 }: {
   draft: EventRecord
   dateOfBirth: string | null
   relationships: RelationshipRecord[]
+  events: EventRecord[]
+  professionals: ProfessionalOption[]
   onChange: (event: EventRecord) => void
 }) {
+  const treatment = isTreatmentEvent(draft.eventType)
+  const conditions = events.filter(
+    (event) => event.eventRecordId !== draft.eventRecordId && isConditionEvent(event.eventType) && event.attribution === "self"
+  )
+  const startLabel =
+    draft.eventType === "psychiatric_admission" ? "Admitted" : draft.eventType === "medication" ? "Started" : "Start"
+  const endLabel =
+    draft.eventType === "psychiatric_admission" ? "Discharged" : draft.eventType === "medication" ? "Ended" : "End"
   const stage = lifeStageAtStart(dateOfBirth, draft.startPrecision, draft.startValue)
   const familyEvent = draft.eventType === "family_events"
 
@@ -764,11 +833,72 @@ function EventEditor({
       ) : null}
       <TextField
         id={`${draft.eventRecordId}_title`}
-        label="Title"
+        label={draft.eventType === "medication" ? "Medication name" : "Title"}
         value={draft.title}
         onChange={(title) => patch({ title })}
         placeholder="Optional"
       />
+      {treatment && draft.attribution === "self" ? (
+        <SelectField
+          id={`${draft.eventRecordId}_for`}
+          label="For"
+          value={draft.conditionEventId ?? ""}
+          onChange={(conditionEventId) => patch({ conditionEventId: conditionEventId || null })}
+        >
+          <option value="">Not linked</option>
+          {conditions.map((condition) => (
+            <option key={condition.eventRecordId} value={condition.eventRecordId}>
+              {condition.title.trim() || EVENT_TYPE_LABELS[condition.eventType]}
+            </option>
+          ))}
+        </SelectField>
+      ) : null}
+      {draft.eventType === "psychiatric_admission" ? (
+        <>
+          <SelectField
+            id={`${draft.eventRecordId}_admission_type`}
+            label="Admission type"
+            value={draft.admissionType}
+            onChange={(admissionType) => patch({ admissionType: admissionType as EventRecord["admissionType"] })}
+          >
+            <option value="">Not recorded</option>
+            {ADMISSION_TYPES.map((option) => (
+              <option key={option} value={option}>
+                {ADMISSION_TYPE_LABELS[option]}
+              </option>
+            ))}
+          </SelectField>
+          <TextField
+            id={`${draft.eventRecordId}_facility`}
+            label="Facility (optional)"
+            value={draft.facility}
+            onChange={(facility) => patch({ facility })}
+          />
+          <TextField
+            id={`${draft.eventRecordId}_length`}
+            label="Length"
+            value={draft.admissionLength}
+            onChange={(admissionLength) => patch({ admissionLength })}
+          />
+        </>
+      ) : null}
+      {draft.eventType === "medication" ? (
+        <SelectField
+          id={`${draft.eventRecordId}_prescriber`}
+          label="Prescribed or supervised by"
+          value={draft.prescriberProfessionalId ?? ""}
+          onChange={(prescriberProfessionalId) =>
+            patch({ prescriberProfessionalId: prescriberProfessionalId || null, prescriberName: "" })
+          }
+        >
+          <option value="">{draft.prescriberName.trim() || "Not recorded"}</option>
+          {professionals.map((professional) => (
+            <option key={professional.professionalId} value={professional.professionalId}>
+              {professionalOptionLabel(professional)}
+            </option>
+          ))}
+        </SelectField>
+      ) : null}
       <TextAreaField
         id={`${draft.eventRecordId}_description`}
         label="Description"
@@ -777,7 +907,7 @@ function EventEditor({
       />
       <PartialDatePicker
         id={`${draft.eventRecordId}_start`}
-        dateLabel="Start"
+        dateLabel={startLabel}
         ageLabel="Client age at start"
         mode="client-at-event"
         clientDateOfBirth={dateOfBirth}
@@ -793,7 +923,7 @@ function EventEditor({
       ) : (
         <PartialDatePicker
           id={`${draft.eventRecordId}_end`}
-          dateLabel="End"
+          dateLabel={endLabel}
           ageLabel="Client age at end"
           mode="client-at-event"
           clientDateOfBirth={dateOfBirth}
@@ -810,6 +940,8 @@ function EventEditor({
           Category: {stage === "childhood" ? "Childhood" : "Adulthood"}
         </p>
       ) : null}
+      {treatment ? null : (
+      <>
       <SelectField
         id={`${draft.eventRecordId}_treated`}
         label="Treated"
@@ -842,6 +974,8 @@ function EventEditor({
           />
         </>
       ) : null}
+      </>
+      )}
       <SelectField
         id={`${draft.eventRecordId}_resolved`}
         label="Resolved / Ongoing"

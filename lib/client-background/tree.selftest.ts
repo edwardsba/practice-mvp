@@ -32,6 +32,15 @@ function person(partial: Partial<RelationshipRecord> & Pick<RelationshipRecord, 
     dependency: "",
     livingSituation: "",
     caregiverRelationship: "",
+    caregiverRelationshipDetail: "",
+    startedOn: "",
+    endedOn: "",
+    partnerType: "",
+    parentType: "",
+    adoptedOn: "",
+    notKnown: false,
+    otherParentKind: "",
+    otherParentDetail: "",
     linkedPartnerRecordId: null,
     partnershipRecordId: null,
     supportive: "",
@@ -174,7 +183,7 @@ assert.equal(relationshipLineLabel(stepParent, "De facto", "2026-10-02"), "Step-
 assert.equal(relationshipLineLabel(fullSibling, undefined, "2026-10-02"), "Sibling – Sam")
 assert.equal(
   relationshipLineLabel(caregiver, undefined, "2026-10-02"),
-  "Other primary caregiver – Nan (grandparent)"
+  "Other primary caregiver – Nan (Grandparent)"
 )
 assert.equal(
   relationshipLineLabel({ ...caregiver, caregiverRelationship: "" }, undefined, "2026-10-02"),
@@ -212,7 +221,8 @@ assert.equal(motherVisibility.clientRelationshipStatus, false)
 assert.equal(motherVisibility.howItEnded, false)
 
 const caregiverVisibility = relationshipFieldVisibility(caregiver, asOf)
-assert.equal(caregiverVisibility.lengthOfRelationship, true)
+assert.equal(caregiverVisibility.lengthOfRelationship, false)
+assert.equal(caregiverVisibility.spanDates, true)
 assert.equal(caregiverVisibility.dependency, true)
 
 const stepVisibility = relationshipFieldVisibility(stepParent, asOf)
@@ -233,7 +243,8 @@ assert.equal(currentPartnerVisibility.clientRelationshipStatus, true)
 assert.equal(currentPartnerVisibility.howItEnded, false)
 assert.equal(currentPartnerVisibility.timeSinceEnded, false)
 assert.equal(currentPartnerVisibility.dateOfBirth, true)
-assert.equal(currentPartnerVisibility.lengthOfRelationship, true)
+assert.equal(currentPartnerVisibility.lengthOfRelationship, false)
+assert.equal(currentPartnerVisibility.spanDates, true)
 assert.equal(currentPartnerVisibility.dependency, true)
 
 const priorPartnerVisibility = relationshipFieldVisibility(
@@ -247,14 +258,16 @@ const priorPartnerVisibility = relationshipFieldVisibility(
 )
 assert.equal(priorPartnerVisibility.dateOfBirth, false)
 assert.equal(priorPartnerVisibility.health, false)
-assert.equal(priorPartnerVisibility.lengthOfRelationship, true)
+assert.equal(priorPartnerVisibility.lengthOfRelationship, false)
+assert.equal(priorPartnerVisibility.spanDates, true)
+assert.equal(priorPartnerVisibility.partnerType, true)
 assert.equal(priorPartnerVisibility.supportive, true)
 assert.equal(priorPartnerVisibility.comment, true)
 assert.equal(priorPartnerVisibility.dependency, false)
 assert.equal(priorPartnerVisibility.livingSituation, false)
 assert.equal(priorPartnerVisibility.clientRelationshipStatus, false)
 assert.equal(priorPartnerVisibility.howItEnded, true)
-assert.equal(priorPartnerVisibility.timeSinceEnded, true)
+assert.equal(priorPartnerVisibility.timeSinceEnded, false)
 
 const adultChildVisibility = relationshipFieldVisibility(
   person({
@@ -365,12 +378,12 @@ const linkPartnerships = [
   partnership({ partnershipRecordId: "sally-phil", partnerAId: "sally", partnerBId: "step-phil" }),
 ]
 assert.deepEqual(relationshipLinkLine(henry, linkPeople, linkPartnerships), {
-  label: "Associated partner",
+  label: "Other parent",
   value: "Phil (Prior partner)",
 })
 assert.deepEqual(relationshipLinkLine(unlinkedChild, linkPeople, linkPartnerships), {
-  label: "Associated partner",
-  value: "Not linked to a partner",
+  label: "Other parent",
+  value: "",
 })
 assert.deepEqual(relationshipLinkLine(stepPhil, linkPeople, linkPartnerships), {
   label: "Associated parent",

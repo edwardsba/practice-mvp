@@ -1,6 +1,9 @@
 import { assessAge, displayedAge } from "@/lib/client-background/age"
 import { parsePartialDate } from "@/lib/client-background/partial-date"
 import {
+  CAREGIVER_RELATIONSHIP_LABELS,
+  CAREGIVER_RELATIONSHIPS,
+  isOneOf,
   ORIGIN_PARENT_ROLES,
   PARTNERSHIP_STATUS_LABELS,
   RELATIONSHIP_TO_CLIENT_LABELS,
@@ -31,6 +34,7 @@ export type RelationshipTree = {
   /** Other primary caregivers, shown in Family of Origin after the parents' relationship. */
   otherCaregivers: RelationshipRecord[]
   fullSiblings: RelationshipRecord[]
+  adoptiveSiblings: RelationshipRecord[]
   otherFamily: OtherFamilyGroup[]
   unlinkedStepParents: RelationshipRecord[]
   unlinkedStepSiblings: RelationshipRecord[]
@@ -94,14 +98,24 @@ function treeAgeToken(
 export function relationshipLineLabel(
   person: Pick<
     RelationshipRecord,
-    "relationshipToClient" | "givenName" | "dateOfBirth" | "healthStatus" | "caregiverRelationship"
+    | "relationshipToClient"
+    | "givenName"
+    | "dateOfBirth"
+    | "healthStatus"
+    | "caregiverRelationship"
+    | "caregiverRelationshipDetail"
   >,
   status?: string | null,
   asOf = todayDateString()
 ): string {
   if (person.relationshipToClient === "other_caregiver") {
     const name = person.givenName.trim()
-    const relation = person.caregiverRelationship.trim()
+    const code = person.caregiverRelationship.trim()
+    const relation = isOneOf(code, CAREGIVER_RELATIONSHIPS)
+      ? code === "other"
+        ? person.caregiverRelationshipDetail.trim() || CAREGIVER_RELATIONSHIP_LABELS.other
+        : CAREGIVER_RELATIONSHIP_LABELS[code]
+      : code
     let label = name ? `Other primary caregiver – ${name}` : "Other primary caregiver"
     if (relation) label += ` (${relation})`
     const age = treeAgeToken(person, asOf)
@@ -237,6 +251,10 @@ export function buildRelationshipTree(
     .filter((person) => person.relationshipToClient === "sibling_full")
     .sort(byOrder)
 
+  const adoptiveSiblings = people
+    .filter((person) => person.relationshipToClient === "sibling_adoptive")
+    .sort(byOrder)
+
   const otherFamily = originParents
     .map((parent) => {
       const stepParents = partnerships
@@ -326,6 +344,7 @@ export function buildRelationshipTree(
     originParents,
     otherCaregivers,
     fullSiblings,
+    adoptiveSiblings,
     otherFamily,
     unlinkedStepParents,
     unlinkedStepSiblings,
@@ -345,13 +364,16 @@ export function familyOfOriginLayout(
 } {
   const primary = [link.mother, link.father].filter((person): person is RelationshipRecord => person != null)
   const primaryIds = new Set(primary.map((person) => person.relationshipRecordId))
+  const parents = [
+    ...primary,
+    ...tree.originParents.filter((person) => !primaryIds.has(person.relationshipRecordId)),
+  ]
+  const adoptive = parents.filter((person) => person.parentType === "adoptive")
+  const birth = parents.filter((person) => person.parentType !== "adoptive")
   return {
-    parents: [
-      ...primary,
-      ...tree.originParents.filter((person) => !primaryIds.has(person.relationshipRecordId)),
-    ],
+    parents: adoptive.length > 0 && birth.length > 0 ? [...adoptive, ...birth] : parents,
     caregivers: tree.otherCaregivers,
-    siblings: tree.fullSiblings,
+    siblings: [...tree.fullSiblings, ...tree.adoptiveSiblings],
   }
 }
 
@@ -427,24 +449,50 @@ export type RelationshipLinkLine = { label: string; value: string }
  * The link row shown in a relationship's read-only view.
  * Labels match the edit form's select options. Null means the row is omitted.
  */
+export function halfSiblingSide(
+  person: Pick<RelationshipRecord, "relationshipToClient" | "partnershipRecordId">,
+  people: RelationshipRecord[],
+  partnerships: PartnershipRecord[]
+): "maternal" | "paternal" | null {
+  if (person.relationshipToClient !== "sibling_half") return null
+  const link = stepParentLinks(people, partnerships).find(
+    (item) => item.partnershipRecordId === person.partnershipRecordId
+  )
+  if (!link) return null
+  const sex = link.parent.sex.trim().toLowerCase()
+  if (link.parent.relationshipToClient === "mother" || sex === "female") return "maternal"
+  if (link.parent.relationshipToClient === "father" || sex === "male") return "paternal"
+  return null
+}
+
 export function relationshipLinkLine(
   record: Pick<
     RelationshipRecord,
-    "relationshipRecordId" | "relationshipToClient" | "linkedPartnerRecordId" | "partnershipRecordId"
+    | "relationshipRecordId"
+    | "relationshipToClient"
+    | "linkedPartnerRecordId"
+    | "partnershipRecordId"
+    | "otherParentKind"
+    | "otherParentDetail"
   >,
   people: RelationshipRecord[],
   partnerships: PartnershipRecord[]
 ): RelationshipLinkLine | null {
   const role = record.relationshipToClient
-  if (role === "child_biological" || role === "child_step") {
+  if (role === "child_biological") {
+    const partner = people.find((person) => person.relationshipRecordId === record.linkedPartnerRecordId)
+    let value = ""
+    if (partner) value = personWithRoleLabel(partner)
+    else if (record.otherParentKind === "donor_conception") value = "Donor conception"
+    else if (record.otherParentKind === "adopted_sole") value = "Adopted as a sole parent"
+    else if (record.otherParentKind === "other") value = record.otherParentDetail.trim() || "Other"
+    return { label: "Other parent", value }
+  }
+  if (role === "child_step") {
     const partner = people.find((person) => person.relationshipRecordId === record.linkedPartnerRecordId)
     return {
       label: "Associated partner",
-      value: partner
-        ? personWithRoleLabel(partner)
-        : role === "child_biological"
-          ? "Not linked to a partner"
-          : "Not linked",
+      value: partner ? personWithRoleLabel(partner) : "Not linked",
     }
   }
   if (role === "step_parent") {
@@ -464,7 +512,7 @@ export function relationshipLinkLine(
       value: link ? stepParentLinkLabel(link) : "Not linked",
     }
   }
-  if (role === "sibling_full") {
+  if (role === "sibling_full" || role === "sibling_adoptive") {
     const origins = originPartnerships(people, partnerships)
     if (origins.length <= 1) return null
     const partnership = origins.find((item) => item.partnershipRecordId === record.partnershipRecordId)

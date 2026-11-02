@@ -1,6 +1,9 @@
+import { entryDetailMessage, unlinkedTreatmentMessage } from "@/lib/client-background/history-links"
 import { eventsForQuestion, historyQuestionAcceptsEntries, HISTORY_QUESTION_KEYS, HISTORY_QUESTIONS, type ScreeningAnswers } from "@/lib/client-background/interview-history"
 import { needsLinkingItems } from "@/lib/client-background/relationship-groups"
 import { buildRelationshipTree, personRoleLabel } from "@/lib/client-background/tree"
+import { estimatedCurrentAge } from "@/lib/client-background/visibility"
+import { todayDateString } from "@/lib/dates/practice-time"
 import {
   CLIENT_RELATIONSHIP_STATUS_LABELS,
   EMPLOYED_WORK_STATUSES,
@@ -38,9 +41,16 @@ export type BackgroundCheckInput = {
 const PARTNER_EXPECTED: readonly ClientRelationshipStatus[] = [
   "in_relationship_not_living_together",
   "engaged",
+  "dating",
   "defacto",
   "married",
 ]
+
+const ENDED_STATUS_MATCH: Partial<Record<ClientRelationshipStatus, RegExp>> = {
+  separated: /separat/i,
+  divorced: /divorc/i,
+  widowed: /widow|died|death/i,
+}
 
 const PARTNER_UNEXPECTED: readonly ClientRelationshipStatus[] = ["single", "separated", "divorced", "widowed"]
 
@@ -104,6 +114,63 @@ export function backgroundChecks(input: BackgroundCheckInput): BackgroundCheck[]
     })
   }
 
+  const endedMatch =
+    status === "separated" || status === "divorced" || status === "widowed" ? ENDED_STATUS_MATCH[status] : undefined
+  if (status && endedMatch) {
+    const prior = data.relationships.filter((person) => person.relationshipToClient === "prior_partner")
+    const matched = prior.some((person) => endedMatch.test(person.relationshipStatus))
+    if (!matched) {
+      checks.push({
+        id: "partner-ended",
+        message: `Relationship status is ${CLIENT_RELATIONSHIP_STATUS_LABELS[status]}, but no prior partner has a matching How it ended.`,
+        target: "relationships",
+      })
+    }
+  }
+
+  for (const person of data.relationships) {
+    if (person.relationshipToClient !== "prior_partner" || person.startedOn.trim()) continue
+    const name = person.givenName.trim()
+    checks.push({
+      id: `partner-start-${person.relationshipRecordId}`,
+      message: name ? `Prior partner ${name}: no start date` : "Prior partner: no start date",
+      target: "relationships",
+    })
+  }
+
+  for (const child of data.relationships) {
+    if (child.relationshipToClient !== "child_biological") continue
+    if (child.linkedPartnerRecordId || child.otherParentKind) continue
+    const age = estimatedCurrentAge(child, todayDateString())
+    const aged = age == null ? "" : ` (aged ${age})`
+    checks.push({
+      id: `other-parent-${child.relationshipRecordId}`,
+      message: `Child${aged}: other parent not recorded`,
+      target: "relationships",
+    })
+  }
+
+  for (const parent of data.relationships) {
+    const isParent =
+      parent.relationshipToClient === "mother" ||
+      parent.relationshipToClient === "father" ||
+      parent.relationshipToClient === "parent"
+    if (!isParent || parent.parentType !== "adoptive" || parent.notKnown || parent.adoptedOn.trim()) continue
+    const sex = parent.sex.trim().toLowerCase()
+    const role =
+      parent.relationshipToClient === "mother" || sex === "female"
+        ? "mother"
+        : parent.relationshipToClient === "father" || sex === "male"
+          ? "father"
+          : "parent"
+    const name = parent.givenName.trim()
+    checks.push({
+      id: `adoption-${parent.relationshipRecordId}`,
+      message: name ? `Adoptive ${role} (${name}): no adoption date` : `Adoptive ${role}: no adoption date`,
+      target: "relationships",
+    })
+  }
+
   if (input.numberOfChildren != null) {
     const recorded = data.relationships.filter(
       (person) => person.relationshipToClient === "child_biological" || person.relationshipToClient === "child_step"
@@ -160,20 +227,23 @@ export function backgroundChecks(input: BackgroundCheckInput): BackgroundCheck[]
     }
   }
 
-  if (data.medication.currentlyTaking === "yes" && !data.medication.supervisedBy.trim()) {
-    checks.push({
-      id: "medication-supervisor",
-      message: "Currently taking medication, but no supervisor is recorded.",
-      target: "medication",
-    })
-  }
-
   if (data.demographics.identity.disability === true && !data.demographics.identity.disabilityDetail.trim()) {
     checks.push({
       id: "disability",
       message: "Disability is Yes, with no description.",
       target: "identity",
     })
+  }
+
+  for (const event of data.events) {
+    const detail = entryDetailMessage(event, data.dateOfBirth)
+    if (detail) {
+      checks.push({ id: `detail-${event.eventRecordId}`, message: detail, target: "history" })
+    }
+    const unlinked = unlinkedTreatmentMessage(event)
+    if (unlinked) {
+      checks.push({ id: `unlinked-${event.eventRecordId}`, message: unlinked, target: "history" })
+    }
   }
 
   const tree = buildRelationshipTree(data.relationships, data.partnerships)

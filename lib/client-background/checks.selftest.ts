@@ -41,6 +41,15 @@ function person(
     dependency: "",
     livingSituation: "",
     caregiverRelationship: "",
+    caregiverRelationshipDetail: "",
+    startedOn: "",
+    endedOn: "",
+    partnerType: "",
+    parentType: "",
+    adoptedOn: "",
+    notKnown: false,
+    otherParentKind: "",
+    otherParentDetail: "",
     linkedPartnerRecordId: null,
     partnershipRecordId: null,
     ...partial,
@@ -165,15 +174,28 @@ const childrenMismatch = backgroundChecks(
     }),
   })
 )
-assert.equal(childrenMismatch[0]?.message, "Client reported 2 children; 1 recorded.")
-assert.equal(childrenMismatch[0]?.target, "relationships")
+assert.equal(
+  childrenMismatch.find((check) => check.id === "children-count")?.message,
+  "Client reported 2 children; 1 recorded."
+)
+assert.equal(childrenMismatch.find((check) => check.id === "children-count")?.target, "relationships")
 assert.deepEqual(
   ids({
     numberOfChildren: 2,
     data: data({
       relationships: [
-        person({ relationshipRecordId: "child-1", relationshipToClient: "child_biological", givenName: "Ari" }),
-        person({ relationshipRecordId: "child-2", relationshipToClient: "child_biological", givenName: "Bo" }),
+        person({
+          relationshipRecordId: "child-1",
+          relationshipToClient: "child_biological",
+          givenName: "Ari",
+          otherParentKind: "donor_conception",
+        }),
+        person({
+          relationshipRecordId: "child-2",
+          relationshipToClient: "child_biological",
+          givenName: "Bo",
+          otherParentKind: "donor_conception",
+        }),
       ],
     }),
   }),
@@ -182,7 +204,13 @@ assert.deepEqual(
 assert.deepEqual(
   ids({
     data: data({
-      relationships: [person({ relationshipRecordId: "child", relationshipToClient: "child_biological" })],
+      relationships: [
+        person({
+          relationshipRecordId: "child",
+          relationshipToClient: "child_biological",
+          otherParentKind: "donor_conception",
+        }),
+      ],
     }),
   }),
   []
@@ -301,30 +329,24 @@ assert.equal(historyYes[0]?.target, "history")
 assert.deepEqual(
   ids({
     screening: { emotional_problems: "yes" },
-    data: data({ events: [event({ eventType: "emotional_problems" })] }),
+    data: data({
+      events: [
+        event({
+          eventType: "emotional_problems",
+          title: "Anxiety",
+          startPrecision: "year",
+          startValue: "2010",
+        }),
+      ],
+    }),
   }),
   []
 )
 
-const medication = backgroundChecks(
-  input({
-    data: data({ medication: { currentlyTaking: "yes", previouslyTaken: null, supervisedBy: "" } }),
-  })
-)
-assert.equal(medication[0]?.message, "Currently taking medication, but no supervisor is recorded.")
-assert.equal(medication[0]?.target, "medication")
 assert.deepEqual(
   ids({
-    data: data({ medication: { currentlyTaking: "yes", previouslyTaken: null, supervisedBy: "Dr Patel" } }),
+    data: data({ medication: { currentlyTaking: "yes", previouslyTaken: null, supervisedBy: "" } }),
   }),
-  []
-)
-assert.deepEqual(
-  backgroundChecks(
-    input({
-      data: data({ medication: { currentlyTaking: "no", previouslyTaken: "yes", supervisedBy: "" } }),
-    })
-  ).map((check) => check.id),
   []
 )
 
@@ -373,7 +395,12 @@ assert.deepEqual(
           givenName: "Alex",
           linkedPartnerRecordId: "partner",
         }),
-        person({ relationshipRecordId: "child", relationshipToClient: "child_biological", givenName: "Ari" }),
+        person({
+          relationshipRecordId: "child",
+          relationshipToClient: "child_biological",
+          givenName: "Ari",
+          otherParentKind: "donor_conception",
+        }),
       ],
     }),
   }),
@@ -393,6 +420,7 @@ assert.deepEqual(
   ben01.map((check) => check.message),
   [
     "Relationship status is De facto, but no current partner is recorded.",
+    "Child: other parent not recorded",
     "Client reported 2 children; 1 recorded.",
   ]
 )

@@ -22,6 +22,7 @@ import {
   saveInterviewScreening,
   startBackgroundInterview,
   updateEvent,
+  createParentsPartnership,
   updatePartnership,
   updateRelationshipDetail,
 } from "@/lib/client-background/mutations"
@@ -199,6 +200,23 @@ export async function updateRelationshipAction(
     associatedParentId: options?.associatedParentId,
     relink: options?.relink,
     clientRelationshipStatus: options?.clientRelationshipStatus,
+  })
+  if (!result.error) refresh(clientId)
+  return result
+}
+
+export async function createParentsPartnershipAction(
+  clientId: string,
+  partnerAId: string,
+  partnerBId: string
+) {
+  const context = await requirePractitionerContext()
+  const result = await createParentsPartnership({
+    clientId,
+    practiceId: context.practiceId,
+    userId: context.userId,
+    partnerAId,
+    partnerBId,
   })
   if (!result.error) refresh(clientId)
   return result

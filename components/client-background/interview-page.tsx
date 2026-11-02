@@ -7,7 +7,6 @@ import {
   saveEducationAction,
   saveIdentityAction,
   saveLivingSituationAction,
-  saveMedicationAction,
   saveOccupationAction,
   saveReasonForAttendingAction,
 } from "@/app/clients/[client_id]/background/actions"
@@ -20,7 +19,6 @@ import {
 import { AutosaveFields, type SavePhase } from "@/components/client-background/interview-autosave"
 import { InterviewHistory } from "@/components/client-background/interview-history"
 import { InterviewRelationships } from "@/components/client-background/interview-relationships"
-import { MedicationFields } from "@/components/client-background/medication-stressors"
 import { ReasonFields } from "@/components/client-background/reason-section"
 import { scrollToBackgroundCheck } from "@/components/client-background/worth-checking"
 import { Button } from "@/components/ui/button"
@@ -441,41 +439,6 @@ export function InterviewPage({
             </AutosaveFields>
           </CardContent>
         </Card>
-        <Card id="check-medication" className="scroll-mt-28">
-          <CardHeader>
-            <CardTitle>Medication</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <AutosaveFields
-              saved={data.medication}
-              save={async (value) => {
-                const next = { ...value, previouslyTaken: medicationRef.current.previouslyTaken }
-                medicationRef.current = next
-                const result = await saveMedicationAction(clientId, next)
-                if (result.error || !("medication" in result) || !result.medication) {
-                  return { error: result.error ?? "Could not save medication." }
-                }
-                medicationRef.current = result.medication
-                return { value: result.medication }
-              }}
-              onPhase={(phase, retry) => onPhase("medication", phase, retry)}
-              registerFlush={registerFlush}
-            >
-              {(value, onChange, commit) => {
-                medicationRef.current = { ...value, previouslyTaken: medicationRef.current.previouslyTaken }
-                return (
-                  <MedicationFields
-                    idPrefix="interview_medication"
-                    value={value}
-                    onChange={onChange}
-                    onCommit={commit}
-                    client={suggestions?.medication}
-                  />
-                )
-              }}
-            </AutosaveFields>
-          </CardContent>
-        </Card>
         <Button type="button" className="min-h-11" onClick={() => show("history")}>
           Continue to History
         </Button>
@@ -493,6 +456,8 @@ export function InterviewPage({
           stressors={data.stressors}
           selfReportId={selfReport?.resultId ?? null}
           historyClient={suggestions?.history}
+          medicationClient={suggestions?.medication}
+          professionals={professionals}
           stressorsClient={suggestions?.stressors}
           onEvents={() => {}}
           onPhase={onPhase}

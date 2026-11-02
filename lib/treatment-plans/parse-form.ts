@@ -7,6 +7,7 @@ import {
 } from "@/lib/treatment-plans/fields"
 import type {
   MedicationSupervisionJson,
+  MedicationSupervisorAssignment,
   MultiSelectSectionJson,
   OngoingAssessmentsJson,
   SingleSelectSectionJson,
@@ -73,6 +74,17 @@ function parseSmartGoals(formData: FormData): SmartGoalsJson {
   return { items }
 }
 
+function parseMedicationSupervisors(formData: FormData): MedicationSupervisorAssignment[] {
+  const eventIds = formData.getAll("medication_event_id").map(String)
+  const supervisors = formData.getAll("medication_supervisor_id").map(String)
+  return eventIds
+    .map((eventId, index) => ({
+      eventId: eventId.trim(),
+      professionalId: supervisors[index]?.trim() || null,
+    }))
+    .filter((item) => item.eventId)
+}
+
 function parseMedicationSupervision(formData: FormData): MedicationSupervisionJson {
   const supervised = formData.get("medication_supervised") === "on"
   const supervisorName = String(
@@ -132,6 +144,7 @@ export function parseTreatmentPlanFormData(
     suicideAttempts: parseSuicideAttempts(formData),
     ongoingAssessments: parseOngoingAssessments(formData),
     medicationSupervision: parseMedicationSupervision(formData),
+    medicationSupervisors: parseMedicationSupervisors(formData),
     supportServices: parseMultiSection(
       formData,
       "support",

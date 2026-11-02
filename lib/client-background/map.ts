@@ -38,6 +38,15 @@ export function toRelationship(row: {
   dependency: string | null
   livingSituation: string | null
   caregiverRelationship: string | null
+  caregiverRelationshipDetail: string | null
+  startedOn: string | null
+  endedOn: string | null
+  partnerType: string | null
+  parentType: string | null
+  adoptedOn: string | null
+  notKnown: boolean
+  otherParentKind: string | null
+  otherParentDetail: string | null
   linkedPartnerRecordId: string | null
   partnershipRecordId: string | null
 }): RelationshipRecord {
@@ -63,6 +72,15 @@ export function toRelationship(row: {
     dependency: row.dependency ?? "",
     livingSituation: row.livingSituation ?? "",
     caregiverRelationship: row.caregiverRelationship ?? "",
+    caregiverRelationshipDetail: row.caregiverRelationshipDetail ?? "",
+    startedOn: row.startedOn ?? "",
+    endedOn: row.endedOn ?? "",
+    partnerType: row.partnerType ?? "",
+    parentType: row.parentType ?? "",
+    adoptedOn: row.adoptedOn ?? "",
+    notKnown: row.notKnown,
+    otherParentKind: row.otherParentKind ?? "",
+    otherParentDetail: row.otherParentDetail ?? "",
   })
 }
 
@@ -115,6 +133,12 @@ export function toEvent(row: {
   familyRelation: string | null
   familySide: string | null
   relationshipRecordId: string | null
+  conditionEventId: string | null
+  admissionType: string | null
+  facility: string | null
+  admissionLength: string | null
+  prescriberProfessionalId: string | null
+  prescriberName: string | null
   selfHarmType: string | null
   substanceStatus: string | null
   abstinentSincePrecision: string | null
@@ -136,6 +160,12 @@ export function toEvent(row: {
     outcome: row.outcome ?? "",
     familyRelation: row.familyRelation ?? "",
     familySide: row.familySide ?? "",
+    conditionEventId: row.conditionEventId,
+    admissionType: row.admissionType ?? "",
+    facility: row.facility ?? "",
+    admissionLength: row.admissionLength ?? "",
+    prescriberProfessionalId: row.prescriberProfessionalId,
+    prescriberName: row.prescriberName ?? "",
     selfHarmType: row.selfHarmType ?? "",
     substanceStatus: row.substanceStatus ?? "",
     abstinentSincePrecision: row.abstinentSincePrecision ?? "",

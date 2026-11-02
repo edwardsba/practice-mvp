@@ -7,6 +7,7 @@ export const RELATIONSHIP_TO_CLIENT = [
   "sibling_full",
   "sibling_half",
   "sibling_step",
+  "sibling_adoptive",
   "current_partner",
   "prior_partner",
   "child_biological",
@@ -17,7 +18,7 @@ export type RelationshipToClient = (typeof RELATIONSHIP_TO_CLIENT)[number]
 /** Types offered by Add relationship and by the type select. Mother and Father are always present and are not chosen here. */
 export const ADDABLE_RELATIONSHIP_GROUPS: { label: string; roles: RelationshipToClient[] }[] = [
   { label: "Parents", roles: ["parent", "step_parent", "other_caregiver"] },
-  { label: "Siblings", roles: ["sibling_full", "sibling_half", "sibling_step"] },
+  { label: "Siblings", roles: ["sibling_full", "sibling_half", "sibling_step", "sibling_adoptive"] },
   { label: "Partners", roles: ["current_partner", "prior_partner"] },
   { label: "Children", roles: ["child_biological", "child_step"] },
 ]
@@ -57,6 +58,7 @@ export const EVENT_TYPES = [
   "substance_use",
   "psychiatric_admission",
   "previous_therapy",
+  "medication",
   "emotional_problems",
   "family_events",
   "significant_history",
@@ -106,6 +108,7 @@ export const RELATIONSHIP_TO_CLIENT_LABELS: Record<RelationshipToClient, string>
   sibling_full: "Sibling",
   sibling_half: "Half-sibling",
   sibling_step: "Step-sibling",
+  sibling_adoptive: "Adoptive sibling",
   current_partner: "Current partner",
   prior_partner: "Prior partner",
   child_biological: "Child",
@@ -128,6 +131,78 @@ export const PARTNERSHIP_STATUS_LABELS: Record<PartnershipStatus, string> = {
   never_formalised: "Never formalised",
 }
 
+/** Prior partner relationship type. The current partner's type is the client's relationship status. */
+export const PARTNER_TYPES = ["married", "defacto", "engaged", "dating", "other"] as const
+export type PartnerType = (typeof PARTNER_TYPES)[number]
+
+export const PARTNER_TYPE_LABELS: Record<PartnerType, string> = {
+  married: "Married",
+  defacto: "De facto",
+  engaged: "Engaged",
+  dating: "Dating",
+  other: "Other",
+}
+
+export const PARENT_TYPES = ["biological", "adoptive"] as const
+export type ParentType = (typeof PARENT_TYPES)[number]
+
+export const PARENT_TYPE_LABELS: Record<ParentType, string> = {
+  biological: "Biological",
+  adoptive: "Adoptive",
+}
+
+/** Biological child whose other parent is not one of the recorded partners. */
+export const OTHER_PARENT_KINDS = ["donor_conception", "adopted_sole", "other"] as const
+export type OtherParentKind = (typeof OTHER_PARENT_KINDS)[number]
+
+export const OTHER_PARENT_KIND_LABELS: Record<OtherParentKind, string> = {
+  donor_conception: "Donor conception",
+  adopted_sole: "Adopted as a sole parent",
+  other: "Other",
+}
+
+export const CAREGIVER_RELATIONSHIPS = [
+  "grandparent",
+  "other_relative",
+  "family_friend",
+  "foster_carer",
+  "kinship_carer",
+  "residential",
+  "other",
+] as const
+export type CaregiverRelationship = (typeof CAREGIVER_RELATIONSHIPS)[number]
+
+export const CAREGIVER_RELATIONSHIP_LABELS: Record<CaregiverRelationship, string> = {
+  grandparent: "Grandparent",
+  other_relative: "Other relative",
+  family_friend: "Family friend",
+  foster_carer: "Foster carer",
+  kinship_carer: "Kinship carer",
+  residential: "Residential / out-of-home care",
+  other: "Other",
+}
+
+export const ADMISSION_TYPES = [
+  "psychiatric_inpatient",
+  "residential_rehab",
+  "medical",
+  "emergency_department",
+] as const
+export type AdmissionType = (typeof ADMISSION_TYPES)[number]
+
+export const ADMISSION_TYPE_LABELS: Record<AdmissionType, string> = {
+  psychiatric_inpatient: "Psychiatric inpatient",
+  residential_rehab: "Residential rehab",
+  medical: "Medical",
+  emergency_department: "Emergency department only",
+}
+
+export const CONDITION_EVENT_TYPES = ["illness_injury", "emotional_problems", "substance_use"] as const
+export type ConditionEventType = (typeof CONDITION_EVENT_TYPES)[number]
+
+export const TREATMENT_EVENT_TYPES = ["psychiatric_admission", "previous_therapy", "medication"] as const
+export type TreatmentEventType = (typeof TREATMENT_EVENT_TYPES)[number]
+
 export const HEALTH_STATUSES = ["good", "fair", "poor", "deceased"] as const
 export type HealthStatus = (typeof HEALTH_STATUSES)[number]
 
@@ -142,8 +217,9 @@ export const EVENT_TYPE_LABELS: Record<EventType, string> = {
   self_harm: "Self-harm",
   illness_injury: "Illness / injury",
   substance_use: "Substance use",
-  psychiatric_admission: "Psychiatric hospital admissions / residential rehab",
+  psychiatric_admission: "Admission",
   previous_therapy: "Previous therapy",
+  medication: "Medication",
   emotional_problems: "Emotional problems",
   family_events: "Family events",
   significant_history: "Significant history",
@@ -206,6 +282,7 @@ export const CLIENT_RELATIONSHIP_STATUSES = [
   "single",
   "in_relationship_not_living_together",
   "engaged",
+  "dating",
   "defacto",
   "married",
   "separated",
@@ -219,6 +296,7 @@ export const CLIENT_RELATIONSHIP_STATUS_LABELS: Record<ClientRelationshipStatus,
   single: "Single",
   in_relationship_not_living_together: "In a relationship (not living together)",
   engaged: "Engaged",
+  dating: "Dating",
   defacto: "De facto",
   married: "Married",
   separated: "Separated",
@@ -496,8 +574,25 @@ export type RelationshipRecord = {
   qualityOfRelationship: string
   dependency: DependencyValue | ""
   livingSituation: RelationshipLivingSituation | ""
-  /** Free text for other_caregiver, such as grandparent or foster carer. Cleared for every other role. */
+  /** Caregiver relationship code. Cleared for every other role. */
   caregiverRelationship: string
+  /** Description when the caregiver relationship is Other. */
+  caregiverRelationshipDetail: string
+  /** Partial date. Partner start, or the date care began. */
+  startedOn: string
+  /** Partial date. Partner end, or the date care ended. */
+  endedOn: string
+  /** Prior partner relationship type. Cleared for every other role. */
+  partnerType: PartnerType | ""
+  /** Biological or adoptive. Used on parent records. */
+  parentType: ParentType | ""
+  /** Partial date an adoptive parent adopted the client. */
+  adoptedOn: string
+  /** Parent is not known. Other fields stay stored and are hidden. */
+  notKnown: boolean
+  /** Set when a biological child's other parent is not a recorded partner. */
+  otherParentKind: OtherParentKind | ""
+  otherParentDetail: string
   linkedPartnerRecordId: string | null
   partnershipRecordId: string | null
 }
@@ -531,6 +626,14 @@ export type EventRecord = {
   familyRelation: string
   familySide: FamilySide | ""
   relationshipRecordId: string | null
+  /** Treatment entries: the condition entry this treatment is for. */
+  conditionEventId: string | null
+  admissionType: AdmissionType | ""
+  facility: string
+  admissionLength: string
+  prescriberProfessionalId: string | null
+  /** Free-text supervisor from the old medication record, used when no professional is chosen. */
+  prescriberName: string
   selfHarmType: SelfHarmType | ""
   substanceStatus: SubstanceStatus | ""
   abstinentSincePrecision: StartPrecision | ""
@@ -710,6 +813,12 @@ export function emptyEvent(eventType: EventType, displayOrder: number): Omit<Eve
     familyRelation: "",
     familySide: "",
     relationshipRecordId: null,
+    conditionEventId: null,
+    admissionType: "",
+    facility: "",
+    admissionLength: "",
+    prescriberProfessionalId: null,
+    prescriberName: "",
     selfHarmType: "",
     substanceStatus: "",
     abstinentSincePrecision: "",

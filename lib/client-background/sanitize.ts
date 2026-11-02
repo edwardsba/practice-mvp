@@ -1,11 +1,16 @@
 import {
+  ADMISSION_TYPES,
   ATTRIBUTIONS,
+  CAREGIVER_RELATIONSHIPS,
   DEPENDENCY_VALUES,
   EVENT_TYPES,
   FAMILY_SIDES,
   HEALTH_STATUSES,
   isOneOf,
   NECESSITY_KEYS,
+  OTHER_PARENT_KINDS,
+  PARENT_TYPES,
+  PARTNER_TYPES,
   PARTNERSHIP_STATUSES,
   RATED_FACTOR_KEYS,
   RATED_VALUES,
@@ -34,7 +39,9 @@ import {
   emptyNecessities,
   emptyOccupation,
   emptyRisk,
+  type AdmissionType,
   type Attribution,
+  type CaregiverRelationship,
   type ClientRelationshipStatus,
   type ClientRelationshipStatusValue,
   type Demographics,
@@ -55,6 +62,9 @@ import {
   type WillingnessAnswer,
   type RelationshipRating,
   type WorkStatus,
+  type OtherParentKind,
+  type ParentType,
+  type PartnerType,
   type PartnershipRecord,
   type PartnershipStatus,
   type PreviousJob,
@@ -341,14 +351,6 @@ export function markUnansweredMedicationAndStressors(
   let changed = false
   const nextMedication = { ...medication }
   const nextStressors = { ...stressors }
-  if (nextMedication.currentlyTaking == null) {
-    nextMedication.currentlyTaking = "not_asked"
-    changed = true
-  }
-  if (nextMedication.previouslyTaken == null) {
-    nextMedication.previouslyTaken = "not_asked"
-    changed = true
-  }
   for (const item of STRESSOR_ITEMS) {
     if (nextStressors[item.key] == null) {
       nextStressors[item.key] = "not_asked"
@@ -397,6 +399,28 @@ export function sanitizeRisk(value: unknown): RiskRatings {
     }
   }
   return risk
+}
+
+/** Maps a stored caregiver relationship onto the dropdown. Unknown text becomes Other and is kept. */
+export function normalizeCaregiverRelationship(
+  kind: string,
+  detail: string
+): { kind: CaregiverRelationship | ""; detail: string } {
+  const trimmed = kind.trim()
+  if (!trimmed) return { kind: "", detail: "" }
+  if (isOneOf(trimmed, CAREGIVER_RELATIONSHIPS)) {
+    return { kind: trimmed, detail: trimmed === "other" ? detail.trim() : "" }
+  }
+  const value = trimmed.toLowerCase()
+  if (/grandparent|grandmother|grandfather|grandma|grandpa|nanna|\bnan\b|\bpop\b/.test(value)) {
+    return { kind: "grandparent", detail: "" }
+  }
+  if (value.includes("foster")) return { kind: "foster_carer", detail: "" }
+  if (value.includes("kinship")) return { kind: "kinship_carer", detail: "" }
+  if (/residential|out[- ]of[- ]home|\boohc\b/.test(value)) return { kind: "residential", detail: "" }
+  if (/family friend|\bfriend\b/.test(value)) return { kind: "family_friend", detail: "" }
+  if (/relative|aunt|uncle|cousin/.test(value)) return { kind: "other_relative", detail: "" }
+  return { kind: "other", detail: detail.trim() || trimmed }
 }
 
 export function sanitizeRelationship(value: unknown, fallbackId = ""): RelationshipRecord {
@@ -448,9 +472,21 @@ export function sanitizeRelationship(value: unknown, fallbackId = ""): Relations
     dependency,
     livingSituation: normalizeLivingSituation(raw.livingSituation),
     caregiverRelationship: str(raw.caregiverRelationship),
+    caregiverRelationshipDetail: str(raw.caregiverRelationshipDetail),
+    startedOn: canonicalPartialDate(str(raw.startedOn)),
+    endedOn: canonicalPartialDate(str(raw.endedOn)),
+    partnerType: oneOf<PartnerType>(raw.partnerType, PARTNER_TYPES),
+    parentType: oneOf<ParentType>(raw.parentType, PARENT_TYPES),
+    adoptedOn: canonicalPartialDate(str(raw.adoptedOn)),
+    notKnown: bool(raw.notKnown),
+    otherParentKind: oneOf<OtherParentKind>(raw.otherParentKind, OTHER_PARENT_KINDS),
+    otherParentDetail: str(raw.otherParentDetail),
     linkedPartnerRecordId: str(raw.linkedPartnerRecordId) || null,
     partnershipRecordId: str(raw.partnershipRecordId) || null,
   }
+  const caregiver = normalizeCaregiverRelationship(record.caregiverRelationship, record.caregiverRelationshipDetail)
+  record.caregiverRelationship = caregiver.kind
+  record.caregiverRelationshipDetail = caregiver.detail
   if (!record.deceased) {
     record.ageAtDeath = null
     record.dateOfDeath = ""
@@ -527,7 +563,28 @@ export function sanitizeEvent(value: unknown, fallbackId = ""): EventRecord {
     familySide: attribution === "family" ? oneOf<FamilySide>(raw.familySide, FAMILY_SIDES) : "",
     relationshipRecordId:
       attribution === "self_linked" ? str(raw.relationshipRecordId) || null : null,
+    conditionEventId: str(raw.conditionEventId) || null,
+    admissionType: oneOf<AdmissionType>(raw.admissionType, ADMISSION_TYPES),
+    facility: str(raw.facility),
+    admissionLength: str(raw.admissionLength),
+    prescriberProfessionalId: professionalId(raw.prescriberProfessionalId),
+    prescriberName: str(raw.prescriberName),
     displayOrder: intOrNull(raw.displayOrder) ?? 0,
+  }
+
+  const treatment =
+    eventType === "psychiatric_admission" || eventType === "previous_therapy" || eventType === "medication"
+  if (!treatment) event.conditionEventId = null
+  if (eventType !== "psychiatric_admission") {
+    event.admissionType = ""
+    event.facility = ""
+    event.admissionLength = ""
+  }
+  if (eventType !== "medication") {
+    event.prescriberProfessionalId = null
+    event.prescriberName = ""
+  } else if (event.prescriberProfessionalId) {
+    event.prescriberName = ""
   }
 
   if (eventType === "self_harm") {

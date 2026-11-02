@@ -1,12 +1,10 @@
 import { and, eq } from "drizzle-orm"
 
-import { auditEvents, clientBackgrounds, treatmentPlans } from "@/db/schema"
-import { medicationAfterPlanSave } from "@/lib/client-background/medication"
-import { sanitizeMedication } from "@/lib/client-background/sanitize"
+import { auditEvents, clientEventRecords, treatmentPlans } from "@/db/schema"
 import { db } from "@/lib/db"
 import { formValuesToDbColumns } from "@/lib/treatment-plans/parse-form"
 import { loadTreatmentPlanForPractice } from "@/lib/treatment-plans/load"
-import type { MedicationSupervisionJson, TreatmentPlanFormValues } from "@/lib/treatment-plans/types"
+import type { MedicationSupervisorAssignment, TreatmentPlanFormValues } from "@/lib/treatment-plans/types"
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0]
 
@@ -16,58 +14,46 @@ async function syncMedicationSupervision(
     clientId: string
     practiceId: string
     userId: string
-    supervision: MedicationSupervisionJson
+    supervisors: MedicationSupervisorAssignment[]
     now: Date
   }
 ) {
-  const [existing] = await tx
-    .select({
-      clientBackgroundId: clientBackgrounds.clientBackgroundId,
-      practiceId: clientBackgrounds.practiceId,
-      medicationJson: clientBackgrounds.medicationJson,
-    })
-    .from(clientBackgrounds)
-    .where(eq(clientBackgrounds.clientId, input.clientId))
-    .limit(1)
-
-  if (existing && existing.practiceId !== input.practiceId) {
-    throw new Error("Client background belongs to another practice.")
-  }
-
-  const medication = medicationAfterPlanSave(sanitizeMedication(existing?.medicationJson), input.supervision)
-  let entityId = ""
-  if (!existing) {
-    const [created] = await tx
-      .insert(clientBackgrounds)
-      .values({
-        clientId: input.clientId,
-        practiceId: input.practiceId,
-        medicationJson: medication,
-        updatedAt: input.now,
-      })
-      .returning({ clientBackgroundId: clientBackgrounds.clientBackgroundId })
-    entityId = created.clientBackgroundId
-  } else {
-    entityId = existing.clientBackgroundId
-    await tx
-      .update(clientBackgrounds)
-      .set({ medicationJson: medication, updatedAt: input.now })
+  for (const assignment of input.supervisors) {
+    const [existing] = await tx
+      .select({ eventRecordId: clientEventRecords.eventRecordId })
+      .from(clientEventRecords)
       .where(
         and(
-          eq(clientBackgrounds.clientBackgroundId, existing.clientBackgroundId),
-          eq(clientBackgrounds.practiceId, input.practiceId)
+          eq(clientEventRecords.eventRecordId, assignment.eventId),
+          eq(clientEventRecords.clientId, input.clientId),
+          eq(clientEventRecords.practiceId, input.practiceId),
+          eq(clientEventRecords.eventType, "medication")
         )
       )
+      .limit(1)
+    if (!existing) continue
+    await tx
+      .update(clientEventRecords)
+      .set({
+        prescriberProfessionalId: assignment.professionalId,
+        ...(assignment.professionalId ? { prescriberName: "" } : {}),
+        updatedAt: input.now,
+      })
+      .where(
+        and(
+          eq(clientEventRecords.eventRecordId, existing.eventRecordId),
+          eq(clientEventRecords.practiceId, input.practiceId)
+        )
+      )
+    await tx.insert(auditEvents).values({
+      practiceId: input.practiceId,
+      userId: input.userId,
+      clientId: input.clientId,
+      eventType: "client_background.updated",
+      entityType: "client_event_record",
+      entityId: existing.eventRecordId,
+    })
   }
-
-  await tx.insert(auditEvents).values({
-    practiceId: input.practiceId,
-    userId: input.userId,
-    clientId: input.clientId,
-    eventType: "client_background.updated",
-    entityType: "client_background",
-    entityId,
-  })
 }
 
 function dayBeforeDateString(dateString: string): string {
@@ -126,7 +112,7 @@ export async function commitTreatmentPlan({
         clientId,
         practiceId,
         userId,
-        supervision: values.medicationSupervision,
+        supervisors: values.medicationSupervisors ?? [],
         now,
       })
     })
@@ -195,7 +181,7 @@ export async function commitTreatmentPlan({
       clientId,
       practiceId,
       userId,
-      supervision: values.medicationSupervision,
+      supervisors: values.medicationSupervisors ?? [],
       now,
     })
   })

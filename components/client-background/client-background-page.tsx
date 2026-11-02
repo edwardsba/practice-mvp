@@ -110,7 +110,6 @@ export function ClientBackgroundPage({
               clientId={clientId}
               demographics={data.demographics}
               relationships={data.relationships}
-              medication={data.medication}
             />
           ) : null}
           {item.id === "relationships" ? (
@@ -128,7 +127,7 @@ export function ClientBackgroundPage({
               events={data.events}
               relationships={data.relationships}
               interviewSource={interview.latest}
-              previouslyTaken={data.medication.previouslyTaken}
+              professionals={reasonSupport.professionals}
             />
           ) : null}
           {item.id === "stressors" ? (

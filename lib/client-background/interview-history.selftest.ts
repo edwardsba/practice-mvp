@@ -109,15 +109,14 @@ assert.deepEqual(
 )
 
 const gaps = unansweredInterviewLabels({}, [], null, emptyMedication(), emptyStressors(), emptyReasonForAttending())
-assert.deepEqual(gaps.slice(0, 5), [
+assert.deepEqual(gaps.slice(0, 4), [
   "Referred by a medical professional",
   "Family involved in them attending",
   "Came on their own initiative",
-  "Attended willingly",
   "Currently taking medication",
 ])
-assert.equal(gaps[5], "Illness / injury")
-assert.equal(gaps[6], "Traumatic events")
+assert.equal(gaps[4], "Illness / injury")
+assert.equal(gaps[5], "Traumatic events")
 assert.ok(gaps.includes("Medication history"))
 assert.ok(gaps.indexOf("Medication history") > gaps.indexOf("Previous therapy"))
 assert.ok(gaps.indexOf("Medication history") < gaps.indexOf("Other significant events"))
@@ -129,7 +128,7 @@ assert.ok(gaps.indexOf("Family") > gaps.indexOf("Emotional problems"))
 assert.equal(gaps.at(-1), "Legal matters, police or accidents")
 assert.ok(gaps.includes("Currently taking medication"))
 assert.equal(gaps.filter((label) => label === "Family").length, 1)
-assert.equal(gaps.length, HISTORY_QUESTION_KEYS.length + 4 + 1 + 9)
+assert.equal(gaps.length, HISTORY_QUESTION_KEYS.length + 3 + 1 + 9)
 
 const answeredMedication: MedicationRecord = { ...emptyMedication(), currentlyTaking: "not_asked" }
 const answeredStressors: StressorsRecord = { ...emptyStressors(), family: "yes", financial: "no" }
@@ -151,7 +150,7 @@ assert.equal(remaining.includes("Family"), false)
 assert.equal(remaining.includes("Financial"), false)
 assert.ok(remaining.includes("Social life"))
 assert.equal(remaining.length, HISTORY_QUESTION_KEYS.length + 7)
-assert.equal(INTERVIEW_ANSWER_TOTAL, 29)
+assert.equal(INTERVIEW_ANSWER_TOTAL, 28)
 assert.equal(gaps.length, INTERVIEW_ANSWER_TOTAL)
 assert.equal(
   answeredInterviewCount({}, [], null, emptyMedication(), emptyStressors(), emptyReasonForAttending()),
@@ -163,7 +162,7 @@ assert.equal(
     attendedWillingly: "somewhat",
     clientMotivation: "Still not counted",
   }),
-  1
+  0
 )
 assert.equal(
   answeredInterviewCount(

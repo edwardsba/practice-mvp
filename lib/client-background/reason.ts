@@ -1,10 +1,6 @@
 import { formatPartialDateLabel } from "@/lib/client-background/age"
 import { professionalSummary, type ProfessionalOption } from "@/lib/client-background/professionals"
-import {
-  triStateLabel,
-  willingnessLabel,
-  type ReasonForAttending,
-} from "@/lib/client-background/types"
+import { triStateLabel, type ReasonForAttending } from "@/lib/client-background/types"
 
 export function applyKeptSuggestion(
   reason: ReasonForAttending,
@@ -29,9 +25,6 @@ export function reasonReadOnlyLines(
   if (family) lines.push({ label: "Family involved in them attending", value: family })
   if (reason.ownInitiative) {
     lines.push({ label: "Came on their own initiative", value: triStateLabel(reason.ownInitiative) })
-  }
-  if (reason.attendedWillingly) {
-    lines.push({ label: "Attended willingly", value: willingnessLabel(reason.attendedWillingly) })
   }
   if (reason.clientMotivation.trim()) {
     lines.push({ label: "Client's motivation", value: reason.clientMotivation.trim() })

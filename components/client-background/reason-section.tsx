@@ -19,7 +19,6 @@ import { applyKeptSuggestion, reasonReadOnlyLines } from "@/lib/client-backgroun
 import {
   type ReasonForAttending,
   type TriStateAnswer,
-  type WillingnessAnswer,
 } from "@/lib/client-background/types"
 
 export function ReasonReadOnly({
@@ -182,11 +181,6 @@ export function ReasonFields({
         value={value.ownInitiative}
         onChange={(ownInitiative) => emit({ ...value, ownInitiative })}
       />
-      <WillingnessField
-        id={`${idPrefix}_willingly`}
-        value={value.attendedWillingly}
-        onChange={(attendedWillingly) => emit({ ...value, attendedWillingly })}
-      />
       <TextAreaField
         id={`${idPrefix}_motivation`}
         label="Client's motivation (optional)"
@@ -260,32 +254,5 @@ export function ReasonSection({
         />
       )}
     />
-  )
-}
-
-function WillingnessField({
-  id,
-  value,
-  onChange,
-}: {
-  id: string
-  value: WillingnessAnswer | null
-  onChange: (value: WillingnessAnswer | null) => void
-}) {
-  return (
-    <SelectField
-      id={id}
-      label="Attended willingly"
-      value={value ?? ""}
-      onChange={(next) =>
-        onChange(next === "yes" || next === "somewhat" || next === "no" || next === "not_asked" ? next : null)
-      }
-    >
-      <option value="">Select…</option>
-      <option value="yes">Yes</option>
-      <option value="somewhat">Somewhat</option>
-      <option value="no">No</option>
-      <option value="not_asked">Not asked</option>
-    </SelectField>
   )
 }

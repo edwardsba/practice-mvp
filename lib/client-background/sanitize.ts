@@ -331,10 +331,6 @@ export function markUnansweredReason(reason: ReasonForAttending): { reason: Reas
     next.ownInitiative = "not_asked"
     changed = true
   }
-  if (next.attendedWillingly == null) {
-    next.attendedWillingly = "not_asked"
-    changed = true
-  }
   return { reason: next, changed }
 }
 

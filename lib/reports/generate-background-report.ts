@@ -214,12 +214,23 @@ function sentence(text: string): string {
   return /[.!?]"?$/.test(trimmed) ? trimmed : `${trimmed}.`
 }
 
+/**
+ * Lower-cases prose one letter-run at a time.
+ * A run of two or more letters that is entirely capitals stays as typed
+ * (digits and punctuation such as / - . are left in place and ignored).
+ * A mixed-case run with a capital after its first letter stays as typed.
+ * Every other run is lower-cased.
+ */
+export function lowerKeepingTypedCase(value: string): string {
+  return value.replace(/[A-Za-z]+/g, (word) => {
+    if (word.length >= 2 && word === word.toUpperCase()) return word
+    if (/[A-Z]/.test(word.slice(1))) return word
+    return word.toLowerCase()
+  })
+}
+
 function lowerFirst(value: string): string {
-  const trimmed = value.trim()
-  if (!trimmed) return ""
-  const firstWord = trimmed.split(/\s+/)[0] ?? ""
-  if (firstWord.length > 1 && firstWord === firstWord.toUpperCase() && /[A-Za-z]/.test(firstWord)) return trimmed
-  return trimmed.charAt(0).toLowerCase() + trimmed.slice(1)
+  return lowerKeepingTypedCase(value.trim())
 }
 
 function withArticle(value: string): string {
@@ -372,9 +383,9 @@ function familyRoles(events: EventRecord[], relationships: RelationshipRecord[],
     let role = ""
     if (event.relationshipRecordId) {
       const person = relationships.find((row) => row.relationshipRecordId === event.relationshipRecordId)
-      if (person) role = personRoleLabel(person).toLowerCase()
+      if (person) role = lowerKeepingTypedCase(personRoleLabel(person))
     }
-    if (!role) role = event.familyRelation.trim().toLowerCase()
+    if (!role) role = lowerKeepingTypedCase(event.familyRelation.trim())
     if (!role) role = "family member"
     if (!roles.includes(role)) roles.push(role)
   }
@@ -411,7 +422,7 @@ function historySentence(
   family: boolean
 ): string {
   if (family) {
-    const topic = HISTORY_QUESTIONS[key].label.replace(/^family\s+/i, "").toLowerCase()
+    const topic = lowerKeepingTypedCase(HISTORY_QUESTIONS[key].label.replace(/^family\s+/i, ""))
     return `${who.text} reported a family history of ${topic} (${familyRoles(events, relationships, voice)}).`
   }
   if (key === "medication_history") {
@@ -429,7 +440,7 @@ function historySentence(
     const whens = describeWhens(events, dateOfBirth)
     return `${who.text} reported a history of self-harm${whens ? `, ${whens}` : ""}.`
   }
-  const noun = HISTORY_NOUN[key] ?? `a history of ${HISTORY_QUESTIONS[key].label.toLowerCase()}`
+  const noun = HISTORY_NOUN[key] ?? `a history of ${lowerKeepingTypedCase(HISTORY_QUESTIONS[key].label)}`
   const phrase = historyEntryPhrase(events, dateOfBirth, noun, key === "substance_use")
   return `${who.text} reported ${phrase}.`
 }
@@ -511,7 +522,7 @@ function sourceLines(source: BackgroundReportSource): string[] {
   if (referral && source.data.reason.referredByMedicalProfessional === "yes") {
     const name = referralName(referral)
     if (name) {
-      const profession = referral.profession?.trim().toLowerCase() ?? ""
+      const profession = lowerKeepingTypedCase(referral.profession?.trim() ?? "")
       const date = referral.date?.trim() ?? ""
       const parts = [name, profession, date ? displayDate(date) : ""].filter(Boolean)
       rows.push({ sort: date || "9999-99-99", text: `Referral from ${parts.join(", ")}.` })
@@ -531,7 +542,7 @@ function presentingItems(
   const items: string[] = []
   const referred = reason.referredByMedicalProfessional
   if (referred === "yes" && source.referral && referralName(source.referral)) {
-    const profession = source.referral.profession?.trim().toLowerCase()
+    const profession = lowerKeepingTypedCase(source.referral.profession?.trim() ?? "")
     const name = referralName(source.referral)
     const by = profession ? `${voice.possessive} ${profession}, ${name}` : name
     let line = `${first} was referred by ${by}`
@@ -564,7 +575,7 @@ function presentingItems(
   for (const item of STRESSOR_ITEMS) {
     const answer = source.data.stressors[item.key]
     if (answer === "yes" || answer === "no") stressorAnswered = true
-    if (answer === "yes") yesStressors.push(item.label.toLowerCase())
+    if (answer === "yes") yesStressors.push(lowerKeepingTypedCase(item.label))
   }
   if (!stressorAnswered) {
     omitted.push({ id: "stressors", message: "Current stressors not assessed", target: "stressors" })
@@ -598,15 +609,8 @@ function presentingItems(
     omitted.push({ id: "own-initiative", message: "Own initiative not asked", target: "reason" })
   } else omitted.push({ id: "own-initiative", message: "Own initiative not recorded", target: "reason" })
 
-  if (reason.attendedWillingly === "yes") attended.push("willingly")
-  else if (reason.attendedWillingly === "somewhat") attended.push("somewhat willingly")
-  else if (reason.attendedWillingly === "no") attended.push("reluctantly")
-  else if (reason.attendedWillingly === "not_asked") {
-    omitted.push({ id: "willingness", message: "Willingness to attend not asked", target: "reason" })
-  } else omitted.push({ id: "willingness", message: "Willingness to attend not recorded", target: "reason" })
-
   if (attended.length > 0) {
-    items.push(`${voice.Subject} attended ${joinList(attended, "and")}.`)
+    items.push(`${voice.Subject} attended ${attended[0]}.`)
   }
   if (reason.clientMotivation.trim()) items.push(sentence(reason.clientMotivation))
   else omitted.push({ id: "motivation", message: "Client's motivation not recorded", target: "reason" })
@@ -660,7 +664,7 @@ function relationshipItem(source: BackgroundReportSource, voice: Voice, who: Spe
   const is = verb(who.plural, "is", "are")
   let line = ""
   if (status === "single" || status === "separated" || status === "divorced" || status === "widowed") {
-    line = `${who.text} ${is} ${CLIENT_RELATIONSHIP_STATUS_LABELS[status].toLowerCase()}`
+    line = `${who.text} ${is} ${lowerKeepingTypedCase(CLIENT_RELATIONSHIP_STATUS_LABELS[status])}`
   } else if (status === "married") {
     line = partner
       ? length
@@ -710,7 +714,7 @@ function parentsItem(
   }
   for (const parent of people(source.data.relationships, PARENT_ROLES)) {
     if (parent.healthStatus !== "deceased" && !parent.deceased) continue
-    const role = personRoleLabel(parent).toLowerCase()
+    const role = lowerKeepingTypedCase(personRoleLabel(parent))
     const age = parent.dateOfDeath ? clientAgeOn(source.dateOfBirth, parent.dateOfDeath) : null
     if (parent.dateOfDeath && age != null) {
       bits.push(`${voice.Possessive} ${role} died when ${first} was ${age}.`)
@@ -921,7 +925,7 @@ function necessitiesKnown(source: BackgroundReportSource): boolean {
 function necessitiesItem(source: BackgroundReportSource, who: Speaker): string | null {
   if (!necessitiesKnown(source)) return null
   const ticked = NECESSITY_KEYS.filter((key) => source.data.demographics.occupation.necessities[key]).map((key) =>
-    NECESSITY_LABELS[key].toLowerCase()
+    lowerKeepingTypedCase(NECESSITY_LABELS[key])
   )
   if (ticked.length === 0) {
     return `${who.text} reported no difficulty affording basic necessities.`

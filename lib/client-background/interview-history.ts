@@ -220,16 +220,15 @@ export function sanitizeScreening(value: unknown): ScreeningAnswers {
   return screening
 }
 
-/** The four counted Reason for attending questions. Client's motivation is optional and is not one of them. */
+/** The three counted Reason for attending questions. Client's motivation is optional and is not one of them. */
 const REASON_ANSWER_FIELDS = [
   ["referredByMedicalProfessional", "Referred by a medical professional"],
   ["familyInvolved", "Family involved in them attending"],
   ["ownInitiative", "Came on their own initiative"],
-  ["attendedWillingly", "Attended willingly"],
 ] as const satisfies readonly (readonly [keyof ReasonForAttending, string])[]
 
 /**
- * Reason for attending (4), currently taking medication (1), client and family history
+ * Reason for attending (3), currently taking medication (1), client and family history
  * (15, including medication history), and the nine stressors.
  */
 export const INTERVIEW_ANSWER_TOTAL =

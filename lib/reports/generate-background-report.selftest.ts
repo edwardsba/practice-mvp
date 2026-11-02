@@ -16,6 +16,7 @@ import {
 } from "@/lib/client-background/types"
 import {
   generateBackgroundReport,
+  lowerKeepingTypedCase,
   numberedLetterOutline,
   chooseReportInterviews,
   type BackgroundReportSource,
@@ -348,7 +349,13 @@ assert.match(presenting, /His partner came to the first appointment\./)
 assert.match(presenting, /Ben01 reported current difficulties with family and financial\./)
 assert.doesNotMatch(presenting, /social life|work or study|denied/i)
 assert.match(presenting, /He described the main problem as "I can't switch off"\./)
-assert.match(presenting, /He attended on his own initiative and willingly\./)
+assert.match(presenting, /He attended on his own initiative\./)
+assert.equal(presenting.includes("willingly"), false)
+assert.equal(lowerKeepingTypedCase("GP"), "GP")
+assert.equal(lowerKeepingTypedCase("TAFE"), "TAFE")
+assert.equal(lowerKeepingTypedCase("Social Worker"), "social worker")
+assert.equal(lowerKeepingTypedCase("GP/Psychiatrist"), "GP/psychiatrist")
+assert.equal(lowerKeepingTypedCase("McKenzie"), "McKenzie")
 assert.match(presenting, /He wants to feel more like himself\./)
 
 const demographics = outline.filter((line) => line.startsWith("4.")).join("\n")

@@ -27,6 +27,10 @@ function person(partial: Partial<RelationshipRecord> & Pick<RelationshipRecord, 
     healthOrCauseOfDeath: "",
     lengthOfRelationship: "",
     relationshipStatus: "",
+    howEnded: "",
+    laterRelationships: "",
+    childType: "",
+    childTypeDetail: "",
     timeSinceEnded: "",
     qualityOfRelationship: "",
     dependency: "",
@@ -256,7 +260,7 @@ const priorPartnerVisibility = relationshipFieldVisibility(
   }),
   asOf
 )
-assert.equal(priorPartnerVisibility.dateOfBirth, false)
+assert.equal(priorPartnerVisibility.dateOfBirth, true)
 assert.equal(priorPartnerVisibility.health, false)
 assert.equal(priorPartnerVisibility.lengthOfRelationship, false)
 assert.equal(priorPartnerVisibility.spanDates, true)

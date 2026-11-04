@@ -23,7 +23,7 @@ export const HISTORY_QUESTION_GROUPS = [
     ],
   },
   {
-    title: "Family history",
+    title: "Significant others",
     keys: [
       "family_illness",
       "family_emotional_problems",
@@ -53,6 +53,7 @@ type QuestionDefinition = {
   label: string
   eventType: EventType | null
   attribution: "self" | "family" | null
+  about: "self" | "significant_other"
 }
 
 const SCREENING_QUESTION_KEYS = HISTORY_QUESTION_KEYS
@@ -63,90 +64,105 @@ export const HISTORY_QUESTIONS: Record<HistoryQuestionKey, QuestionDefinition> =
     label: "Emotional problems",
     eventType: "emotional_problems",
     attribution: "self",
+    about: "self",
   },
   self_harm: {
     key: "self_harm",
     label: "Self-harm",
     eventType: "self_harm",
     attribution: "self",
+    about: "self",
   },
   substance_use: {
     key: "substance_use",
     label: "Substance use",
     eventType: "substance_use",
     attribution: "self",
+    about: "self",
   },
   psychiatric_admission: {
     key: "psychiatric_admission",
-    label: "Admission",
+    label: "Hospital admission",
     eventType: "psychiatric_admission",
     attribution: "self",
+    about: "self",
   },
   previous_therapy: {
     key: "previous_therapy",
     label: "Previous therapy",
     eventType: "previous_therapy",
     attribution: "self",
+    about: "self",
   },
   illness_injury: {
     key: "illness_injury",
     label: "Illness / injury",
     eventType: "illness_injury",
     attribution: "self",
+    about: "self",
   },
   traumatic_events: {
     key: "traumatic_events",
     label: "Traumatic events",
     eventType: "traumatic_event",
     attribution: "self",
+    about: "self",
   },
   medication_history: {
     key: "medication_history",
     label: "Medication",
     eventType: "medication",
     attribution: "self",
+    about: "self",
   },
   other_significant_events: {
     key: "other_significant_events",
     label: "Other significant events",
     eventType: "significant_history",
     attribution: "self",
+    about: "self",
   },
   family_emotional_problems: {
     key: "family_emotional_problems",
-    label: "Family emotional problems",
+    label: "Emotional problems",
     eventType: "emotional_problems",
     attribution: "family",
+    about: "significant_other",
   },
   family_self_harm: {
     key: "family_self_harm",
-    label: "Family self-harm",
+    label: "Self-harm",
     eventType: "self_harm",
     attribution: "family",
+    about: "significant_other",
   },
   family_substance_use: {
     key: "family_substance_use",
-    label: "Family substance use",
+    label: "Substance use",
     eventType: "substance_use",
     attribution: "family",
+    about: "significant_other",
   },
   family_psychiatric_admission: {
     key: "family_psychiatric_admission",
-    label: "Family psych hospital / rehab",
+    label: "Hospital admission",
     eventType: "psychiatric_admission",
     attribution: "family",
+    about: "significant_other",
   },
   family_illness: {
     key: "family_illness",
-    label: "Family illness",
+    label: "Illness / injury",
     eventType: "illness_injury",
     attribution: "family",
+    about: "significant_other",
   },
   family_significant_events: {
     key: "family_significant_events",
-    label: "Family significant events",
+    label: "Significant events",
     eventType: "significant_history",
     attribution: "family",
+    about: "significant_other",
   },
 }
 
@@ -170,30 +186,37 @@ const FAMILY_QUESTION: Partial<Record<EventType, HistoryQuestionKey>> = {
 }
 
 /**
+ * Legacy rows stored a family member on attribution. An explicit significant-other
+ * About wins when attribution is still self.
+ */
+export function resolvedAbout(event: { attribution?: string; about?: string }): "self" | "significant_other" {
+  if (event.attribution && event.attribution !== "self") return "significant_other"
+  if (event.about === "significant_other") return "significant_other"
+  return "self"
+}
+
+/** Worth-checking text. Significant others keeps its group name so the two Hospital admission rows stay distinct. */
+export function historyQuestionCheckLabel(key: HistoryQuestionKey): string {
+  const label = HISTORY_QUESTIONS[key].label
+  return key.startsWith("family_") ? `Significant others: ${label}` : label
+}
+
+/**
  * Every history entry belongs to exactly one screening question.
- * Self significant history, including childhood, school and work, is Other significant events.
- * A family-attributed entry that no specific family row claims lands on family significant events.
- * Medication entries belong to the Medication heading.
+ * About = Self uses the client headings. About = Significant other uses the
+ * significant-others headings. The old family_events rows are emotional problems.
+ * A significant-other type with no heading of its own lands on Significant events.
  */
 export function historyQuestionKeyForEvent(
-  event: Pick<EventRecord, "eventType" | "attribution" | "startPrecision" | "startValue">,
+  event: Pick<EventRecord, "eventType" | "attribution" | "startPrecision" | "startValue"> & {
+    about?: string
+  },
   _dateOfBirth: string | null
 ): HistoryQuestionKey {
-  if (event.attribution === "self") {
-    const key = SELF_QUESTION[event.eventType]
-    if (key) return key
-  }
-  if (event.attribution === "family") {
-    const key = FAMILY_QUESTION[event.eventType]
-    if (key) return key
-  }
-  if (
-    event.eventType === "family_events" ||
-    (event.eventType === "significant_history" && event.attribution === "self")
-  ) {
-    return "other_significant_events"
-  }
-  return "family_significant_events"
+  const about = resolvedAbout(event)
+  const type = event.eventType === "family_events" ? "emotional_problems" : event.eventType
+  const table = about === "self" ? SELF_QUESTION : FAMILY_QUESTION
+  return table[type] ?? (about === "self" ? "other_significant_events" : "family_significant_events")
 }
 
 export function historyQuestionAcceptsEntries(key: HistoryQuestionKey): key is ScreeningQuestionKey {

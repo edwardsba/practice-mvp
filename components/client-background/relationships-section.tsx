@@ -33,6 +33,8 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { assessAge, displayedAge, formatPartialDateLabel } from "@/lib/client-background/age"
+import { HOW_ENDED, HOW_ENDED_LABELS } from "@/lib/client-background/how-ended"
+import { LATER_RELATIONSHIPS, LATER_RELATIONSHIP_LABELS } from "@/lib/client-background/later-relationships"
 import { parsePartialDate } from "@/lib/client-background/partial-date"
 import {
   RELATIONSHIP_ADD_LABELS,
@@ -48,6 +50,8 @@ import {
 import {
   ADDABLE_RELATIONSHIP_GROUPS,
   ADDABLE_RELATIONSHIP_ROLES,
+  CHILD_TYPE_LABELS,
+  CHILD_TYPES,
   CAREGIVER_RELATIONSHIP_LABELS,
   CAREGIVER_RELATIONSHIPS,
   CLIENT_RELATIONSHIP_STATUS_LABELS,
@@ -392,7 +396,14 @@ export function RelationshipsSection({
       return
     }
     const removedId = draft.relationshipRecordId
-    setPeople((current) => current.filter((person) => person.relationshipRecordId !== removedId))
+    setPeople((current) => {
+      const next = new Map(current.map((person) => [person.relationshipRecordId, person]))
+      for (const person of ("affectedRelationships" in result ? result.affectedRelationships : [])) {
+        next.set(person.relationshipRecordId, person)
+      }
+      next.delete(removedId)
+      return [...next.values()]
+    })
     setPairs((current) => current.filter((pair) => pair.partnerAId !== removedId && pair.partnerBId !== removedId))
     setSelection(null)
     setDraft(null)
@@ -710,6 +721,10 @@ export function blankRelationship(role: RelationshipToClient): RelationshipRecor
     healthOrCauseOfDeath: "",
     lengthOfRelationship: "",
     relationshipStatus: "",
+    howEnded: "",
+    laterRelationships: "",
+    childType: "",
+    childTypeDetail: "",
     timeSinceEnded: "",
     supportive: "",
     conflict: "",
@@ -1100,6 +1115,51 @@ export function PersonDetail({
       {editing ? (
         <>
           <RoleSelect record={draft} onChange={onRole} />
+          {visibility.childType ? (
+            <SelectField
+              id="rel_child_type"
+              label="Child type"
+              value={draft.childType}
+              onChange={(childType) =>
+                onPatch({
+                  childType: childType as RelationshipRecord["childType"],
+                  childTypeDetail: childType === "other" ? draft.childTypeDetail : "",
+                })
+              }
+            >
+              <option value="">Not recorded</option>
+              {CHILD_TYPES.map((option) => (
+                <option key={option} value={option}>
+                  {CHILD_TYPE_LABELS[option]}
+                </option>
+              ))}
+            </SelectField>
+          ) : null}
+          {visibility.childType && draft.childType === "other" ? (
+            <TextField
+              id="rel_child_type_detail"
+              label="Describe"
+              value={draft.childTypeDetail}
+              onChange={(childTypeDetail) => onPatch({ childTypeDetail })}
+            />
+          ) : null}
+          {visibility.laterRelationships ? (
+            <SelectField
+              id="rel_later_relationships"
+              label="Later relationships"
+              value={draft.laterRelationships}
+              onChange={(laterRelationships) =>
+                onPatch({ laterRelationships: laterRelationships as RelationshipRecord["laterRelationships"] })
+              }
+            >
+              <option value="">Not recorded</option>
+              {LATER_RELATIONSHIPS.map((option) => (
+                <option key={option} value={option}>
+                  {LATER_RELATIONSHIP_LABELS[option]}
+                </option>
+              ))}
+            </SelectField>
+          ) : null}
           {visibility.parentType ? (
             <SelectField
               id="rel_parent_type"
@@ -1588,6 +1648,24 @@ function PersonReadOnly({
   return (
     <div className="space-y-4">
       <ReadOnlyField label="Relationship to client" value={personRoleLabel(record)} />
+      {visibility.childType ? (
+        <ReadOnlyField
+          label="Child type"
+          value={
+            record.childType === "other"
+              ? record.childTypeDetail || CHILD_TYPE_LABELS.other
+              : record.childType
+                ? CHILD_TYPE_LABELS[record.childType]
+                : ""
+          }
+        />
+      ) : null}
+      {visibility.laterRelationships ? (
+        <ReadOnlyField
+          label="Later relationships"
+          value={record.laterRelationships ? LATER_RELATIONSHIP_LABELS[record.laterRelationships] : ""}
+        />
+      ) : null}
       {visibility.parentType ? (
         <ReadOnlyField
           label="Parent type"
@@ -1651,7 +1729,18 @@ function PersonReadOnly({
       {visibility.adoptedOn && record.parentType === "adoptive" ? (
         <ReadOnlyField label="Adopted" value={formatPartialDateLabel(record.adoptedOn)} />
       ) : null}
-      {visibility.howItEnded ? <ReadOnlyField label="How it ended" value={record.relationshipStatus} /> : null}
+      {visibility.howItEnded ? (
+        <ReadOnlyField
+          label="How it ended"
+          value={
+            record.howEnded === "other"
+              ? record.relationshipStatus
+              : record.howEnded
+                ? HOW_ENDED_LABELS[record.howEnded]
+                : ""
+          }
+        />
+      ) : null}
       {visibility.timeSinceEnded ? <ReadOnlyField label="Time since ended" value={record.timeSinceEnded} /> : null}
       <ReadOnlyField label="Supportive" value={ratingText(record.supportive)} />
       <ReadOnlyField label="Conflict or strain" value={ratingText(record.conflict)} />
@@ -1796,12 +1885,34 @@ function RelationshipExtras({
         </SelectField>
       ) : null}
       {visibility.howItEnded ? (
-        <TextField
-          id="rel_status"
-          label="How it ended"
-          value={record.relationshipStatus}
-          onChange={(relationshipStatus) => onChange({ relationshipStatus })}
-        />
+        <>
+          <SelectField
+            id="rel_status"
+            label="How it ended"
+            value={record.howEnded}
+            onChange={(howEnded) =>
+              onChange({
+                howEnded: howEnded as RelationshipRecord["howEnded"],
+                relationshipStatus: howEnded === "other" ? record.relationshipStatus : "",
+              })
+            }
+          >
+            <option value="">Not recorded</option>
+            {HOW_ENDED.map((option) => (
+              <option key={option} value={option}>
+                {HOW_ENDED_LABELS[option]}
+              </option>
+            ))}
+          </SelectField>
+          {record.howEnded === "other" ? (
+            <TextField
+              id="rel_status_detail"
+              label="Describe"
+              value={record.relationshipStatus}
+              onChange={(relationshipStatus) => onChange({ relationshipStatus })}
+            />
+          ) : null}
+        </>
       ) : null}
       {visibility.timeSinceEnded ? (
         <TextField

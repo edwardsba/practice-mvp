@@ -31,6 +31,10 @@ export function toRelationship(row: {
   healthOrCauseOfDeath: string | null
   lengthOfRelationship: string | null
   relationshipStatus: string | null
+  howEnded: string | null
+  laterRelationships: string | null
+  childType: string | null
+  childTypeDetail: string | null
   timeSinceEnded: string | null
   supportive: string | null
   conflict: string | null
@@ -65,6 +69,10 @@ export function toRelationship(row: {
     healthOrCauseOfDeath: row.healthOrCauseOfDeath ?? "",
     lengthOfRelationship: row.lengthOfRelationship ?? "",
     relationshipStatus: row.relationshipStatus ?? "",
+    howEnded: row.howEnded ?? "",
+    laterRelationships: row.laterRelationships ?? "",
+    childType: row.childType ?? "",
+    childTypeDetail: row.childTypeDetail ?? "",
     timeSinceEnded: row.timeSinceEnded ?? "",
     supportive: row.supportive ?? "",
     conflict: row.conflict ?? "",
@@ -130,6 +138,8 @@ export function toEvent(row: {
   treatmentDetail: string | null
   outcome: string | null
   attribution: string
+  about: string | null
+  aboutOther: string | null
   familyRelation: string | null
   familySide: string | null
   relationshipRecordId: string | null
@@ -158,6 +168,8 @@ export function toEvent(row: {
     treatmentType: row.treatmentType ?? "",
     treatmentDetail: row.treatmentDetail ?? "",
     outcome: row.outcome ?? "",
+    about: row.about ?? "",
+    aboutOther: row.aboutOther ?? "",
     familyRelation: row.familyRelation ?? "",
     familySide: row.familySide ?? "",
     conditionEventId: row.conditionEventId,

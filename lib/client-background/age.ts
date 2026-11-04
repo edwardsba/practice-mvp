@@ -58,15 +58,34 @@ function ambiguousOrBefore(low: number, high: number): AgeReading {
   return { kind: "ambiguous", low, high: Math.min(high, 130) }
 }
 
+function withYearOnlyAsJuly(parts: DateParts): { parts: DateParts; assumed: boolean } {
+  if (parts.year != null && parts.month == null) {
+    return { parts: { year: parts.year, month: 7, day: 1 }, assumed: true }
+  }
+  return { parts, assumed: false }
+}
+
 /**
  * Age from a partial date.
  * Person mode: `entered` is a date of birth and `reference` is today.
  * Client-at-event mode: `entered` is the event and `reference` is the client's date of birth.
- * A year-only date is the difference in calendar years. A known month or day
- * reduces that by 1 when it falls before the reference anniversary. Year plus
+ * A year-only date is 1 July of that year, and the age stays approximate.
+ * A full date on both sides is exact. A known month or day reduces the year
+ * difference by 1 when it falls before the reference anniversary. Year plus
  * month in the reference month is ambiguous, because the day is unknown.
  */
 export function assessAge(entered: DateParts, reference: DateParts, mode: "person" | "client-at-event"): AgeReading {
+  if (entered.year == null || reference.year == null) return { kind: "none" }
+  const enteredUse = withYearOnlyAsJuly(entered)
+  const referenceUse = withYearOnlyAsJuly(reference)
+  const reading = assessAgeFromParts(enteredUse.parts, referenceUse.parts, mode)
+  if ((enteredUse.assumed || referenceUse.assumed) && reading.kind === "exact") {
+    return { kind: "approximate", years: reading.years }
+  }
+  return reading
+}
+
+function assessAgeFromParts(entered: DateParts, reference: DateParts, mode: "person" | "client-at-event"): AgeReading {
   if (entered.year == null || reference.year == null) return { kind: "none" }
   const diff = mode === "person" ? reference.year - entered.year : entered.year - reference.year
   if (entered.month == null || reference.month == null) return bounded(diff, "approximate")

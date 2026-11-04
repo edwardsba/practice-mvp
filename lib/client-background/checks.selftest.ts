@@ -34,6 +34,20 @@ function person(
     healthOrCauseOfDeath: "",
     lengthOfRelationship: "",
     relationshipStatus: "",
+    howEnded: "",
+    laterRelationships:
+      partial.relationshipToClient === "mother" ||
+      partial.relationshipToClient === "father" ||
+      partial.relationshipToClient === "parent"
+        ? "none"
+        : "",
+    childType:
+      partial.relationshipToClient === "child_step"
+        ? "step_child"
+        : partial.relationshipToClient === "child_biological"
+          ? "biological"
+          : "",
+    childTypeDetail: "",
     timeSinceEnded: "",
     supportive: "",
     conflict: "",
@@ -424,5 +438,37 @@ assert.deepEqual(
     "Client reported 2 children; 1 recorded.",
   ]
 )
+
+const blankType = backgroundChecks(
+  input({
+    data: data({
+      relationships: [
+        person({
+          relationshipRecordId: "child-blank",
+          relationshipToClient: "child_biological",
+          givenName: "Ari",
+          childType: "",
+          otherParentKind: "donor_conception",
+        }),
+      ],
+    }),
+  })
+)
+assert.ok(blankType.some((check) => check.id === "child-type-child-blank" && check.message === "Child Ari: type not recorded"))
+
+const laterMissing = backgroundChecks(
+  input({
+    data: data({
+      relationships: [
+        person({
+          relationshipRecordId: "mum",
+          relationshipToClient: "mother",
+          laterRelationships: "",
+        }),
+      ],
+    }),
+  })
+)
+assert.ok(laterMissing.some((check) => check.message === "Mother: later relationships not recorded"))
 
 console.log("client background checks selftest passed")

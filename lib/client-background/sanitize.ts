@@ -1,5 +1,9 @@
+import { HOW_ENDED, mapHowEnded, type HowEnded } from "@/lib/client-background/how-ended"
+import { LATER_RELATIONSHIPS, type LaterRelationships } from "@/lib/client-background/later-relationships"
 import {
   ADMISSION_TYPES,
+  CHILD_TYPES,
+  HISTORY_ABOUT,
   ATTRIBUTIONS,
   CAREGIVER_RELATIONSHIPS,
   DEPENDENCY_VALUES,
@@ -63,6 +67,8 @@ import {
   type RelationshipRating,
   type WorkStatus,
   type OtherParentKind,
+  type ChildType,
+  type HistoryAbout,
   type ParentType,
   type PartnerType,
   type PartnershipRecord,
@@ -465,6 +471,10 @@ export function sanitizeRelationship(value: unknown, fallbackId = ""): Relations
     healthOrCauseOfDeath: deceased ? str(raw.healthOrCauseOfDeath) : "",
     lengthOfRelationship: str(raw.lengthOfRelationship),
     relationshipStatus: str(raw.relationshipStatus),
+    howEnded: oneOf<HowEnded>(raw.howEnded, HOW_ENDED),
+    laterRelationships: oneOf<LaterRelationships>(raw.laterRelationships, LATER_RELATIONSHIPS),
+    childType: oneOf<ChildType>(raw.childType, CHILD_TYPES),
+    childTypeDetail: str(raw.childTypeDetail),
     timeSinceEnded: str(raw.timeSinceEnded),
     supportive: oneOf<RelationshipRating>(raw.supportive, RELATIONSHIP_RATING_VALUES),
     conflict: oneOf<RelationshipRating>(raw.conflict, RELATIONSHIP_RATING_VALUES),
@@ -483,6 +493,10 @@ export function sanitizeRelationship(value: unknown, fallbackId = ""): Relations
     otherParentDetail: str(raw.otherParentDetail),
     linkedPartnerRecordId: str(raw.linkedPartnerRecordId) || null,
     partnershipRecordId: str(raw.partnershipRecordId) || null,
+  }
+  if (!record.howEnded && record.relationshipStatus) {
+    const mapped = mapHowEnded(record.relationshipStatus)
+    record.howEnded = mapped.howEnded
   }
   const caregiver = normalizeCaregiverRelationship(record.caregiverRelationship, record.caregiverRelationshipDetail)
   record.caregiverRelationship = caregiver.kind
@@ -536,12 +550,19 @@ export function sanitizeEvent(value: unknown, fallbackId = ""): EventRecord {
   let resolvedOrOngoing = oneOf<ResolvedOrOngoing>(raw.resolvedOrOngoing, RESOLVED_OR_ONGOING)
   if (!resolvedOrOngoing && bool(raw.endOngoing)) resolvedOrOngoing = "ongoing"
   const ongoing = resolvedOrOngoing === "ongoing"
+  const storedAttribution = oneOf<Attribution>(raw.attribution, ATTRIBUTIONS)
+  const legacyOther = storedAttribution === "family" || storedAttribution === "self_linked" || eventType === "family_events"
+  const about: HistoryAbout =
+    oneOf<HistoryAbout>(raw.about, HISTORY_ABOUT) === "significant_other" || legacyOther
+      ? "significant_other"
+      : "self"
+  const relationshipRecordId = about === "significant_other" ? str(raw.relationshipRecordId) || null : null
+  const aboutOther =
+    about === "significant_other" && !relationshipRecordId
+      ? str(raw.aboutOther) || str(raw.familyRelation)
+      : ""
   const attribution: Attribution =
-    eventType === "family_events"
-      ? "self_linked"
-      : oneOf<Attribution>(raw.attribution, ATTRIBUTIONS) === "family"
-        ? "family"
-        : "self"
+    about === "self" ? "self" : relationshipRecordId ? "self_linked" : "family"
 
   const event: EventRecord = {
     ...base,
@@ -559,10 +580,11 @@ export function sanitizeEvent(value: unknown, fallbackId = ""): EventRecord {
     treatmentDetail: treated === true ? str(raw.treatmentDetail) : "",
     outcome: treated === true ? str(raw.outcome) : "",
     attribution,
-    familyRelation: attribution === "family" ? str(raw.familyRelation) : "",
+    about,
+    aboutOther,
+    familyRelation: attribution === "family" ? str(raw.familyRelation) || aboutOther : "",
     familySide: attribution === "family" ? oneOf<FamilySide>(raw.familySide, FAMILY_SIDES) : "",
-    relationshipRecordId:
-      attribution === "self_linked" ? str(raw.relationshipRecordId) || null : null,
+    relationshipRecordId,
     conditionEventId: str(raw.conditionEventId) || null,
     admissionType: oneOf<AdmissionType>(raw.admissionType, ADMISSION_TYPES),
     facility: str(raw.facility),

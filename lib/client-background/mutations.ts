@@ -6,6 +6,7 @@ import { auditEvents, assessmentDefinitions, assessmentInstances, assessmentResu
 import { BACKGROUND_ASSESSMENT_CODE } from "@/lib/background-questionnaire/types"
 import { db } from "@/lib/db"
 import { settleEventDates } from "@/lib/client-background/age"
+import { laterRelationshipsAfterLinkChange } from "@/lib/client-background/later-relationships"
 import { toClientRelationshipStatus, toEvent, toPartnership, toRelationship } from "@/lib/client-background/map"
 import { CONDITION_EVENT_TYPES } from "@/lib/client-background/types"
 import {
@@ -157,6 +158,10 @@ function relationshipColumns(record: RelationshipRecord) {
     healthOrCauseOfDeath: record.healthOrCauseOfDeath || null,
     lengthOfRelationship: record.lengthOfRelationship || null,
     relationshipStatus: record.relationshipStatus || null,
+    howEnded: record.howEnded || null,
+    laterRelationships: record.laterRelationships || null,
+    childType: record.childType || null,
+    childTypeDetail: record.childTypeDetail || null,
     timeSinceEnded: record.timeSinceEnded || null,
     supportive: record.supportive || null,
     conflict: record.conflict || null,
@@ -951,6 +956,60 @@ async function retargetPartnershipParent(
   return toPartnership(saved)
 }
 
+async function syncParentLaterRelationships(
+  tx: Tx,
+  ctx: WriteContext,
+  parentIds: string[]
+): Promise<RelationshipRecord[]> {
+  const updated: RelationshipRecord[] = []
+  for (const parentId of [...new Set(parentIds.filter(Boolean))]) {
+    const [parent] = await tx
+      .select()
+      .from(clientRelationshipRecords)
+      .where(
+        and(
+          eq(clientRelationshipRecords.relationshipRecordId, parentId),
+          eq(clientRelationshipRecords.clientId, ctx.clientId),
+          eq(clientRelationshipRecords.practiceId, ctx.practiceId)
+        )
+      )
+      .limit(1)
+    if (!parent || !isOriginRole(parent.relationshipToClient)) continue
+    const partnerships = await tx
+      .select({
+        partnerAId: clientPartnershipRecords.partnerAId,
+        partnerBId: clientPartnershipRecords.partnerBId,
+      })
+      .from(clientPartnershipRecords)
+      .where(
+        and(
+          eq(clientPartnershipRecords.clientId, ctx.clientId),
+          eq(clientPartnershipRecords.practiceId, ctx.practiceId),
+          or(eq(clientPartnershipRecords.partnerAId, parentId), eq(clientPartnershipRecords.partnerBId, parentId))
+        )
+      )
+    let remaining = 0
+    for (const partnership of partnerships) {
+      const otherId = partnership.partnerAId === parentId ? partnership.partnerBId : partnership.partnerAId
+      const [other] = await tx
+        .select({ relationshipToClient: clientRelationshipRecords.relationshipToClient })
+        .from(clientRelationshipRecords)
+        .where(eq(clientRelationshipRecords.relationshipRecordId, otherId))
+        .limit(1)
+      if (other?.relationshipToClient === "step_parent") remaining += 1
+    }
+    const next = laterRelationshipsAfterLinkChange(remaining)
+    if ((parent.laterRelationships ?? "") === next) continue
+    const [saved] = await tx
+      .update(clientRelationshipRecords)
+      .set({ laterRelationships: next, updatedAt: new Date() })
+      .where(eq(clientRelationshipRecords.relationshipRecordId, parentId))
+      .returning()
+    updated.push(toRelationship(saved))
+  }
+  return updated
+}
+
 async function deletePartnership(tx: Tx, ctx: WriteContext, partnershipRecordId: string) {
   await writeAudit(tx, {
     practiceId: ctx.practiceId,
@@ -1097,10 +1156,12 @@ export async function createRelationship(input: {
       })
 
       const partnerships: PartnershipRecord[] = []
+      const laterParentIds: string[] = []
       if (validated.draft.relationshipToClient === "step_parent" && validated.associatedParentId) {
         partnerships.push(
           await insertStepPartnership(tx, ctx, validated.associatedParentId, created.relationshipRecordId)
         )
+        laterParentIds.push(validated.associatedParentId)
       }
       if (validated.draft.relationshipToClient === "parent") {
         const origin = await ensureOriginPartnership(tx, input.clientId, input.practiceId, input.userId)
@@ -1115,10 +1176,11 @@ export async function createRelationship(input: {
             })
           : undefined
 
+      const laterParents = await syncParentLaterRelationships(tx, ctx, laterParentIds)
       return {
         relationship: toRelationship(created),
         partnerships,
-        affectedRelationships: [],
+        affectedRelationships: laterParents,
         removedPartnershipIds: [],
         clientRelationshipStatus,
       }
@@ -1217,6 +1279,7 @@ export async function updateRelationshipDetail(input: {
       const ownLinks = stepParentLinks(family.people, family.partnerships).filter(
         (link) => link.stepParent.relationshipRecordId === existing.relationshipRecordId
       )
+      const laterParentIds: string[] = []
 
       if (wasStep && nowStep) {
         if (ownLinks.length === 0 && validated.associatedParentId) {
@@ -1227,6 +1290,7 @@ export async function updateRelationshipDetail(input: {
             existing.relationshipRecordId
           )
           savedPartnerships.set(created.partnershipRecordId, created)
+          laterParentIds.push(validated.associatedParentId)
         } else if (
           ownLinks[0] &&
           validated.associatedParentId &&
@@ -1240,6 +1304,7 @@ export async function updateRelationshipDetail(input: {
             family.partnerships
           )
           savedPartnerships.set(updated.partnershipRecordId, updated)
+          laterParentIds.push(ownLinks[0].parent.relationshipRecordId, validated.associatedParentId)
         }
       } else if (wasStep && !nowStep) {
         for (const link of ownLinks) {
@@ -1247,6 +1312,7 @@ export async function updateRelationshipDetail(input: {
           affected.push(...(await clearSiblingLinks(tx, ctx, link.partnershipRecordId)))
           await deletePartnership(tx, ctx, link.partnershipRecordId)
           removed.add(link.partnershipRecordId)
+          laterParentIds.push(link.parent.relationshipRecordId)
         }
       } else if (!wasStep && nowStep && validated.associatedParentId) {
         const created = await insertStepPartnership(
@@ -1256,7 +1322,9 @@ export async function updateRelationshipDetail(input: {
           existing.relationshipRecordId
         )
         savedPartnerships.set(created.partnershipRecordId, created)
+        laterParentIds.push(validated.associatedParentId)
       }
+      affected.push(...(await syncParentLaterRelationships(tx, ctx, laterParentIds)))
 
       const [updated] = await tx
         .update(clientRelationshipRecords)
@@ -1507,6 +1575,11 @@ export async function deleteRelationship(input: {
         }
       }
 
+      const family = await loadFamily(tx, input.clientId, input.practiceId)
+      const laterParentIds = stepParentLinks(family.people, family.partnerships)
+        .filter((link) => link.stepParent.relationshipRecordId === existing.relationshipRecordId)
+        .map((link) => link.parent.relationshipRecordId)
+
       await writeAudit(tx, {
         practiceId: input.practiceId,
         userId: input.userId,
@@ -1520,7 +1593,12 @@ export async function deleteRelationship(input: {
         .delete(clientRelationshipRecords)
         .where(eq(clientRelationshipRecords.relationshipRecordId, existing.relationshipRecordId))
 
-      return {}
+      const affectedRelationships = await syncParentLaterRelationships(
+        tx,
+        { clientId: input.clientId, practiceId: input.practiceId, userId: input.userId },
+        laterParentIds
+      )
+      return { affectedRelationships }
     })
   } catch {
     return { error: "Could not remove this person." }
@@ -1570,6 +1648,8 @@ function eventColumns(event: EventRecord) {
     treatmentDetail: event.treatmentDetail || null,
     outcome: event.outcome || null,
     attribution: event.attribution,
+    about: event.about,
+    aboutOther: event.aboutOther || null,
     familyRelation: event.familyRelation || null,
     familySide: event.familySide || null,
     relationshipRecordId: event.relationshipRecordId,

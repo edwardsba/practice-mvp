@@ -1,3 +1,6 @@
+import type { HowEnded } from "@/lib/client-background/how-ended"
+import type { LaterRelationships } from "@/lib/client-background/later-relationships"
+
 export const RELATIONSHIP_TO_CLIENT = [
   "mother",
   "father",
@@ -151,6 +154,20 @@ export const PARENT_TYPE_LABELS: Record<ParentType, string> = {
   adoptive: "Adoptive",
 }
 
+export const CHILD_TYPES = ["biological", "adopted", "step_child", "foster", "other"] as const
+export type ChildType = (typeof CHILD_TYPES)[number]
+
+export const CHILD_TYPE_LABELS: Record<ChildType, string> = {
+  biological: "Biological",
+  adopted: "Adopted",
+  step_child: "Step-child",
+  foster: "Foster",
+  other: "Other (describe)",
+}
+
+export const HISTORY_ABOUT = ["self", "significant_other"] as const
+export type HistoryAbout = (typeof HISTORY_ABOUT)[number]
+
 /** Biological child whose other parent is not one of the recorded partners. */
 export const OTHER_PARENT_KINDS = ["donor_conception", "adopted_sole", "other"] as const
 export type OtherParentKind = (typeof OTHER_PARENT_KINDS)[number]
@@ -217,7 +234,7 @@ export const EVENT_TYPE_LABELS: Record<EventType, string> = {
   self_harm: "Self-harm",
   illness_injury: "Illness / injury",
   substance_use: "Substance use",
-  psychiatric_admission: "Admission",
+  psychiatric_admission: "Hospital admission",
   previous_therapy: "Previous therapy",
   medication: "Medication",
   emotional_problems: "Emotional problems",
@@ -565,8 +582,16 @@ export type RelationshipRecord = {
   dateOfDeath: string
   healthOrCauseOfDeath: string
   lengthOfRelationship: string
-  /** Prior partner: how the relationship ended. Cleared for every other role. */
+  /** Prior partner: free text kept for Other (describe), and for values mapped before howEnded existed. */
   relationshipStatus: string
+  /** Prior partner: Separated, Divorced, Partner died, or Other. */
+  howEnded: HowEnded | ""
+  /** Parent records: Yes, None, or Not asked. */
+  laterRelationships: LaterRelationships | ""
+  /** Child records. Blank is worth checking. */
+  childType: ChildType | ""
+  /** Description when child type is Other. */
+  childTypeDetail: string
   timeSinceEnded: string
   supportive: RelationshipRating | ""
   conflict: RelationshipRating | ""
@@ -623,6 +648,10 @@ export type EventRecord = {
   treatmentDetail: string
   outcome: string
   attribution: Attribution
+  /** Self, or a significant other. */
+  about: HistoryAbout
+  /** Who, when the significant other is not a recorded person. */
+  aboutOther: string
   familyRelation: string
   familySide: FamilySide | ""
   relationshipRecordId: string | null
@@ -810,6 +839,8 @@ export function emptyEvent(eventType: EventType, displayOrder: number): Omit<Eve
     treatmentDetail: "",
     outcome: "",
     attribution: eventType === "family_events" ? "self_linked" : "self",
+    about: eventType === "family_events" ? "significant_other" : "self",
+    aboutOther: "",
     familyRelation: "",
     familySide: "",
     relationshipRecordId: null,

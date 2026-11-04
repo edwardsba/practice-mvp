@@ -45,7 +45,7 @@ const expected: { key: HistoryQuestionKey; event: ReturnType<typeof entry> }[] =
     event: entry("significant_history", { attribution: "self", startPrecision: "date", startValue: "2018-06-14" }),
   },
   {
-    key: "other_significant_events",
+    key: "family_emotional_problems",
     event: entry("family_events", { attribution: "self_linked", startPrecision: "date", startValue: "2010-01-01" }),
   },
   {
@@ -57,7 +57,7 @@ const expected: { key: HistoryQuestionKey; event: ReturnType<typeof entry> }[] =
     event: entry("significant_history", { attribution: "self", startPrecision: "date", startValue: "2018-06-15" }),
   },
   {
-    key: "other_significant_events",
+    key: "family_emotional_problems",
     event: entry("family_events", { attribution: "family", startPrecision: "date", startValue: "2020-01-01" }),
   },
   { key: "family_emotional_problems", event: entry("emotional_problems", { attribution: "family" }) },
@@ -96,7 +96,7 @@ assert.deepEqual(
       ],
     },
     {
-      title: "Family history",
+      title: "Significant others",
       keys: [
         "family_illness",
         "family_emotional_problems",
@@ -120,7 +120,9 @@ assert.equal(gaps[4], "Traumatic events")
 assert.ok(gaps.includes("Medication"))
 assert.ok(gaps.indexOf("Medication") > gaps.indexOf("Previous therapy"))
 assert.ok(gaps.indexOf("Medication") < gaps.indexOf("Other significant events"))
-assert.ok(gaps.indexOf("Family illness") < gaps.indexOf("Family emotional problems"))
+assert.equal(gaps.filter((label) => label === "Illness / injury").length, 2)
+assert.equal(gaps.filter((label) => label === "Hospital admission").length, 2)
+assert.ok(gaps.includes("Significant events"))
 assert.equal(gaps.includes("Childhood events"), false)
 assert.equal(gaps.includes("Abuse"), false)
 assert.equal(gaps.includes("Client's motivation"), false)

@@ -1,5 +1,6 @@
 import { entryDetailMessage, unlinkedTreatmentMessage } from "@/lib/client-background/history-links"
-import { eventsForQuestion, historyQuestionAcceptsEntries, HISTORY_QUESTION_KEYS, HISTORY_QUESTIONS, type ScreeningAnswers } from "@/lib/client-background/interview-history"
+import { eventsForQuestion, historyQuestionAcceptsEntries, historyQuestionCheckLabel, HISTORY_QUESTION_KEYS, type ScreeningAnswers } from "@/lib/client-background/interview-history"
+import { HOW_ENDED } from "@/lib/client-background/how-ended"
 import { needsLinkingItems } from "@/lib/client-background/relationship-groups"
 import { buildRelationshipTree, personRoleLabel } from "@/lib/client-background/tree"
 import { estimatedCurrentAge } from "@/lib/client-background/visibility"
@@ -46,10 +47,10 @@ const PARTNER_EXPECTED: readonly ClientRelationshipStatus[] = [
   "married",
 ]
 
-const ENDED_STATUS_MATCH: Partial<Record<ClientRelationshipStatus, RegExp>> = {
-  separated: /separat/i,
-  divorced: /divorc/i,
-  widowed: /widow|died|death/i,
+const ENDED_STATUS_CODE: Partial<Record<ClientRelationshipStatus, (typeof HOW_ENDED)[number]>> = {
+  separated: "separated",
+  divorced: "divorced",
+  widowed: "partner_died",
 }
 
 const PARTNER_UNEXPECTED: readonly ClientRelationshipStatus[] = ["single", "separated", "divorced", "widowed"]
@@ -114,11 +115,11 @@ export function backgroundChecks(input: BackgroundCheckInput): BackgroundCheck[]
     })
   }
 
-  const endedMatch =
-    status === "separated" || status === "divorced" || status === "widowed" ? ENDED_STATUS_MATCH[status] : undefined
-  if (status && endedMatch) {
+  const endedCode =
+    status === "separated" || status === "divorced" || status === "widowed" ? ENDED_STATUS_CODE[status] : undefined
+  if (status && endedCode) {
     const prior = data.relationships.filter((person) => person.relationshipToClient === "prior_partner")
-    const matched = prior.some((person) => endedMatch.test(person.relationshipStatus))
+    const matched = prior.some((person) => person.howEnded === endedCode)
     if (!matched) {
       checks.push({
         id: "partner-ended",
@@ -167,6 +168,37 @@ export function backgroundChecks(input: BackgroundCheckInput): BackgroundCheck[]
     checks.push({
       id: `adoption-${parent.relationshipRecordId}`,
       message: name ? `Adoptive ${role} (${name}): no adoption date` : `Adoptive ${role}: no adoption date`,
+      target: "relationships",
+    })
+  }
+
+  for (const parent of data.relationships) {
+    const isParent =
+      parent.relationshipToClient === "mother" ||
+      parent.relationshipToClient === "father" ||
+      parent.relationshipToClient === "parent"
+    if (!isParent || parent.notKnown) continue
+    if (parent.laterRelationships === "yes" || parent.laterRelationships === "none") continue
+    const role =
+      parent.relationshipToClient === "mother"
+        ? "Mother"
+        : parent.relationshipToClient === "father"
+          ? "Father"
+          : "Parent"
+    checks.push({
+      id: `later-${parent.relationshipRecordId}`,
+      message: `${role}: later relationships not recorded`,
+      target: "relationships",
+    })
+  }
+
+  for (const child of data.relationships) {
+    if (child.relationshipToClient !== "child_biological" && child.relationshipToClient !== "child_step") continue
+    if (child.childType) continue
+    const name = child.givenName.trim()
+    checks.push({
+      id: `child-type-${child.relationshipRecordId}`,
+      message: name ? `Child ${name}: type not recorded` : "Child: type not recorded",
       target: "relationships",
     })
   }
@@ -221,7 +253,7 @@ export function backgroundChecks(input: BackgroundCheckInput): BackgroundCheck[]
       if (eventsForQuestion(data.events, key, data.dateOfBirth).length > 0) continue
       checks.push({
         id: `history-${key}`,
-        message: `${HISTORY_QUESTIONS[key].label} is Yes, with no entries.`,
+        message: `${historyQuestionCheckLabel(key)} is Yes, with no entries.`,
         target: "history",
       })
     }

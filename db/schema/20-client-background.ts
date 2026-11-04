@@ -69,8 +69,16 @@ export const clientRelationshipRecords = pgTable("client_relationship_records", 
   dateOfDeath: text("date_of_death"),
   healthOrCauseOfDeath: text("health_or_cause_of_death"),
   lengthOfRelationship: text("length_of_relationship"),
-  /** Prior partner: how the relationship ended. Current partners leave this null. */
+  /** Prior partner: how the relationship ended. Current partners leave this null. Retired once how_ended is set; kept for Other (describe). */
   relationshipStatus: text("relationship_status"),
+  /** Prior partner: separated, divorced, partner_died, or other. */
+  howEnded: text("how_ended"),
+  /** Parent records: yes, none, or not_asked. None is only set by the practitioner. */
+  laterRelationships: text("later_relationships"),
+  /** Child records: biological, adopted, step_child, foster, or other. */
+  childType: text("child_type"),
+  /** Description when child_type is other. */
+  childTypeDetail: text("child_type_detail"),
   timeSinceEnded: text("time_since_ended"),
   supportive: text("supportive"),
   conflict: text("conflict"),
@@ -150,6 +158,10 @@ export const clientEventRecords = pgTable("client_event_records", {
   treatmentDetail: text("treatment_detail"),
   outcome: text("outcome"),
   attribution: text("attribution").notNull().default("self"),
+  /** self or significant_other. Significant-other entries use relationship_record_id or about_other. */
+  about: text("about"),
+  /** Who, when the significant other is not a recorded person. */
+  aboutOther: text("about_other"),
   familyRelation: text("family_relation"),
   familySide: text("family_side"),
   relationshipRecordId: uuid("relationship_record_id").references(

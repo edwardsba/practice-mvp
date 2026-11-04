@@ -5,6 +5,7 @@ import {
   HISTORY_QUESTION_GROUPS,
   HISTORY_QUESTIONS,
   eventsForQuestion,
+  historyQuestionCheckLabel,
   type HistoryQuestionKey,
   type ScreeningAnswers,
 } from "@/lib/client-background/interview-history"
@@ -24,11 +25,17 @@ import {
   type StartPrecision,
 } from "@/lib/client-background/types"
 import {
+  childrenTotalParagraph,
+  parentsParagraph,
+  parentsSeparationMissing,
+  partnersParagraph,
+  siblingsParagraph,
+  significantOtherParagraphs,
+} from "@/lib/reports/background-family-paragraphs"
+import {
   conditionParagraph,
   currentMedicationParagraph,
-  familyOriginsParagraph,
   lowerKeepingTypedCase,
-  relationshipsParagraph,
   unlinkedTreatmentsParagraph,
   type ReportVoice,
 } from "@/lib/reports/background-report-prose"
@@ -488,7 +495,7 @@ function historyItems(
     const entries = eventsForQuestion(source.data.events, key, source.data.dateOfBirth)
     const recorded = answerFor(source, key)
     const answer = entries.length > 0 ? "yes" : recorded
-    const label = HISTORY_QUESTIONS[key].label
+    const label = historyQuestionCheckLabel(key)
     if (answer === "yes" && entries.length > 0) {
       answered = true
       if (family) {
@@ -512,7 +519,7 @@ function historyItems(
       const index = omitted.findIndex((row) => row.id === `history-${key}`)
       if (index >= 0) omitted.splice(index, 1)
     }
-    omitted.push({ id: "family-history", message: "Family history not assessed", target: "history" })
+    omitted.push({ id: "family-history", message: "Significant others not assessed", target: "history" })
   }
   return items
 }
@@ -896,7 +903,7 @@ function educationItem(source: BackgroundReportSource, voice: Voice, who: Speake
     const detail = education.disruptionDetail.trim()
     parts.push(
       detail
-        ? `${voice.Possessive} schooling was disrupted ${detail.replace(/\.$/, "")}.`
+        ? `${voice.Possessive} schooling was disrupted: ${lowerKeepingTypedCase(detail).replace(/\.+$/, "")}.`
         : `${voice.Possessive} schooling was disrupted.`
     )
   }
@@ -1029,7 +1036,7 @@ function demographicItems(
     named = true
     items.push(disability)
   }
-  const relationships = relationshipsParagraph(
+  const relationships = partnersParagraph(
     first,
     voice as ReportVoice,
     source.data.relationshipStatus.relationshipStatus,
@@ -1040,6 +1047,11 @@ function demographicItems(
     named = true
     items.push(relationships)
   }
+  const childrenTotal = childrenTotalParagraph(first, source.data.relationships, source.reportDate)
+  if (childrenTotal) {
+    named = true
+    items.push(childrenTotal)
+  }
   for (const parent of people(source.data.relationships, ["mother", "father", "parent"])) {
     if ((parent.healthStatus === "deceased" || parent.deceased) && !parent.dateOfDeath.trim() && !parent.notKnown) {
       omitted.push({
@@ -1049,17 +1061,14 @@ function demographicItems(
       })
     }
   }
-  for (const partnership of source.data.partnerships) {
-    const status = partnership.relationshipStatus
-    if ((status === "separated" || status === "divorced") && !partnership.ended.trim()) {
-      omitted.push({
-        id: "parents-ended",
-        message: `When ${voice.possessive} parents separated not recorded`,
-        target: "relationships",
-      })
-    }
+  if (parentsSeparationMissing(source.data.relationships, source.data.partnerships)) {
+    omitted.push({
+      id: "parents-ended",
+      message: `When ${voice.possessive} parents separated not recorded`,
+      target: "relationships",
+    })
   }
-  const family = familyOriginsParagraph(
+  const family = parentsParagraph(
     first,
     voice as ReportVoice,
     source.dateOfBirth,
@@ -1070,6 +1079,18 @@ function demographicItems(
   if (family) {
     named = true
     items.push(family)
+  }
+  const siblings = siblingsParagraph(
+    first,
+    voice as ReportVoice,
+    source.dateOfBirth,
+    source.data.relationships,
+    source.data.partnerships,
+    source.reportDate
+  )
+  if (siblings) {
+    named = true
+    items.push(siblings)
   }
   next((who) => livingItem(source, voice, who))
   next((who) => educationItem(source, voice, who))
@@ -1118,7 +1139,7 @@ export function generateBackgroundReport(source: BackgroundReportSource): Backgr
   }
   const named = { value: false }
   historyItems(source, voice, first, omitted, false, named)
-  const familyHistory = historyItems(source, voice, first, omitted, true, named)
+  historyItems(source, voice, first, omitted, true, named)
   const clientHistory = [
     conditionParagraph("illness_injury", source.data.events, first, voice as ReportVoice, source.dateOfBirth),
     conditionParagraph("emotional_problems", source.data.events, first, voice as ReportVoice, source.dateOfBirth),
@@ -1145,11 +1166,11 @@ export function generateBackgroundReport(source: BackgroundReportSource): Backgr
       items: [
         ...introductionLines(source, omitted),
         `This report summarises my background assessment of ${full}.`,
-        `The report addresses ${first}'s presenting problem, demographics, and client and family history.`,
+        `The report addresses ${first}'s presenting problem, demographics, client history, and family and significant others.`,
       ],
     },
   ])
-  pushNumberedSection(content, "Sources", [{ items: sourceLines(source) }])
+  pushNumberedSection(content, "Sources", [{ items: sourceLines(source) }], "[No sources recorded.]")
   pushNumberedSection(
     content,
     "Presenting Problem",
@@ -1162,8 +1183,13 @@ export function generateBackgroundReport(source: BackgroundReportSource): Backgr
     [{ items: demographicItems(source, voice, omitted) }],
     "[Demographics — not yet recorded.]"
   )
-  pushNumberedSection(content, "Client History", [{ items: clientHistory }])
-  pushNumberedSection(content, "Family History", [{ items: familyHistory }])
+  pushNumberedSection(content, "Client History", [{ items: clientHistory }], "[No client history recorded.]")
+  pushNumberedSection(
+    content,
+    "Family and Significant Others",
+    [{ items: significantOtherParagraphs(first, source.data.relationships, source.data.events) }],
+    "[No family or significant other history recorded.]"
+  )
   pushNumberedSection(content, "Summary", [{ items: ["[Summary — practitioner to write.]"] }])
   content.push(paragraph("Yours sincerely,"))
 

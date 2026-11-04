@@ -1,4 +1,5 @@
 import { assessAge, clientAgeAtStart, compareEventsChronologically } from "@/lib/client-background/age"
+import { resolvedAbout } from "@/lib/client-background/interview-history"
 import { treatmentsForCondition } from "@/lib/client-background/history-links"
 import { parsePartialDate, precisionForPartialDate } from "@/lib/client-background/partial-date"
 import { professionalSummary, type ProfessionalOption } from "@/lib/client-background/professionals"
@@ -72,7 +73,7 @@ type DatedEvent = Pick<
   | "familyRelation"
 >
 
-function proseDate(value: string): string {
+export function proseDate(value: string): string {
   const trimmed = value.trim()
   if (/^\d{4}-\d{2}-\d{2}/.test(trimmed)) {
     const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(trimmed)
@@ -89,7 +90,7 @@ function proseDate(value: string): string {
   return trimmed
 }
 
-function yearOf(precision: string, value: string): string {
+export function yearOf(precision: string, value: string): string {
   if (precision === "age" || !precision) return ""
   return /^(\d{4})/.exec(value.trim())?.[1] ?? ""
 }
@@ -111,25 +112,47 @@ export function ageAtRecordedDate(
   return clientAgeAtStart(dateOfBirth, precision, trimmed)
 }
 
-function ageOn(dateOfBirth: string | null, when: string): number | null {
+export function ageOn(dateOfBirth: string | null, when: string): number | null {
   if (!dateOfBirth || !when.trim()) return null
   const precision = precisionForPartialDate(parsePartialDate(when))
   if (!precision) return null
   return ageAtRecordedDate(dateOfBirth, precision, when.trim())
 }
 
-function personAge(dateOfBirth: string, asOf: string): number | null {
+export function personAge(dateOfBirth: string, asOf: string): number | null {
   const reading = assessAge(parsePartialDate(dateOfBirth), parsePartialDate(asOf), "person")
   if (reading.kind === "exact" || reading.kind === "approximate") return reading.years
   if (reading.kind === "ambiguous") return reading.high
   return null
 }
 
+function hasBareComma(item: string): boolean {
+  let depth = 0
+  for (const char of item) {
+    if (char === "(") depth += 1
+    else if (char === ")") depth = Math.max(0, depth - 1)
+    else if (char === "," && depth === 0) return true
+  }
+  return false
+}
+
+/** "a, b and c". Items with a comma outside brackets are separated with semicolons. */
+export function joinProse(items: string[]): string {
+  const clean = items.map((item) => item.trim()).filter(Boolean)
+  if (clean.length === 0) return ""
+  if (clean.length === 1) return clean[0]
+  const bare = clean.some(hasBareComma)
+  if (clean.length === 2) {
+    const outside = clean[0].replace(/\([^)]*\)/g, "")
+    if (bare || /\band\b/.test(outside)) return `${clean[0]}, and ${clean[1]}`
+    return `${clean[0]} and ${clean[1]}`
+  }
+  if (bare) return `${clean.slice(0, -1).join("; ")}; and ${clean[clean.length - 1]}`
+  return `${clean.slice(0, -1).join(", ")} and ${clean[clean.length - 1]}`
+}
+
 function joinAnd(items: string[]): string {
-  if (items.length === 0) return ""
-  if (items.length === 1) return items[0]
-  if (items.length === 2) return `${items[0]} and ${items[1]}`
-  return `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`
+  return joinProse(items)
 }
 
 function deceased(person: RelationshipRecord): boolean {
@@ -256,21 +279,44 @@ export function substanceUseSentence(
   return `${name} reported ${body}.`
 }
 
-/** "Ben01 reported self-harm by cutting from age 14 to 16." */
+function withIndefinite(title: string): string {
+  const lower = lowerKeepingTypedCase(title.trim())
+  if (!lower) return ""
+  if (/^(a|an|the)\b/i.test(lower)) return lower
+  const article = /^[aeiou]/i.test(lower) ? "an" : "a"
+  return `${article} ${lower}`
+}
+
+/**
+ * Untitled entries share the heading once. A title is used instead of the
+ * self-harm method, which is never printed.
+ */
 export function selfHarmSentence(events: DatedEvent[], name: string, dateOfBirth: string | null): string {
-  const parts = sortByStart(events, dateOfBirth).map((event) => {
-    const method = event.title.trim()
-      ? lowerKeepingTypedCase(event.title.trim())
-      : event.selfHarmType === "potentially_lethal"
-        ? "potentially lethal means"
-        : event.selfHarmType === "non_lethal"
-          ? "non-lethal means"
-          : ""
-    const how = method ? `by ${method}` : ""
+  const sorted = sortByStart(events, dateOfBirth)
+  const untitled = sorted.filter((event) => !event.title.trim())
+  const titled = sorted.filter((event) => event.title.trim())
+  const parts: { event: DatedEvent; text: string }[] = []
+  if (untitled.length > 0) {
+    const whens = untitled
+      .map((event) => eventWhenPhrase(event, dateOfBirth, "starting"))
+      .filter(Boolean)
+    const whenText = whens
+      .map((when, index) => (index === 0 ? when : when.replace(/^at /, "")))
+      .join(" and ")
+    parts.push({
+      event: untitled[0],
+      text: ["self-harm", whenText].filter(Boolean).join(" "),
+    })
+  }
+  for (const event of titled) {
     const when = eventWhenPhrase(event, dateOfBirth, "starting")
-    return ["self-harm", how, when].filter(Boolean).join(" ")
-  })
-  return `${name} reported ${joinAnd(parts)}.`
+    parts.push({
+      event,
+      text: [withIndefinite(event.title), when].filter(Boolean).join(" "),
+    })
+  }
+  parts.sort((a, b) => compareEventsChronologically(a.event, b.event, dateOfBirth))
+  return `${name} reported ${joinProse(parts.map((part) => part.text))}.`
 }
 
 /** "Ben01 reported experiencing a serious car accident at age 19 (1994)." */
@@ -734,7 +780,7 @@ export function currentMedicationParagraph(
   professionals: ProfessionalOption[]
 ): string | null {
   const ongoing = events.filter(
-    (event) => event.eventType === "medication" && event.attribution === "self" && isOngoing(event)
+    (event) => event.eventType === "medication" && resolvedAbout(event) === "self" && isOngoing(event)
   )
   if (ongoing.length === 0) return null
   const parts = ongoing.map((event) => {
@@ -754,7 +800,7 @@ export function conditionParagraph(
   dateOfBirth: string | null
 ): string | null {
   const rows = sortByStart(
-    events.filter((event) => event.eventType === kind && event.attribution === "self"),
+    events.filter((event) => event.eventType === kind && resolvedAbout(event) === "self"),
     dateOfBirth
   )
   if (rows.length === 0) return null
@@ -777,7 +823,7 @@ export function unlinkedTreatmentsParagraph(events: EventRecord[], name: string,
   const rows = events.filter(
     (event) =>
       (event.eventType === "psychiatric_admission" || event.eventType === "previous_therapy" || event.eventType === "medication") &&
-      event.attribution === "self" &&
+      resolvedAbout(event) === "self" &&
       !event.conditionEventId
   )
   if (rows.length === 0) return null

@@ -5,6 +5,8 @@ import { todayDateString } from "@/lib/dates/practice-time"
 
 export type RelationshipFieldVisibility = {
   dateOfBirth: boolean
+  laterRelationships: boolean
+  childType: boolean
   health: boolean
   lengthOfRelationship: boolean
   supportive: boolean
@@ -40,7 +42,7 @@ type AgeSource = Pick<RelationshipRecord, "dateOfBirth" | "healthStatus">
 
 /**
  * Age today from the stored partial date of birth.
- * A year-only date uses the difference in calendar years. Deceased people have no current age.
+ * A year-only date is 1 July of that year. Deceased people have no current age.
  */
 export function estimatedCurrentAge(record: AgeSource, asOf: string): number | null {
   if (record.healthStatus === "deceased") return null
@@ -71,7 +73,7 @@ export function relationshipFieldVisibility(
   const parent = PARENT_ROLES.has(role)
 
   return {
-    dateOfBirth: !priorPartner,
+    dateOfBirth: true,
     health: !priorPartner,
     lengthOfRelationship: LENGTH_OF_RELATIONSHIP_ROLES.has(role),
     supportive: true,
@@ -86,6 +88,8 @@ export function relationshipFieldVisibility(
     parentType: parent,
     adoptedOn: parent,
     notKnown: parent,
+    laterRelationships: parent,
+    childType: role === "child_biological" || role === "child_step",
   }
 }
 
@@ -112,7 +116,17 @@ export function applyRelationshipVisibilityDefaults(record: RelationshipRecord):
     next.healthOrCauseOfDeath = ""
   }
   if (!visibility.lengthOfRelationship) next.lengthOfRelationship = ""
-  if (!visibility.howItEnded) next.relationshipStatus = ""
+  if (!visibility.howItEnded) {
+    next.howEnded = ""
+    next.relationshipStatus = ""
+  }
+  if (!visibility.laterRelationships) next.laterRelationships = ""
+  if (!visibility.childType) {
+    next.childType = ""
+    next.childTypeDetail = ""
+  } else if (next.childType !== "other") {
+    next.childTypeDetail = ""
+  }
   if (!visibility.timeSinceEnded) next.timeSinceEnded = ""
   if (!visibility.spanDates) {
     next.startedOn = ""

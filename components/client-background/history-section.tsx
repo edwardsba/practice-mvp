@@ -30,6 +30,7 @@ import {
   HISTORY_QUESTIONS,
   backgroundInterviewSourceLine,
   eventsForQuestion,
+  resolvedAbout,
   type BackgroundInterviewAnswerSource,
   type HistoryQuestionKey,
   type ScreeningAnswer,
@@ -51,9 +52,6 @@ import {
   EVENT_TYPES,
   EVENT_TYPE_LABELS,
   emptyEvent,
-  FAMILY_RELATION_PICKS,
-  FAMILY_SIDES,
-  FAMILY_SIDE_LABELS,
   RESOLVED_OR_ONGOING,
   SELF_HARM_TYPES,
   SELF_HARM_TYPE_LABELS,
@@ -102,20 +100,26 @@ export function HistorySection({
     setError(null)
   }
 
-  function add(eventType: EventType, attribution?: EventRecord["attribution"]) {
+  function add(eventType: EventType, about?: EventRecord["about"]) {
     setPickerOpen(false)
     setError(null)
     setIsNew(true)
     setSelectedId(null)
-    setDraft({ ...emptyEvent(eventType, 0), eventRecordId: "", ...(attribution ? { attribution } : {}) })
+    setDraft({
+      ...emptyEvent(eventType, 0),
+      eventRecordId: "",
+      ...(about
+        ? { about, attribution: about === "significant_other" ? "family" : "self" }
+        : {}),
+    })
     setEditing(true)
     setMobileScreen("edit")
   }
 
   function addForQuestion(key: HistoryQuestionKey) {
     const question = HISTORY_QUESTIONS[key]
-    if (!question.eventType || !question.attribution) return
-    add(question.eventType, question.attribution)
+    if (!question.eventType) return
+    add(question.eventType, question.about)
   }
 
   async function save() {
@@ -283,7 +287,7 @@ export function HistorySection({
             <DialogDescription>Choose the event type for this entry.</DialogDescription>
           </DialogHeader>
           <div className="flex flex-col gap-2">
-            {EVENT_TYPES.map((eventType) => (
+            {EVENT_TYPES.filter((eventType) => eventType !== "family_events").map((eventType) => (
               <Button key={eventType} type="button" variant="outline" disabled={pending} onClick={() => void add(eventType)}>
                 {EVENT_TYPE_LABELS[eventType]}
               </Button>
@@ -588,17 +592,10 @@ function rowWhen(entry: EventRecord, dateOfBirth: string | null) {
 }
 
 function attributionLabel(entry: EventRecord, relationships: RelationshipRecord[]) {
-  if (entry.attribution === "family") {
-    const relation = entry.familyRelation.trim()
-    const side = entry.familySide ? FAMILY_SIDE_LABELS[entry.familySide] : ""
-    const who = [relation, side].filter(Boolean).join(", ")
-    return who ? `Family · ${who}` : "Family member"
-  }
-  if (entry.attribution === "self_linked") {
-    const person = relationships.find((item) => item.relationshipRecordId === entry.relationshipRecordId)
-    return person ? personName(person) : "Linked person"
-  }
-  return "Self"
+  if (resolvedAbout(entry) === "self") return "Self"
+  const person = relationships.find((item) => item.relationshipRecordId === entry.relationshipRecordId)
+  if (person) return personName(person)
+  return entry.aboutOther.trim() || entry.familyRelation.trim() || "Significant other"
 }
 
 function yesNoLabel(value: boolean | null) {
@@ -620,11 +617,10 @@ function EventReadOnly({
 
   return (
     <div className="space-y-4">
-      {draft.eventType === "family_events" ? (
-        <ReadOnlyField label="Linked person" value={linked ? personName(linked) : ""} />
-      ) : (
-        <ReadOnlyField label="Attribution" value={attributionLabel(draft, relationships)} />
-      )}
+      <ReadOnlyField label="About" value={resolvedAbout(draft) === "self" ? "Self" : "Significant other"} />
+      {resolvedAbout(draft) === "significant_other" ? (
+        <ReadOnlyField label="Who" value={linked ? personName(linked) : draft.aboutOther || draft.familyRelation} />
+      ) : null}
       <ReadOnlyField label="Event type" value={EVENT_TYPE_LABELS[draft.eventType]} />
       {draft.eventType === "self_harm" ? (
         <ReadOnlyField
@@ -688,30 +684,40 @@ function EventEditor({
 }) {
   const treatment = isTreatmentEvent(draft.eventType)
   const conditions = events.filter(
-    (event) => event.eventRecordId !== draft.eventRecordId && isConditionEvent(event.eventType) && event.attribution === "self"
+    (event) =>
+      event.eventRecordId !== draft.eventRecordId &&
+      isConditionEvent(event.eventType) &&
+      resolvedAbout(event) === resolvedAbout(draft)
   )
   const startLabel =
     draft.eventType === "psychiatric_admission" ? "Admitted" : draft.eventType === "medication" ? "Started" : "Start"
   const endLabel =
     draft.eventType === "psychiatric_admission" ? "Discharged" : draft.eventType === "medication" ? "Ended" : "End"
   const stage = lifeStageAtStart(dateOfBirth, draft.startPrecision, draft.startValue)
-  const familyEvent = draft.eventType === "family_events"
+  const whoValue = draft.relationshipRecordId
+    ? draft.relationshipRecordId
+    : resolvedAbout(draft) === "significant_other"
+      ? "other"
+      : ""
 
   function patch(partial: Partial<EventRecord>) {
     const next = { ...draft, ...partial }
-    if (partial.eventType === "family_events") {
-      next.attribution = "self_linked"
-      next.familyRelation = ""
-      next.familySide = ""
-    } else if (partial.eventType && next.attribution === "self_linked") {
+    if (next.about !== "significant_other") {
+      next.about = "self"
       next.attribution = "self"
       next.relationshipRecordId = null
-    }
-    if (next.attribution !== "family") {
+      next.aboutOther = ""
       next.familyRelation = ""
       next.familySide = ""
+    } else if (next.relationshipRecordId) {
+      next.attribution = "self_linked"
+      next.aboutOther = ""
+      next.familyRelation = ""
+      next.familySide = ""
+    } else {
+      next.attribution = "family"
+      next.familyRelation = next.aboutOther
     }
-    if (next.attribution !== "self_linked") next.relationshipRecordId = null
     if (next.eventType !== "self_harm") {
       next.selfHarmType = ""
     }
@@ -737,79 +743,60 @@ function EventEditor({
 
   return (
     <div className="min-w-0 space-y-4">
-      {familyEvent ? (
-        <SelectField
-          id={`${draft.eventRecordId}_person`}
-          label="Linked person"
-          value={draft.relationshipRecordId ?? ""}
-          onChange={(relationshipRecordId) =>
-            patch({ relationshipRecordId: relationshipRecordId || null, attribution: "self_linked" })
-          }
-        >
-          <option value="">Select someone from Relationships</option>
-          {relationships.map((person) => (
-            <option key={person.relationshipRecordId} value={person.relationshipRecordId}>
-              {personName(person)}
-            </option>
-          ))}
-        </SelectField>
-      ) : (
+      <SelectField
+        id={`${draft.eventRecordId}_about`}
+        label="About"
+        value={draft.about === "significant_other" ? "significant_other" : "self"}
+        onChange={(about) =>
+          patch({
+            about: about === "significant_other" ? "significant_other" : "self",
+            relationshipRecordId: about === "significant_other" ? draft.relationshipRecordId : null,
+            aboutOther: about === "significant_other" ? draft.aboutOther : "",
+          })
+        }
+      >
+        <option value="self">Self</option>
+        <option value="significant_other">Significant other</option>
+      </SelectField>
+      {draft.about === "significant_other" ? (
         <>
           <SelectField
-            id={`${draft.eventRecordId}_attribution`}
-            label="Attribution"
-            value={draft.attribution === "family" ? "family" : "self"}
-            onChange={(attribution) => patch({ attribution: attribution === "family" ? "family" : "self" })}
+            id={`${draft.eventRecordId}_who`}
+            label="Who"
+            value={whoValue}
+            onChange={(value) => {
+              if (value === "other") {
+                patch({ about: "significant_other", relationshipRecordId: null, aboutOther: draft.aboutOther })
+                return
+              }
+              patch({ about: "significant_other", relationshipRecordId: value || null, aboutOther: "" })
+            }}
           >
-            <option value="self">Self</option>
-            <option value="family">Family member</option>
+            <option value="">Select…</option>
+            {relationships.map((person) => (
+              <option key={person.relationshipRecordId} value={person.relationshipRecordId}>
+                {personName(person)}
+              </option>
+            ))}
+            <option value="other">Other (describe)</option>
           </SelectField>
-          {draft.attribution === "family" ? (
-            <div className="space-y-2">
-              <p className="text-sm font-medium">Relation</p>
-              <div className="flex flex-wrap gap-1">
-                {FAMILY_RELATION_PICKS.map((pick) => (
-                  <Button
-                    key={pick}
-                    type="button"
-                    size="sm"
-                    variant={draft.familyRelation === pick ? "secondary" : "outline"}
-                    onClick={() => patch({ familyRelation: pick === "Other" ? "" : pick, attribution: "family" })}
-                  >
-                    {pick}
-                  </Button>
-                ))}
-              </div>
-              <TextField
-                id={`${draft.eventRecordId}_relation`}
-                label="Relation"
-                value={draft.familyRelation}
-                onChange={(familyRelation) => patch({ familyRelation, attribution: "family" })}
-              />
-              <SelectField
-                id={`${draft.eventRecordId}_side`}
-                label="Side"
-                value={draft.familySide}
-                onChange={(familySide) => patch({ familySide: familySide as EventRecord["familySide"], attribution: "family" })}
-              >
-                <option value="">Not recorded</option>
-                {FAMILY_SIDES.map((side) => (
-                  <option key={side} value={side}>
-                    {FAMILY_SIDE_LABELS[side]}
-                  </option>
-                ))}
-              </SelectField>
-            </div>
+          {whoValue === "other" ? (
+            <TextField
+              id={`${draft.eventRecordId}_who_other`}
+              label="Describe"
+              value={draft.aboutOther}
+              onChange={(aboutOther) => patch({ about: "significant_other", relationshipRecordId: null, aboutOther })}
+            />
           ) : null}
         </>
-      )}
+      ) : null}
       <SelectField
         id={`${draft.eventRecordId}_type`}
         label="Event type"
         value={draft.eventType}
         onChange={(eventType) => patch({ eventType: eventType as EventType })}
       >
-        {EVENT_TYPES.map((eventType) => (
+        {EVENT_TYPES.filter((eventType) => eventType !== "family_events" || eventType === draft.eventType).map((eventType) => (
           <option key={eventType} value={eventType}>
             {EVENT_TYPE_LABELS[eventType]}
           </option>
@@ -856,7 +843,7 @@ function EventEditor({
         <>
           <SelectField
             id={`${draft.eventRecordId}_admission_type`}
-            label="Admission type"
+            label="Hospital admission type"
             value={draft.admissionType}
             onChange={(admissionType) => patch({ admissionType: admissionType as EventRecord["admissionType"] })}
           >

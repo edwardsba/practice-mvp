@@ -40,6 +40,10 @@ function person(
     healthOrCauseOfDeath: "",
     lengthOfRelationship: "",
     relationshipStatus: "",
+    howEnded: "",
+    laterRelationships: "",
+    childType: "",
+    childTypeDetail: "",
     timeSinceEnded: "",
     supportive: "",
     conflict: "",
@@ -324,7 +328,7 @@ assert.deepEqual(
     "3 Presenting Problem",
     "4 Demographics",
     "5 Client History",
-    "6 Family History",
+    "6 Family and Significant Others",
     "7 Summary",
   ]
 )
@@ -336,7 +340,7 @@ assert.deepEqual(
     "1.2. I have been registered as a psychologist since 2014.",
     "1.3. My principal therapeutic modalities include CBT.",
     "1.4. This report summarises my background assessment of Ben01 Lee.",
-    "1.5. The report addresses Ben01's presenting problem, demographics, and client and family history.",
+    "1.5. The report addresses Ben01's presenting problem, demographics, client history, and family and significant others.",
   ]
 )
 assert.equal(
@@ -374,12 +378,14 @@ assert.match(
   /He describes his cultural background as Australian and his religion as Catholic, and he mainly speaks English at home\./
 )
 assert.match(demographics, /Ben01 has been married to his wife, with no children\./)
-assert.match(demographics, /His parents divorced when he was 8\./)
+assert.match(demographics, /His parents divorced in 1978, when Ben01 was 8\./)
 assert.match(demographics, /His father died in 1993, when Ben01 was 23\./)
+assert.match(demographics, /Ben01 is the eldest of his full siblings\./)
 assert.match(
   demographics,
-  /Ben01 is the eldest of three children, with a younger sibling, 48, and a younger sibling, 45\. He also has one step-sibling, 28\./
+  /two full siblings \(a sibling, 48 and a sibling, 45\) and one step-sibling \(28\)/
 )
+assert.match(demographics, /In total, Ben01 has three children: three biological children \(9, 7 and 6\)\./)
 assert.match(
   demographics,
   /He lives with his wife and children in a private rental and describes his housing as stable\./
@@ -394,7 +400,7 @@ assert.doesNotMatch(demographics, /reported no disability/)
 assert.doesNotMatch(demographics, /not currently taking medication/)
 
 assert.equal(outline.includes("5 Client History"), true)
-assert.equal(outline.includes("6 Family History"), true)
+assert.equal(outline.includes("6 Family and Significant Others"), true)
 assert.equal(outline.includes("Risk Assessment"), false)
 assert.doesNotMatch(body, /ASSIST/)
 assert.match(
@@ -403,11 +409,11 @@ assert.match(
 )
 assert.match(
   outline.find((line) => line.startsWith("5.2.")) ?? "",
-  /Ben01 reported self-harm by cutting episode at age 14 \(1984\) and self-harm by overdose at age 18 \(1988\)\./
+  /Ben01 reported a cutting episode at age 14 \(1984\) and an overdose at age 18 \(1988\)\./
 )
 assert.match(
   outline.find((line) => line.startsWith("6.1.")) ?? "",
-  /Ben01's mother has a history of anxiety\. His brother has a history of low mood\./
+  /Ben01's mother has a history of anxiety\. A brother of Ben01's has a history of low mood\./
 )
 assert.match(body, /\[Summary — practitioner to write\.\]/)
 assert.doesNotMatch(body, /reported experiencing traumatic|family history of substance/)
@@ -483,7 +489,7 @@ assert.doesNotMatch(theyText, /\bthey has\b/i)
 assert.doesNotMatch(theyText, /\bthey was\b/i)
 assert.match(theyText, /Alex is a 56-year-old female \(they\/them\)\./)
 assert.match(theyText, /Alex has been married to their wife, with no children/)
-assert.match(theyText, /when they were 8/)
+assert.match(theyText, /divorced in 1978, when Alex was 8/)
 assert.match(theyText, /died in 1993, when Alex was 23/)
 assert.doesNotMatch(theyText, /not currently taking medication/)
 
@@ -528,7 +534,7 @@ assert.deepEqual(
     "3 Presenting Problem",
     "4 Demographics",
     "5 Client History",
-    "6 Family History",
+    "6 Family and Significant Others",
     "7 Summary",
   ]
 )
@@ -537,7 +543,10 @@ assert.match(blankOutline.join("\n"), /\[Demographics — not yet recorded\.\]/)
 assert.equal(blankOutline.includes("Risk Assessment"), false)
 assert.doesNotMatch(blankOutline.join("\n"), /ASSIST/)
 assert.equal(blankOutline.includes("5 Client History"), true)
-assert.equal(blankOutline.includes("6 Family History"), true)
+assert.equal(blankOutline.includes("6 Family and Significant Others"), true)
+assert.match(blankOutline.join("\n"), /\[No client history recorded\.\]/)
+assert.match(blankOutline.join("\n"), /\[No family or significant other history recorded\.\]/)
+assert.match(blankOutline.join("\n"), /\[No sources recorded\.\]/)
 assert.equal(
   blankOutline.some((line) => line.includes("Clinical interview")),
   false
@@ -691,7 +700,7 @@ assert.match(decemberText, /a history of emotional problems at age 30 \(2005\)/)
 assert.match(decemberText, /substance use at age 45 \(2020\)/)
 assert.match(decemberText, /reported another significant event\./)
 assert.match(decemberText, /a fall/)
-assert.match(decemberText, /parents divorced when they were 51/)
+assert.match(decemberText, /parents divorced in 2026, when Alex was 51/)
 assert.match(decemberText, /father died in 2026, when Alex was 51/)
 assert.doesNotMatch(decemberText, /including \./)
 assert.doesNotMatch(decemberText, /including at\b/)
@@ -710,16 +719,19 @@ function siblingLine(births: string[]): string {
     })
   )
   const text = numberedLetterOutline(generateBackgroundReport(source).document).join("\n")
-  const match = text.match(/Ben01 is the eldest of three children[^.]*\.|Ben01 has two siblings\./)
-  assert.ok(match, text)
-  return match[0]
+  const line = text.split("\n").find((row) => row.includes("siblings in total"))
+  assert.ok(line, text)
+  return line.replace(/^\d+\.\d+\. /, "")
 }
 assert.equal(
   siblingLine(["1978-01-01", "1981-06-01"]),
-  "Ben01 is the eldest of three children, with a younger sibling, 48, and a younger sibling, 45."
+  "Ben01 is the eldest of his full siblings. He has two siblings in total: two full siblings (a sibling, 48 and a sibling, 45)."
 )
-assert.equal(siblingLine(["1978", ""]), "Ben01 has two siblings.")
-assert.equal(siblingLine(["", ""]), "Ben01 has two siblings.")
+assert.equal(
+  siblingLine(["1978", ""]),
+  "He has two siblings in total: two full siblings (a sibling, 48 and a sibling)."
+)
+assert.equal(siblingLine(["", ""]), "He has two siblings in total: two full siblings (a sibling and a sibling).")
 
 const wording = emptySource()
 wording.clientFirstName = "Alex"
@@ -885,11 +897,11 @@ const relationships = roundText((source) => {
   ]
 })
 assert.match(relationships, /has been married to his wife since 2014/)
-assert.match(relationships, /They have three children, aged 9, 7 and 6/)
-assert.match(relationships, /his wife has one child from a previous relationship, aged 14/)
+assert.match(relationships, /They have three biological children, aged 9, 7 and 6/)
+assert.match(relationships, /His wife also has one child from a previous relationship, aged 14/)
 assert.match(relationships, /de facto relationship with a woman from 2005 to 2011, which ended in separation, with no children/)
 assert.match(relationships, /was married to a woman from 1998 to 2003, and the marriage ended in divorce/)
-assert.match(relationships, /They have one child, aged 25/)
+assert.match(relationships, /They have one biological child, aged 25/)
 assert.match(relationships, /one child by donor conception, aged 11/)
 assert.ok(relationships.indexOf("since 2014") < relationships.indexOf("from 2005 to 2011"))
 assert.ok(relationships.indexOf("from 2005 to 2011") < relationships.indexOf("from 1998 to 2003"))
@@ -907,6 +919,7 @@ const family = roundText((source) => {
       sex: "Female",
       dateOfBirth: "1950-01-01",
       parentType: "biological",
+      laterRelationships: "yes",
     }),
     person({
       relationshipRecordId: "father",
@@ -986,13 +999,23 @@ assert.match(family, /were married until his father's death/)
 assert.doesNotMatch(family, /remain married|suicide/)
 assert.match(family, /His mother remarried when he was 11/)
 assert.match(family, /From the age of 8 to 12, Ben01 was mainly cared for by his maternal grandmother/)
-assert.match(family, /the eldest of three children, with a younger brother, 48, and a younger sister, 45/)
-assert.match(family, /A second brother died when Ben01 was 19/)
-assert.match(family, /one maternal step-sibling, 28/)
+assert.match(family, /the eldest of his full siblings/)
+assert.match(
+  family,
+  /three full siblings \(a brother, 48, a sister, 45, and a brother who has died\) and one maternal step-sibling \(28\)/
+)
+assert.match(family, /His second brother died when Ben01 was 19/)
+assert.doesNotMatch(family, /suicide/)
 
 const repartnered = roundText((source) => {
   source.data.relationships = [
-    person({ relationshipRecordId: "mother", relationshipToClient: "mother", sex: "Female", parentType: "biological" }),
+    person({
+      relationshipRecordId: "mother",
+      relationshipToClient: "mother",
+      sex: "Female",
+      parentType: "biological",
+      laterRelationships: "yes",
+    }),
     person({ relationshipRecordId: "step", relationshipToClient: "step_parent", sex: "Male" }),
   ]
   source.data.partnerships = [
@@ -1007,7 +1030,7 @@ const repartnered = roundText((source) => {
     },
   ]
 })
-assert.match(repartnered, /His mother re-partnered when he was 11/)
+assert.match(repartnered, /His mother has been in a de facto relationship since 1986/)
 
 const adopted = roundText((source) => {
   source.clientFirstName = "Tom"
@@ -1088,8 +1111,9 @@ assert.match(adopted, /His adoptive father died in 2011, when Tom was 41/)
 assert.match(adopted, /adoptive parents were married until his father's death/)
 assert.match(adopted, /His birth mother is 74/)
 assert.match(adopted, /His birth father is not known/)
-assert.match(adopted, /the elder of two children in his adoptive family, with a younger sister, 52/)
-assert.match(adopted, /one maternal half-sibling, 45/)
+assert.match(adopted, /the eldest of his adoptive siblings/)
+assert.match(adopted, /one adoptive sibling \(a sister, 52\)/)
+assert.match(adopted, /one maternal half-sibling \(45\)/)
 
 const work = roundText((source) => {
   source.data.demographics.occupation.workStatus = "unemployed"
@@ -1193,9 +1217,9 @@ assert.match(
   history,
   /Ben01 reported a history of depression from age 30 to 32 \(2005–2007\)\. He was admitted to a psychiatric unit at age 31 \(2006\) for two weeks, saw a psychologist from age 31 to 32 \(2006–2007\), and has been treated with sertraline since age 50 \(2025\)\./
 )
-assert.match(history, /Ben01 reported self-harm by cutting from age 14 to 16/)
+assert.match(history, /Ben01 reported a cutting from age 14 to 16/)
 assert.match(history, /Ben01 also reported taking temazepam from age 31 to 32/)
-const selfHarmAt = history.indexOf("self-harm by cutting")
+const selfHarmAt = history.indexOf("a cutting from age 14")
 const unlinkedAt = history.indexOf("also reported taking temazepam")
 const mentalAt = history.indexOf("history of depression")
 assert.ok(mentalAt < selfHarmAt && selfHarmAt < unlinkedAt)
@@ -1239,5 +1263,156 @@ assert.ok(messages.some((message) => message === "Adoptive mother (Jane): no ado
 assert.ok(messages.some((message) => message.includes("Anxiety") && message.includes("needs detail")))
 assert.ok(messages.some((message) => message === "Medication 'Temazepam' is not linked to a condition"))
 assert.ok(messages.some((message) => message === "Prior partner Sam: no start date"))
+
+const disruption = benSource()
+disruption.data.demographics.education.disruption = true
+disruption.data.demographics.education.disruptionDetail = "Left school at 16 to work."
+assert.match(
+  numberedLetterOutline(generateBackgroundReport(disruption).document).join("\n"),
+  /His schooling was disrupted: left school at 16 to work\./
+)
+
+const untitledHarm = emptySource()
+untitledHarm.clientFirstName = "Ben01"
+untitledHarm.dateOfBirth = "1974-12-12"
+untitledHarm.data.dateOfBirth = "1974-12-12"
+untitledHarm.data.demographics.identity.sex = "Male"
+untitledHarm.data.demographics.identity.pronouns = "he/him"
+untitledHarm.reportDate = "2026-11-04"
+untitledHarm.data.events = [
+  event({ eventRecordId: "h1", eventType: "self_harm", title: "", selfHarmType: "non_lethal", startPrecision: "year", startValue: "1986" }),
+  event({ eventRecordId: "h2", eventType: "self_harm", title: "", selfHarmType: "non_lethal", startPrecision: "year", startValue: "1992" }),
+  event({
+    eventRecordId: "h3",
+    eventType: "self_harm",
+    title: "Overdose",
+    selfHarmType: "potentially_lethal",
+    startPrecision: "date",
+    startValue: "2026-10-01",
+  }),
+  event({
+    eventRecordId: "mother-depression",
+    eventType: "emotional_problems",
+    title: "Mother depression",
+    attribution: "self_linked",
+    relationshipRecordId: "mother",
+  }),
+]
+untitledHarm.data.relationships = [
+  person({ relationshipRecordId: "mother", relationshipToClient: "mother", sex: "Female" }),
+]
+const harmText = numberedLetterOutline(generateBackgroundReport(untitledHarm).document).join("\n")
+assert.match(
+  harmText,
+  /Ben01 reported self-harm at age 11 \(1986\) and age 17 \(1992\), and an overdose at age 51 \(2026\)\./
+)
+assert.doesNotMatch(harmText, /non-lethal|non lethal/)
+assert.match(harmText, /Ben01's mother has a history of depression\./)
+const harmLines = harmText.split("\n")
+assert.equal(
+  harmLines.some((line) => line.startsWith("5.") && line.includes("mother has a history")),
+  false
+)
+assert.ok(harmLines.some((line) => line.startsWith("6.") && line.includes("mother has a history of depression")))
+
+function previousCount(count: number): string {
+  return roundText((source) => {
+    source.data.relationshipStatus.relationshipStatus = "single"
+    source.data.relationships = Array.from({ length: count }, (_, index) =>
+      person({
+        relationshipRecordId: `prior-${index}`,
+        relationshipToClient: "prior_partner",
+        sex: "Female",
+        partnerType: "dating",
+        startedOn: String(2000 - index),
+        endedOn: String(2001 - index),
+        howEnded: "separated",
+      })
+    )
+  })
+}
+assert.match(previousCount(0), /Ben01 is currently single\./)
+assert.doesNotMatch(previousCount(0), /previous significant relationship/)
+assert.match(previousCount(1), /Ben01 has had one previous significant relationship\./)
+assert.doesNotMatch(previousCount(1), /Most recently|Before that/)
+const three = previousCount(3)
+assert.match(three, /three previous significant relationships/)
+assert.match(three, /Most recently, he was in a dating relationship/)
+assert.equal(three.split("Before that").length - 1, 2)
+
+const oneChild = roundText((source) => {
+  source.data.relationships = [
+    person({
+      relationshipRecordId: "only",
+      relationshipToClient: "child_biological",
+      childType: "biological",
+      dateOfBirth: "2001-01-01",
+      otherParentKind: "donor_conception",
+    }),
+  ]
+})
+assert.match(oneChild, /Ben01 has one child in total, a biological child aged 25\./)
+
+const laterNone = roundText((source) => {
+  source.data.relationships = [
+    person({
+      relationshipRecordId: "mother",
+      relationshipToClient: "mother",
+      sex: "Female",
+      dateOfBirth: "1950-01-01",
+      laterRelationships: "none",
+    }),
+    person({
+      relationshipRecordId: "father",
+      relationshipToClient: "father",
+      sex: "Male",
+      deceased: true,
+      healthStatus: "deceased",
+      dateOfDeath: "1998",
+      laterRelationships: "not_asked",
+    }),
+  ]
+})
+assert.match(laterNone, /His mother has had no later relationships\./)
+assert.doesNotMatch(laterNone, /father had no later|father has had no later/)
+
+const twoLater = roundText((source) => {
+  source.dateOfBirth = "1970-01-15"
+  source.data.dateOfBirth = "1970-01-15"
+  source.data.relationships = [
+    person({
+      relationshipRecordId: "mother",
+      relationshipToClient: "mother",
+      sex: "Female",
+      laterRelationships: "yes",
+    }),
+    person({ relationshipRecordId: "step-1", relationshipToClient: "step_parent", sex: "Male" }),
+    person({ relationshipRecordId: "step-2", relationshipToClient: "step_parent", sex: "Male" }),
+  ]
+  source.data.partnerships = [
+    {
+      partnershipRecordId: "first",
+      partnerAId: "mother",
+      partnerBId: "step-1",
+      relationshipStatus: "married",
+      started: "1981",
+      ended: "1990",
+      qualityOfRelationship: "",
+    },
+    {
+      partnershipRecordId: "second",
+      partnerAId: "mother",
+      partnerBId: "step-2",
+      relationshipStatus: "defacto",
+      started: "2010",
+      ended: "",
+      qualityOfRelationship: "",
+    },
+  ]
+})
+assert.match(
+  twoLater,
+  /Ben01's mother has had two later relationships: she remarried when Ben01 was 11, and that marriage ended when he was 20, and she has been in a de facto relationship since 2010\./
+)
 
 console.log("generate-background-report self-test passed")

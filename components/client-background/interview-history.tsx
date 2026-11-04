@@ -194,13 +194,14 @@ export function InterviewHistory({
   function addEntry(key: HistoryQuestionKey, event: MouseEvent<HTMLButtonElement>) {
     remember(event)
     const question = HISTORY_QUESTIONS[key]
-    if (!question.eventType || !question.attribution) return
+    if (!question.eventType) return
     setError(null)
     setSheet({
       draft: {
         ...emptyEvent(question.eventType, 0),
         eventRecordId: "",
-        attribution: question.attribution,
+        about: question.about,
+        attribution: question.about === "significant_other" ? "family" : "self",
       },
       editing: true,
       isNew: true,

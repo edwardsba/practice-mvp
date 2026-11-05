@@ -314,24 +314,24 @@ const endedBlock = block({
 })
 for (const status of ["divorced", "married_separated", "defacto_separated", "engagement_ended", "relationship_ended", "widowed", "partner_died"] as const) {
   const clause = endedRelationshipClause({ ...endedBlock, status }, [wife], he, "2026-11-05")
-  if (status === "divorced") assert.match(clause, /was married to his wife, 49, from 1998 to 2003, and the marriage ended in divorce/)
-  if (status === "married_separated") assert.match(clause, /was married to his wife, 49, from 1998 to 2003, and they separated/)
-  if (status === "defacto_separated") assert.match(clause, /was in a de facto relationship with a woman, 49, from 1998 to 2003, which ended in separation/)
-  if (status === "engagement_ended") assert.match(clause, /was engaged to a woman, 49, from 1998 to 2003/)
-  if (status === "relationship_ended") assert.match(clause, /was in a relationship with a woman, 49, from 1998 to 2003/)
+  if (status === "divorced") assert.match(clause, /was married to a woman \(49 years old\) from 1998 to 2003 \(5 years\), and the marriage ended in divorce/)
+  if (status === "married_separated") assert.match(clause, /was married to a woman \(49 years old\) from 1998 to 2003 \(5 years\), and they separated/)
+  if (status === "defacto_separated") assert.match(clause, /was in a de facto relationship with a woman \(49 years old\) from 1998 to 2003 \(5 years\), which ended in separation/)
+  if (status === "engagement_ended") assert.match(clause, /was engaged to a woman \(49 years old\) from 1998 to 2003 \(5 years\)/)
+  if (status === "relationship_ended") assert.match(clause, /was in a relationship with a woman \(49 years old\) from 1998 to 2003 \(5 years\)/)
   if (status === "widowed") assert.match(clause, /which ended when his wife died/)
   if (status === "partner_died") assert.match(clause, /which ended when his partner died/)
 }
 const twoPartners = endedRelationshipClause({ ...endedBlock, status: "divorced" }, [wife, herPartner], he, "2026-11-05")
-assert.match(twoPartners, /his wife, 49, and her partner, 51/)
+assert.match(twoPartners, /a woman \(49 years old\) and a man \(51 years old\)/)
 
 const currentA = block({ relationshipBlockId: "now-1", kind: "client_current", status: "married", startedOn: "2014", displayOrder: 0 })
 const currentB = block({ relationshipBlockId: "now-2", kind: "client_current", status: "dating", displayOrder: 1 })
 const ann = person({ relationshipRecordId: "ann", relationshipToClient: "current_partner", sex: "Female", relationshipBlockId: "now-1", blockRole: "partner" })
 const bea = person({ relationshipRecordId: "bea", relationshipToClient: "current_partner", sex: "Female", relationshipBlockId: "now-2", blockRole: "partner" })
 const twoCurrent = partnersFromBlocks("Ben01", he, "married", [currentA, currentB], [ann, bea], "2026-11-05")
-assert.match(twoCurrent ?? "", /Ben01 has been married to his wife since 2014, with no children/)
-assert.match(twoCurrent ?? "", /Ben01 has been dating a woman, with no children/)
+assert.match(twoCurrent ?? "", /Ben01 has been married to his wife since 2014 \(12 years\)\. They do not have any children/)
+assert.match(twoCurrent ?? "", /Ben01 has been dating a woman\. They do not have any children/)
 
 const other = block({ relationshipBlockId: "others", kind: "client_other_children" })
 const loose = person({
@@ -402,7 +402,7 @@ const siblingText = siblingsFromBlocks(
   "2026-11-05"
 )
 assert.match(siblingText ?? "", /both brothers, one aged/)
-assert.match(siblingText ?? "", /one maternal step-sibling/)
+assert.match(siblingText ?? "", /one maternal step-brother/)
 
 const deadBrother = person({
   relationshipRecordId: "dead-bro",

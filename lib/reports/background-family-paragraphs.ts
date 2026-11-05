@@ -720,11 +720,20 @@ function conditionText(event: EventRecord, role: string, kind: string): string {
 }
 
 /** Section 6. One paragraph per heading. The first sentence names the client; later sentences use the pronoun. */
+function sectionPersonTag(person: RelationshipRecord, asOf: string): string {
+  const name = person.givenName.trim()
+  if (deceased(person)) return name ? ` (${name}, deceased)` : " (deceased)"
+  if (name) return ` (${name})`
+  const age = person.dateOfBirth && asOf ? personAge(person.dateOfBirth, asOf) : null
+  return age != null ? ` (${age} years old)` : ""
+}
+
 export function significantOtherParagraphs(
   name: string,
   people: RelationshipRecord[],
   events: EventRecord[],
-  voice?: ReportVoice
+  voice?: ReportVoice,
+  asOf = ""
 ): string[] {
   const rows = events.filter((event) => resolvedAbout(event) === "significant_other")
   const paragraphs: string[] = []
@@ -740,7 +749,7 @@ export function significantOtherParagraphs(
         const role = roleWord(person)
         const detail = conditionText(event, role, kind)
         const owner = index === 0 ? `${name}'s` : laterOwner
-        return `${owner} ${role} ${detail}.`
+        return `${owner} ${role}${sectionPersonTag(person, asOf)} ${detail}.`
       }
       const other = event.aboutOther.trim() || event.familyRelation.trim()
       const who = other ? `A ${lowerKeepingTypedCase(other)} of ${name}'s` : `A significant other of ${name}'s`

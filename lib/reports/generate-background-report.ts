@@ -834,13 +834,23 @@ function ageItem(source: BackgroundReportSource, voice: Voice): string | null {
   const gender = identity.genderIdentity.trim()
   const pronouns = identity.pronouns.trim()
   const first = source.clientFirstName.trim() || "the client"
-  if (years == null || !sexWord) return null
+  if (years == null) return null
   const pronounBit = pronouns ? ` (${pronouns})` : ""
+  const orientation = orientationPhrase(identity)
   if (gender) {
-    const identify = verb(voice.kind === "they", "identifies", "identify")
-    return `${first} is a ${years}-year-old ${sexWord}; ${voice.subject} ${identify} as ${lowerFirst(gender)}${pronounBit}.`
+    const who = orientation ? `${orientation} and ${lowerFirst(gender)}` : lowerFirst(gender)
+    return `${first} is ${years} years old and identifies as ${who}${pronounBit}.`
   }
+  if (!sexWord) return null
+  if (orientation) return `${first} is a ${years}-year-old ${sexWord}${pronounBit} who identifies as ${orientation}.`
   return `${first} is a ${years}-year-old ${sexWord}${pronounBit}.`
+}
+
+function orientationPhrase(identity: BackgroundReportSource["data"]["demographics"]["identity"]): string {
+  const value = identity.sexualOrientation
+  if (!value || value === "prefer_not_to_say") return ""
+  if (value === "another") return identity.sexualOrientationOther.trim()
+  return value
 }
 
 function livingItem(source: BackgroundReportSource, voice: Voice, who: Speaker): string | null {
@@ -1233,7 +1243,7 @@ export function generateBackgroundReport(source: BackgroundReportSource): Backgr
   pushNumberedSection(
     content,
     "Family and Significant Others",
-    [{ items: significantOtherParagraphs(first, source.data.relationships, source.data.events, voice as ReportVoice) }],
+    [{ items: significantOtherParagraphs(first, source.data.relationships, source.data.events, voice as ReportVoice, source.reportDate) }],
     "[No family or significant other history recorded.]"
   )
   pushNumberedSection(content, "Summary", [{ items: ["[Summary — practitioner to write.]"] }])

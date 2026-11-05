@@ -317,7 +317,8 @@ assert.equal(textOf(draft.document.content.at(-1)!), "Yours sincerely,")
 assert.doesNotMatch(body, /BACKGROUND REPORT/i)
 assert.doesNotMatch(body, /29 October 2026/)
 assert.doesNotMatch(body, /\bdenied\b/i)
-assert.doesNotMatch(body, /SECRET|Margaret|John|Should Not Appear|Child One|Sibling One/i)
+assert.doesNotMatch(body, /SECRET/i)
+assert.match(body, /Ben01's mother \(Margaret\)/)
 assert.doesNotMatch(body, /SAGE|PHQ|questionnaire|treatment commenced|mental state|\bMSE\b/i)
 
 assert.deepEqual(
@@ -413,7 +414,7 @@ assert.match(
 )
 assert.match(
   outline.find((line) => line.startsWith("6.1.")) ?? "",
-  /Ben01's mother has a history of anxiety\. A brother of Ben01's has a history of low mood\./
+  /Ben01's mother \(Margaret\) has a history of anxiety\. A brother of Ben01's has a history of low mood\./
 )
 assert.match(body, /\[Summary — practitioner to write\.\]/)
 assert.doesNotMatch(body, /reported experiencing traumatic|family history of substance/)
@@ -750,7 +751,7 @@ wording.data.demographics.livingSituation.housingStability = "Stable"
 wording.data.demographics.occupation.workStatus = "self_employed"
 wording.data.demographics.occupation.role = "electrician"
 const wordingText = numberedLetterOutline(generateBackgroundReport(wording).document).join("\n")
-assert.match(wordingText, /they identify as non-binary/)
+assert.match(wordingText, /Alex is \d+ years old and identifies as non-binary \(they\/them\)/)
 assert.match(wordingText, /in electrical\./)
 assert.match(
   wordingText,

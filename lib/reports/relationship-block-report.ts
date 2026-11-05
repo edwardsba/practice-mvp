@@ -58,34 +58,69 @@ function agedPhrase(children: RelationshipRecord[], asOf: string): string {
   return ages.length > 0 ? `aged ${joinProse(ages.map(String))}` : ""
 }
 
-function partnerPhrase(partners: RelationshipRecord[], voice: ReportVoice, asOf: string, married: boolean): string {
-  const described = partners.map((person, index) => {
-    const age = person.dateOfBirth ? personAge(person.dateOfBirth, asOf) : null
-    const sex = sexWord(person.sex)
-    let noun: string
-    if (index === 0) {
-      if (married && sex === "female") noun = `${voice.possessive} wife`
-      else if (married && sex === "male") noun = `${voice.possessive} husband`
-      else if (sex === "female") noun = "a woman"
-      else if (sex === "male") noun = "a man"
-      else noun = "a partner"
-    } else {
-      const first = sexWord(partners[0]?.sex ?? "")
-      const owner = first === "female" ? "her" : first === "male" ? "his" : "their"
-      noun = `${owner} partner`
-    }
-    return age == null ? noun : `${noun}, ${age}`
-  })
-  return joinProse(described)
+/** Name and age inside parentheses: "Phil, 55", "55 years old", "Phil", or "Susan, deceased". */
+export function personDetail(person: RelationshipRecord, asOf: string): string {
+  const name = person.givenName.trim()
+  if (deceased(person)) return name ? `${name}, deceased` : "deceased"
+  const age = person.dateOfBirth ? personAge(person.dateOfBirth, asOf) : null
+  if (name && age != null) return `${name}, ${age}`
+  if (name) return name
+  if (age != null) return `${age} years old`
+  return ""
 }
 
-function rangeBit(block: RelationshipBlock, current: boolean): string {
+function wrappedDetail(person: RelationshipRecord, asOf: string): string {
+  const detail = personDetail(person, asOf)
+  return detail ? ` (${detail})` : ""
+}
+
+function partnerNoun(person: RelationshipRecord, voice: ReportVoice, married: boolean): string {
+  const sex = sexWord(person.sex)
+  if (married && sex === "female") return `${voice.possessive} wife`
+  if (married && sex === "male") return `${voice.possessive} husband`
+  if (sex === "female") return "a woman"
+  if (sex === "male") return "a man"
+  return "a partner"
+}
+
+function partnerPhrase(partners: RelationshipRecord[], voice: ReportVoice, asOf: string, married: boolean): string {
+  return joinProse(
+    partners.map((person, index) => `${partnerNoun(person, voice, married && index === 0)}${wrappedDetail(person, asOf)}`)
+  )
+}
+
+function monthNumber(value: string): number | null {
+  const match = /^\d{4}-(\d{2})/.exec(value.trim())
+  return match ? Number(match[1]) : null
+}
+
+/** Whole years between the dates. Under a year is months. No start date leaves it out. */
+export function relationshipDuration(start: string, end: string, asOf: string): string {
+  if (!start.trim()) return ""
+  const startYear = Number(/^(\d{4})/.exec(start)?.[1])
+  const endSource = end.trim() || asOf
+  const endYear = Number(/^(\d{4})/.exec(endSource)?.[1])
+  if (!startYear || !endYear) return ""
+  const startMonth = monthNumber(start)
+  const endMonth = monthNumber(endSource)
+  if (startMonth == null || endMonth == null) {
+    const years = endYear - startYear
+    if (years < 1) return ""
+    return years === 1 ? "1 year" : `${years} years`
+  }
+  const months = (endYear - startYear) * 12 + (endMonth - startMonth)
+  if (months < 1) return ""
+  if (months < 12) return months === 1 ? "1 month" : `${months} months`
+  const years = Math.floor(months / 12)
+  return years === 1 ? "1 year" : `${years} years`
+}
+
+function rangeBit(block: RelationshipBlock, current: boolean, asOf: string): string {
   const start = block.startedOn.trim() ? proseDate(block.startedOn) : ""
   const end = block.endedOn.trim() ? proseDate(block.endedOn) : ""
-  if (start && end) return ` from ${start} to ${end}`
-  if (start) return current ? ` since ${start}` : ` from ${start}`
-  if (end) return ` until ${end}`
-  return ""
+  const duration = relationshipDuration(block.startedOn, current ? "" : block.endedOn, asOf)
+  const span = start && end ? ` from ${start} to ${end}` : start ? (current ? ` since ${start}` : ` from ${start}`) : end ? ` until ${end}` : ""
+  return duration ? `${span} (${duration})` : span
 }
 
 function diedWho(partners: RelationshipRecord[], voice: ReportVoice, widowed: boolean): string {
@@ -104,8 +139,8 @@ export function endedRelationshipClause(
   asOf: string
 ): string {
   const married = block.status === "divorced" || block.status === "married_separated" || block.status === "widowed"
-  const phrase = partnerPhrase(partners, voice, asOf, married || block.status === "married")
-  const range = rangeBit(block, false)
+  const phrase = partnerPhrase(partners, voice, asOf, false)
+  const range = rangeBit(block, false, asOf)
   const to = married || block.status === "engagement_ended" ? "to" : "with"
   const object = phrase ? ` ${to} ${phrase}${phrase.includes(",") && range ? "," : ""}${range}` : range
   const was = agree(voice, "was", "were")
@@ -125,32 +160,64 @@ export function endedRelationshipClause(
   return `${voice.subject} ${was} in a relationship${object}`
 }
 
-function childrenSentences(children: RelationshipRecord[], voice: ReportVoice, asOf: string): string[] {
+function childSexNoun(person: RelationshipRecord, typed: boolean): [string, string] {
+  const sex = sexWord(person.sex)
+  const base: [string, string] = sex === "female" ? ["daughter", "daughters"] : sex === "male" ? ["son", "sons"] : ["child", "children"]
+  if (!typed) return base
+  const type = childTypeOf(person)
+  const prefix = type === "adopted" ? "adopted " : type === "foster" ? "foster " : type === "other" ? "other " : ""
+  return [`${prefix}${base[0]}`, `${prefix}${base[1]}`]
+}
+
+function byAge(people: RelationshipRecord[], asOf: string): RelationshipRecord[] {
+  return [...people].sort((a, b) => (personAge(b.dateOfBirth, asOf) ?? -1) - (personAge(a.dateOfBirth, asOf) ?? -1))
+}
+
+function peopleList(people: RelationshipRecord[], asOf: string, separator: "and" | "semi"): string {
+  const bits = byAge(people, asOf).map((person) => personDetail(person, asOf)).filter(Boolean)
+  if (bits.length === 0) return ""
+  if (separator === "semi") return bits.join("; ")
+  return joinProse(bits)
+}
+
+function groupedChildBits(children: RelationshipRecord[], asOf: string, typed: boolean): string[] {
+  const buckets = new Map<string, { one: string; many: string; children: RelationshipRecord[] }>()
+  for (const child of children) {
+    const [one, many] = childSexNoun(child, typed)
+    const key = one
+    const bucket = buckets.get(key) ?? { one, many, children: [] }
+    bucket.children.push(child)
+    buckets.set(key, bucket)
+  }
+  return [...buckets.values()].map((group) => {
+    const noun = `${countWord(group.children.length)} ${group.children.length === 1 ? group.one : group.many}`
+    const listed = peopleList(group.children, asOf, "and")
+    return listed ? `${noun} (${listed})` : noun
+  })
+}
+
+function childrenSentences(
+  children: RelationshipRecord[],
+  partners: RelationshipRecord[],
+  voice: ReportVoice,
+  asOf: string,
+  current: boolean,
+  status: string
+): string[] {
+  if (children.length === 0) return [current ? "They do not have any children." : "They did not have any children."]
   const own = children.filter((child) => childTypeOf(child) !== "step_child")
   const step = children.filter((child) => childTypeOf(child) === "step_child")
   const sentences: string[] = []
   if (own.length > 0) {
-    const groups = CHILD_TYPES.filter((type) => type !== "step_child")
-      .map((type) => ({ type, children: own.filter((child) => childTypeOf(child) === type) }))
-      .filter((group) => group.children.length > 0)
-    const bits = groups.map((group) => {
-      const [one, many] = CHILD_NOUN[group.type]
-      const noun = `${countWord(group.children.length)} ${group.children.length === 1 ? one : many}`
-      const ages = agedPhrase(group.children, asOf)
-      return ages ? `${noun}, ${ages}` : noun
-    })
-    const untyped = own.filter((child) => !childTypeOf(child))
-    if (untyped.length > 0) {
-      const noun = `${countWord(untyped.length)} ${untyped.length === 1 ? "child" : "children"}`
-      const ages = agedPhrase(untyped, asOf)
-      bits.push(ages ? `${noun}, ${ages}` : noun)
-    }
-    sentences.push(bits.length === 1 ? `They have ${bits[0]}.` : `They have ${countWord(own.length)} children: ${joinProse(bits)}.`)
+    const bits = groupedChildBits(own, asOf, true)
+    sentences.push(`They have ${joinProse(bits)}.`)
   }
   if (step.length > 0) {
-    const ages = agedPhrase(step, asOf)
-    const noun = step.length === 1 ? "one child" : `${countWord(step.length)} children`
-    sentences.push(`${voice.Possessive} partner also has ${noun} from a previous relationship${ages ? `, ${ages}` : ""}.`)
+    const female = partners.some((person) => sexWord(person.sex) === "female")
+    const male = partners.some((person) => sexWord(person.sex) === "male")
+    const whose = status === "married" && female ? "wife" : status === "married" && male ? "husband" : "partner"
+    const bits = groupedChildBits(step, asOf, false).map((bit) => bit.replace(/^one /, "a "))
+    sentences.push(`${voice.Possessive} ${whose} also has ${joinProse(bits)} from a previous relationship.`)
   }
   return sentences
 }
@@ -164,9 +231,10 @@ function currentOpening(
 ): string {
   const married = block.status === "married"
   const phrase = partnerPhrase(partners, voice, asOf, married)
-  const range = rangeBit(block, true)
+  const range = rangeBit(block, true, asOf)
   const preposition = married || block.status === "engaged" ? " to " : block.status === "dating" ? " " : " with "
-  const withPartner = phrase ? `${preposition}${phrase}${phrase.includes(",") && range ? "," : ""}${range}` : ""
+  const withPartner = phrase ? `${preposition}${phrase}${range}` : ""
+  const apart = block.status === "in_relationship_not_living_together" ? " (not living together)" : ""
   const kind =
     block.status === "married"
       ? "married"
@@ -176,12 +244,8 @@ function currentOpening(
           ? "engaged"
           : block.status === "dating"
             ? "dating"
-            : block.status === "in_relationship_not_living_together"
-              ? "in a relationship"
-              : block.status
-                ? block.status.replaceAll("_", " ")
-                : "in a relationship"
-  return `${name} has been ${kind}${withPartner}`.replace(/\s{2,}/g, " ")
+            : "in a relationship"
+  return `${name} has been ${kind}${withPartner}${apart}`.replace(/\s{2,}/g, " ")
 }
 
 /** 4.3 Current blocks, then previous blocks from most recent to oldest. */
@@ -202,25 +266,21 @@ export function partnersFromBlocks(
     const partners = members(block, people, "partner")
     const children = members(block, people, "child")
     if (partners.length === 0 && !block.status) continue
-    let opening = currentOpening(name, block, partners, voice, asOf)
-    if (children.length === 0) opening += ", with no children"
-    sentences.push(`${opening}.`)
-    sentences.push(...childrenSentences(children, voice, asOf))
+    sentences.push(`${currentOpening(name, block, partners, voice, asOf)}.`)
+    sentences.push(...childrenSentences(children, partners, voice, asOf, true, block.status))
   }
   if (current.length === 0 && ["single", "separated", "divorced", "widowed"].includes(status)) {
     const label = status === "single" ? "single" : status
     sentences.push(`${name} is currently ${label}.`)
   }
-  if (previous.length === 1) {
-    sentences.push(`${name} has had one previous significant relationship.`)
-    const lines = previousBlockSentences(previous[0], people, voice, asOf)
-    sentences.push(...lines.map((line) => line.charAt(0).toUpperCase() + line.slice(1)))
-  } else if (previous.length > 1) {
-    sentences.push(`${name} has had ${countWord(previous.length)} previous significant relationships.`)
+  if (previous.length > 0) {
+    sentences.push(
+      `${name} has had ${previous.length === 1 ? "one previous significant relationship" : `${countWord(previous.length)} previous significant relationships`}.`
+    )
+    const leadFor = current.length > 0 ? "Prior to this current relationship, " : "Previously, "
     previous.forEach((block, index) => {
-      const lines = previousBlockSentences(block, people, voice, asOf)
-      const lead = index === 0 ? "Most recently, " : "Before that, "
-      sentences.push(`${lead}${lines[0]}`)
+      const lines = previousBlockSentences(block, people, name, voice, asOf)
+      sentences.push(`${index === 0 ? leadFor : "Before that, "}${lines[0]}`)
       sentences.push(...lines.slice(1))
     })
   }
@@ -230,14 +290,15 @@ export function partnersFromBlocks(
 function previousBlockSentences(
   block: RelationshipBlock,
   people: RelationshipRecord[],
+  name: string,
   voice: ReportVoice,
   asOf: string
 ): string[] {
   const partners = members(block, people, "partner")
   const children = members(block, people, "child")
-  const line = endedRelationshipClause(block, partners, voice, asOf)
-  const sentences = [`${line}${children.length === 0 ? ", with no children" : ""}.`]
-  sentences.push(...childrenSentences(children, voice, asOf))
+  const line = endedRelationshipClause(block, partners, voice, asOf).replace(new RegExp(`^${voice.subject}\\b`), name)
+  const sentences = [`${line}.`]
+  sentences.push(...childrenSentences(children, partners, voice, asOf, false, block.status))
   return sentences
 }
 
@@ -259,8 +320,8 @@ export function childrenFromBlocks(name: string, blocks: RelationshipBlock[], pe
   const bits = groups.map((group) => {
     const [one, many] = CHILD_NOUN[group.type]
     const noun = `${countWord(group.children.length)} ${group.children.length === 1 ? one : many}`
-    const ages = agesDescending(group.children, asOf)
-    return ages.length > 0 ? `${noun} (${joinProse(ages.map(String))})` : noun
+    const listed = peopleList(group.children, asOf, "semi")
+    return listed ? `${noun} (${listed})` : noun
   })
   return `In total, ${name} has ${countWord(children.length)} children: ${joinProse(bits)}.`
 }
@@ -272,22 +333,22 @@ function parentRole(person: RelationshipRecord): string {
   return "parent"
 }
 
-function parentLine(person: RelationshipRecord, voice: ReportVoice, name: string, dateOfBirth: string | null, asOf: string): string | null {
+function parentLine(person: RelationshipRecord, owner: string, name: string, dateOfBirth: string | null, asOf: string): string | null {
   const role = parentRole(person)
-  if (person.notKnown) return `${voice.Possessive} ${role} is not known.`
+  const living = wrappedDetail(person, asOf)
+  const named = person.givenName.trim() ? ` (${person.givenName.trim()})` : ""
+  if (person.notKnown) return `${owner} ${role} is not known.`
   if (deceased(person)) {
     const year = person.dateOfDeath ? yearOf(precisionForPartialDate(parsePartialDate(person.dateOfDeath)) ?? "", person.dateOfDeath) : ""
     const age = person.dateOfDeath ? ageOn(dateOfBirth, person.dateOfDeath) : null
-    if (year && age != null) return `${voice.Possessive} ${role} died in ${year}, when ${name} was ${age}.`
-    if (year) return `${voice.Possessive} ${role} died in ${year}.`
-    if (age != null) return `${voice.Possessive} ${role} died when ${name} was ${age}.`
-    return `${voice.Possessive} ${role} is deceased.`
+    if (year && age != null) return `${owner} ${role}${named} died in ${year}, when ${name} was ${age}.`
+    if (year) return `${owner} ${role}${named} died in ${year}.`
+    if (age != null) return `${owner} ${role}${named} died when ${name} was ${age}.`
+    return `${owner} ${role}${named || " (deceased)"} is deceased.`
   }
-  const age = person.dateOfBirth ? personAge(person.dateOfBirth, asOf) : null
   const health = person.healthStatus === "good" ? "in good health" : person.healthStatus === "fair" ? "in fair health" : person.healthStatus === "poor" ? "in poor health" : ""
-  if (age != null && health) return `${voice.Possessive} ${role} is ${age} and ${health}.`
-  if (age != null) return `${voice.Possessive} ${role} is ${age}.`
-  if (health) return `${voice.Possessive} ${role} is ${health}.`
+  if (health) return `${owner} ${role}${living} is ${health}.`
+  if (living) return `${owner} ${role}${living}.`
   return null
 }
 
@@ -316,14 +377,22 @@ function bareBlock(block: RelationshipBlock): boolean {
   return !block.status.trim() && !block.startedOn.trim() && !block.endedOn.trim()
 }
 
-function parentLaterClause(block: RelationshipBlock, name: string, voice: ReportVoice, dateOfBirth: string | null): string {
+function parentLaterClause(
+  block: RelationshipBlock,
+  name: string,
+  voice: ReportVoice,
+  dateOfBirth: string | null,
+  people: RelationshipRecord[]
+): string {
   const startAge = block.startedOn.trim() ? ageOn(dateOfBirth, block.startedOn) : null
   const endAge = block.endedOn.trim() ? ageOn(dateOfBirth, block.endedOn) : null
   const startYear = block.startedOn.trim() ? yearOf(precisionForPartialDate(parsePartialDate(block.startedOn)) ?? "", block.startedOn) : ""
   const endYear = block.endedOn.trim() ? yearOf(precisionForPartialDate(parsePartialDate(block.endedOn)) ?? "", block.endedOn) : ""
+  const partner = members(block, people, "partner").find((person) => person.givenName.trim())
+  const who = partner ? ` (${partner.givenName.trim()})` : ""
   const marriage = ["married", "divorced", "widowed", "married_separated"].includes(block.status)
   if (marriage) {
-    const began = startAge != null ? `remarried when ${name} was ${startAge}` : startYear ? `remarried in ${startYear}` : "remarried"
+    const began = startAge != null ? `remarried${who} when ${name} was ${startAge}` : startYear ? `remarried${who} in ${startYear}` : `remarried${who}`
     if (!block.endedOn.trim() && block.status === "married") return began
     const ended = endAge != null ? `, and that marriage ended when ${voice.subject} was ${endAge}` : block.endedOn.trim() ? ", and that marriage ended" : ""
     return `${began}${ended}`
@@ -362,7 +431,8 @@ function laterClauses(
   blocks: RelationshipBlock[],
   name: string,
   voice: ReportVoice,
-  dateOfBirth: string | null
+  dateOfBirth: string | null,
+  people: RelationshipRecord[]
 ): string[] {
   const dated = blocks.filter((block) => !undated(block))
   const grouped = new Map<string, RelationshipBlock[]>()
@@ -370,11 +440,11 @@ function laterClauses(
     grouped.set(block.status, [...(grouped.get(block.status) ?? []), block])
   }
   const clauses: string[] = []
-  for (const block of dated) clauses.push(parentLaterClause(block, name, voice, dateOfBirth))
+  for (const block of dated) clauses.push(parentLaterClause(block, name, voice, dateOfBirth, people))
   for (const [status, group] of grouped) {
     const combined = combinedLaterClause(status, group.length)
     if (combined) clauses.push(combined)
-    else for (const block of group) clauses.push(parentLaterClause(block, name, voice, dateOfBirth))
+    else for (const block of group) clauses.push(parentLaterClause(block, name, voice, dateOfBirth, people))
   }
   return clauses
 }
@@ -385,7 +455,8 @@ function laterSentences(
   answer: string,
   voice: ReportVoice,
   name: string,
-  dateOfBirth: string | null
+  dateOfBirth: string | null,
+  people: RelationshipRecord[]
 ): string[] {
   const verb = "has had"
   if (answer === "none") return [`${voice.Possessive} ${role} ${verb} no later relationships.`]
@@ -397,7 +468,7 @@ function laterSentences(
   const bare = mine.length - detailed.length
   const counted = `${name}'s ${role} ${verb} ${countWord(mine.length)} later ${mine.length === 1 ? "relationship" : "relationships"}`
   if (detailed.length === 0) return [`${counted}.`]
-  const clauses = laterClauses(detailed, name, voice, dateOfBirth)
+  const clauses = laterClauses(detailed, name, voice, dateOfBirth, people)
   if (clauses.length === 1 && bare === 0 && clauses[0].startsWith("has ")) {
     return [`${name}'s ${role} ${clauses[0]}.`]
   }
@@ -424,11 +495,12 @@ export function parentsFromBlocks(
   const sentences: string[] = []
   const biological = blocks.find((block) => block.kind === "biological_parents")
   if (biological) {
-    const parents = members(biological, people, "parent")
-    for (const person of parents) {
-      const line = parentLine(person, voice, name, dateOfBirth, asOf)
+    const parents = members(biological, people, "parent").sort((a, b) => (parentRole(a) === "mother" ? 0 : 1) - (parentRole(b) === "mother" ? 0 : 1))
+    parents.forEach((person, index) => {
+      const owner = index === 0 ? `${name}'s` : voice.Possessive
+      const line = parentLine(person, owner, name, dateOfBirth, asOf)
       if (line) sentences.push(line)
-    }
+    })
     const bond = parentsBond(biological, voice, name, dateOfBirth)
     if (bond) sentences.push(bond)
   }
@@ -457,7 +529,8 @@ export function parentsFromBlocks(
         caregiver?.caregiverRelationshipDetail.trim() ||
         (caregiver?.blockRoleType ?? "").replaceAll("_", " ") ||
         (block.arrangementType === "grandparent_care" ? "grandparent" : "caregiver")
-      care = `${name} was mainly cared for by ${voice.possessive} ${lowerKeepingTypedCase(detail)}`
+      const carer = caregiver?.givenName.trim() ? ` (${caregiver.givenName.trim()})` : ""
+      care = `${name} was mainly cared for by ${voice.possessive} ${lowerKeepingTypedCase(detail)}${carer}`
     }
     if (span || care) sentences.push(`${span ? `${span}, ` : ""}${care}.`)
   }
@@ -468,14 +541,22 @@ export function parentsFromBlocks(
     fatherOtherRelationships: "",
     caregiverArrangements: "",
   }
-  sentences.push(...laterSentences("mother", blocks, recorded.motherOtherRelationships, voice, name, dateOfBirth))
-  sentences.push(...laterSentences("father", blocks, recorded.fatherOtherRelationships, voice, name, dateOfBirth))
+  sentences.push(...laterSentences("mother", blocks, recorded.motherOtherRelationships, voice, name, dateOfBirth, people))
+  sentences.push(...laterSentences("father", blocks, recorded.fatherOtherRelationships, voice, name, dateOfBirth, people))
   return sentences.length > 0 ? sentences.join(" ") : null
 }
 
 function ordinalWord(value: number): string {
   const words = ["", "first", "second", "third", "fourth", "fifth", "sixth", "seventh", "eighth", "ninth"]
   return words[value] ?? String(value)
+}
+
+function siblingGroupLabel(group: RelationshipRecord[], label: string): string {
+  const sexes = new Set(group.map(siblingSex))
+  if (sexes.size !== 1) return label
+  const sex = [...sexes][0]
+  if (sex !== "brother" && sex !== "sister") return label
+  return label.replace(/sibling$/, sex)
 }
 
 function siblingSex(person: RelationshipRecord): string {
@@ -552,10 +633,13 @@ export function siblingsFromBlocks(
   const bits: string[] = []
   const pushGroup = (group: RelationshipRecord[], label: string) => {
     if (group.length === 0) return
-    const noun = `${countWord(group.length)} ${group.length === 1 ? label : label.endsWith("sibling") ? label.replace("sibling", "siblings") : `${label}s`}`
-    const detail = label.startsWith("full") || label.startsWith("adoptive sibling") ? fullDetail(group, asOf) : ""
+    const sexLabel = label.startsWith("full") ? label : siblingGroupLabel(group, label)
+    const noun = `${countWord(group.length)} ${group.length === 1 ? sexLabel : sexLabel.endsWith("sibling") ? sexLabel.replace("sibling", "siblings") : sexLabel.endsWith("sister") ? sexLabel.replace(/sister$/, "sisters") : sexLabel.endsWith("brother") ? sexLabel.replace(/brother$/, "brothers") : `${sexLabel}s`}`
+    const named = group.some((person) => person.givenName.trim()) ? peopleList(group, asOf, "and") : ""
+    const detail = named ? "" : label.startsWith("full") || label.startsWith("adoptive sibling") ? fullDetail(group, asOf) : ""
     const ages = agesDescending(group, asOf)
-    if (detail) bits.push(`${noun} (${detail})`)
+    if (named) bits.push(`${noun} (${named})`)
+    else if (detail) bits.push(`${noun} (${detail})`)
     else if (ages.length > 0) bits.push(`${noun} (${joinProse(ages.map(String))})`)
     else bits.push(noun)
   }
@@ -591,9 +675,10 @@ export function siblingsFromBlocks(
     for (const person of group.filter(deceased)) {
       const age = person.dateOfDeath ? ageOn(dateOfBirth, person.dateOfDeath) : null
       const index = ordered.findIndex((row) => row.relationshipRecordId === person.relationshipRecordId)
-      const place = index >= 0 && ordered.length > 1 ? `${ordinalWord(index + 1)} ` : ""
+      const place = person.givenName.trim() || !(index >= 0 && ordered.length > 1) ? "" : `${ordinalWord(index + 1)} `
+      const called = person.givenName.trim() ? ` (${person.givenName.trim()})` : ""
       const when = age != null ? ` when ${name} was ${age}` : ""
-      sentences.push(`${voice.Possessive} ${place}${sexName} died${when}.`.replace(/\s{2,}/g, " "))
+      sentences.push(`${voice.Possessive} ${place}${sexName}${called} died${when}.`.replace(/\s{2,}/g, " "))
     }
   }
   return sentences.join(" ")

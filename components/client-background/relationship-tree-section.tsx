@@ -318,7 +318,22 @@ function TreeCard({
         </button>
       </CardHeader>
       <CardContent>
-        <BranchList nodes={nodes} plainNotes onPerson={onPerson} onBlock={onBlock} />
+        {nodes.some((node) => node.kind === "section") ? (
+          <div className="space-y-6">
+            {nodes.map((node, index) =>
+              node.kind === "section" ? (
+                <div key={node.title}>
+                  <h3 className="mb-2 text-sm font-semibold">{node.title}</h3>
+                  {node.children.length > 0 ? <ConnectedList nodes={node.children} onPerson={onPerson} onBlock={onBlock} /> : null}
+                </div>
+              ) : (
+                <ConnectedList key={nodeKey(node, index)} nodes={[node]} onPerson={onPerson} onBlock={onBlock} />
+              )
+            )}
+          </div>
+        ) : (
+          <ConnectedList nodes={nodes} onPerson={onPerson} onBlock={onBlock} />
+        )}
       </CardContent>
     </Card>
   )
@@ -403,23 +418,27 @@ function TreeNode({
   if (node.kind === "person") {
     const [name, ...rest] = node.line.split(" · ")
     return (
-      <button type="button" className="flex min-h-10 w-full items-center gap-2 rounded-md px-1 text-left hover:bg-muted" onClick={() => onPerson(node.id)}>
-        <span
-          className={cn(
-            "flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-medium",
-            node.deceased ? "border-2 border-dashed border-[#a1a1aa]" : "bg-muted"
-          )}
-          aria-hidden
-        >
-          {node.initial}
-        </span>
-        <span className="text-sm">
-          <span className="font-medium">{name}</span>
-          {rest.length > 0 ? <span className="text-muted-foreground"> · {rest.join(" · ")}</span> : null}
-        </span>
-      </button>
+      <>
+        <button type="button" className="flex min-h-10 w-full items-center gap-2 rounded-md px-1 text-left hover:bg-muted" onClick={() => onPerson(node.id)}>
+          <span
+            className={cn(
+              "flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-medium",
+              node.deceased ? "border-2 border-dashed border-[#a1a1aa]" : "bg-muted"
+            )}
+            aria-hidden
+          >
+            {node.initial}
+          </span>
+          <span className="text-sm">
+            <span className="font-medium">{name}</span>
+            {rest.length > 0 ? <span className="text-muted-foreground"> · {rest.join(" · ")}</span> : null}
+          </span>
+        </button>
+        {node.children.length > 0 ? <ConnectedList nodes={node.children} onPerson={onPerson} onBlock={onBlock} /> : null}
+      </>
     )
   }
+  if (node.kind === "section") return null
   if (node.kind === "block") {
     return (
       <>
@@ -1275,7 +1294,8 @@ function roleTitle(person: RelationshipRecord, block: RelationshipBlock | null):
 
 function nodeKey(node: RelationshipTreeNode, index: number): string {
   if (node.kind === "person" || node.kind === "block") return node.id
-  if (node.kind === "note") return node.text
+  if (node.kind === "note") return `${node.text}-${index}`
+  if (node.kind === "section") return node.title
   return `${node.label}-${index}`
 }
 

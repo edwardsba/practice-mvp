@@ -13,13 +13,11 @@ import {
   updateBlockMemberAction,
   updateRelationshipBlockAction,
 } from "@/app/clients/[client_id]/background/actions"
-import { PartialDatePicker, SelectField, TextAreaField, TextField, selectClassName } from "@/components/client-background/fields"
+import { PartialDatePicker, SelectField, TextAreaField, TextField } from "@/components/client-background/fields"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   childTypesForBlock,
   isPartneredClientStatus,
-  moveDestinationKind,
-  moveDestinations,
   rolesForBlock,
   siblingTypesForBlock,
 } from "@/lib/client-background/relationship-blocks"
@@ -28,6 +26,7 @@ import {
   buildRelationshipTree,
   headingFor,
   linesAboutPerson,
+  moveTargets,
   type RelationshipTreeNode,
 } from "@/lib/client-background/relationship-tree"
 import { todayDateString } from "@/lib/dates/practice-time"
@@ -133,7 +132,7 @@ export function RelationshipTreeSection({
     asOf: todayDateString(),
   })
   const [selection, setSelection] = useState<Selection | null>(null)
-  const [mode, setMode] = useState<"view" | "edit">("view")
+  const [mode, setMode] = useState<"view" | "edit" | "move">("view")
   const [error, setError] = useState("")
   const [saving, setSaving] = useState(false)
   const [ready, setReady] = useState(false)
@@ -251,6 +250,7 @@ export function RelationshipTreeSection({
                     error={error}
                     onClose={close}
                     onEdit={() => { setMode("edit"); setError("") }}
+                    onStartMove={() => { setMode("move"); setError("") }}
                     onCancel={() => { setMode("view"); setError("") }}
                     onSave={async (draft) => {
                       const saved = await apply(() => updateBlockMemberAction(clientId, personFromDraft(person, draft)))
@@ -261,7 +261,8 @@ export function RelationshipTreeSection({
                       if (removed) close()
                     }}
                     onMove={async (destinationId, role, roleType) => {
-                      await apply(() => moveBlockMemberAction(clientId, person.relationshipRecordId, destinationId, role, roleType))
+                      const moved = await apply(() => moveBlockMemberAction(clientId, person.relationshipRecordId, destinationId, role, roleType))
+                      if (moved) setMode("view")
                     }}
                   />
                 ) : selection.type === "block" && block ? (
@@ -269,7 +270,7 @@ export function RelationshipTreeSection({
                     block={block}
                     people={people.filter((item) => item.relationshipBlockId === block.relationshipBlockId)}
                     locked={block.relationshipBlockId === lockedId}
-                    mode={mode}
+                    mode={mode === "move" ? "view" : mode}
                     saving={saving}
                     error={error}
                     onClose={close}
@@ -317,13 +318,50 @@ function TreeCard({
         </button>
       </CardHeader>
       <CardContent>
-        <BranchList nodes={nodes} onPerson={onPerson} onBlock={onBlock} />
+        <BranchList nodes={nodes} plainNotes onPerson={onPerson} onBlock={onBlock} />
       </CardContent>
     </Card>
   )
 }
 
 function BranchList({
+  nodes,
+  plainNotes = false,
+  onPerson,
+  onBlock,
+}: {
+  nodes: RelationshipTreeNode[]
+  plainNotes?: boolean
+  onPerson: (id: string) => void
+  onBlock: (id: string) => void
+}) {
+  if (!plainNotes) return <ConnectedList nodes={nodes} onPerson={onPerson} onBlock={onBlock} />
+  const parts: ({ kind: "list"; nodes: Exclude<RelationshipTreeNode, { kind: "note" }>[] } | { kind: "note"; text: string })[] = []
+  for (const node of nodes) {
+    if (node.kind === "note") {
+      parts.push({ kind: "note", text: node.text })
+      continue
+    }
+    const last = parts[parts.length - 1]
+    if (last?.kind === "list") last.nodes.push(node)
+    else parts.push({ kind: "list", nodes: [node] })
+  }
+  return (
+    <>
+      {parts.map((part, index) =>
+        part.kind === "note" ? (
+          <p key={`${part.text}-${index}`} className="my-3 text-sm text-muted-foreground">
+            {part.text}
+          </p>
+        ) : (
+          <ConnectedList key={`list-${index}`} nodes={part.nodes} onPerson={onPerson} onBlock={onBlock} />
+        )
+      )}
+    </>
+  )
+}
+
+function ConnectedList({
   nodes,
   onPerson,
   onBlock,
@@ -332,33 +370,24 @@ function BranchList({
   onPerson: (id: string) => void
   onBlock: (id: string) => void
 }) {
-  const items = nodes.filter((node) => node.kind !== "note")
-  const notes = nodes.filter((node) => node.kind === "note")
   return (
-    <>
-      {items.length > 0 ? (
-        <ul>
-          {items.map((node, index) => (
-            <li key={nodeKey(node, index)} className="relative pl-4">
-              <span
-                aria-hidden
-                className="absolute top-0 left-0 w-0.5 bg-[#a1a1aa]"
-                style={{ height: index === items.length - 1 ? 20 : "100%" }}
-              />
-              <span aria-hidden className="absolute top-5 left-0 h-0.5 w-4 bg-[#a1a1aa]" />
-              <TreeNode node={node} onPerson={onPerson} onBlock={onBlock} />
-            </li>
-          ))}
-        </ul>
-      ) : null}
-      {notes.map((note) =>
-        note.kind === "note" ? (
-          <p key={note.text} className="mt-3 text-sm text-muted-foreground">
-            {note.text}
-          </p>
-        ) : null
-      )}
-    </>
+    <ul>
+      {nodes.map((node, index) => (
+        <li key={nodeKey(node, index)} className="relative pl-4">
+          <span
+            aria-hidden
+            className="absolute top-0 left-0 w-0.5 bg-[#a1a1aa]"
+            style={{ height: index === nodes.length - 1 ? 20 : "100%" }}
+          />
+          <span aria-hidden className="absolute top-5 left-0 h-0.5 w-4 bg-[#a1a1aa]" />
+          {node.kind === "note" ? (
+            <p className="flex min-h-10 items-center px-1 text-sm text-muted-foreground italic">{node.text}</p>
+          ) : (
+            <TreeNode node={node} onPerson={onPerson} onBlock={onBlock} />
+          )}
+        </li>
+      ))}
+    </ul>
   )
 }
 
@@ -394,7 +423,7 @@ function TreeNode({
   if (node.kind === "block") {
     return (
       <>
-        <button type="button" className="flex min-h-10 w-full flex-col justify-center rounded-md px-1 text-left hover:bg-muted" onClick={() => onBlock(node.id)}>
+        <button type="button" className="flex min-h-10 w-full flex-col justify-center rounded-[8px] bg-[#f4f4f5] px-3 py-2 text-left hover:bg-[#e4e4e7]" onClick={() => onBlock(node.id)}>
           <span className="text-sm font-medium">{node.heading}</span>
           {node.meta ? <span className="text-xs text-muted-foreground">{node.meta}</span> : null}
         </button>
@@ -402,19 +431,13 @@ function TreeNode({
       </>
     )
   }
+  if (node.children.length === 0) {
+    return node.empty ? <p className="flex min-h-10 items-center px-1 text-sm text-muted-foreground italic">{node.empty}</p> : null
+  }
   return (
     <>
       <p className="flex min-h-10 items-center px-1 text-sm text-muted-foreground">{node.label}</p>
-      {node.children.length > 0 ? <BranchList nodes={node.children} onPerson={onPerson} onBlock={onBlock} /> : null}
-      {node.children.length === 0 && node.empty ? (
-        <ul>
-          <li className="relative pl-4">
-            <span aria-hidden className="absolute top-0 left-0 h-5 w-0.5 bg-[#a1a1aa]" />
-            <span aria-hidden className="absolute top-5 left-0 h-0.5 w-4 bg-[#a1a1aa]" />
-            <p className="flex min-h-10 items-center px-1 text-sm text-muted-foreground italic">{node.empty}</p>
-          </li>
-        </ul>
-      ) : null}
+      <BranchList nodes={node.children} onPerson={onPerson} onBlock={onBlock} />
     </>
   )
 }
@@ -431,6 +454,7 @@ function PersonPanel({
   error,
   onClose,
   onEdit,
+  onStartMove,
   onCancel,
   onSave,
   onRemove,
@@ -442,11 +466,12 @@ function PersonPanel({
   people: RelationshipRecord[]
   events: EventRecord[]
   dateOfBirth: string | null
-  mode: "view" | "edit"
+  mode: "view" | "edit" | "move"
   saving: boolean
   error: string
   onClose: () => void
   onEdit: () => void
+  onStartMove: () => void
   onCancel: () => void
   onSave: (draft: PersonDraft) => Promise<void>
   onRemove: () => Promise<void>
@@ -467,6 +492,10 @@ function PersonPanel({
         subtitle={`${title} · ${context}`}
         onClose={onClose}
       />
+      {mode === "move" ? (
+        <MoveStep name={nodeName} person={person} blocks={blocks} saving={saving} error={error} onCancel={onCancel} onMove={onMove} />
+      ) : (
+      <>
       <div className="min-h-0 flex-1 overflow-y-auto p-4">
         {mode === "view" ? (
           <div className="space-y-6">
@@ -499,16 +528,18 @@ function PersonPanel({
         {error ? <p className="mt-3 text-sm text-destructive">{error}</p> : null}
       </div>
       {mode === "view" ? (
-        <footer className="space-y-3 border-t p-4">
-          <MoveBox person={person} blocks={blocks} disabled={saving} onMove={onMove} />
-          <div className="flex justify-end">
-            <button type="button" className="inline-flex min-h-10 items-center rounded-md bg-primary px-3 text-sm text-primary-foreground" onClick={onEdit}>
-              Edit
-            </button>
-          </div>
+        <footer className="flex items-center justify-end gap-2 border-t p-4">
+          <button type="button" className="inline-flex min-h-10 items-center rounded-md border px-3 text-sm" onClick={onStartMove}>
+            Move to…
+          </button>
+          <button type="button" className="inline-flex min-h-10 items-center rounded-md bg-primary px-3 text-sm text-primary-foreground" onClick={onEdit}>
+            Edit
+          </button>
         </footer>
       ) : (
         <EditFooter saving={saving} onRemove={() => void onRemove()} onCancel={onCancel} onSave={() => void onSave(draft)} />
+      )}
+      </>
       )}
     </>
   )
@@ -874,61 +905,112 @@ function BlockFields({
   )
 }
 
-function MoveBox({
+function MoveStep({
+  name,
   person,
   blocks,
-  disabled,
+  saving,
+  error,
+  onCancel,
   onMove,
 }: {
+  name: string
   person: RelationshipRecord
   blocks: RelationshipBlock[]
-  disabled: boolean
+  saving: boolean
+  error: string
+  onCancel: () => void
   onMove: (destinationId: string, role: BlockRole, roleType: string) => Promise<void>
 }) {
-  const destinations = moveDestinations(blocks)
-  const [destinationId, setDestinationId] = useState(() => destinations.find((item) => item.id !== person.relationshipBlockId)?.id ?? destinations[0]?.id ?? "")
-  const kind = moveDestinationKind(blocks, destinationId)
-  const roles = kind ? [...rolesForBlock(kind)] : []
-  const [roleChoice, setRoleChoice] = useState<BlockRole>(roles[0] ?? "partner")
-  const role = roles.includes(roleChoice) ? roleChoice : roles[0] ?? "partner"
-  const arrangement = blocks.find((item) => item.relationshipBlockId === destinationId)?.arrangementType ?? ""
-  const types = typesFor(kind, role, arrangement)
-  const [typeChoice, setTypeChoice] = useState(types[0] ?? "")
-  const roleType = types.includes(typeChoice) ? typeChoice : types[0] ?? ""
+  const targets = moveTargets(blocks, person.relationshipBlockId ?? null)
+  const [blockId, setBlockId] = useState("")
+  const [role, setRole] = useState<BlockRole | "">("")
+  const [roleType, setRoleType] = useState("")
+  const target = targets.find((item) => item.id === blockId)
+  const roles = target ? rolesForBlock(target.kind) : []
+  const chosenRole = role && roles.includes(role) ? role : ""
+  const arrangement = blocks.find((item) => item.relationshipBlockId === blockId)?.arrangementType ?? ""
+  const types = chosenRole ? typesFor(target?.kind ?? null, chosenRole, arrangement) : []
+  const chosenType = types.includes(roleType) ? roleType : ""
+  const ready = Boolean(blockId && chosenRole && (types.length === 0 || chosenType))
   return (
-    <div className="space-y-2">
-      <div className="grid gap-2 sm:grid-cols-3">
-        <label className="space-y-1 text-sm">
-          <span className="text-muted-foreground">Move to…</span>
-          <select className={selectClassName} value={destinationId} onChange={(event) => setDestinationId(event.target.value)}>
-            {destinations.map((item) => (
-              <option key={item.id} value={item.id}>{item.label}</option>
+    <>
+      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
+        <h3 className="text-sm font-medium">Move {name} to…</h3>
+        <fieldset className="space-y-1">
+          <legend className="text-sm text-muted-foreground">Relationship</legend>
+          {targets.map((item) => (
+            <label key={item.id} className="flex min-h-10 items-center gap-2 text-sm">
+              <input
+                type="radio"
+                name={`move-block-${person.relationshipRecordId}`}
+                checked={blockId === item.id}
+                onChange={() => {
+                  setBlockId(item.id)
+                  setRole("")
+                  setRoleType("")
+                }}
+              />
+              {item.label}
+            </label>
+          ))}
+        </fieldset>
+        <fieldset className={cn("space-y-1", !blockId && "opacity-60")} disabled={!blockId}>
+          <legend className="text-sm text-muted-foreground">Role</legend>
+          {blockId ? (
+            roles.map((item) => (
+              <label key={item} className="flex min-h-10 items-center gap-2 text-sm">
+                <input
+                  type="radio"
+                  name={`move-role-${person.relationshipRecordId}`}
+                  checked={chosenRole === item}
+                  onChange={() => {
+                    setRole(item)
+                    setRoleType("")
+                  }}
+                />
+                {ROLE_LABELS[item]}
+              </label>
+            ))
+          ) : (
+            <p className="flex min-h-10 items-center text-sm text-muted-foreground">Choose a relationship first.</p>
+          )}
+        </fieldset>
+        {chosenRole && types.length > 0 ? (
+          <fieldset className="space-y-1">
+            <legend className="text-sm text-muted-foreground">Type</legend>
+            {types.map((item) => (
+              <label key={item} className="flex min-h-10 items-center gap-2 text-sm">
+                <input
+                  type="radio"
+                  name={`move-type-${person.relationshipRecordId}`}
+                  checked={chosenType === item}
+                  onChange={() => setRoleType(item)}
+                />
+                {typeOptionLabel(chosenRole, item)}
+              </label>
             ))}
-          </select>
-        </label>
-        <label className="space-y-1 text-sm">
-          <span className="text-muted-foreground">Role</span>
-          <select className={selectClassName} value={role} onChange={(event) => setRoleChoice(event.target.value as BlockRole)}>
-            {roles.map((item) => (
-              <option key={item} value={item}>{ROLE_LABELS[item]}</option>
-            ))}
-          </select>
-        </label>
-        {types.length > 0 ? (
-          <label className="space-y-1 text-sm">
-            <span className="text-muted-foreground">Type</span>
-            <select className={selectClassName} value={roleType} onChange={(event) => setTypeChoice(event.target.value)}>
-              {types.map((item) => (
-                <option key={item} value={item}>{typeOptionLabel(role, item)}</option>
-              ))}
-            </select>
-          </label>
+          </fieldset>
         ) : null}
+        {error ? <p className="text-sm text-destructive">{error}</p> : null}
       </div>
-      <button type="button" className="inline-flex min-h-10 items-center text-sm text-primary underline-offset-2 hover:underline disabled:opacity-60" disabled={disabled || !destinationId} onClick={() => void onMove(destinationId, role, roleType)}>
-        Move
-      </button>
-    </div>
+      <footer className="flex items-center justify-end gap-2 border-t p-4">
+        <button type="button" className="inline-flex min-h-10 items-center rounded-md border px-3 text-sm" disabled={saving} onClick={onCancel}>
+          Cancel
+        </button>
+        <button
+          type="button"
+          className="inline-flex min-h-10 items-center rounded-md bg-primary px-3 text-sm text-primary-foreground disabled:opacity-60"
+          disabled={saving || !ready || chosenRole === ""}
+          onClick={() => {
+            if (chosenRole === "") return
+            void onMove(blockId, chosenRole, chosenType)
+          }}
+        >
+          Move
+        </button>
+      </footer>
+    </>
   )
 }
 

@@ -1,8 +1,8 @@
 import assert from "node:assert/strict"
 
-import { siblingTypesForBlock } from "@/lib/client-background/relationship-blocks"
+import { NEW_CURRENT_RELATIONSHIP, NEW_PREVIOUS_RELATIONSHIP, siblingTypesForBlock } from "@/lib/client-background/relationship-blocks"
 import { emptyBlockAnswers } from "@/lib/client-background/types"
-import { buildRelationshipTree, type RelationshipTreeNode } from "@/lib/client-background/relationship-tree"
+import { buildRelationshipTree, moveTargets, type RelationshipTreeNode } from "@/lib/client-background/relationship-tree"
 import { tomBlocks, tomExampleSource, tomRelationships, TOM_REPORT_DATE } from "@/lib/reports/tom-example-fixture"
 
 assert.deepEqual(siblingTypesForBlock("biological_parents"), ["full", "adopted"])
@@ -55,10 +55,7 @@ assert.deepEqual(tree.partners.children.map(shape), [
   {
     heading: "Previous · De facto, separated",
     meta: "2005–2011 · 6 years",
-    children: [
-      "Pam · woman · 47",
-      { label: "Children", empty: "No children", children: [] },
-    ],
+    children: ["Pam · woman · 47", "No children"],
   },
   {
     heading: "Previous · Divorced",
@@ -81,7 +78,7 @@ assert.deepEqual(tree.parents.children.map(shape), [
       {
         label: "Siblings · eldest first",
         empty: null,
-        children: ["Harry · brother · 58 · full", "Ann · sister · 52 · full", "Michael · brother · died 1989 · full"],
+        children: ["Harry · brother · 58 · full", "Ann · sister · 52 · full", "Michael · brother · died 1989 (client 19) · full"],
       },
     ],
   },
@@ -99,11 +96,8 @@ assert.deepEqual(tree.parents.children.map(shape), [
   },
   {
     heading: "Mother's relationship · De facto",
-    meta: "since 2010 · client aged 40",
-    children: [
-      "Larry · step-father · 70",
-      { label: "Siblings", empty: "No siblings from this relationship", children: [] },
-    ],
+    meta: "since 2010 · from client aged 40",
+    children: ["Larry · step-father · 70", "No siblings from this relationship"],
   },
   "Father's other relationships: none",
   {
@@ -128,6 +122,63 @@ assert.equal(
 )
 const siblings = listed.filter((person) => person.line.includes("· full") || person.line.includes("· half") || person.line.includes("· step"))
 const biological = siblings.filter((person) => person.context === "Biological parents").map((person) => person.line)
-assert.deepEqual(biological, ["Harry · brother · 58 · full", "Ann · sister · 52 · full", "Michael · brother · died 1989 · full"])
+assert.deepEqual(biological, ["Harry · brother · 58 · full", "Ann · sister · 52 · full", "Michael · brother · died 1989 (client 19) · full"])
+
+function assertFilledGroups(nodes: RelationshipTreeNode[]) {
+  for (const node of nodes) {
+    if (node.kind === "group") {
+      assert.ok(node.children.length > 0, node.label)
+      assert.equal(node.empty, null)
+      assertFilledGroups(node.children)
+    } else if (node.kind === "block") assertFilledGroups(node.children)
+  }
+}
+assertFilledGroups([...tree.partners.children, ...tree.parents.children])
+
+const parentOrder = tree.parents.children.map((node) =>
+  node.kind === "note" ? node.text : node.kind === "block" ? node.heading : node.kind === "group" ? node.label : ""
+)
+const motherAt = parentOrder.findIndex((item) => item.startsWith("Mother's relationship"))
+const fatherAt = parentOrder.indexOf("Father's other relationships: none")
+const careAt = parentOrder.findIndex((item) => item.startsWith("Caregiver"))
+assert.ok(parentOrder[0]?.startsWith("Biological parents"))
+assert.ok(motherAt > 0 && fatherAt > motherAt && careAt > fatherAt)
+
+const sally = tomRelationships().find((person) => person.givenName === "Sally")
+const sallyTargets = moveTargets(tomBlocks(), sally?.relationshipBlockId ?? null).map((item) => item.id)
+assert.deepEqual(sallyTargets, [
+  "tom-current",
+  "tom-pam",
+  "tom-kim",
+  "tom-phil",
+  "tom-larry",
+  "tom-joan",
+  NEW_CURRENT_RELATIONSHIP,
+  NEW_PREVIOUS_RELATIONSHIP,
+])
+assert.equal(sallyTargets.includes("tom-bio"), false)
+
+const sample = tomBlocks()[0]
+const wider = moveTargets(
+  [
+    ...tomBlocks(),
+    { ...sample, relationshipBlockId: "tom-other", kind: "client_other_children", status: "", startedOn: "", endedOn: "" },
+    { ...sample, relationshipBlockId: "tom-father", kind: "parent_other", parentSide: "father", parentRecordId: "tom-john", status: "divorced", startedOn: "1975", endedOn: "1980" },
+  ],
+  null
+).map((item) => item.id)
+assert.deepEqual(wider, [
+  "tom-current",
+  "tom-pam",
+  "tom-kim",
+  "tom-other",
+  "tom-bio",
+  "tom-phil",
+  "tom-larry",
+  "tom-father",
+  "tom-joan",
+  NEW_CURRENT_RELATIONSHIP,
+  NEW_PREVIOUS_RELATIONSHIP,
+])
 
 console.log("relationship tree selftest passed")

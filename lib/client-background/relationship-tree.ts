@@ -1,4 +1,4 @@
-import { previousBlocksInOrder } from "@/lib/client-background/relationship-blocks"
+import { NEW_CURRENT_RELATIONSHIP, NEW_PREVIOUS_RELATIONSHIP, previousBlocksInOrder } from "@/lib/client-background/relationship-blocks"
 import {
   ARRANGEMENT_TYPE_LABELS,
   CAREGIVER_RELATIONSHIP_LABELS,
@@ -193,25 +193,24 @@ function childrenFor(block: RelationshipBlock, people: RelationshipRecord[], inp
   }
   if (block.kind === "caregiver_arrangement") {
     nodes.push(...members(block, people, "caregiver").map((person) => personNode(person, block, people, input)))
-    const siblings = siblingPeople(block, people, input.asOf)
-    if (siblings.length > 0) nodes.push(siblingGroup(block, people, input, "Siblings", null))
+    if (siblingPeople(block, people, input.asOf).length > 0) nodes.push(siblingGroup(block, people, input, "Siblings", null))
     return nodes
   }
   if (block.kind === "client_other_children") {
     const children = members(block, people, "child").map((person) => personNode(person, block, people, input))
-    if (children.length === 0) nodes.push({ kind: "group", label: "Children", empty: "No children", children: [] })
+    if (children.length === 0) nodes.push({ kind: "note", text: "No children" })
     else nodes.push(...children)
     return nodes
   }
   nodes.push(...members(block, people, "partner").map((person) => personNode(person, block, people, input)))
-  const recorded = members(block, people, "child")
-  nodes.push({
-    kind: "group",
-    label: "Children",
-    empty: recorded.length === 0 ? "No children" : null,
-    children: recorded.map((person) => personNode(person, block, people, input)),
-  })
+  nodes.push(childGroup(block, people, input))
   return nodes
+}
+
+function childGroup(block: RelationshipBlock, people: RelationshipRecord[], input: TreeInput): RelationshipTreeNode {
+  const children = members(block, people, "child").map((person) => personNode(person, block, people, input))
+  if (children.length === 0) return { kind: "note", text: "No children" }
+  return { kind: "group", label: "Children", empty: null, children }
 }
 
 function siblingGroup(
@@ -220,9 +219,10 @@ function siblingGroup(
   input: TreeInput,
   label: string,
   empty: string | null
-): RelationshipTreeGroup {
+): RelationshipTreeNode {
   const siblings = siblingPeople(block, people, input.asOf).map((person) => personNode(person, block, people, input))
-  return { kind: "group", label, empty: siblings.length === 0 ? empty : null, children: siblings }
+  if (siblings.length === 0) return { kind: "note", text: empty ?? "No siblings" }
+  return { kind: "group", label, empty: null, children: siblings }
 }
 
 function siblingPeople(block: RelationshipBlock, people: RelationshipRecord[], asOf: string): RelationshipRecord[] {
@@ -287,9 +287,7 @@ function personLine(
   if (dead) {
     const year = yearOf(person.dateOfDeath)
     const clientAge = year && input.dateOfBirth ? ageOn(input.dateOfBirth, person.dateOfDeath) : null
-    if (person.blockRole === "parent" && year) {
-      bits.push(clientAge != null ? `died ${year} (client ${clientAge})` : `died ${year}`)
-    } else if (year) bits.push(`died ${year}`)
+    if (year) bits.push(clientAge != null ? `died ${year} (client ${clientAge})` : `died ${year}`)
     else bits.push("deceased")
   } else {
     const age = person.dateOfBirth.trim() ? personAge(person.dateOfBirth, input.asOf) : null
@@ -381,6 +379,30 @@ function blockContext(block: RelationshipBlock): string {
   return "Caregiver arrangement"
 }
 
+/** Blocks a person can move to, in tree order, without their current block. */
+export function moveTargets(blocks: RelationshipBlock[], currentBlockId: string | null): { id: string; label: string; kind: BlockKind }[] {
+  const targets: { id: string; label: string; kind: BlockKind }[] = []
+  const add = (block: RelationshipBlock) => {
+    if (currentBlockId && block.relationshipBlockId === currentBlockId) return
+    targets.push({ id: block.relationshipBlockId, label: headingFor(block), kind: block.kind })
+  }
+  const byOrder = (a: RelationshipBlock, b: RelationshipBlock) => a.displayOrder - b.displayOrder
+  for (const block of blocks.filter((item) => item.kind === "client_current").sort(byOrder)) add(block)
+  for (const block of previousBlocksInOrder(blocks)) add(block)
+  for (const block of blocks.filter((item) => item.kind === "client_other_children").sort(byOrder)) add(block)
+  for (const block of blocks.filter((item) => item.kind === "biological_parents").sort(byOrder)) add(block)
+  for (const block of sideBlocks(blocks, "mother")) add(block)
+  for (const block of sideBlocks(blocks, "father")) add(block)
+  for (const block of blocks
+    .filter((item) => item.kind === "caregiver_arrangement")
+    .sort((a, b) => a.startedOn.localeCompare(b.startedOn) || a.displayOrder - b.displayOrder)) {
+    add(block)
+  }
+  targets.push({ id: NEW_CURRENT_RELATIONSHIP, label: "+ New current relationship", kind: "client_current" })
+  targets.push({ id: NEW_PREVIOUS_RELATIONSHIP, label: "+ New previous relationship", kind: "client_previous" })
+  return targets
+}
+
 export function headingFor(block: RelationshipBlock): string {
   const status = block.kind === "caregiver_arrangement" ? arrangementText(block) : statusText(block)
   const title = blockContext(block).replace("Previous relationship", "Previous")
@@ -402,11 +424,12 @@ function metaFor(block: RelationshipBlock, dateOfBirth: string | null, asOf: str
   }
   const startAge = block.startedOn.trim() ? ageOn(dateOfBirth, block.startedOn) : null
   const endAge = block.endedOn.trim() ? ageOn(dateOfBirth, block.endedOn) : null
+  const ongoing = !block.endedOn.trim()
   if (block.kind === "biological_parents") {
     if (endAge != null) bits.push(`client aged ${endAge}`)
-    else if (startAge != null) bits.push(`client aged ${startAge}`)
+    else if (startAge != null) bits.push(ongoing ? `from client aged ${startAge}` : `client aged ${startAge}`)
   } else if (startAge != null && endAge != null) bits.push(`client aged ${startAge} to ${endAge}`)
-  else if (startAge != null) bits.push(`client aged ${startAge}`)
+  else if (startAge != null) bits.push(ongoing ? `from client aged ${startAge}` : `client aged ${startAge}`)
   else if (endAge != null) bits.push(`client aged ${endAge}`)
   return bits.join(" · ")
 }

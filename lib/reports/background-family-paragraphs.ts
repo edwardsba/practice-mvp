@@ -445,18 +445,25 @@ function laterRelationshipSentences(
     .filter((item): item is PartnershipRecord => Boolean(item))
     .sort((a, b) => (a.started || "").localeCompare(b.started || ""))
   if (links.length === 0) return []
+  const bare = (partnership: PartnershipRecord) =>
+    !partnership.relationshipStatus.trim() && !partnership.started.trim() && !partnership.ended.trim()
+  const detailed = links.filter((link) => !bare(link))
+  const bareCount = links.length - detailed.length
+  const verb = deceased(person) ? "had" : "has had"
+  const counted = `${name}'s ${role} ${verb} ${countWord(links.length)} later ${links.length === 1 ? "relationship" : "relationships"}`
+  if (detailed.length === 0) return [`${counted}.`]
   const pronoun = parentPronoun(person)
   if (links.length === 1) {
-    return [`${voice.Possessive} ${role} ${laterClause(links[0], voice.subject, voice, dateOfBirth)}.` ]
+    return [`${voice.Possessive} ${role} ${laterClause(detailed[0], voice.subject, voice, dateOfBirth)}.`]
   }
-  const clauses = links.map((link, index) => {
+  const clauses = detailed.map((link, index) => {
     const clause = laterClause(link, name, voice, dateOfBirth)
     if (index === 0) return `${pronoun} ${clause}`
     return clause.startsWith("has been") || clause.startsWith("was ") ? `${pronoun} ${clause}` : clause
   })
-  return [
-    `${name}'s ${role} has had ${countWord(links.length)} later relationships: ${joinProse(clauses)}.`,
-  ]
+  if (bareCount === 1) clauses.push("one other relationship")
+  else if (bareCount > 1) clauses.push(`${countWord(bareCount)} other relationships`)
+  return [`${counted}: ${joinProse(clauses)}.`]
 }
 
 /** 4.5 Adoption, parents, their relationship, caregivers, then later relationships. */
@@ -544,6 +551,45 @@ function ordinalWord(value: number): string {
   return words[value] ?? String(value)
 }
 
+function siblingAge(person: RelationshipRecord, asOf: string): number | null {
+  if (!person.dateOfBirth) return null
+  return personAge(person.dateOfBirth, asOf)
+}
+
+/** One sibling inside the full-sibling brackets, used when the group is mixed sex. */
+function individualSiblingDetail(person: RelationshipRecord, asOf: string): string {
+  const sex = siblingSex(person)
+  if (deceased(person) && siblingAge(person, asOf) == null) return `a ${sex} who has died`
+  const age = siblingAge(person, asOf)
+  return age == null ? `a ${sex}` : `a ${sex}, ${age}`
+}
+
+/**
+ * Same-sex full siblings: "both brothers, one aged 48" / "all sisters, ages not recorded".
+ * Mixed-sex groups stay as one description per person.
+ */
+function fullSiblingDetail(group: RelationshipRecord[], asOf: string): string {
+  if (group.length === 0) return ""
+  const sexes = new Set(group.map((person) => siblingSex(person)))
+  if (sexes.size !== 1 || group.length === 1) return joinInsideBrackets(group.map((person) => individualSiblingDetail(person, asOf)))
+  const sex = siblingSex(group[0])
+  const plural = sex === "brother" ? "brothers" : sex === "sister" ? "sisters" : "siblings"
+  const head = group.length === 2 ? `both ${plural}` : `all ${plural}`
+  const aged = group
+    .map((person) => siblingAge(person, asOf))
+    .filter((age): age is number => age != null)
+    .sort((a, b) => b - a)
+  const diedWithoutAge = group.filter((person) => deceased(person) && siblingAge(person, asOf) == null)
+  const bits: string[] = []
+  if (aged.length === group.length) bits.push(`aged ${joinProse(aged.map(String))}`)
+  else if (aged.length === 1) bits.push(`one aged ${aged[0]}`)
+  else if (aged.length > 1) bits.push(`${countWord(aged.length)} aged ${joinProse(aged.map(String))}`)
+  else if (diedWithoutAge.length < group.length) bits.push("ages not recorded")
+  if (diedWithoutAge.length === 1) bits.push(aged.length === 0 && diedWithoutAge.length === group.length ? "who has died" : "one who has died")
+  else if (diedWithoutAge.length > 1) bits.push(diedWithoutAge.length === group.length ? "who have died" : `${countWord(diedWithoutAge.length)} who have died`)
+  return bits.length > 0 ? `${head}, ${bits.join(", ")}` : head
+}
+
 /** 4.6 Birth order, the total including deceased siblings, then each type. */
 export function siblingsParagraph(
   name: string,
@@ -574,17 +620,11 @@ export function siblingsParagraph(
     const family = adopted ? "adoptive siblings" : "full siblings"
     sentences.push(`${name} is ${place} of ${voice.possessive} ${family}.`)
   }
-  const fullDetail = full.map((person) => {
-    if (deceased(person) && !(person.dateOfBirth && personAge(person.dateOfBirth, asOf) != null)) {
-      return `a ${siblingSex(person)} who has died`
-    }
-    const age = person.dateOfBirth ? personAge(person.dateOfBirth, asOf) : null
-    return age == null ? `a ${siblingSex(person)}` : `a ${siblingSex(person)}, ${age}`
-  })
   const bits: string[] = []
   if (full.length > 0) {
     const noun = `${countWord(full.length)} ${full.length === 1 ? (adopted ? "adoptive sibling" : "full sibling") : adopted ? "adoptive siblings" : "full siblings"}`
-    bits.push(fullDetail.length > 0 ? `${noun} (${joinInsideBrackets(fullDetail)})` : noun)
+    const detail = fullSiblingDetail(full, asOf)
+    bits.push(detail ? `${noun} (${detail})` : noun)
   }
   const sideGroups = (rows: RelationshipRecord[], label: "half-sibling" | "step-sibling") => {
     const buckets = new Map<string, RelationshipRecord[]>()
@@ -679,26 +719,28 @@ function conditionText(event: EventRecord, role: string, kind: string): string {
   return `has a history of ${title || "significant events"}`
 }
 
-/** Section 6. One paragraph per heading, by role, with no dates. */
+/** Section 6. One paragraph per heading. The first sentence names the client; later sentences use the pronoun. */
 export function significantOtherParagraphs(
   name: string,
   people: RelationshipRecord[],
-  events: EventRecord[]
+  events: EventRecord[],
+  voice?: ReportVoice
 ): string[] {
   const rows = events.filter((event) => resolvedAbout(event) === "significant_other")
   const paragraphs: string[] = []
+  const laterOwner = voice && voice.kind !== "name" ? voice.Possessive : "Their"
   for (const kind of SIGNIFICANT_ORDER) {
     const matched = rows.filter((event) => (event.eventType === "family_events" ? "emotional_problems" : event.eventType) === kind)
     if (matched.length === 0) continue
-    const sentences = matched.map((event) => {
+    const sentences = matched.map((event, index) => {
       const person = event.relationshipRecordId
         ? people.find((row) => row.relationshipRecordId === event.relationshipRecordId)
         : undefined
       if (person) {
         const role = roleWord(person)
         const detail = conditionText(event, role, kind)
-        if (/^(died|was|has|had)\b/i.test(detail)) return `${name}'s ${role} ${detail}.`
-        return `${name}'s ${role} ${detail}.`
+        const owner = index === 0 ? `${name}'s` : laterOwner
+        return `${owner} ${role} ${detail}.`
       }
       const other = event.aboutOther.trim() || event.familyRelation.trim()
       const who = other ? `A ${lowerKeepingTypedCase(other)} of ${name}'s` : `A significant other of ${name}'s`

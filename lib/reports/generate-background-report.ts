@@ -612,7 +612,7 @@ function presentingItems(
   for (const item of STRESSOR_ITEMS) {
     const answer = source.data.stressors[item.key]
     if (answer === "yes" || answer === "no") stressorAnswered = true
-    if (answer === "yes") yesStressors.push(lowerKeepingTypedCase(item.label))
+    if (answer === "yes") yesStressors.push(item.reportNoun)
   }
   if (!stressorAnswered) {
     omitted.push({ id: "stressors", message: "Current stressors not assessed", target: "stressors" })
@@ -1187,7 +1187,7 @@ export function generateBackgroundReport(source: BackgroundReportSource): Backgr
   pushNumberedSection(
     content,
     "Family and Significant Others",
-    [{ items: significantOtherParagraphs(first, source.data.relationships, source.data.events) }],
+    [{ items: significantOtherParagraphs(first, source.data.relationships, source.data.events, voice as ReportVoice) }],
     "[No family or significant other history recorded.]"
   )
   pushNumberedSection(content, "Summary", [{ items: ["[Summary — practitioner to write.]"] }])

@@ -513,16 +513,17 @@ export type MedicationRecord = {
   supervisedBy: string
 }
 
+/** Form labels stay as the client sees them. reportNoun is the noun after "difficulties with". */
 export const STRESSOR_ITEMS = [
-  { key: "family", label: "Family" },
-  { key: "socialLife", label: "Social life" },
-  { key: "intimateRelationships", label: "Intimate relationships" },
-  { key: "workStudy", label: "Work or study" },
-  { key: "financial", label: "Financial" },
-  { key: "ownHealth", label: "Your health" },
-  { key: "othersHealth", label: "Health of significant others" },
-  { key: "lossOfLovedOne", label: "Loss of a loved one" },
-  { key: "legalPoliceAccidents", label: "Legal matters, police or accidents" },
+  { key: "family", label: "Family", reportNoun: "family" },
+  { key: "socialLife", label: "Social life", reportNoun: "social life" },
+  { key: "intimateRelationships", label: "Intimate relationships", reportNoun: "intimate relationships" },
+  { key: "workStudy", label: "Work or study", reportNoun: "work or study" },
+  { key: "financial", label: "Financial", reportNoun: "finances" },
+  { key: "ownHealth", label: "Your health", reportNoun: "their health" },
+  { key: "othersHealth", label: "Health of significant others", reportNoun: "the health of significant others" },
+  { key: "lossOfLovedOne", label: "Loss of a loved one", reportNoun: "the loss of a loved one" },
+  { key: "legalPoliceAccidents", label: "Legal matters, police or accidents", reportNoun: "legal matters and police or accidents" },
 ] as const
 
 export type StressorKey = (typeof STRESSOR_ITEMS)[number]["key"]

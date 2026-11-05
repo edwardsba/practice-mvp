@@ -142,7 +142,8 @@ export function endedRelationshipClause(
   const phrase = partnerPhrase(partners, voice, asOf, false)
   const range = rangeBit(block, false, asOf)
   const to = married || block.status === "engagement_ended" ? "to" : "with"
-  const object = phrase ? ` ${to} ${phrase}${phrase.includes(",") && range ? "," : ""}${range}` : range
+  const bareComma = phrase.replace(/\([^)]*\)/g, "").includes(",")
+  const object = phrase ? ` ${to} ${phrase}${bareComma && range ? "," : ""}${range}` : range
   const was = agree(voice, "was", "were")
   if (block.status === "divorced") return `${voice.subject} ${was} married${object}, and the marriage ended in divorce`
   if (block.status === "defacto_separated") {
@@ -216,8 +217,21 @@ function childrenSentences(
     const female = partners.some((person) => sexWord(person.sex) === "female")
     const male = partners.some((person) => sexWord(person.sex) === "male")
     const whose = status === "married" && female ? "wife" : status === "married" && male ? "husband" : "partner"
-    const bits = groupedChildBits(step, asOf, false).map((bit) => bit.replace(/^one /, "a "))
-    sentences.push(`${voice.Possessive} ${whose} also has ${joinProse(bits)} from a previous relationship.`)
+    const stepBits = [...new Map(step.map((child) => {
+      const [one, many] = childSexNoun(child, false)
+      return [one, { one, many, children: [] as RelationshipRecord[] }]
+    })).values()]
+    for (const child of step) {
+      const [one] = childSexNoun(child, false)
+      const bucket = stepBits.find((item) => item.one === one)
+      bucket?.children.push(child)
+    }
+    const stepText = stepBits.map((group) => {
+      const listed = peopleList(group.children, asOf, "and")
+      const noun = group.children.length === 1 ? `a ${group.one}` : `${countWord(group.children.length)} ${group.many}`
+      return `${noun} from a previous relationship${listed ? ` (${listed})` : ""}`
+    })
+    sentences.push(`${voice.Possessive} ${whose} also has ${joinProse(stepText)}.`)
   }
   return sentences
 }
@@ -397,7 +411,7 @@ function parentLaterClause(
     const ended = endAge != null ? `, and that marriage ended when ${voice.subject} was ${endAge}` : block.endedOn.trim() ? ", and that marriage ended" : ""
     return `${began}${ended}`
   }
-  if (!block.endedOn.trim() && startYear) return `re-partnered and has been in a de facto relationship since ${startYear}`
+  if (!block.endedOn.trim() && startYear) return `re-partnered${who} and has been in a de facto relationship since ${startYear}`
   if (startYear && endYear) return `re-partnered in a de facto relationship from ${startYear} to ${endYear}`
   if (block.status === "defacto_separated") return "re-partnered, and that relationship ended in separation"
   if (block.status === "engagement_ended") return "was engaged again"
@@ -475,7 +489,7 @@ function laterSentences(
   const pronoun = role === "mother" ? "she" : "he"
   if (mine.length === 1) return [`${voice.Possessive} ${role} ${clauses[0]}.`]
   const spoken = clauses.map((clause, index) =>
-    index === 0 || clause.startsWith("has ") || clause.startsWith("re-partnered and has") ? `${pronoun} ${clause}` : clause
+    index === 0 || clause.startsWith("has ") || clause.startsWith("re-partnered") ? `${pronoun} ${clause}` : clause
   )
   if (bare === 1) spoken.push("one other relationship")
   else if (bare > 1) spoken.push(`${countWord(bare)} other relationships`)

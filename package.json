@@ -108,6 +108,7 @@
     "db:client-display-name": "tsx db/apply-assessment-definition-client-display-name-migration.ts",
     "db:fix-client-display-names": "tsx db/fix-assessment-definition-client-display-names.ts",
     "seed:background-questionnaire": "tsx db/seed-background-questionnaire.ts",
+    "seed:test-client-tom": "tsx scripts/seed-test-client-tom.ts",
     "db:seed-email-templates": "tsx db/seed-email-templates.ts",
     "db:seed-psf": "npx tsx db/seed-psf.ts"
   },

@@ -857,6 +857,11 @@ export type EventRecord = {
   relationshipRecordId: string | null
   /** Treatment entries: the condition entry this treatment is for. */
   conditionEventId: string | null
+  /**
+   * Episodes of one condition share this id. The condition's title is its earliest episode's title.
+   * Empty until the entry is saved as a condition.
+   */
+  conditionGroupId?: string | null
   admissionType: AdmissionType | ""
   facility: string
   admissionLength: string

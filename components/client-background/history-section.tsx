@@ -667,7 +667,7 @@ function EventReadOnly({
   )
 }
 
-function EventEditor({
+export function EventEditor({
   draft,
   dateOfBirth,
   relationships,

@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react"
 import { ChevronDown } from "lucide-react"
 
 import { DemographicsSection } from "@/components/client-background/demographics-section"
-import { HistorySection } from "@/components/client-background/history-section"
+import { HistoryTreeSection } from "@/components/client-background/history-tree-section"
 import { BackgroundInterviewCard } from "@/components/client-background/interview-card"
 import { BackgroundStressorsSection } from "@/components/client-background/medication-stressors"
 import { ReasonSection } from "@/components/client-background/reason-section"
@@ -125,12 +125,12 @@ export function ClientBackgroundPage({
             />
           ) : null}
           {item.id === "history" ? (
-            <HistorySection
+            <HistoryTreeSection
               clientId={clientId}
               dateOfBirth={data.dateOfBirth}
               events={data.events}
               relationships={data.relationships}
-              interviewSource={interview.latest}
+              screening={interview.latest?.screening ?? {}}
               professionals={reasonSupport.professionals}
             />
           ) : null}

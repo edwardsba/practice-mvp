@@ -709,14 +709,15 @@ function roleWord(person: RelationshipRecord): string {
   return "relative"
 }
 
-function conditionText(event: EventRecord, role: string, kind: string): string {
+function conditionText(event: EventRecord, role: string, kind: string, past: boolean): string {
   let title = lowerKeepingTypedCase(event.title.trim())
   if (role && title.startsWith(`${role} `)) title = title.slice(role.length + 1).trim()
   if (/^(died|was|has|had)\b/i.test(event.title.trim())) return event.title.trim().replace(/\.$/, "")
-  if (kind === "substance_use") return `has a history of problems with ${title || "alcohol or drugs"}`
-  if (kind === "self_harm") return title ? `has a history of ${title}` : "has a history of self-harm"
-  if (kind === "psychiatric_admission") return "has been admitted to hospital"
-  return `has a history of ${title || "significant events"}`
+  const verb = past ? "had" : "has"
+  if (kind === "substance_use") return `${verb} a history of problems with ${title || "alcohol or drugs"}`
+  if (kind === "self_harm") return title ? `${verb} a history of ${title}` : `${verb} a history of self-harm`
+  if (kind === "psychiatric_admission") return past ? "had been admitted to hospital" : "has been admitted to hospital"
+  return `${verb} a history of ${title || "significant events"}`
 }
 
 /** Section 6. One paragraph per heading. The first sentence names the client; later sentences use the pronoun. */
@@ -747,13 +748,13 @@ export function significantOtherParagraphs(
         : undefined
       if (person) {
         const role = roleWord(person)
-        const detail = conditionText(event, role, kind)
+        const detail = conditionText(event, role, kind, deceased(person))
         const owner = index === 0 ? `${name}'s` : laterOwner
         return `${owner} ${role}${sectionPersonTag(person, asOf)} ${detail}.`
       }
       const other = event.aboutOther.trim() || event.familyRelation.trim()
       const who = other ? `A ${lowerKeepingTypedCase(other)} of ${name}'s` : `A significant other of ${name}'s`
-      const detail = conditionText(event, "", kind)
+      const detail = conditionText(event, "", kind, false)
       return `${who} ${detail}.`
     })
     paragraphs.push(sentences.join(" "))

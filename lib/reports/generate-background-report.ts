@@ -43,6 +43,8 @@ import {
   conditionParagraph,
   currentMedicationParagraph,
   lowerKeepingTypedCase,
+  lowerLeadingWord,
+  reportProfession,
   unlinkedTreatmentsParagraph,
   type ReportVoice,
 } from "@/lib/reports/background-report-prose"
@@ -244,7 +246,15 @@ function sentence(text: string): string {
 }
 
 function lowerFirst(value: string): string {
-  return lowerKeepingTypedCase(value.trim())
+  return lowerLeadingWord(value.trim())
+}
+
+/** "a Certificate IV…" — a or an from the first letter, and no extra article when one is already there. */
+function studyDetail(value: string): string {
+  const text = value.trim()
+  if (!text) return ""
+  if (/^(a|an|the)\b/i.test(text)) return text
+  return `${/^[aeiou]/i.test(text) ? "an" : "a"} ${text}`
 }
 
 function withArticle(value: string): string {
@@ -563,10 +573,10 @@ function sourceLines(source: BackgroundReportSource): string[] {
     })
   }
   const referral = source.referral
-  if (referral && source.data.reason.referredByMedicalProfessional === "yes") {
+  if (referral && source.data.reason.referralType === "medical") {
     const name = referralName(referral)
     if (name) {
-      const profession = lowerKeepingTypedCase(referral.profession?.trim() ?? "")
+      const profession = reportProfession(referral.profession)
       const date = referral.date?.trim() ?? ""
       const parts = [name, profession, date ? displayDate(date) : ""].filter(Boolean)
       rows.push({ sort: date || "9999-99-99", text: `Referral from ${parts.join(", ")}.` })
@@ -584,34 +594,37 @@ function presentingItems(
 ): string[] {
   const { reason } = source.data
   const items: string[] = []
-  const referred = reason.referredByMedicalProfessional
-  if (referred === "yes" && source.referral && referralName(source.referral)) {
-    const profession = lowerKeepingTypedCase(source.referral.profession?.trim() ?? "")
-    const name = referralName(source.referral)
-    const by = profession ? `${voice.possessive} ${profession}, ${name}` : name
-    let line = `${first} was referred by ${by}`
-    if (source.referral.date?.trim()) line += `, on ${displayDate(source.referral.date)}`
-    if (reason.referrerConcerns.trim()) line += `, with concerns about ${reason.referrerConcerns.trim()}`
-    else {
-      omitted.push({ id: "referrer-concerns", message: "Referrer's concerns not recorded", target: "reason" })
+  if (reason.referralType === "medical") {
+    if (source.referral && referralName(source.referral)) {
+      const profession = reportProfession(source.referral.profession)
+      const name = referralName(source.referral)
+      const by = profession ? `${voice.possessive} ${profession}, ${name}` : name
+      let line = `${first} was referred by ${by}`
+      if (source.referral.date?.trim()) line += `, on ${displayDate(source.referral.date)}`
+      if (reason.referrerConcerns.trim()) line += `, with concerns about ${reason.referrerConcerns.trim()}`
+      else {
+        omitted.push({ id: "referrer-concerns", message: "Referrer's concerns not recorded", target: "reason" })
+      }
+      items.push(`${line}.`)
     }
-    items.push(`${line}.`)
-  } else if (referred === "not_asked") {
-    omitted.push({ id: "referral", message: "Referral not asked", target: "reason" })
-  } else if (referred == null) {
-    omitted.push({ id: "referral", message: "Referral not recorded", target: "reason" })
-  }
-
-  if (reason.familyInvolved === "yes") {
-    items.push(
-      reason.familyInvolvement.trim()
-        ? sentence(reason.familyInvolvement)
-        : `${voice.Possessive} family were involved in ${voice.object} attending.`
-    )
-  } else if (reason.familyInvolved === "not_asked") {
-    omitted.push({ id: "family-involvement", message: "Family involvement not asked", target: "reason" })
-  } else if (reason.familyInvolved == null) {
-    omitted.push({ id: "family-involvement", message: "Family involvement not recorded", target: "reason" })
+  } else if (reason.referralType === "family_or_friend") {
+    const person = reason.referrerRelationshipId
+      ? source.data.relationships.find((row) => row.relationshipRecordId === reason.referrerRelationshipId)
+      : undefined
+    const other = reason.referrerIsOther ? lowerLeadingWord(reason.referrerOther) : ""
+    const by = person ? referrerPerson(person, voice, source.data.relationshipStatus.relationshipStatus) : other
+    if (by) {
+      const concerns = reason.theirConcerns.trim().replace(/\.+$/, "")
+      items.push(
+        concerns
+          ? `${first} was referred by ${by}, who was concerned about ${concerns}.`
+          : `${first} was referred by ${by}.`
+      )
+    }
+  } else if (reason.referralType === "self") {
+    items.push(`${first} self-referred.`)
+  } else {
+    omitted.push({ id: "referral-type", message: "Referral type not recorded", target: "reason" })
   }
 
   const yesStressors: string[] = []
@@ -646,20 +659,32 @@ function presentingItems(
     })
   }
 
-  const attended: string[] = []
-  if (reason.ownInitiative === "yes") attended.push(`on ${voice.possessive} own initiative`)
-  else if (reason.ownInitiative === "no") attended.push("at the encouragement of others")
-  else if (reason.ownInitiative === "not_asked") {
-    omitted.push({ id: "own-initiative", message: "Own initiative not asked", target: "reason" })
-  } else omitted.push({ id: "own-initiative", message: "Own initiative not recorded", target: "reason" })
-
-  if (attended.length > 0) {
-    items.push(`${voice.Subject} attended ${attended[0]}.`)
-  }
-  if (reason.clientMotivation.trim()) items.push(sentence(reason.clientMotivation))
-  else omitted.push({ id: "motivation", message: "Client's motivation not recorded", target: "reason" })
-
   return items
+}
+
+function referrerPerson(person: RelationshipRecord, voice: Voice, clientStatus: string): string {
+  const name = person.givenName.trim()
+  const sex = person.sex.trim().toLowerCase()
+  const female = sex === "female"
+  const male = sex === "male"
+  const partner =
+    person.blockRole === "partner" ||
+    person.relationshipToClient === "current_partner" ||
+    person.relationshipToClient === "prior_partner"
+  let role = "relative"
+  if (partner) {
+    const married = clientStatus === "married" || person.partnerType === "married"
+    role = married ? (female ? "wife" : male ? "husband" : "partner") : female ? "female partner" : male ? "male partner" : "partner"
+  } else if (person.relationshipToClient === "mother" || person.blockRoleType === "mother") role = "mother"
+  else if (person.relationshipToClient === "father" || person.blockRoleType === "father") role = "father"
+  else if (person.blockRole === "child" || person.relationshipToClient.startsWith("child_")) {
+    role = female ? "daughter" : male ? "son" : "child"
+  } else if (person.blockRole === "sibling" || person.relationshipToClient.startsWith("sibling_")) {
+    role = female ? "sister" : male ? "brother" : "sibling"
+  } else if (person.blockRole === "caregiver" || person.relationshipToClient === "other_caregiver") {
+    role = lowerLeadingWord(person.caregiverRelationshipDetail.trim() || "caregiver")
+  }
+  return `${voice.possessive} ${role}${name ? ` (${name})` : ""}`
 }
 
 function partnerNoun(status: ClientRelationshipStatus | "", sex: string): string {
@@ -912,7 +937,7 @@ function educationItem(source: BackgroundReportSource, voice: Voice, who: Speake
     const detail = education.currentlyStudyingDetail.trim()
     parts.push(
       detail
-        ? `${who.text} ${verb(who.plural, "is", "are")} currently studying ${detail}.`
+        ? `${who.text} ${verb(who.plural, "is", "are")} currently studying ${studyDetail(detail)}.`
         : `${who.text} ${verb(who.plural, "is", "are")} currently studying.`
     )
   }
@@ -920,7 +945,7 @@ function educationItem(source: BackgroundReportSource, voice: Voice, who: Speake
     const detail = education.disruptionDetail.trim()
     parts.push(
       detail
-        ? `${voice.Possessive} schooling was disrupted: ${lowerKeepingTypedCase(detail).replace(/\.+$/, "")}.`
+        ? `${voice.Possessive} schooling was disrupted: ${lowerLeadingWord(detail).replace(/\.+$/, "")}.`
         : `${voice.Possessive} schooling was disrupted.`
     )
   }
@@ -1011,14 +1036,18 @@ function necessitiesItem(source: BackgroundReportSource, who: Speaker): string |
 
 function disabilityItem(source: BackgroundReportSource, voice: Voice, name: string): string | null {
   const identity = source.data.demographics.identity
-  if (identity.disability !== true) return null
   const detail = identity.disabilityDetail.trim()
   const access = identity.accessibilityNeeds.trim()
-  const lines = [
-    detail ? `${name} has ${lowerFirst(detail).replace(/\.$/, "")}.` : `${name} has a disability.`,
-  ]
-  if (access) lines.push(`${voice.Subject} asked that ${lowerFirst(access).replace(/\.$/, "")}.`)
-  return lines.join(" ")
+  const lines: string[] = []
+  if (identity.disability === true) {
+    lines.push(
+      detail
+        ? `${name} reported a disability (${lowerLeadingWord(detail).replace(/\.+$/, "")}).`
+        : `${name} reported a disability.`
+    )
+  }
+  if (access) lines.push(`${voice.Possessive} accessibility needs are: ${lowerLeadingWord(access).replace(/\.+$/, "")}.`)
+  return lines.length > 0 ? lines.join(" ") : null
 }
 
 function medicationItem(source: BackgroundReportSource, name: string): string | null {

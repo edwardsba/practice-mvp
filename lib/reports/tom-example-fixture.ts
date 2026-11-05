@@ -90,11 +90,11 @@ function history(
 
 export function tomRelationships(): RelationshipRecord[] {
   return [
-    person({ relationshipRecordId: "tom-jordan", relationshipToClient: "current_partner", sex: "Female", givenName: "Jordan", dateOfBirth: "1977-01-01", relationshipBlockId: "tom-current", blockRole: "partner", displayOrder: 0 }),
-    person({ relationshipRecordId: "tom-henry", relationshipToClient: "child_biological", sex: "Male", givenName: "Henry", dateOfBirth: "2017-01-01", childType: "biological", relationshipBlockId: "tom-current", blockRole: "child", blockRoleType: "biological", displayOrder: 1 }),
-    person({ relationshipRecordId: "tom-lily", relationshipToClient: "child_biological", sex: "Female", givenName: "Lily", dateOfBirth: "2019-01-01", childType: "biological", relationshipBlockId: "tom-current", blockRole: "child", blockRoleType: "biological", displayOrder: 2 }),
-    person({ relationshipRecordId: "tom-max", relationshipToClient: "child_biological", sex: "Male", givenName: "Max", dateOfBirth: "2020-01-01", childType: "adopted", relationshipBlockId: "tom-current", blockRole: "child", blockRoleType: "adopted", displayOrder: 3 }),
-    person({ relationshipRecordId: "tom-sam", relationshipToClient: "child_step", sex: "Male", givenName: "Sam", dateOfBirth: "2012-01-01", childType: "step_child", relationshipBlockId: "tom-current", blockRole: "child", blockRoleType: "step_child", displayOrder: 4 }),
+    person({ relationshipRecordId: "tom-jordan", relationshipToClient: "current_partner", sex: "Female", givenName: "Jordan", dateOfBirth: "1977-01-01", relationshipBlockId: "tom-current", blockRole: "partner", livingSituation: "lives_with_client_full_time", displayOrder: 0 }),
+    person({ relationshipRecordId: "tom-henry", relationshipToClient: "child_biological", sex: "Male", givenName: "Henry", dateOfBirth: "2017-01-01", childType: "biological", relationshipBlockId: "tom-current", blockRole: "child", blockRoleType: "biological", livingSituation: "lives_with_client_full_time", displayOrder: 1 }),
+    person({ relationshipRecordId: "tom-lily", relationshipToClient: "child_biological", sex: "Female", givenName: "Lily", dateOfBirth: "2019-01-01", childType: "biological", relationshipBlockId: "tom-current", blockRole: "child", blockRoleType: "biological", livingSituation: "lives_with_client_full_time", displayOrder: 2 }),
+    person({ relationshipRecordId: "tom-max", relationshipToClient: "child_biological", sex: "Male", givenName: "Max", dateOfBirth: "2020-01-01", childType: "adopted", relationshipBlockId: "tom-current", blockRole: "child", blockRoleType: "adopted", livingSituation: "lives_with_client_full_time", displayOrder: 3 }),
+    person({ relationshipRecordId: "tom-sam", relationshipToClient: "child_step", sex: "Male", givenName: "Sam", dateOfBirth: "2012-01-01", childType: "step_child", relationshipBlockId: "tom-current", blockRole: "child", blockRoleType: "step_child", livingSituation: "lives_with_client_full_time", displayOrder: 4 }),
     person({ relationshipRecordId: "tom-pam", relationshipToClient: "prior_partner", sex: "Female", givenName: "Pam", dateOfBirth: "1979-01-01", relationshipBlockId: "tom-pam", blockRole: "partner", displayOrder: 5 }),
     person({ relationshipRecordId: "tom-kim", relationshipToClient: "prior_partner", sex: "Female", givenName: "Kim", dateOfBirth: "1974-01-01", relationshipBlockId: "tom-kim", blockRole: "partner", displayOrder: 6 }),
     person({ relationshipRecordId: "tom-ella", relationshipToClient: "child_biological", sex: "Female", givenName: "Ella", dateOfBirth: "2001-01-01", childType: "biological", relationshipBlockId: "tom-kim", blockRole: "child", blockRoleType: "biological", displayOrder: 7 }),
@@ -103,7 +103,7 @@ export function tomRelationships(): RelationshipRecord[] {
     person({ relationshipRecordId: "tom-harry", relationshipToClient: "sibling_full", sex: "Male", givenName: "Harry", dateOfBirth: "1968-01-01", relationshipBlockId: "tom-bio", blockRole: "sibling", blockRoleType: "full", displayOrder: 10 }),
     person({ relationshipRecordId: "tom-ann", relationshipToClient: "sibling_full", sex: "Female", givenName: "Ann", dateOfBirth: "1974-01-01", relationshipBlockId: "tom-bio", blockRole: "sibling", blockRoleType: "full", displayOrder: 11 }),
     person({ relationshipRecordId: "tom-michael", relationshipToClient: "sibling_full", sex: "Male", givenName: "Michael", deceased: true, healthStatus: "deceased", dateOfDeath: "1989", relationshipBlockId: "tom-bio", blockRole: "sibling", blockRoleType: "full", displayOrder: 12 }),
-    person({ relationshipRecordId: "tom-phil", relationshipToClient: "step_parent", sex: "Male", givenName: "Phil", relationshipBlockId: "tom-phil", blockRole: "partner", displayOrder: 13 }),
+    person({ relationshipRecordId: "tom-phil", relationshipToClient: "step_parent", sex: "Male", givenName: "Phil", dateOfBirth: "1950-01-01", relationshipBlockId: "tom-phil", blockRole: "partner", displayOrder: 13 }),
     person({ relationshipRecordId: "tom-rose", relationshipToClient: "sibling_half", sex: "Female", givenName: "Rose", dateOfBirth: "1986-01-01", relationshipBlockId: "tom-phil", blockRole: "sibling", blockRoleType: "half", displayOrder: 14 }),
     person({ relationshipRecordId: "tom-bob", relationshipToClient: "sibling_step", sex: "Male", givenName: "Bob", dateOfBirth: "1981-01-01", relationshipBlockId: "tom-phil", blockRole: "sibling", blockRoleType: "step", displayOrder: 15 }),
     person({ relationshipRecordId: "tom-larry", relationshipToClient: "step_parent", sex: "Male", givenName: "Larry", dateOfBirth: "1956-01-01", relationshipBlockId: "tom-larry", blockRole: "partner", displayOrder: 16 }),
@@ -130,7 +130,7 @@ export function tomEvents(): EventRecord[] {
     history({ eventRecordId: "tom-admission", eventType: "psychiatric_admission", title: "Psychiatric inpatient admission", admissionType: "psychiatric_inpatient", admissionLength: "2 weeks", startPrecision: "year", startValue: "2001", endPrecision: "year", endValue: "2001", conditionEventId: "tom-depression-1", displayOrder: 3, about: "self" }),
     history({ eventRecordId: "tom-psychologist", eventType: "previous_therapy", title: "Psychologist", startPrecision: "year", startValue: "2001", endPrecision: "year", endValue: "2002", conditionEventId: "tom-depression-1", displayOrder: 4, about: "self" }),
     history({ eventRecordId: "tom-depression-2", eventType: "emotional_problems", title: "Depression", startPrecision: "year", startValue: "2025", endOngoing: true, resolvedOrOngoing: "ongoing", displayOrder: 5, about: "self" }),
-    history({ eventRecordId: "tom-sertraline", eventType: "medication", title: "Sertraline", startPrecision: "year", startValue: "2025", endOngoing: true, resolvedOrOngoing: "ongoing", prescriberName: "Dr Harry TestDoc", conditionEventId: "tom-depression-2", displayOrder: 6, about: "self" }),
+    history({ eventRecordId: "tom-sertraline", eventType: "medication", title: "Sertraline", startPrecision: "year", startValue: "2025", endOngoing: true, resolvedOrOngoing: "ongoing", prescriberProfessionalId: "tom-prescriber", prescriberName: "Dr Harry TestDoc", conditionEventId: "tom-depression-2", displayOrder: 6, about: "self" }),
     history({ eventRecordId: "tom-alcohol", eventType: "substance_use", title: "Alcohol", startPrecision: "year", startValue: "1988", endPrecision: "year", endValue: "2000", substanceStatus: "abstinent", displayOrder: 7, about: "self" }),
     history({ eventRecordId: "tom-rehab", eventType: "psychiatric_admission", title: "Residential rehab", admissionType: "residential_rehab", startPrecision: "year", startValue: "2000", endPrecision: "year", endValue: "2000", conditionEventId: "tom-alcohol", displayOrder: 8, about: "self" }),
     history({ eventRecordId: "tom-cutting", eventType: "self_harm", title: "Cutting", selfHarmType: "non_lethal", startPrecision: "year", startValue: "1984", endPrecision: "year", endValue: "1986", displayOrder: 9, about: "self" }),
@@ -197,9 +197,11 @@ export function tomExampleSource(): BackgroundReportSource {
   stressors.legalPoliceAccidents = "no"
   stressors.mainReason = "I can't stop worrying about money"
   const reason = emptyReasonForAttending()
-  reason.referredByMedicalProfessional = "yes"
+  reason.referralType = "medical"
+  reason.referrerProfessionalId = "tom-prescriber"
   reason.referralDate = "2026-10-03"
   reason.referrerConcerns = "low mood and stress"
+  reason.referredByMedicalProfessional = "yes"
   reason.familyInvolved = "yes"
   reason.familyInvolvement = "His wife encouraged him to attend."
   reason.ownInitiative = "no"
@@ -215,8 +217,9 @@ export function tomExampleSource(): BackgroundReportSource {
     clientFirstName: TOM_FIRST_NAME,
     clientLastName: TOM_LAST_NAME,
     dateOfBirth: "1970-03-12",
-    practitionerName: "Ben Edwards",
-    practitionerReportIntroduction: "I am Ben Edwards, a registered psychologist.",
+    practitionerName: "Benjamin Edwards",
+    practitionerReportIntroduction:
+      "I am Benjamin Edwards, a registered psychologist. I have been registered as a psychologist since 2014. My principal therapeutic modalities include Cognitive Behaviour Therapy (CBT) and Dialectical Behaviour Therapy (DBT).",
     data: {
       dateOfBirth: "1970-03-12",
       backgroundCapturedAt: "2026-11-05T00:00:00.000Z",
@@ -240,8 +243,17 @@ export function tomExampleSource(): BackgroundReportSource {
       title: "Dr",
       firstName: "Harry",
       lastName: "TestDoc",
-      profession: "General practitioner",
+      profession: "GP",
       date: "2026-10-03",
     },
+    professionals: [
+      {
+        professionalId: "tom-prescriber",
+        title: "Dr",
+        firstName: "Harry",
+        lastName: "TestDoc",
+        professionName: "GP",
+      },
+    ],
   }
 }

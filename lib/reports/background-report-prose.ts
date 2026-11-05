@@ -30,6 +30,22 @@ export function lowerKeepingTypedCase(value: string): string {
   })
 }
 
+/** Lower-case only the first word, and only when the capitals helper allows it. */
+export function lowerLeadingWord(value: string): string {
+  const trimmed = value.trim()
+  const match = /^([A-Za-z]+)([\s\S]*)$/.exec(trimmed)
+  if (!match) return trimmed
+  return lowerKeepingTypedCase(match[1]) + match[2]
+}
+
+/** "GP" and "General practitioner" are written as GP. Other professions keep typed capitals. */
+export function reportProfession(value: string | null | undefined): string {
+  const text = (value ?? "").trim()
+  if (!text) return ""
+  if (/^general practitioners?$/i.test(text) || /^g\.?p\.?$/i.test(text)) return "GP"
+  return lowerKeepingTypedCase(text)
+}
+
 const COUNT_WORDS = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"]
 
 export function agree(voice: ReportVoice, singular: string, pluralForm: string): string {
@@ -191,13 +207,35 @@ function titled(event: DatedEvent, fallback: string): string {
   return title ? lowerKeepingTypedCase(title) : fallback
 }
 
-/** "Ben01 reported a broken leg at age 12 (1987)." */
+function colonDetail(event: DatedEvent, dateOfBirth: string | null): string {
+  const when = eventWhenPhrase(event, dateOfBirth, "starting")
+  const title = event.title.trim() ? lowerLeadingWord(event.title) : ""
+  return [title, when].filter(Boolean).join(" ")
+}
+
+function colonSentence(
+  events: DatedEvent[],
+  name: string,
+  dateOfBirth: string | null,
+  singular: string,
+  plural: string
+): string {
+  const bits = sortByStart(events, dateOfBirth).map((event) => colonDetail(event, dateOfBirth))
+  const head = events.length === 1 ? singular : plural
+  return `${name} reported ${head}: ${joinAnd(bits)}.`
+}
+
+/** "Tom reported an illness or injury: broken leg at age 12 (1982)." Untitled entries keep the older grouping. */
 export function illnessInjurySentence(events: DatedEvent[], name: string, dateOfBirth: string | null): string {
-  const parts = sortByStart(events, dateOfBirth).map((event) => {
-    const when = eventWhenPhrase(event, dateOfBirth, "starting")
-    return [titled(event, "an illness or injury"), when].filter(Boolean).join(" ")
-  })
-  return `${name} reported ${joinAnd(parts)}.`
+  const sorted = sortByStart(events, dateOfBirth)
+  if (sorted.some((event) => !event.title.trim())) {
+    const parts = sorted.map((event) => {
+      const when = eventWhenPhrase(event, dateOfBirth, "starting")
+      return [titled(event, "an illness or injury"), when].filter(Boolean).join(" ")
+    })
+    return `${name} reported ${joinAnd(parts)}.`
+  }
+  return colonSentence(sorted, name, dateOfBirth, "an illness or injury", "illnesses or injuries")
 }
 
 /** "Ben01 reported a history of depression from age 30 to 32 (2005–2007), and again starting at age 50 (2025)." */
@@ -288,11 +326,14 @@ function withIndefinite(title: string): string {
 }
 
 /**
- * Untitled entries share the heading once. A title is used instead of the
- * self-harm method, which is never printed.
+ * A titled entry is "self-harm: cutting from age 14 to 16". Untitled entries
+ * share the heading once, as before. The self-harm method is never printed.
  */
 export function selfHarmSentence(events: DatedEvent[], name: string, dateOfBirth: string | null): string {
   const sorted = sortByStart(events, dateOfBirth)
+  if (sorted.length > 0 && sorted.every((event) => event.title.trim())) {
+    return colonSentence(sorted, name, dateOfBirth, "self-harm", "self-harm")
+  }
   const untitled = sorted.filter((event) => !event.title.trim())
   const titled = sorted.filter((event) => event.title.trim())
   const parts: { event: DatedEvent; text: string }[] = []
@@ -319,22 +360,30 @@ export function selfHarmSentence(events: DatedEvent[], name: string, dateOfBirth
   return `${name} reported ${joinProse(parts.map((part) => part.text))}.`
 }
 
-/** "Ben01 reported experiencing a serious car accident at age 19 (1994)." */
+/** "Tom reported a traumatic event: serious car accident at age 19 (1989)." Untitled entries keep the older grouping. */
 export function traumaticEventsSentence(events: DatedEvent[], name: string, dateOfBirth: string | null): string {
-  const parts = sortByStart(events, dateOfBirth).map((event) => {
-    const when = eventWhenPhrase(event, dateOfBirth, "starting")
-    return ["experiencing " + titled(event, "a traumatic event"), when].filter(Boolean).join(" ")
-  })
-  return `${name} reported ${joinAnd(parts)}.`
+  const sorted = sortByStart(events, dateOfBirth)
+  if (sorted.some((event) => !event.title.trim())) {
+    const parts = sorted.map((event) => {
+      const when = eventWhenPhrase(event, dateOfBirth, "starting")
+      return ["experiencing " + titled(event, "a traumatic event"), when].filter(Boolean).join(" ")
+    })
+    return `${name} reported ${joinAnd(parts)}.`
+  }
+  return colonSentence(sorted, name, dateOfBirth, "a traumatic event", "traumatic events")
 }
 
-/** "Ben01 reported moving interstate at age 13 (1988)." */
+/** "Tom reported a significant event: moved interstate at age 15 (1985)." Untitled entries keep the older grouping. */
 export function otherSignificantEventsSentence(events: DatedEvent[], name: string, dateOfBirth: string | null): string {
-  const parts = sortByStart(events, dateOfBirth).map((event) => {
-    const when = eventWhenPhrase(event, dateOfBirth, "starting")
-    return [titled(event, "another significant event"), when].filter(Boolean).join(" ")
-  })
-  return `${name} reported ${joinAnd(parts)}.`
+  const sorted = sortByStart(events, dateOfBirth)
+  if (sorted.some((event) => !event.title.trim())) {
+    const parts = sorted.map((event) => {
+      const when = eventWhenPhrase(event, dateOfBirth, "starting")
+      return [titled(event, "another significant event"), when].filter(Boolean).join(" ")
+    })
+    return `${name} reported ${joinAnd(parts)}.`
+  }
+  return colonSentence(sorted, name, dateOfBirth, "a significant event", "significant events")
 }
 
 /** "Ben01 also reported taking temazepam from age 31 to 32." */
@@ -786,7 +835,11 @@ export function currentMedicationParagraph(
   const parts = ongoing.map((event) => {
     const title = titled(event, "medication")
     const professional = professionals.find((item) => item.professionalId === event.prescriberProfessionalId)
-    const supervisor = professional ? professionalSummary(professional) : event.prescriberName.trim()
+    const supervisor = professional
+      ? [professionalSummary(professional).replace(/, [^,]+$/, ""), reportProfession(professional.professionName)]
+          .filter(Boolean)
+          .join(", ")
+      : event.prescriberName.trim()
     return supervisor ? `${title}, supervised by ${supervisor}` : title
   })
   return `${name} is currently taking ${joinAnd(parts)}.`

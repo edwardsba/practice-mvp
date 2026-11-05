@@ -115,6 +115,7 @@ function benSource(): BackgroundReportSource {
     },
     reason: {
       ...emptyReasonForAttending(),
+      referralType: "medical",
       referredByMedicalProfessional: "yes",
       referrerConcerns: "low mood",
       familyInvolved: "yes",
@@ -352,25 +353,26 @@ assert.equal(
 assert.deepEqual(
   outline.filter((line) => line.startsWith("2.")),
   [
-    "2.1. Referral from Dr Harry Nguyen, general practitioner, 20 July 2026.",
+    "2.1. Referral from Dr Harry Nguyen, GP, 20 July 2026.",
     "2.2. Clinical interview, 1 October 2026.",
   ]
 )
 
 const presenting = outline.filter((line) => line.startsWith("3.")).join("\n")
-assert.match(presenting, /Ben01 was referred by his general practitioner, Dr Harry Nguyen, on 20 July 2026, with concerns about low mood\./)
-assert.match(presenting, /His partner came to the first appointment\./)
+assert.match(presenting, /Ben01 was referred by his GP, Dr Harry Nguyen, on 20 July 2026, with concerns about low mood\./)
 assert.match(presenting, /Ben01 reported current difficulties with family and finances\./)
 assert.doesNotMatch(presenting, /social life|work or study|denied/i)
 assert.match(presenting, /He described the main problem as "I can't switch off"\./)
-assert.match(presenting, /He attended on his own initiative\./)
+assert.doesNotMatch(presenting, /His partner came to the first appointment/)
+assert.doesNotMatch(presenting, /He attended on his own initiative/)
 assert.equal(presenting.includes("willingly"), false)
 assert.equal(lowerKeepingTypedCase("GP"), "GP")
 assert.equal(lowerKeepingTypedCase("TAFE"), "TAFE")
 assert.equal(lowerKeepingTypedCase("Social Worker"), "social worker")
 assert.equal(lowerKeepingTypedCase("GP/Psychiatrist"), "GP/psychiatrist")
 assert.equal(lowerKeepingTypedCase("McKenzie"), "McKenzie")
-assert.match(presenting, /He wants to feel more like himself\./)
+assert.doesNotMatch(presenting, /He wants to feel more like himself\./)
+assert.doesNotMatch(presenting, /own initiative|encouragement of others/)
 
 const demographics = outline.filter((line) => line.startsWith("4.")).join("\n")
 assert.match(demographics, /Ben01 is a 56-year-old male \(he\/him\)\./)
@@ -406,11 +408,11 @@ assert.equal(outline.includes("Risk Assessment"), false)
 assert.doesNotMatch(body, /ASSIST/)
 assert.match(
   outline.find((line) => line.startsWith("5.1.")) ?? "",
-  /Ben01 reported a broken leg at age 12 \(1982\) and depression at age 30 \(2000\)\./
+  /Ben01 reported illnesses or injuries: a broken leg at age 12 \(1982\) and depression at age 30 \(2000\)\./
 )
 assert.match(
   outline.find((line) => line.startsWith("5.2.")) ?? "",
-  /Ben01 reported a cutting episode at age 14 \(1984\) and an overdose at age 18 \(1988\)\./
+  /Ben01 reported self-harm: cutting episode at age 14 \(1984\) and overdose at age 18 \(1988\)\./
 )
 assert.match(
   outline.find((line) => line.startsWith("6.1.")) ?? "",
@@ -758,7 +760,7 @@ assert.match(
   /They live with their partner and children in a private rental and describe their housing as stable\./
 )
 assert.match(wordingText, /They are self-employed as an electrician\./)
-assert.match(wordingText, /Alex has hearing loss, left ear\./)
+assert.match(wordingText, /Alex reported a disability \(hearing loss, left ear\)\./)
 assert.doesNotMatch(wordingText, /including \.|including at\b/)
 
 wording.data.demographics.education.fieldOfStudy = "IT"
@@ -1218,9 +1220,9 @@ assert.match(
   history,
   /Ben01 reported a history of depression from age 30 to 32 \(2005–2007\)\. He was admitted to a psychiatric unit at age 31 \(2006\) for two weeks, saw a psychologist from age 31 to 32 \(2006–2007\), and has been treated with sertraline since age 50 \(2025\)\./
 )
-assert.match(history, /Ben01 reported a cutting from age 14 to 16/)
+assert.match(history, /Ben01 reported self-harm: cutting from age 14 to 16/)
 assert.match(history, /Ben01 also reported taking temazepam from age 31 to 32/)
-const selfHarmAt = history.indexOf("a cutting from age 14")
+const selfHarmAt = history.indexOf("self-harm: cutting from age 14")
 const unlinkedAt = history.indexOf("also reported taking temazepam")
 const mentalAt = history.indexOf("history of depression")
 assert.ok(mentalAt < selfHarmAt && selfHarmAt < unlinkedAt)

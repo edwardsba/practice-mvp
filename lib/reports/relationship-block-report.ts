@@ -411,7 +411,7 @@ function parentLaterClause(
     const ended = endAge != null ? `, and that marriage ended when ${voice.subject} was ${endAge}` : block.endedOn.trim() ? ", and that marriage ended" : ""
     return `${began}${ended}`
   }
-  if (!block.endedOn.trim() && startYear) return `re-partnered${who} and has been in a de facto relationship since ${startYear}`
+  if (!block.endedOn.trim() && startYear) return `since ${startYear} has been in a de facto relationship${who}`
   if (startYear && endYear) return `re-partnered in a de facto relationship from ${startYear} to ${endYear}`
   if (block.status === "defacto_separated") return "re-partnered, and that relationship ended in separation"
   if (block.status === "engagement_ended") return "was engaged again"
@@ -487,10 +487,16 @@ function laterSentences(
     return [`${name}'s ${role} ${clauses[0]}.`]
   }
   const pronoun = role === "mother" ? "she" : "he"
-  if (mine.length === 1) return [`${voice.Possessive} ${role} ${clauses[0]}.`]
-  const spoken = clauses.map((clause, index) =>
-    index === 0 || clause.startsWith("has ") || clause.startsWith("re-partnered") ? `${pronoun} ${clause}` : clause
-  )
+  if (mine.length === 1) {
+    const since = /^since (\S+) has been in a de facto relationship(.*)$/.exec(clauses[0] ?? "")
+    if (since) return [`${voice.Possessive} ${role} has been in a de facto relationship${since[2]} since ${since[1]}.`]
+    return [`${voice.Possessive} ${role} ${clauses[0]}.`]
+  }
+  const spoken = clauses.map((clause, index) => {
+    if (clause.startsWith("since ")) return clause.replace(" has been", ` ${pronoun} has been`)
+    if (index === 0 || clause.startsWith("has ") || clause.startsWith("re-partnered")) return `${pronoun} ${clause}`
+    return clause
+  })
   if (bare === 1) spoken.push("one other relationship")
   else if (bare > 1) spoken.push(`${countWord(bare)} other relationships`)
   return [`${counted}: ${joinProse(spoken)}.`]
@@ -638,9 +644,9 @@ export function siblingsFromBlocks(
   const orderPool = (adoptive.length > 0 && full.length === 0 ? adoptive : full).filter((person) => siblingAge(person, asOf) != null)
   const orderAll = adoptive.length > 0 && full.length === 0 ? adoptive : full
   const livingMissing = orderAll.some((person) => !deceased(person) && siblingAge(person, asOf) == null)
-  if (clientYears != null && !livingMissing && orderPool.length > 0) {
+  if (clientYears != null && !livingMissing && orderPool.length > 0 && orderAll.length > 0) {
     const older = orderPool.filter((person) => (siblingAge(person, asOf) ?? 0) > clientYears).length
-    const place = older === 0 ? "the eldest" : older === orderPool.length ? "the youngest" : `the ${ordinalWord(older + 1)}`
+    const place = older === 0 ? "the eldest" : older === orderPool.length ? "the youngest" : `the ${ordinalWord(older + 1)}-eldest`
     const family = adoptive.length > 0 && full.length === 0 ? "adoptive siblings" : "full siblings"
     sentences.push(`${name} is ${place} of ${voice.possessive} ${family}.`)
   }

@@ -33,6 +33,13 @@ import {
   significantOtherParagraphs,
 } from "@/lib/reports/background-family-paragraphs"
 import {
+  childrenFromBlocks,
+  parentsFromBlocks,
+  parentsSeparationMissingFromBlocks,
+  partnersFromBlocks,
+  siblingsFromBlocks,
+} from "@/lib/reports/relationship-block-report"
+import {
   conditionParagraph,
   currentMedicationParagraph,
   lowerKeepingTypedCase,
@@ -1036,18 +1043,32 @@ function demographicItems(
     named = true
     items.push(disability)
   }
-  const relationships = partnersParagraph(
-    first,
-    voice as ReportVoice,
-    source.data.relationshipStatus.relationshipStatus,
-    source.data.relationships,
-    source.reportDate
-  )
+  const blocks = source.data.relationshipBlocks ?? []
+  const relationships =
+    blocks.length > 0
+      ? partnersFromBlocks(
+          first,
+          voice as ReportVoice,
+          source.data.relationshipStatus.relationshipStatus,
+          blocks,
+          source.data.relationships,
+          source.reportDate
+        )
+      : partnersParagraph(
+          first,
+          voice as ReportVoice,
+          source.data.relationshipStatus.relationshipStatus,
+          source.data.relationships,
+          source.reportDate
+        )
   if (relationships) {
     named = true
     items.push(relationships)
   }
-  const childrenTotal = childrenTotalParagraph(first, source.data.relationships, source.reportDate)
+  const childrenTotal =
+    blocks.length > 0
+      ? childrenFromBlocks(first, blocks, source.data.relationships, source.reportDate)
+      : childrenTotalParagraph(first, source.data.relationships, source.reportDate)
   if (childrenTotal) {
     named = true
     items.push(childrenTotal)
@@ -1061,33 +1082,58 @@ function demographicItems(
       })
     }
   }
-  if (parentsSeparationMissing(source.data.relationships, source.data.partnerships)) {
+  if (
+    blocks.length > 0
+      ? parentsSeparationMissingFromBlocks(blocks)
+      : parentsSeparationMissing(source.data.relationships, source.data.partnerships)
+  ) {
     omitted.push({
       id: "parents-ended",
       message: `When ${voice.possessive} parents separated not recorded`,
       target: "relationships",
     })
   }
-  const family = parentsParagraph(
-    first,
-    voice as ReportVoice,
-    source.dateOfBirth,
-    source.data.relationships,
-    source.data.partnerships,
-    source.reportDate
-  )
+  const family =
+    blocks.length > 0
+      ? parentsFromBlocks(
+          first,
+          voice as ReportVoice,
+          source.dateOfBirth,
+          blocks,
+          source.data.relationships,
+          source.data.blockAnswers,
+          source.reportDate
+        )
+      : parentsParagraph(
+          first,
+          voice as ReportVoice,
+          source.dateOfBirth,
+          source.data.relationships,
+          source.data.partnerships,
+          source.reportDate
+        )
   if (family) {
     named = true
     items.push(family)
   }
-  const siblings = siblingsParagraph(
-    first,
-    voice as ReportVoice,
-    source.dateOfBirth,
-    source.data.relationships,
-    source.data.partnerships,
-    source.reportDate
-  )
+  const siblings =
+    blocks.length > 0
+      ? siblingsFromBlocks(
+          first,
+          voice as ReportVoice,
+          source.dateOfBirth,
+          blocks,
+          source.data.relationships,
+          source.reportDate
+        )
+      : siblingsParagraph(
+          first,
+          voice as ReportVoice,
+          source.dateOfBirth,
+          source.data.relationships,
+          source.data.partnerships,
+          source.reportDate
+        )
   if (siblings) {
     named = true
     items.push(siblings)

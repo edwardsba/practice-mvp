@@ -1507,4 +1507,18 @@ const repeatedNames = roundText((source) => {
 assert.match(repeatedNames, /Ben01's mother has a history of depression\. His father has a history of depression\./)
 assert.doesNotMatch(repeatedNames, /Ben01's father has a history of depression/)
 
+const missingReferrer = emptySource()
+missingReferrer.data.reason.referralType = "family_or_friend"
+assert.ok(
+  generateBackgroundReport(missingReferrer).omitted.some((item) => item.message === "Referral: who referred the client not recorded")
+)
+const namedReferrer = emptySource()
+namedReferrer.data.reason.referralType = "family_or_friend"
+namedReferrer.data.reason.referrerIsOther = true
+namedReferrer.data.reason.referrerOther = "a neighbour"
+assert.equal(
+  generateBackgroundReport(namedReferrer).omitted.some((item) => item.message === "Referral: who referred the client not recorded"),
+  false
+)
+
 console.log("generate-background-report self-test passed")

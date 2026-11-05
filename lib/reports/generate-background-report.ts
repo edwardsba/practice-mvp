@@ -620,6 +620,8 @@ function presentingItems(
           ? `${first} was referred by ${by}, who was concerned about ${concerns}.`
           : `${first} was referred by ${by}.`
       )
+    } else {
+      omitted.push({ id: "referrer-who", message: "Referral: who referred the client not recorded", target: "reason" })
     }
   } else if (reason.referralType === "self") {
     items.push(`${first} self-referred.`)

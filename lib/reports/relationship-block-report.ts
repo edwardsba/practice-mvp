@@ -499,7 +499,22 @@ function laterSentences(
   })
   if (bare === 1) spoken.push("one other relationship")
   else if (bare > 1) spoken.push(`${countWord(bare)} other relationships`)
-  return [`${counted}: ${joinProse(spoken)}.`]
+  return [`${counted}: ${joinLaterProse(spoken)}.`]
+}
+
+/** An ongoing later relationship follows an ended one with a semicolon, not a second "and". */
+function joinLaterProse(parts: string[]): string {
+  return parts.reduce((text, part) => {
+    if (!text) return part
+    if (part.startsWith("since ")) return `${text}; ${part}`
+    return joinProse([text, part])
+  }, "")
+}
+
+function countsAsFullSibling(person: RelationshipRecord, block: RelationshipBlock | undefined): boolean {
+  if (person.blockRoleType === "adopted") return false
+  if (person.blockRoleType && person.blockRoleType !== "full") return false
+  return person.blockRoleType === "full" || block?.kind === "biological_parents"
 }
 
 /** 4.5 Biological parents, adoption, other care, then each parent's other relationships. */
@@ -632,8 +647,9 @@ export function siblingsFromBlocks(
   const blockById = new Map(blocks.map((block) => [block.relationshipBlockId, block]))
   const full = siblings.filter((person) => {
     const block = person.relationshipBlockId ? blockById.get(person.relationshipBlockId) : undefined
-    return block?.kind === "biological_parents" || person.blockRoleType === "full"
+    return countsAsFullSibling(person, block)
   })
+  const adopted = siblings.filter((person) => person.blockRoleType === "adopted")
   const adoptive = siblings.filter((person) => person.blockRoleType === "adoptive")
   const foster = siblings.filter((person) => person.blockRoleType === "foster")
   const other = siblings.filter((person) => person.blockRoleType === "other")
@@ -663,7 +679,8 @@ export function siblingsFromBlocks(
     else if (ages.length > 0) bits.push(`${noun} (${joinProse(ages.map(String))})`)
     else bits.push(noun)
   }
-  pushGroup(full, full.length === 1 ? "full sibling" : "full sibling")
+  pushGroup(full, "full sibling")
+  pushGroup(adopted, "adopted sibling")
   const sideGroups = (rows: RelationshipRecord[], label: string) => {
     const buckets = new Map<string, RelationshipRecord[]>()
     for (const person of rows) {

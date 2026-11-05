@@ -1,10 +1,13 @@
 import {
+  ARRANGEMENT_TYPE_LABELS,
   ARRANGEMENT_TYPES,
   BLOCK_ANSWERS,
   CHILD_TYPES,
+  CURRENT_BLOCK_STATUS_LABELS,
   CURRENT_BLOCK_STATUSES,
   NEVER_IN_A_RELATIONSHIP,
   PARTNERED_CLIENT_STATUSES,
+  PREVIOUS_BLOCK_STATUS_LABELS,
   PREVIOUS_BLOCK_STATUSES,
   SIBLING_BLOCK_TYPES,
   type ArrangementType,
@@ -87,6 +90,54 @@ export function childTypesForBlock(kind: BlockKind): readonly ChildType[] {
 /** Adding a block sets Yes. Removing the last one sets Not asked, never None. */
 export function answerAfterBlockCount(count: number): "yes" | "not_asked" {
   return count > 0 ? "yes" : "not_asked"
+}
+
+/** Sent when Move to should create the block and then place the person in it. */
+export const NEW_CURRENT_RELATIONSHIP = "new-current-relationship"
+export const NEW_PREVIOUS_RELATIONSHIP = "new-previous-relationship"
+
+export function relationshipBlockLabel(block: RelationshipBlock): string {
+  const status = block.status.trim()
+  const statusText =
+    status in CURRENT_BLOCK_STATUS_LABELS
+      ? CURRENT_BLOCK_STATUS_LABELS[status as keyof typeof CURRENT_BLOCK_STATUS_LABELS]
+      : status in PREVIOUS_BLOCK_STATUS_LABELS
+        ? PREVIOUS_BLOCK_STATUS_LABELS[status as keyof typeof PREVIOUS_BLOCK_STATUS_LABELS]
+        : status === NEVER_IN_A_RELATIONSHIP
+          ? "Never in a relationship"
+          : block.arrangementType in ARRANGEMENT_TYPE_LABELS
+            ? ARRANGEMENT_TYPE_LABELS[block.arrangementType as keyof typeof ARRANGEMENT_TYPE_LABELS]
+            : ""
+  const title =
+    block.kind === "client_current"
+      ? "Current relationship"
+      : block.kind === "client_previous"
+        ? "Previous relationship"
+        : block.kind === "client_other_children"
+          ? "Other children"
+          : block.kind === "biological_parents"
+            ? "Biological parents"
+            : block.kind === "parent_other"
+              ? block.parentSide === "father"
+                ? "Father's other relationship"
+                : "Mother's other relationship"
+              : "Care arrangement"
+  const when = block.startedOn.trim() ? `, from ${block.startedOn.trim()}` : ""
+  return statusText ? `${title} (${statusText}${when})` : title
+}
+
+export function moveDestinations(blocks: RelationshipBlock[]): { id: string; label: string }[] {
+  return [
+    ...blocks.map((block) => ({ id: block.relationshipBlockId, label: relationshipBlockLabel(block) })),
+    { id: NEW_CURRENT_RELATIONSHIP, label: "+ New current relationship" },
+    { id: NEW_PREVIOUS_RELATIONSHIP, label: "+ New previous relationship" },
+  ]
+}
+
+export function moveDestinationKind(blocks: RelationshipBlock[], destinationId: string): BlockKind | null {
+  if (destinationId === NEW_CURRENT_RELATIONSHIP) return "client_current"
+  if (destinationId === NEW_PREVIOUS_RELATIONSHIP) return "client_previous"
+  return blocks.find((block) => block.relationshipBlockId === destinationId)?.kind ?? null
 }
 
 export function previousBlocksInOrder(blocks: RelationshipBlock[]): RelationshipBlock[] {

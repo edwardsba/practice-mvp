@@ -1,14 +1,19 @@
 import assert from "node:assert/strict"
 
 import {
+  NEW_CURRENT_RELATIONSHIP,
+  NEW_PREVIOUS_RELATIONSHIP,
   answerAfterBlockCount,
   mapRelationshipsToBlocks,
+  moveDestinationKind,
+  moveDestinations,
   previousStatusFromPartner,
   statusesForBlock,
 } from "@/lib/client-background/relationship-blocks"
 import type { PartnershipRecord, RelationshipBlock, RelationshipRecord } from "@/lib/client-background/types"
 import {
   childrenFromBlocks,
+  combinedLaterClause,
   endedRelationshipClause,
   parentsFromBlocks,
   partnersFromBlocks,
@@ -421,5 +426,37 @@ const youngerBrother = person({
 })
 const deathText = siblingsFromBlocks("Ben01", he, "1970-01-15", [block({ relationshipBlockId: "bio", kind: "biological_parents" })], [deadBrother, youngerBrother], "2026-11-05")
 assert.match(deathText ?? "", /His first brother died when Ben01 was 19/)
+
+const destinations = moveDestinations([
+  block({ relationshipBlockId: "now", kind: "client_current", status: "married" }),
+  block({ relationshipBlockId: "then", kind: "client_previous", status: "divorced" }),
+])
+assert.deepEqual(
+  destinations.map((item) => item.id),
+  ["now", "then", NEW_CURRENT_RELATIONSHIP, NEW_PREVIOUS_RELATIONSHIP]
+)
+assert.equal(moveDestinationKind([block({ relationshipBlockId: "now", kind: "client_current" })], NEW_PREVIOUS_RELATIONSHIP), "client_previous")
+assert.ok(destinations.some((item) => item.label === "+ New previous relationship"))
+assert.match(combinedLaterClause("divorced", 2) ?? "", /has remarried twice, and both marriages ended in divorce/)
+const twice = parentsFromBlocks(
+  "Ben01",
+  he,
+  "1970-01-15",
+  [
+    block({ relationshipBlockId: "m1", kind: "parent_other", parentSide: "mother", status: "divorced" }),
+    block({ relationshipBlockId: "m2", kind: "parent_other", parentSide: "mother", status: "divorced" }),
+  ],
+  [],
+  {
+    previousRelationships: "not_asked",
+    otherChildren: "not_asked",
+    motherOtherRelationships: "yes",
+    fatherOtherRelationships: "not_asked",
+    caregiverArrangements: "not_asked",
+  },
+  "2026-11-05"
+)
+assert.match(twice ?? "", /Ben01's mother has remarried twice, and both marriages ended in divorce/)
+assert.doesNotMatch(twice ?? "", /she remarried and remarried/)
 
 console.log("relationship blocks selftest passed")

@@ -14,6 +14,8 @@ import {
   isPartneredClientStatus,
   isSiblingBlockType,
   legacyRoleForMember,
+  NEW_CURRENT_RELATIONSHIP,
+  NEW_PREVIOUS_RELATIONSHIP,
   rolesForBlock,
   siblingTypesForBlock,
 } from "@/lib/client-background/relationship-blocks"
@@ -397,12 +399,30 @@ export async function moveBlockMember(input: Scope & {
   roleType?: string
 }) {
   const person = await ownedPerson(input, input.relationshipRecordId)
-  const blockRow = await ownedBlock(input, input.relationshipBlockId)
-  if (!person || !blockRow) return { error: "Choose a relationship to move them to." }
+  if (!person) return { error: "Person was not found." }
+  let destinationId = input.relationshipBlockId
+  if (destinationId === NEW_CURRENT_RELATIONSHIP || destinationId === NEW_PREVIOUS_RELATIONSHIP) {
+    const created = await createRelationshipBlock({
+      ...input,
+      kind: destinationId === NEW_CURRENT_RELATIONSHIP ? "client_current" : "client_previous",
+    })
+    if (!created || !("blocks" in created) || !created.blocks) return created ?? { error: "Could not add the relationship." }
+    const kind = destinationId === NEW_CURRENT_RELATIONSHIP ? "client_current" : "client_previous"
+    const newest = created.blocks
+      .filter((block) => block.kind === kind)
+      .sort((a, b) => b.displayOrder - a.displayOrder)[0]
+    if (!newest) return { error: "Could not add the relationship." }
+    destinationId = newest.relationshipBlockId
+  }
+  const blockRow = await ownedBlock(input, destinationId)
+  if (!blockRow) return { error: "Choose a relationship to move them to." }
   const block = toRelationshipBlock(blockRow)
   if (!rolesForBlock(block.kind).includes(input.role)) return { error: "That person does not belong in this relationship." }
   const roleType = (input.roleType ?? siblingTypesForBlock(block.kind)[0] ?? "").trim()
-  if ((input.role === "child" || input.role === "sibling" || input.role === "parent") && !allowedType(block.kind, input.role, roleType, block.arrangementType)) {
+  if (
+    (input.role === "child" || input.role === "sibling" || input.role === "parent" || input.role === "caregiver") &&
+    !allowedType(block.kind, input.role, roleType, block.arrangementType)
+  ) {
     return { error: "Choose a type for this relationship." }
   }
   await db
@@ -414,6 +434,7 @@ export async function moveBlockMember(input: Scope & {
       relationshipToClient: legacyRoleForMember(block.kind, input.role, roleType),
       placementReview: null,
       childType: input.role === "child" ? roleType || null : person.childType,
+      caregiverRelationship: input.role === "caregiver" ? roleType || null : person.caregiverRelationship,
       updatedAt: new Date(),
     })
     .where(eq(clientRelationshipRecords.relationshipRecordId, person.relationshipRecordId))

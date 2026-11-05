@@ -337,6 +337,48 @@ function parentLaterClause(block: RelationshipBlock, name: string, voice: Report
   return "re-partnered"
 }
 
+function undated(block: RelationshipBlock): boolean {
+  return !block.startedOn.trim() && !block.endedOn.trim()
+}
+
+/** Two or more later relationships with the same status and no dates become one clause. */
+export function combinedLaterClause(status: string, count: number): string | null {
+  if (count < 2 || !status.trim()) return null
+  const times = count === 2 ? "twice" : `${countWord(count)} times`
+  const both = count === 2 ? "both" : "all"
+  if (status === "divorced") return `has remarried ${times}, and ${both} marriages ended in divorce`
+  if (status === "married_separated") return `has remarried ${times}, and ${both} marriages ended in separation`
+  if (status === "widowed") return `has remarried ${times}, and ${both} marriages ended when the partner died`
+  if (status === "defacto_separated") return `has re-partnered ${times}, and ${both} relationships ended in separation`
+  if (status === "relationship_ended") return `has re-partnered ${times}, and ${both} relationships ended`
+  if (status === "engagement_ended") return `was engaged ${times}, and ${both} engagements ended`
+  if (status === "partner_died") return `has re-partnered ${times}, and ${both} relationships ended when the partner died`
+  if (status === "married") return `has remarried ${times}`
+  if (status === "defacto") return `has re-partnered ${times}`
+  return null
+}
+
+function laterClauses(
+  blocks: RelationshipBlock[],
+  name: string,
+  voice: ReportVoice,
+  dateOfBirth: string | null
+): string[] {
+  const dated = blocks.filter((block) => !undated(block))
+  const grouped = new Map<string, RelationshipBlock[]>()
+  for (const block of blocks.filter(undated)) {
+    grouped.set(block.status, [...(grouped.get(block.status) ?? []), block])
+  }
+  const clauses: string[] = []
+  for (const block of dated) clauses.push(parentLaterClause(block, name, voice, dateOfBirth))
+  for (const [status, group] of grouped) {
+    const combined = combinedLaterClause(status, group.length)
+    if (combined) clauses.push(combined)
+    else for (const block of group) clauses.push(parentLaterClause(block, name, voice, dateOfBirth))
+  }
+  return clauses
+}
+
 function laterSentences(
   role: "mother" | "father",
   blocks: RelationshipBlock[],
@@ -355,15 +397,18 @@ function laterSentences(
   const bare = mine.length - detailed.length
   const counted = `${name}'s ${role} ${verb} ${countWord(mine.length)} later ${mine.length === 1 ? "relationship" : "relationships"}`
   if (detailed.length === 0) return [`${counted}.`]
+  const clauses = laterClauses(detailed, name, voice, dateOfBirth)
+  if (clauses.length === 1 && bare === 0 && clauses[0].startsWith("has ")) {
+    return [`${name}'s ${role} ${clauses[0]}.`]
+  }
   const pronoun = role === "mother" ? "she" : "he"
-  if (mine.length === 1) return [`${voice.Possessive} ${role} ${parentLaterClause(detailed[0], name, voice, dateOfBirth)}.`]
-  const clauses = detailed.map((block, index) => {
-    const clause = parentLaterClause(block, name, voice, dateOfBirth)
-    return index === 0 || clause.startsWith("has ") || clause.startsWith("re-partnered and has") ? `${pronoun} ${clause}` : clause
-  })
-  if (bare === 1) clauses.push("one other relationship")
-  else if (bare > 1) clauses.push(`${countWord(bare)} other relationships`)
-  return [`${counted}: ${joinProse(clauses)}.`]
+  if (mine.length === 1) return [`${voice.Possessive} ${role} ${clauses[0]}.`]
+  const spoken = clauses.map((clause, index) =>
+    index === 0 || clause.startsWith("has ") || clause.startsWith("re-partnered and has") ? `${pronoun} ${clause}` : clause
+  )
+  if (bare === 1) spoken.push("one other relationship")
+  else if (bare > 1) spoken.push(`${countWord(bare)} other relationships`)
+  return [`${counted}: ${joinProse(spoken)}.`]
 }
 
 /** 4.5 Biological parents, adoption, other care, then each parent's other relationships. */

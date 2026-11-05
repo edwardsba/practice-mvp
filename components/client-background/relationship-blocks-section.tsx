@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState } from "react"
+import { createContext, useContext, useEffect, useRef, useState } from "react"
 
 import {
   addBlockMemberAction,
@@ -21,6 +21,8 @@ import {
   answerKeyForBlock,
   childTypesForBlock,
   isPartneredClientStatus,
+  moveDestinationKind,
+  moveDestinations,
   needLabel,
   needsForBlock,
   needsForMember,
@@ -73,6 +75,16 @@ type EditorState = {
 }
 
 const linkClass = "text-sm text-primary underline-offset-2 hover:underline"
+
+const BlocksContext = createContext<RelationshipBlock[]>([])
+
+const ROLE_LABELS: Record<BlockRole, string> = {
+  partner: "Partner",
+  child: "Child",
+  parent: "Parent",
+  sibling: "Sibling",
+  caregiver: "Caregiver",
+}
 
 function statusLabel(status: string): string {
   if (status === "never_in_a_relationship") return "Never in a relationship"
@@ -184,6 +196,7 @@ export function RelationshipBlocksSection({
   const otherChildren = blockList.find((block) => block.kind === "client_other_children")
 
   return (
+    <BlocksContext.Provider value={blockList}>
     <Card id="check-relationships" className="scroll-mt-28">
       <CardHeader>
         <CardTitle>Relationships</CardTitle>
@@ -277,12 +290,13 @@ export function RelationshipBlocksSection({
             <h3 className="text-sm font-medium text-amber-950">Unplaced</h3>
             <p className="text-sm text-amber-950">These people could not be placed in a relationship.</p>
             {unplaced.map((person) => (
-              <UnplacedRow key={person.relationshipRecordId} clientId={clientId} person={person} blocks={blockList} run={run} />
+              <UnplacedRow key={person.relationshipRecordId} clientId={clientId} person={person} run={run} />
             ))}
           </section>
         ) : null}
       </CardContent>
     </Card>
+    </BlocksContext.Provider>
   )
 }
 
@@ -840,6 +854,7 @@ function PersonRow({
           </SelectField>
         </div>
       </details>
+      <MoveControl clientId={clientId} person={draft} run={run} />
       {removable ? (
         <button
           type="button"
@@ -853,64 +868,79 @@ function PersonRow({
   )
 }
 
-function UnplacedRow({
+function typeLabel(role: BlockRole, value: string): string {
+  if (role === "child" && value in CHILD_TYPE_LABELS) return CHILD_TYPE_LABELS[value as keyof typeof CHILD_TYPE_LABELS]
+  if (role === "sibling" && value in SIBLING_BLOCK_TYPE_LABELS) return SIBLING_BLOCK_TYPE_LABELS[value as keyof typeof SIBLING_BLOCK_TYPE_LABELS]
+  if (role === "parent") return value === "mother" ? "Mother" : value === "father" ? "Father" : value
+  if (role === "caregiver" && value in CAREGIVER_RELATIONSHIP_LABELS) {
+    return CAREGIVER_RELATIONSHIP_LABELS[value as keyof typeof CAREGIVER_RELATIONSHIP_LABELS]
+  }
+  return value
+}
+
+function typesForDestination(blocks: RelationshipBlock[], destinationId: string, role: BlockRole): string[] {
+  const kind = moveDestinationKind(blocks, destinationId)
+  const block = blocks.find((item) => item.relationshipBlockId === destinationId)
+  if (!kind) return []
+  if (role === "child") return [...childTypesForBlock(kind)]
+  if (role === "sibling") return [...siblingTypesForBlock(kind)]
+  if (role === "parent") return ["mother", "father"]
+  if (role === "caregiver") {
+    if (block?.arrangementType === "adoption") return ["", ...CAREGIVER_RELATIONSHIPS]
+    return [...CAREGIVER_RELATIONSHIPS]
+  }
+  return []
+}
+
+function MoveControl({
   clientId,
   person,
-  blocks,
   run,
 }: {
   clientId: string
   person: RelationshipRecord
-  blocks: RelationshipBlock[]
   run: (work: () => Promise<EditorState | null>) => Promise<void>
 }) {
-  const [blockId, setBlockId] = useState(blocks[0]?.relationshipBlockId ?? "")
-  const block = blocks.find((item) => item.relationshipBlockId === blockId)
-  const roles = block ? rolesForBlock(block.kind) : []
-  const [role, setRole] = useState<BlockRole>(roles[0] ?? "child")
-  const types = useMemo(() => {
-    if (!block) return []
-    if (role === "child") return [...childTypesForBlock(block.kind)]
-    if (role === "sibling") return [...siblingTypesForBlock(block.kind)]
-    if (role === "parent") return ["mother", "father"]
-    return []
-  }, [block, role])
-  const [roleType, setRoleType] = useState(types[0] ?? "")
-  useEffect(() => {
-    if (roles[0] && !roles.includes(role)) setRole(roles[0])
-  }, [roles, role])
-  useEffect(() => {
-    if (types[0] && !types.includes(roleType)) setRoleType(types[0])
-  }, [types, roleType])
+  const blocks = useContext(BlocksContext)
+  const destinations = moveDestinations(blocks)
+  const [destinationId, setDestinationId] = useState(
+    () => destinations.find((item) => item.id !== person.relationshipBlockId)?.id ?? destinations[0]?.id ?? ""
+  )
+  const kind = moveDestinationKind(blocks, destinationId)
+  const roles = kind ? rolesForBlock(kind) : []
+  const [roleChoice, setRoleChoice] = useState<BlockRole>(roles[0] ?? "partner")
+  const role = roles.includes(roleChoice) ? roleChoice : roles[0] ?? "partner"
+  const types = typesForDestination(blocks, destinationId, role)
+  const [typeChoice, setTypeChoice] = useState(types[0] ?? "")
+  const roleType = types.includes(typeChoice) ? typeChoice : types[0] ?? ""
 
   return (
-    <div className="space-y-2 rounded-md bg-white p-2 text-sm">
-      <p className="font-medium">{person.givenName.trim() || person.relationshipToClient}</p>
+    <div className="space-y-2">
       <div className="grid gap-2 sm:grid-cols-3">
         <Field label="Move to">
-          <select className={selectClassName} value={blockId} onChange={(event) => setBlockId(event.target.value)}>
-            {blocks.map((item) => (
-              <option key={item.relationshipBlockId} value={item.relationshipBlockId}>
-                {blockTitle(item)}
+          <select className={selectClassName} value={destinationId} onChange={(event) => setDestinationId(event.target.value)}>
+            {destinations.map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.label}
               </option>
             ))}
           </select>
         </Field>
         <Field label="Role">
-          <select className={selectClassName} value={role} onChange={(event) => setRole(event.target.value as BlockRole)}>
+          <select className={selectClassName} value={role} onChange={(event) => setRoleChoice(event.target.value as BlockRole)}>
             {roles.map((item) => (
               <option key={item} value={item}>
-                {item}
+                {ROLE_LABELS[item]}
               </option>
             ))}
           </select>
         </Field>
-        {types.length > 0 ? (
+        {types.some((item) => item) ? (
           <Field label="Type">
-            <select className={selectClassName} value={roleType} onChange={(event) => setRoleType(event.target.value)}>
-              {types.map((item) => (
+            <select className={selectClassName} value={roleType} onChange={(event) => setTypeChoice(event.target.value)}>
+              {types.filter(Boolean).map((item) => (
                 <option key={item} value={item}>
-                  {item}
+                  {typeLabel(role, item)}
                 </option>
               ))}
             </select>
@@ -920,10 +950,27 @@ function UnplacedRow({
       <button
         type="button"
         className={linkClass}
-        onClick={() => void run(() => moveBlockMemberAction(clientId, person.relationshipRecordId, blockId, role, roleType))}
+        onClick={() => void run(() => moveBlockMemberAction(clientId, person.relationshipRecordId, destinationId, role, roleType))}
       >
         Move
       </button>
+    </div>
+  )
+}
+
+function UnplacedRow({
+  clientId,
+  person,
+  run,
+}: {
+  clientId: string
+  person: RelationshipRecord
+  run: (work: () => Promise<EditorState | null>) => Promise<void>
+}) {
+  return (
+    <div className="space-y-2 rounded-md bg-white p-2 text-sm">
+      <p className="font-medium">{person.givenName.trim() || person.relationshipToClient}</p>
+      <MoveControl clientId={clientId} person={person} run={run} />
     </div>
   )
 }

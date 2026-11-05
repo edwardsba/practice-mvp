@@ -1,4 +1,7 @@
+import { compareEventsChronologically } from "@/lib/client-background/age"
+import { conditionGroups } from "@/lib/client-background/condition-groups"
 import { mapHowEnded } from "@/lib/client-background/how-ended"
+import { isConditionEvent, isTreatmentEvent, treatmentsForCondition } from "@/lib/client-background/history-links"
 import { resolvedAbout } from "@/lib/client-background/interview-history"
 import { halfSiblingSide, stepParentLinks } from "@/lib/client-background/tree"
 import {
@@ -7,6 +10,7 @@ import {
   type ChildType,
   type ClientRelationshipStatus,
   type EventRecord,
+  type EventType,
   type PartnershipRecord,
   type RelationshipRecord,
 } from "@/lib/client-background/types"
@@ -720,6 +724,53 @@ function conditionText(event: EventRecord, role: string, kind: string, past: boo
   return `${verb} a history of ${title || "significant events"}`
 }
 
+function historyUnits(kind: string, matched: EventRecord[]): { event: EventRecord; episodes: EventRecord[] }[] {
+  if (isTreatmentEvent(kind as EventType)) {
+    return matched.filter((event) => !event.conditionEventId).map((event) => ({ event, episodes: [event] }))
+  }
+  if (isConditionEvent(kind as EventType)) {
+    return conditionGroups(matched).map((group) => ({ event: group.episodes[0], episodes: group.episodes }))
+  }
+  return matched.map((event) => ({ event, episodes: [event] }))
+}
+
+function sexPronoun(person: RelationshipRecord): string {
+  const sex = sexWord(person.sex)
+  if (sex === "female") return "she"
+  if (sex === "male") return "he"
+  return "they"
+}
+
+function familyTreatmentClause(event: EventRecord, past: boolean): string {
+  const year = yearOf(event.startPrecision, event.startValue)
+  const when = year ? ` (${year})` : ""
+  if (event.eventType === "psychiatric_admission") {
+    if (event.admissionType === "residential_rehab") return `attended residential rehab${when}`
+    if (event.admissionType === "medical" || event.admissionType === "emergency_department") return `was admitted to hospital${when}`
+    return `was admitted to a psychiatric unit${when}`
+  }
+  if (event.eventType === "previous_therapy") {
+    const who = lowerKeepingTypedCase(event.title.trim()) || "therapist"
+    return `saw ${/^(a|an)\s/i.test(who) ? who : `a ${who}`}`
+  }
+  const named = event.title.trim()
+  const medication = named && named.toLowerCase() !== "medication" ? lowerKeepingTypedCase(named) : ""
+  const ended = past || !(event.endOngoing || event.resolvedOrOngoing === "ongoing")
+  if (ended) return medication ? `took ${medication}` : "took medication"
+  return medication ? `takes ${medication}` : "takes medication"
+}
+
+function joinClauses(parts: string[]): string {
+  if (parts.length <= 1) return parts[0] ?? ""
+  if (parts.length === 2) return `${parts[0]} and ${parts[1]}`
+  return `${parts.slice(0, -1).join(", ")}, and ${parts[parts.length - 1]}`
+}
+
+function withTreatment(base: string, care: EventRecord[], past: boolean, pronoun: string): string {
+  if (care.length === 0) return `${base}.`
+  return `${base}, for which ${pronoun} ${joinClauses(care.map((event) => familyTreatmentClause(event, past)))}.`
+}
+
 /** Section 6. One paragraph per heading. The first sentence names the client; later sentences use the pronoun. */
 function sectionPersonTag(person: RelationshipRecord, asOf: string): string {
   const name = person.givenName.trim()
@@ -742,7 +793,17 @@ export function significantOtherParagraphs(
   for (const kind of SIGNIFICANT_ORDER) {
     const matched = rows.filter((event) => (event.eventType === "family_events" ? "emotional_problems" : event.eventType) === kind)
     if (matched.length === 0) continue
-    const sentences = matched.map((event, index) => {
+    const units = historyUnits(kind, matched)
+    const sentences = units.map((unit, index) => {
+      const event = unit.event
+      const care = unit.episodes
+        .flatMap((episode) => treatmentsForCondition(events, episode.eventRecordId))
+        .sort((a, b) => {
+          const aMissing = !a.startValue.trim()
+          const bMissing = !b.startValue.trim()
+          if (aMissing !== bMissing) return aMissing ? 1 : -1
+          return compareEventsChronologically(a, b, null)
+        })
       const person = event.relationshipRecordId
         ? people.find((row) => row.relationshipRecordId === event.relationshipRecordId)
         : undefined
@@ -750,14 +811,14 @@ export function significantOtherParagraphs(
         const role = roleWord(person)
         const detail = conditionText(event, role, kind, deceased(person))
         const owner = index === 0 ? `${name}'s` : laterOwner
-        return `${owner} ${role}${sectionPersonTag(person, asOf)} ${detail}.`
+        return withTreatment(`${owner} ${role}${sectionPersonTag(person, asOf)} ${detail}`, care, deceased(person), sexPronoun(person))
       }
       const other = event.aboutOther.trim() || event.familyRelation.trim()
       const who = other ? `A ${lowerKeepingTypedCase(other)} of ${name}'s` : `A significant other of ${name}'s`
       const detail = conditionText(event, "", kind, false)
-      return `${who} ${detail}.`
+      return withTreatment(`${who} ${detail}`, care, false, "they")
     })
-    paragraphs.push(sentences.join(" "))
+    if (sentences.length > 0) paragraphs.push(sentences.join(" "))
   }
   return paragraphs
 }

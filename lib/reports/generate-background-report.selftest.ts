@@ -1,6 +1,7 @@
 import assert from "node:assert/strict"
 
 import type { ScreeningAnswers } from "@/lib/client-background/interview-history"
+import { significantOtherParagraphs } from "@/lib/reports/background-family-paragraphs"
 import {
   emptyClientRelationshipStatus,
   emptyDemographics,
@@ -1317,6 +1318,75 @@ assert.equal(
   false
 )
 assert.ok(harmLines.some((line) => line.startsWith("6.") && line.includes("mother has a history of depression")))
+
+const treatedMother = significantOtherParagraphs(
+  "Tom",
+  [person({ relationshipRecordId: "sally", relationshipToClient: "mother", sex: "Female", givenName: "Sally" })],
+  [
+    event({
+      eventRecordId: "sally-depression",
+      eventType: "emotional_problems",
+      title: "Depression",
+      about: "significant_other",
+      attribution: "self_linked",
+      relationshipRecordId: "sally",
+    }),
+    event({
+      eventRecordId: "sally-admission",
+      eventType: "psychiatric_admission",
+      admissionType: "psychiatric_inpatient",
+      title: "Admission",
+      startPrecision: "year",
+      startValue: "1992",
+      about: "significant_other",
+      attribution: "self_linked",
+      relationshipRecordId: "sally",
+      conditionEventId: "sally-depression",
+    }),
+    event({
+      eventRecordId: "sally-medication",
+      eventType: "medication",
+      title: "",
+      endOngoing: true,
+      resolvedOrOngoing: "ongoing",
+      about: "significant_other",
+      attribution: "self_linked",
+      relationshipRecordId: "sally",
+      conditionEventId: "sally-depression",
+    }),
+  ]
+).join(" ")
+assert.equal(
+  treatedMother,
+  "Tom's mother (Sally) has a history of depression, for which she was admitted to a psychiatric unit (1992) and takes medication."
+)
+
+const treatedFather = significantOtherParagraphs(
+  "Tom",
+  [person({ relationshipRecordId: "john", relationshipToClient: "father", sex: "Male", givenName: "John", deceased: true, healthStatus: "deceased" })],
+  [
+    event({
+      eventRecordId: "john-depression",
+      eventType: "emotional_problems",
+      title: "Depression",
+      about: "significant_other",
+      attribution: "self_linked",
+      relationshipRecordId: "john",
+    }),
+    event({
+      eventRecordId: "john-medication",
+      eventType: "medication",
+      title: "Sertraline",
+      endOngoing: true,
+      resolvedOrOngoing: "ongoing",
+      about: "significant_other",
+      attribution: "self_linked",
+      relationshipRecordId: "john",
+      conditionEventId: "john-depression",
+    }),
+  ]
+).join(" ")
+assert.equal(treatedFather, "Tom's father (John, deceased) had a history of depression, for which he took sertraline.")
 
 function previousCount(count: number): string {
   return roundText((source) => {

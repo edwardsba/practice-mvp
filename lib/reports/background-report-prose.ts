@@ -1,4 +1,5 @@
 import { assessAge, clientAgeAtStart, compareEventsChronologically } from "@/lib/client-background/age"
+import { conditionGroups } from "@/lib/client-background/condition-groups"
 import { resolvedAbout } from "@/lib/client-background/interview-history"
 import { treatmentsForCondition } from "@/lib/client-background/history-links"
 import { parsePartialDate, precisionForPartialDate } from "@/lib/client-background/partial-date"
@@ -240,18 +241,21 @@ export function illnessInjurySentence(events: DatedEvent[], name: string, dateOf
 
 /** "Ben01 reported a history of depression from age 30 to 32 (2005–2007), and again starting at age 50 (2025)." */
 export function emotionalProblemsSentence(events: DatedEvent[], name: string, dateOfBirth: string | null): string {
-  const sorted = sortByStart(events, dateOfBirth)
+  const groups = conditionGroups(events as EventRecord[], dateOfBirth).sort((a, b) =>
+    compareEventsChronologically(a.episodes[0], b.episodes[0], dateOfBirth)
+  )
   const bits: string[] = []
-  sorted.forEach((event, index) => {
-    const when = eventWhenPhrase(event, dateOfBirth, "starting")
-    const title = titled(event, "emotional problems")
-    if (index === 0) {
-      bits.push(["a history of " + title, when].filter(Boolean).join(" "))
-      return
-    }
-    const previous = titled(sorted[index - 1], "emotional problems")
-    bits.push(previous === title ? ["again", when].filter(Boolean).join(" ") : ["a history of " + title, when].filter(Boolean).join(" "))
-  })
+  for (const group of groups) {
+    const label = titled(group.episodes[0], "emotional problems")
+    group.episodes.forEach((event, index) => {
+      const when = eventWhenPhrase(event, dateOfBirth, "starting")
+      bits.push(
+        index === 0
+          ? ["a history of " + label, when].filter(Boolean).join(" ")
+          : ["again", when].filter(Boolean).join(" ")
+      )
+    })
+  }
   const phrase = bits.length > 1 ? `${bits[0]}, and ${bits.slice(1).join(", and ")}` : bits[0]
   return `${name} reported ${phrase}.`
 }

@@ -9,6 +9,8 @@ import type {
 import {
   EMPLOYED_WORK_STATUSES,
   NECESSITY_KEYS,
+  SEXUAL_ORIENTATION_LABELS,
+  SEXUAL_ORIENTATIONS,
   emptyNecessities,
   type ClientRelationshipStatus,
   type ClientRelationshipStatusValue,
@@ -39,6 +41,7 @@ export type ClientBackgroundSuggestions = {
     sex?: AppliedAnswer<string>
     genderIdentity?: AppliedAnswer<string>
     pronouns?: AppliedAnswer<string>
+    sexualOrientation?: AppliedAnswer<{ sexualOrientation: string; sexualOrientationOther: string }>
     raceEthnicity?: AppliedAnswer<string>
     religion?: AppliedAnswer<string>
     primaryLanguage?: AppliedAnswer<string>
@@ -159,6 +162,16 @@ export function backgroundAnswersToClientBackground(
   if (genderIdentity) identity.genderIdentity = genderIdentity
   const pronouns = textAnswer(about.pronouns)
   if (pronouns) identity.pronouns = pronouns
+  if (about.sexualOrientation && (SEXUAL_ORIENTATIONS as readonly string[]).includes(about.sexualOrientation)) {
+    const other = about.sexualOrientation === "another" ? about.sexualOrientationOther.trim() : ""
+    identity.sexualOrientation = {
+      label:
+        about.sexualOrientation === "another"
+          ? other || "Another term"
+          : SEXUAL_ORIENTATION_LABELS[about.sexualOrientation as (typeof SEXUAL_ORIENTATIONS)[number]],
+      apply: { sexualOrientation: about.sexualOrientation, sexualOrientationOther: other },
+    }
+  }
   const raceEthnicity = textAnswer(about.raceEthnicity)
   if (raceEthnicity) identity.raceEthnicity = raceEthnicity
   const religion = textAnswer(about.religion)

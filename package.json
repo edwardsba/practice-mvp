@@ -100,6 +100,7 @@
     "db:background-relationships-history": "tsx db/apply-background-relationships-history-migration.ts",
     "db:background-report-round-e": "tsx db/apply-background-report-round-e-migration.ts",
     "db:relationship-blocks": "tsx db/apply-relationship-blocks-migration.ts",
+    "db:sexual-orientation": "tsx db/apply-sexual-orientation-migration.ts",
     "db:letter-body": "tsx db/apply-letter-body-migration.ts",
     "db:report-versioning": "tsx db/apply-report-versioning-migration.ts",
     "db:session-note-versioning": "tsx db/apply-session-note-versioning-migration.ts",

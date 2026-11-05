@@ -25,6 +25,7 @@ import {
   RESOLVED_OR_ONGOING,
   SELF_HARM_TYPES,
   SEX_OPTIONS,
+  SEXUAL_ORIENTATIONS,
   STRESSOR_ITEMS,
   START_PRECISIONS,
   SUBSTANCE_STATUSES,
@@ -151,6 +152,15 @@ function normalizeLivingSituation(value: unknown): RelationshipLivingSituation |
   )
 }
 
+function orientationFrom(raw: Record<string, unknown>): Pick<IdentityFields, "sexualOrientation" | "sexualOrientationOther"> {
+  const value = str(raw.sexualOrientation)
+  if (!isOneOf(value, SEXUAL_ORIENTATIONS)) return { sexualOrientation: "", sexualOrientationOther: "" }
+  return {
+    sexualOrientation: value,
+    sexualOrientationOther: value === "another" ? str(raw.sexualOrientationOther) : "",
+  }
+}
+
 function disabilityFrom(raw: Record<string, unknown>): Pick<IdentityFields, "disability" | "disabilityDetail"> {
   if (typeof raw.disability === "string") {
     const text = raw.disability.trim()
@@ -173,6 +183,7 @@ export function sanitizeIdentity(value: unknown): IdentityFields {
     genderIdentity,
     pronouns: str(raw.pronouns),
     pronounsOther: "",
+    ...orientationFrom(raw),
     raceEthnicity: str(raw.raceEthnicity),
     religion: str(raw.religion),
     primaryLanguage: str(raw.primaryLanguage),
@@ -383,10 +394,21 @@ export function demographicsFromStored(parts: {
   livingSituationJson: unknown
   educationJson: unknown
   occupationJson: unknown
+  sexualOrientation?: string | null
+  sexualOrientationOther?: string | null
 }): Demographics {
   const empty = emptyDemographics()
+  const identity = parts.identityJson ? sanitizeIdentity(parts.identityJson) : empty.identity
+  const stored = orientationFrom({
+    sexualOrientation: parts.sexualOrientation ?? identity.sexualOrientation,
+    sexualOrientationOther: parts.sexualOrientationOther ?? identity.sexualOrientationOther,
+  })
+  if (parts.sexualOrientation) {
+    identity.sexualOrientation = stored.sexualOrientation
+    identity.sexualOrientationOther = stored.sexualOrientationOther
+  }
   return {
-    identity: parts.identityJson ? sanitizeIdentity(parts.identityJson) : empty.identity,
+    identity,
     livingSituation: parts.livingSituationJson
       ? sanitizeLivingSituation(parts.livingSituationJson)
       : empty.livingSituation,

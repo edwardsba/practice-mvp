@@ -26,6 +26,8 @@ export type BackgroundAboutYou = {
   sex: SexOption | null
   genderIdentity: string
   pronouns: string
+  sexualOrientation: string | null
+  sexualOrientationOther: string
   raceEthnicity: string
   religion: string
   primaryLanguage: string

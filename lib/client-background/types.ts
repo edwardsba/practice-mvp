@@ -604,12 +604,39 @@ export type RatedFactor = {
 
 export type RiskRatings = Record<RatedFactorKey, RatedFactor>
 
+export const SEXUAL_ORIENTATIONS = [
+  "heterosexual",
+  "gay",
+  "lesbian",
+  "bisexual",
+  "pansexual",
+  "asexual",
+  "queer",
+  "another",
+  "prefer_not_to_say",
+] as const
+export type SexualOrientation = (typeof SEXUAL_ORIENTATIONS)[number]
+
+export const SEXUAL_ORIENTATION_LABELS: Record<SexualOrientation, string> = {
+  heterosexual: "Heterosexual",
+  gay: "Gay",
+  lesbian: "Lesbian",
+  bisexual: "Bisexual",
+  pansexual: "Pansexual",
+  asexual: "Asexual",
+  queer: "Queer",
+  another: "Another term (describe)",
+  prefer_not_to_say: "Prefer not to say",
+}
+
 export type IdentityFields = {
   sex: string
   genderDiffersFromSex: boolean
   genderIdentity: string
   pronouns: string
   pronounsOther: string
+  sexualOrientation: SexualOrientation | ""
+  sexualOrientationOther: string
   raceEthnicity: string
   religion: string
   primaryLanguage: string
@@ -858,6 +885,8 @@ export function emptyIdentity(): IdentityFields {
     genderIdentity: "",
     pronouns: "",
     pronounsOther: "",
+    sexualOrientation: "",
+    sexualOrientationOther: "",
     raceEthnicity: "",
     religion: "",
     primaryLanguage: "",

@@ -18,6 +18,8 @@ import {
   NECESSITY_KEYS,
   NECESSITY_LABELS,
   SEX_OPTIONS,
+  SEXUAL_ORIENTATION_LABELS,
+  SEXUAL_ORIENTATIONS,
   WORK_STATUS_LABELS,
   WORK_STATUSES,
   type Demographics,
@@ -172,6 +174,7 @@ function DemographicsReadOnly({
       <Subsection title="Identity" id="check-identity">
         <ReadOnlyField label="Sex" value={value.identity.sex} />
         <ReadOnlyField label="Gender identity" value={value.identity.genderIdentity} />
+        <ReadOnlyField label="Sexual orientation" value={orientationText(value.identity)} />
         <ReadOnlyField label="Pronouns" value={pronouns} />
         <ReadOnlyField label="Race/Ethnicity" value={value.identity.raceEthnicity} />
         <ReadOnlyField label="Religion" value={value.identity.religion} />
@@ -234,6 +237,12 @@ function jobDateRange(job: PreviousJob) {
   const end = formatPartialDateLabel(job.ended)
   if (start && end) return `${start} – ${end}`
   return start || end
+}
+
+function orientationText(identity: IdentityFields): string {
+  if (!identity.sexualOrientation) return ""
+  if (identity.sexualOrientation === "another") return identity.sexualOrientationOther.trim() || "Another term"
+  return SEXUAL_ORIENTATION_LABELS[identity.sexualOrientation]
 }
 
 function yesNoText(value: boolean | null, detail: string) {
@@ -349,6 +358,51 @@ export function IdentityFieldsEditor({
         }
         onChange={(genderIdentity) => onChange({ ...value, genderIdentity })}
       />
+      <SelectField
+        id="sexual_orientation"
+        label="Sexual orientation"
+        value={value.sexualOrientation}
+        client={
+          client?.sexualOrientation ? (
+            <ClientAnswer
+              label={client.sexualOrientation.label}
+              matches={
+                value.sexualOrientation === client.sexualOrientation.apply.sexualOrientation &&
+                value.sexualOrientationOther === client.sexualOrientation.apply.sexualOrientationOther
+              }
+              onUse={() =>
+                apply({
+                  ...value,
+                  sexualOrientation: client.sexualOrientation!.apply.sexualOrientation as IdentityFields["sexualOrientation"],
+                  sexualOrientationOther: client.sexualOrientation!.apply.sexualOrientationOther,
+                })
+              }
+            />
+          ) : undefined
+        }
+        onChange={(sexualOrientation) =>
+          onChange({
+            ...value,
+            sexualOrientation: sexualOrientation as IdentityFields["sexualOrientation"],
+            sexualOrientationOther: sexualOrientation === "another" ? value.sexualOrientationOther : "",
+          })
+        }
+      >
+        <option value="">Not recorded</option>
+        {SEXUAL_ORIENTATIONS.map((option) => (
+          <option key={option} value={option}>
+            {SEXUAL_ORIENTATION_LABELS[option]}
+          </option>
+        ))}
+      </SelectField>
+      {value.sexualOrientation === "another" ? (
+        <TextField
+          id="sexual_orientation_other"
+          label="Another term"
+          value={value.sexualOrientationOther}
+          onChange={(sexualOrientationOther) => onChange({ ...value, sexualOrientationOther })}
+        />
+      ) : null}
       <TextField
         id="pronouns"
         label="Pronouns"

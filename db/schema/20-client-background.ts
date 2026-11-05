@@ -47,6 +47,10 @@ export const clientBackgrounds = pgTable("client_backgrounds", {
   motherOtherRelationships: text("mother_other_relationships"),
   fatherOtherRelationships: text("father_other_relationships"),
   caregiverArrangements: text("caregiver_arrangements"),
+  /** Heterosexual, gay, lesbian, bisexual, pansexual, asexual, queer, another, or prefer_not_to_say. */
+  sexualOrientation: text("sexual_orientation"),
+  /** Free text when sexual_orientation is another. */
+  sexualOrientationOther: text("sexual_orientation_other"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 })

@@ -15,6 +15,8 @@ export function emptyBackgroundAnswers(): BackgroundAnswers {
       sex: null,
       genderIdentity: "",
       pronouns: "",
+      sexualOrientation: null,
+      sexualOrientationOther: "",
       raceEthnicity: "",
       religion: "",
       primaryLanguage: "",

@@ -379,7 +379,7 @@ export const ARRANGEMENT_TYPES = [
 ] as const
 export type ArrangementType = (typeof ARRANGEMENT_TYPES)[number]
 
-export const SIBLING_BLOCK_TYPES = ["full", "half", "step", "adoptive", "foster", "other"] as const
+export const SIBLING_BLOCK_TYPES = ["full", "adopted", "half", "step", "adoptive", "foster", "other"] as const
 export type SiblingBlockType = (typeof SIBLING_BLOCK_TYPES)[number]
 
 export const PARENT_BLOCK_TYPES = ["mother", "father"] as const
@@ -416,6 +416,7 @@ export const ARRANGEMENT_TYPE_LABELS: Record<ArrangementType, string> = {
 
 export const SIBLING_BLOCK_TYPE_LABELS: Record<SiblingBlockType, string> = {
   full: "Full",
+  adopted: "Adopted",
   half: "Half",
   step: "Step",
   adoptive: "Adoptive",

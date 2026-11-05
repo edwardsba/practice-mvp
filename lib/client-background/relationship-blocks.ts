@@ -56,7 +56,7 @@ export function statusesForBlock(kind: BlockKind): readonly string[] {
 }
 
 export function siblingTypesForBlock(kind: BlockKind): readonly SiblingBlockType[] {
-  if (kind === "biological_parents") return ["full"]
+  if (kind === "biological_parents") return ["full", "adopted"]
   if (kind === "parent_other") return ["half", "step"]
   if (kind === "caregiver_arrangement") return ["adoptive", "foster", "other"]
   return []

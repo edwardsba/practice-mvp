@@ -8,12 +8,12 @@ import { HistorySection } from "@/components/client-background/history-section"
 import { BackgroundInterviewCard } from "@/components/client-background/interview-card"
 import { BackgroundStressorsSection } from "@/components/client-background/medication-stressors"
 import { ReasonSection } from "@/components/client-background/reason-section"
-import { RelationshipBlocksSection } from "@/components/client-background/relationship-blocks-section"
+import { RelationshipTreeSection } from "@/components/client-background/relationship-tree-section"
 import { scrollToBackgroundCheck } from "@/components/client-background/worth-checking"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { backgroundChecks, backgroundSectionForCheck, type BackgroundCheck } from "@/lib/client-background/checks"
 import type { BackgroundInterviewCardData, ReasonSupport } from "@/lib/client-background/load"
-import type { ClientBackgroundData } from "@/lib/client-background/types"
+import { emptyBlockAnswers, type ClientBackgroundData } from "@/lib/client-background/types"
 import { cn } from "@/lib/utils"
 
 const SECTIONS = [
@@ -114,21 +114,14 @@ export function ClientBackgroundPage({
             />
           ) : null}
           {item.id === "relationships" ? (
-            <RelationshipBlocksSection
+            <RelationshipTreeSection
               clientId={clientId}
               relationships={data.relationships}
-              blocks={data.relationshipBlocks}
-              blockAnswers={data.blockAnswers}
+              blocks={data.relationshipBlocks ?? []}
+              blockAnswers={data.blockAnswers ?? emptyBlockAnswers()}
               relationshipStatus={data.relationshipStatus}
-              childrenPrompt={
-                numberOfChildren == null
-                  ? null
-                  : numberOfChildren === 0
-                    ? "no children"
-                    : numberOfChildren === 1
-                      ? "1 child"
-                      : `${numberOfChildren} children (including step-children)`
-              }
+              dateOfBirth={data.dateOfBirth}
+              events={data.events}
             />
           ) : null}
           {item.id === "history" ? (

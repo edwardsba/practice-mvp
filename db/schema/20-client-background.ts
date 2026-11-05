@@ -212,6 +212,8 @@ export const clientEventRecords = pgTable("client_event_records", {
   ),
   /** Treatment entries: the condition this treatment is for. */
   conditionEventId: uuid("condition_event_id"),
+  /** Episodes of one condition share this id. Null on events that are not a condition. */
+  conditionGroupId: uuid("condition_group_id"),
   /** Admission entries: psychiatric_inpatient, residential_rehab, medical, or emergency_department. */
   admissionType: text("admission_type"),
   facility: text("facility"),

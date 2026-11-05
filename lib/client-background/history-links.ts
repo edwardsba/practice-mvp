@@ -46,16 +46,11 @@ export function entryDetailMessage(event: EventRecord, dateOfBirth: string | nul
 }
 
 export function treatmentsForCondition(events: EventRecord[], conditionId: string): EventRecord[] {
-  return events.filter(
-    (event) =>
-      isTreatmentEvent(event.eventType) &&
-      event.attribution === "self" &&
-      event.conditionEventId === conditionId
-  )
+  return events.filter((event) => isTreatmentEvent(event.eventType) && event.conditionEventId === conditionId)
 }
 
 export function treatmentNeedsLink(event: EventRecord): boolean {
-  return isTreatmentEvent(event.eventType) && event.attribution === "self" && !event.conditionEventId
+  return isTreatmentEvent(event.eventType) && !event.conditionEventId
 }
 
 export function unlinkedTreatmentMessage(event: EventRecord): string | null {

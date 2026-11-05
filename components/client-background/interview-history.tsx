@@ -191,6 +191,25 @@ export function InterviewHistory({
     }
   }
 
+  function addTreatment(condition: EventRecord, event: MouseEvent<HTMLButtonElement>) {
+    remember(event)
+    setError(null)
+    setSheet({
+      draft: {
+        ...emptyEvent("psychiatric_admission", 0),
+        eventRecordId: "",
+        about: condition.about,
+        attribution: condition.attribution,
+        relationshipRecordId: condition.relationshipRecordId,
+        aboutOther: condition.aboutOther,
+        familyRelation: condition.familyRelation,
+        conditionEventId: condition.eventRecordId,
+      },
+      editing: true,
+      isNew: true,
+    })
+  }
+
   function addEntry(key: HistoryQuestionKey, event: MouseEvent<HTMLButtonElement>) {
     remember(event)
     const question = HISTORY_QUESTIONS[key]
@@ -357,6 +376,9 @@ export function InterviewHistory({
                               </span>
                               <span className="text-xs text-muted-foreground">{lines.meta}</span>
                             </button>
+                            {group.title === "Significant others" && isConditionEvent(entry.eventType) ? (
+                              <AddButton label="+ Add treatment" onClick={(click) => addTreatment(entry, click)} />
+                            ) : null}
                             {linked.length > 0 ? (
                               <div className="ml-4 space-y-1 border-l pl-3">
                                 {linked.map((treatment) => {

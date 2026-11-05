@@ -43,6 +43,7 @@ import {
   lifeStageAtStart,
 } from "@/lib/client-background/age"
 import { formatPartialDate, parsePartialDate, precisionForPartialDate } from "@/lib/client-background/partial-date"
+import { conditionGroups, matchingConditionGroup, personKey, samePerson } from "@/lib/client-background/condition-groups"
 import { entryDetailGap, isConditionEvent, isTreatmentEvent, treatmentNeedsLink, treatmentsForCondition } from "@/lib/client-background/history-links"
 import { professionalOptionLabel, type ProfessionalOption } from "@/lib/client-background/professionals"
 import { personName } from "@/lib/client-background/tree"
@@ -551,6 +552,13 @@ export function HistoryTags({ entry }: { entry: EventRecord }) {
   )
 }
 
+function keptGroupId(episodes: EventRecord[], current: string | null): string {
+  const stored = episodes.find((episode) => episode.conditionGroupId && !episode.conditionGroupId.startsWith("title:"))?.conditionGroupId
+  if (stored) return stored
+  if (current && !current.startsWith("title:")) return current
+  return crypto.randomUUID()
+}
+
 function entryListLabel(entry: Pick<EventRecord, "title" | "eventType">) {
   return entry.title.trim() || EVENT_TYPE_LABELS[entry.eventType]
 }
@@ -683,11 +691,21 @@ export function EventEditor({
   onChange: (event: EventRecord) => void
 }) {
   const treatment = isTreatmentEvent(draft.eventType)
+  const conditionEntry = isConditionEvent(draft.eventType)
+  const [choiceHeld, setChoiceHeld] = useState(false)
+  const [choiceFor, setChoiceFor] = useState(draft.eventRecordId)
+  if (choiceFor !== draft.eventRecordId) {
+    setChoiceFor(draft.eventRecordId)
+    setChoiceHeld(false)
+  }
   const conditions = events.filter(
     (event) =>
       event.eventRecordId !== draft.eventRecordId &&
       isConditionEvent(event.eventType) &&
-      resolvedAbout(event) === resolvedAbout(draft)
+      samePerson(event, draft)
+  )
+  const episodeChoices = conditionGroups(events, dateOfBirth).filter(
+    (group) => group.eventType === draft.eventType && group.personKey === personKey(draft)
   )
   const startLabel =
     draft.eventType === "psychiatric_admission" ? "Admitted" : draft.eventType === "medication" ? "Started" : "Start"
@@ -738,8 +756,21 @@ export function EventEditor({
     } else {
       next.endOngoing = false
     }
+    if (next.conditionEventId) {
+      const linked = events.find((event) => event.eventRecordId === next.conditionEventId)
+      if (linked && !samePerson(linked, next)) next.conditionEventId = null
+    }
     onChange(next)
   }
+
+  const selectedCondition = episodeChoices.find(
+    (group) =>
+      group.id === draft.conditionGroupId ||
+      group.episodes.some((episode) => episode.conditionGroupId && episode.conditionGroupId === draft.conditionGroupId) ||
+      (Boolean(draft.conditionGroupId) &&
+        group.title.trim().toLowerCase() === draft.title.trim().toLowerCase() &&
+        group.episodes.some((episode) => episode.eventRecordId !== draft.eventRecordId))
+  )
 
   return (
     <div className="min-w-0 space-y-4">
@@ -821,10 +852,41 @@ export function EventEditor({
         id={`${draft.eventRecordId}_title`}
         label={draft.eventType === "medication" ? "Medication name" : "Title"}
         value={draft.title}
-        onChange={(title) => patch({ title })}
+        onChange={(title) => {
+          if (!conditionEntry || choiceHeld) {
+            patch({ title })
+            return
+          }
+          const next = { ...draft, title }
+          const match = matchingConditionGroup(events, next, dateOfBirth)
+          patch({ title, conditionGroupId: match ? keptGroupId(match.episodes, draft.conditionGroupId) : null })
+        }}
         placeholder="Optional"
       />
-      {treatment && draft.attribution === "self" ? (
+      {conditionEntry ? (
+        <SelectField
+          id={`${draft.eventRecordId}_condition`}
+          label="Condition"
+          value={selectedCondition?.id ?? ""}
+          onChange={(value) => {
+            setChoiceHeld(true)
+            if (!value) {
+              patch({ conditionGroupId: null })
+              return
+            }
+            const group = episodeChoices.find((item) => item.id === value)
+            patch({ conditionGroupId: group ? keptGroupId(group.episodes, draft.conditionGroupId) : null })
+          }}
+        >
+          <option value="">New condition</option>
+          {episodeChoices.map((group) => (
+            <option key={group.id} value={group.id}>
+              {`Another episode of: ${group.title}`}
+            </option>
+          ))}
+        </SelectField>
+      ) : null}
+      {treatment ? (
         <SelectField
           id={`${draft.eventRecordId}_for`}
           label="For"

@@ -228,6 +228,7 @@ export function toEvent(row: {
   familySide: string | null
   relationshipRecordId: string | null
   conditionEventId: string | null
+  conditionGroupId: string | null
   admissionType: string | null
   facility: string | null
   admissionLength: string | null
@@ -257,6 +258,7 @@ export function toEvent(row: {
     familyRelation: row.familyRelation ?? "",
     familySide: row.familySide ?? "",
     conditionEventId: row.conditionEventId,
+    conditionGroupId: row.conditionGroupId,
     admissionType: row.admissionType ?? "",
     facility: row.facility ?? "",
     admissionLength: row.admissionLength ?? "",

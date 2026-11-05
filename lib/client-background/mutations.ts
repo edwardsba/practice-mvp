@@ -1,11 +1,15 @@
 import "server-only"
 
-import { and, eq, inArray, or } from "drizzle-orm"
+import { randomUUID } from "node:crypto"
+
+import { and, eq, inArray, isNull, or } from "drizzle-orm"
 
 import { auditEvents, assessmentDefinitions, assessmentInstances, assessmentResults, clientBackgroundInterviews, clientBackgrounds, clientEventRecords, clientPartnershipRecords, clientRelationshipBlocks, clientRelationshipRecords, clients, professionals } from "@/db/schema"
 import { BACKGROUND_ASSESSMENT_CODE } from "@/lib/background-questionnaire/types"
 import { db } from "@/lib/db"
 import { settleEventDates } from "@/lib/client-background/age"
+import { personKey } from "@/lib/client-background/condition-groups"
+import { isConditionEvent } from "@/lib/client-background/history-links"
 import { laterRelationshipsAfterLinkChange } from "@/lib/client-background/later-relationships"
 import { toClientRelationshipStatus, toEvent, toPartnership, toRelationship } from "@/lib/client-background/map"
 import { CONDITION_EVENT_TYPES } from "@/lib/client-background/types"
@@ -1660,6 +1664,39 @@ export async function deleteRelationship(input: {
   }
 }
 
+/** A condition keeps a shared group id. Choosing an existing condition also fills that id on untitled matches. */
+async function withConditionGroup(tx: Tx, clientId: string, practiceId: string, event: EventRecord): Promise<EventRecord> {
+  if (!isConditionEvent(event.eventType)) return { ...event, conditionGroupId: null }
+  const incoming = event.conditionGroupId?.trim() ?? ""
+  const joining = incoming.length > 0 && !incoming.startsWith("title:")
+  const conditionGroupId = joining ? incoming : randomUUID()
+  if (joining) {
+    const rows = await tx
+      .select()
+      .from(clientEventRecords)
+      .where(
+        and(
+          eq(clientEventRecords.clientId, clientId),
+          eq(clientEventRecords.practiceId, practiceId),
+          inArray(clientEventRecords.eventType, [...CONDITION_EVENT_TYPES]),
+          isNull(clientEventRecords.conditionGroupId)
+        )
+      )
+    const title = event.title.trim().toLowerCase()
+    for (const row of rows) {
+      const mapped = toEvent(row)
+      if (mapped.eventRecordId === event.eventRecordId) continue
+      if (mapped.eventType !== event.eventType || personKey(mapped) !== personKey(event)) continue
+      if (mapped.title.trim().toLowerCase() !== title) continue
+      await tx
+        .update(clientEventRecords)
+        .set({ conditionGroupId, updatedAt: new Date() })
+        .where(eq(clientEventRecords.eventRecordId, mapped.eventRecordId))
+    }
+  }
+  return { ...event, conditionGroupId }
+}
+
 async function conditionLinkError(
   tx: Tx,
   clientId: string,
@@ -1709,6 +1746,7 @@ function eventColumns(event: EventRecord) {
     familySide: event.familySide || null,
     relationshipRecordId: event.relationshipRecordId,
     conditionEventId: event.conditionEventId,
+    conditionGroupId: event.conditionGroupId,
     admissionType: event.admissionType || null,
     facility: event.facility || null,
     admissionLength: event.admissionLength || null,
@@ -1737,8 +1775,9 @@ export async function createEvent(input: {
     return await db.transaction(async (tx) => {
       const linkError = await conditionLinkError(tx, input.clientId, input.practiceId, parsed)
       if (linkError) return { error: linkError }
+      const grouped = await withConditionGroup(tx, input.clientId, input.practiceId, parsed)
       const displayOrder = await nextEventOrder(tx, input.clientId, input.practiceId, parsed.eventType)
-      const draft = { ...parsed, eventRecordId: "", displayOrder }
+      const draft = { ...grouped, eventRecordId: "", displayOrder }
       const [created] = await tx
         .insert(clientEventRecords)
         .values({
@@ -1789,15 +1828,16 @@ export async function updateEvent(input: {
       if (!existing) return { error: "That entry was not found." }
       const linkError = await conditionLinkError(tx, input.clientId, input.practiceId, draft)
       if (linkError) return { error: linkError }
+      const grouped = await withConditionGroup(tx, input.clientId, input.practiceId, draft)
 
-      if (draft.relationshipRecordId) {
-        const linked = await ownedRelationship(tx, draft.relationshipRecordId, input.clientId, input.practiceId)
+      if (grouped.relationshipRecordId) {
+        const linked = await ownedRelationship(tx, grouped.relationshipRecordId, input.clientId, input.practiceId)
         if (!linked) return { error: "That family member was not found on this client." }
       }
 
       const [updated] = await tx
         .update(clientEventRecords)
-        .set(eventColumns({ ...draft, displayOrder: existing.displayOrder }))
+        .set(eventColumns({ ...grouped, displayOrder: existing.displayOrder }))
         .where(eq(clientEventRecords.eventRecordId, existing.eventRecordId))
         .returning()
 

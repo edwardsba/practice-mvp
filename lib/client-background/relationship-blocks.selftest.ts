@@ -6,7 +6,15 @@ import {
   previousStatusFromPartner,
   statusesForBlock,
 } from "@/lib/client-background/relationship-blocks"
-import type { PartnershipRecord, RelationshipRecord } from "@/lib/client-background/types"
+import type { PartnershipRecord, RelationshipBlock, RelationshipRecord } from "@/lib/client-background/types"
+import {
+  childrenFromBlocks,
+  endedRelationshipClause,
+  parentsFromBlocks,
+  partnersFromBlocks,
+  siblingsFromBlocks,
+} from "@/lib/reports/relationship-block-report"
+import type { ReportVoice } from "@/lib/reports/background-report-prose"
 
 function person(
   partial: Partial<RelationshipRecord> & Pick<RelationshipRecord, "relationshipRecordId" | "relationshipToClient">
@@ -258,5 +266,160 @@ const cleared = mapRelationshipsToBlocks({
 assert.equal(cleared.answers.motherOtherRelationships, "yes")
 assert.equal(cleared.blocks.filter((block) => block.kind === "parent_other").length, 0)
 assert.equal(answerAfterBlockCount(0), "not_asked")
+
+const he: ReportVoice = { kind: "he", subject: "he", Subject: "He", possessive: "his", Possessive: "His", object: "him" }
+
+function block(partial: Partial<RelationshipBlock> & Pick<RelationshipBlock, "relationshipBlockId" | "kind">): RelationshipBlock {
+  return {
+    parentRecordId: null,
+    parentSide: "",
+    status: "",
+    statusDetail: "",
+    arrangementType: "",
+    arrangementDetail: "",
+    startedOn: "",
+    endedOn: "",
+    noChildren: false,
+    displayOrder: 0,
+    ...partial,
+  }
+}
+
+const wife = person({
+  relationshipRecordId: "wife",
+  relationshipToClient: "current_partner",
+  sex: "Female",
+  dateOfBirth: "1977-01-01",
+  relationshipBlockId: "ended",
+  blockRole: "partner",
+})
+const herPartner = person({
+  relationshipRecordId: "other-partner",
+  relationshipToClient: "current_partner",
+  sex: "Male",
+  dateOfBirth: "1975-01-01",
+  relationshipBlockId: "ended",
+  blockRole: "partner",
+})
+const endedBlock = block({
+  relationshipBlockId: "ended",
+  kind: "client_previous",
+  startedOn: "1998",
+  endedOn: "2003",
+})
+for (const status of ["divorced", "married_separated", "defacto_separated", "engagement_ended", "relationship_ended", "widowed", "partner_died"] as const) {
+  const clause = endedRelationshipClause({ ...endedBlock, status }, [wife], he, "2026-11-05")
+  if (status === "divorced") assert.match(clause, /was married to his wife, 49, from 1998 to 2003, and the marriage ended in divorce/)
+  if (status === "married_separated") assert.match(clause, /was married to his wife, 49, from 1998 to 2003, and they separated/)
+  if (status === "defacto_separated") assert.match(clause, /was in a de facto relationship with a woman, 49, from 1998 to 2003, which ended in separation/)
+  if (status === "engagement_ended") assert.match(clause, /was engaged to a woman, 49, from 1998 to 2003/)
+  if (status === "relationship_ended") assert.match(clause, /was in a relationship with a woman, 49, from 1998 to 2003/)
+  if (status === "widowed") assert.match(clause, /which ended when his wife died/)
+  if (status === "partner_died") assert.match(clause, /which ended when his partner died/)
+}
+const twoPartners = endedRelationshipClause({ ...endedBlock, status: "divorced" }, [wife, herPartner], he, "2026-11-05")
+assert.match(twoPartners, /his wife, 49, and her partner, 51/)
+
+const currentA = block({ relationshipBlockId: "now-1", kind: "client_current", status: "married", startedOn: "2014", displayOrder: 0 })
+const currentB = block({ relationshipBlockId: "now-2", kind: "client_current", status: "dating", displayOrder: 1 })
+const ann = person({ relationshipRecordId: "ann", relationshipToClient: "current_partner", sex: "Female", relationshipBlockId: "now-1", blockRole: "partner" })
+const bea = person({ relationshipRecordId: "bea", relationshipToClient: "current_partner", sex: "Female", relationshipBlockId: "now-2", blockRole: "partner" })
+const twoCurrent = partnersFromBlocks("Ben01", he, "married", [currentA, currentB], [ann, bea], "2026-11-05")
+assert.match(twoCurrent ?? "", /Ben01 has been married to his wife since 2014, with no children/)
+assert.match(twoCurrent ?? "", /Ben01 has been dating a woman, with no children/)
+
+const other = block({ relationshipBlockId: "others", kind: "client_other_children" })
+const loose = person({
+  relationshipRecordId: "loose",
+  relationshipToClient: "child_biological",
+  relationshipBlockId: "others",
+  blockRole: "child",
+  blockRoleType: "biological",
+  childType: "biological",
+  dateOfBirth: "2016-01-01",
+})
+assert.match(childrenFromBlocks("Ben01", [other], [loose], "2026-11-05") ?? "", /one child in total, a biological child aged/)
+
+const motherBlock = block({
+  relationshipBlockId: "mum-later",
+  kind: "parent_other",
+  parentSide: "mother",
+  status: "married",
+  startedOn: "1981",
+  endedOn: "1990",
+})
+const bare = block({ relationshipBlockId: "mum-bare", kind: "parent_other", parentSide: "mother" })
+const parentsText = parentsFromBlocks(
+  "Ben01",
+  he,
+  "1970-01-15",
+  [
+    block({ relationshipBlockId: "bio", kind: "biological_parents", status: "divorced", endedOn: "1978" }),
+    block({ relationshipBlockId: "adopt", kind: "caregiver_arrangement", arrangementType: "adoption", startedOn: "1972" }),
+    motherBlock,
+    bare,
+  ],
+  [
+    person({ relationshipRecordId: "mother", relationshipToClient: "mother", sex: "Female", relationshipBlockId: "bio", blockRole: "parent", blockRoleType: "mother" }),
+    person({ relationshipRecordId: "father", relationshipToClient: "father", sex: "Male", healthStatus: "deceased", deceased: true, dateOfDeath: "1993", relationshipBlockId: "bio", blockRole: "parent", blockRoleType: "father" }),
+    person({ relationshipRecordId: "sib-a", relationshipToClient: "sibling_full", sex: "Male", dateOfBirth: "1978-01-01", relationshipBlockId: "bio", blockRole: "sibling", blockRoleType: "full" }),
+    person({ relationshipRecordId: "sib-b", relationshipToClient: "sibling_full", sex: "Male", relationshipBlockId: "bio", blockRole: "sibling", blockRoleType: "full" }),
+    person({ relationshipRecordId: "donald", relationshipToClient: "sibling_step", sex: "Male", dateOfBirth: "1998-01-01", relationshipBlockId: "mum-later", blockRole: "sibling", blockRoleType: "step" }),
+  ],
+  {
+    previousRelationships: "not_asked",
+    otherChildren: "not_asked",
+    motherOtherRelationships: "yes",
+    fatherOtherRelationships: "none",
+    caregiverArrangements: "yes",
+  },
+  "2026-11-05"
+)
+assert.match(parentsText ?? "", /Ben01 was adopted in 1972, at the age of 2/)
+assert.match(parentsText ?? "", /His parents divorced in 1978, when Ben01 was 8/)
+assert.match(parentsText ?? "", /His father died in 1993, when Ben01 was 23/)
+assert.match(parentsText ?? "", /one other relationship/)
+assert.match(parentsText ?? "", /His father has had no later relationships/)
+
+const siblingText = siblingsFromBlocks(
+  "Ben01",
+  he,
+  "1970-01-15",
+  [
+    block({ relationshipBlockId: "bio", kind: "biological_parents" }),
+    block({ relationshipBlockId: "mum-later", kind: "parent_other", parentSide: "mother" }),
+  ],
+  [
+    person({ relationshipRecordId: "sib-a", relationshipToClient: "sibling_full", sex: "Male", dateOfBirth: "1978-01-01", relationshipBlockId: "bio", blockRole: "sibling", blockRoleType: "full" }),
+    person({ relationshipRecordId: "sib-b", relationshipToClient: "sibling_full", sex: "Male", relationshipBlockId: "bio", blockRole: "sibling", blockRoleType: "full" }),
+    person({ relationshipRecordId: "donald", relationshipToClient: "sibling_step", sex: "Male", dateOfBirth: "1998-01-01", relationshipBlockId: "mum-later", blockRole: "sibling", blockRoleType: "step" }),
+  ],
+  "2026-11-05"
+)
+assert.match(siblingText ?? "", /both brothers, one aged/)
+assert.match(siblingText ?? "", /one maternal step-sibling/)
+
+const deadBrother = person({
+  relationshipRecordId: "dead-bro",
+  relationshipToClient: "sibling_full",
+  sex: "Male",
+  dateOfBirth: "1968-01-01",
+  deceased: true,
+  dateOfDeath: "1989",
+  relationshipBlockId: "bio",
+  blockRole: "sibling",
+  blockRoleType: "full",
+})
+const youngerBrother = person({
+  relationshipRecordId: "young-bro",
+  relationshipToClient: "sibling_full",
+  sex: "Male",
+  dateOfBirth: "1972-01-01",
+  relationshipBlockId: "bio",
+  blockRole: "sibling",
+  blockRoleType: "full",
+})
+const deathText = siblingsFromBlocks("Ben01", he, "1970-01-15", [block({ relationshipBlockId: "bio", kind: "biological_parents" })], [deadBrother, youngerBrother], "2026-11-05")
+assert.match(deathText ?? "", /His first brother died when Ben01 was 19/)
 
 console.log("relationship blocks selftest passed")

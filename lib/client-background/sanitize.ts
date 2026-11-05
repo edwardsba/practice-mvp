@@ -325,42 +325,47 @@ export function sanitizeStressors(value: unknown): StressorsRecord {
   return stressors
 }
 
+function referralTypeOf(raw: Record<string, unknown>): ReasonForAttending["referralType"] {
+  const explicit = str(raw.referralType)
+  if (explicit === "medical" || explicit === "family_or_friend" || explicit === "self") return explicit
+  if (triState(raw.referredByMedicalProfessional) === "yes") return "medical"
+  if (triState(raw.familyInvolved) === "yes") return "family_or_friend"
+  if (triState(raw.ownInitiative) === "yes") return "self"
+  return ""
+}
+
 export function sanitizeReasonForAttending(value: unknown): ReasonForAttending {
   const raw = isRecord(value) ? value : {}
   const referredByMedicalProfessional = triState(raw.referredByMedicalProfessional)
   const familyInvolved = triState(raw.familyInvolved)
-  const referred = referredByMedicalProfessional === "yes"
-  const family = familyInvolved === "yes"
+  const referralType = referralTypeOf(raw)
+  const medical = referralType === "medical"
+  const family = referralType === "family_or_friend"
+  const referrerRelationshipId = family ? professionalId(raw.referrerRelationshipId) : null
+  const referrerIsOther = family && !referrerRelationshipId && (raw.referrerIsOther === true || str(raw.referrerOther).length > 0)
   return {
+    referralType,
+    referrerProfessionalId: medical ? professionalId(raw.referrerProfessionalId) : null,
+    referralDate: medical ? canonicalPartialDate(str(raw.referralDate)) : "",
+    referrerConcerns: medical ? str(raw.referrerConcerns) : "",
+    referrerRelationshipId,
+    referrerIsOther,
+    referrerOther: referrerIsOther ? str(raw.referrerOther) : "",
+    theirConcerns: family
+      ? str(raw.theirConcerns) || (str(raw.referralType) ? "" : str(raw.familyInvolvement))
+      : "",
     referredByMedicalProfessional,
-    referrerProfessionalId: referred ? professionalId(raw.referrerProfessionalId) : null,
-    referralDate: referred ? canonicalPartialDate(str(raw.referralDate)) : "",
-    referrerConcerns: referred ? str(raw.referrerConcerns) : "",
     familyInvolved,
-    familyInvolvement: family ? str(raw.familyInvolvement) : "",
+    familyInvolvement: familyInvolved === "yes" ? str(raw.familyInvolvement) : "",
     ownInitiative: triState(raw.ownInitiative),
     attendedWillingly: willingness(raw.attendedWillingly),
     clientMotivation: str(raw.clientMotivation),
   }
 }
 
-/** Blank Reason for attending answers become Not asked. Client's motivation stays optional. */
+/** Referral type is one choice, so a blank stays blank. The older Yes/No answers are not filled in. */
 export function markUnansweredReason(reason: ReasonForAttending): { reason: ReasonForAttending; changed: boolean } {
-  const next = { ...reason }
-  let changed = false
-  if (next.referredByMedicalProfessional == null) {
-    next.referredByMedicalProfessional = "not_asked"
-    changed = true
-  }
-  if (next.familyInvolved == null) {
-    next.familyInvolved = "not_asked"
-    changed = true
-  }
-  if (next.ownInitiative == null) {
-    next.ownInitiative = "not_asked"
-    changed = true
-  }
-  return { reason: next, changed }
+  return { reason, changed: false }
 }
 
 export function markUnansweredMedicationAndStressors(
@@ -439,11 +444,16 @@ export function normalizeCaregiverRelationship(
   const trimmed = kind.trim()
   if (!trimmed) return { kind: "", detail: "" }
   if (isOneOf(trimmed, CAREGIVER_RELATIONSHIPS)) {
-    return { kind: trimmed, detail: trimmed === "other" ? detail.trim() : "" }
+    const specific = detail.trim()
+    const keepGrandparent =
+      trimmed === "grandparent" && specific.length > 0 && !/^grandparent$/i.test(specific)
+    return { kind: trimmed, detail: trimmed === "other" || keepGrandparent ? specific : "" }
   }
   const value = trimmed.toLowerCase()
   if (/grandparent|grandmother|grandfather|grandma|grandpa|nanna|\bnan\b|\bpop\b/.test(value)) {
-    return { kind: "grandparent", detail: "" }
+    const specific = detail.trim() || (value === "grandparent" ? "" : trimmed)
+    const keep = /maternal|paternal|grandmother|grandfather/.test(specific.toLowerCase()) ? specific : ""
+    return { kind: "grandparent", detail: keep }
   }
   if (value.includes("foster")) return { kind: "foster_carer", detail: "" }
   if (value.includes("kinship")) return { kind: "kinship_carer", detail: "" }

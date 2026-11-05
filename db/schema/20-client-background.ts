@@ -35,7 +35,7 @@ export const clientBackgrounds = pgTable("client_backgrounds", {
   medicationJson: jsonb("medication_json"),
   /** One answer per stressor, plus the main reason for attending. */
   stressorsJson: jsonb("stressors_json"),
-  /** Referral, family involvement, initiative, and the client's motivation. Willingness is unused. */
+  /** Referral type and the older referral answers. The older answers are left in place and are not edited. */
   reasonForAttendingJson: jsonb("reason_for_attending_json"),
   riskJson: jsonb("risk_json"),
   /** Client's current relationship status. Not a field of any relative. */

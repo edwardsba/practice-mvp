@@ -17,7 +17,7 @@ import type { ClientBackgroundData } from "@/lib/client-background/types"
 import { cn } from "@/lib/utils"
 
 const SECTIONS = [
-  { id: "reason", label: "Reason for attending" },
+  { id: "reason", label: "Referral" },
   { id: "demographics", label: "Demographics" },
   { id: "relationships", label: "Relationships" },
   { id: "history", label: "History" },
@@ -102,6 +102,7 @@ export function ClientBackgroundPage({
               professionals={reasonSupport.professionals}
               professions={reasonSupport.professions}
               organisations={reasonSupport.organisations}
+              relationships={data.relationships}
               suggestedProfessionalId={reasonSupport.suggestedProfessionalId}
             />
           ) : null}

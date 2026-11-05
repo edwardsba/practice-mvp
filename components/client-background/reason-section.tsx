@@ -4,8 +4,8 @@ import { useState } from "react"
 
 import { saveProfessionalAction } from "@/lib/actions/contacts"
 import { saveReasonForAttendingAction } from "@/app/clients/[client_id]/background/actions"
-import { AddButton, PartialDatePicker, ReadOnlyField, SelectField, TextAreaField } from "@/components/client-background/fields"
-import { EditableBlock, TriStateField } from "@/components/client-background/medication-stressors"
+import { AddButton, PartialDatePicker, ReadOnlyField, SelectField, TextAreaField, TextField } from "@/components/client-background/fields"
+import { EditableBlock } from "@/components/client-background/medication-stressors"
 import { ProfessionalForm } from "@/components/contacts/professional-form"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import {
@@ -16,19 +16,25 @@ import {
   type ProfessionalOption,
 } from "@/lib/client-background/professionals"
 import { applyKeptSuggestion, reasonReadOnlyLines } from "@/lib/client-background/reason"
+import { personRoleLabel } from "@/lib/client-background/tree"
 import {
+  REFERRAL_TYPE_LABELS,
+  REFERRAL_TYPES,
   type ReasonForAttending,
-  type TriStateAnswer,
+  type ReferralType,
+  type RelationshipRecord,
 } from "@/lib/client-background/types"
 
 export function ReasonReadOnly({
   value,
   professionals,
+  relationships = [],
 }: {
   value: ReasonForAttending
   professionals: ProfessionalOption[]
+  relationships?: RelationshipRecord[]
 }) {
-  const lines = reasonReadOnlyLines(value, professionals)
+  const lines = reasonReadOnlyLines(value, professionals, relationships)
   if (lines.length === 0) return <p className="text-sm text-muted-foreground">Nothing recorded</p>
   return (
     <div className="space-y-3">
@@ -48,6 +54,7 @@ export function ReasonFields({
   professionals,
   professions,
   organisations,
+  relationships,
   suggestedProfessionalId,
   onProfessionalsChange,
   onSuggestionDismissedChange,
@@ -60,6 +67,7 @@ export function ReasonFields({
   professionals: ProfessionalOption[]
   professions: ProfessionOption[]
   organisations: OrganisationOption[]
+  relationships: RelationshipRecord[]
   suggestedProfessionalId: string | null
   onProfessionalsChange?: (professionals: ProfessionalOption[]) => void
   onSuggestionDismissedChange?: (dismissed: boolean) => void
@@ -69,11 +77,12 @@ export function ReasonFields({
   const suggestionKnown =
     suggestedProfessionalId != null && professionals.some((item) => item.professionalId === suggestedProfessionalId)
   const showSuggestion =
-    value.referredByMedicalProfessional === "yes" &&
+    value.referralType === "medical" &&
     !dismissed &&
     suggestionKnown &&
     (value.referrerProfessionalId == null || value.referrerProfessionalId === suggestedProfessionalId)
   const selectedId = value.referrerProfessionalId || (showSuggestion ? suggestedProfessionalId : "") || ""
+  const who = value.referrerRelationshipId || (value.referrerIsOther ? "other" : "")
 
   function dismiss(next: boolean) {
     setDismissed(next)
@@ -84,28 +93,32 @@ export function ReasonFields({
     onChange(next)
   }
 
-  function setReferred(next: TriStateAnswer | null) {
-    if (next !== "yes") dismiss(false)
+  function setType(next: string) {
+    const referralType = (REFERRAL_TYPES as readonly string[]).includes(next) ? (next as ReferralType) : ""
+    if (referralType !== "medical") dismiss(false)
     emit({
       ...value,
-      referredByMedicalProfessional: next,
-      ...(next === "yes"
-        ? {}
+      referralType,
+      ...(referralType === "medical"
+        ? { referrerRelationshipId: null, referrerIsOther: false, referrerOther: "", theirConcerns: "" }
         : { referrerProfessionalId: null, referralDate: "", referrerConcerns: "" }),
-    })
-  }
-
-  function setFamily(next: TriStateAnswer | null) {
-    emit({
-      ...value,
-      familyInvolved: next,
-      ...(next === "yes" ? {} : { familyInvolvement: "" }),
+      ...(referralType === "family_or_friend"
+        ? {}
+        : { referrerRelationshipId: null, referrerIsOther: false, referrerOther: "", theirConcerns: "" }),
     })
   }
 
   function chooseProfessional(id: string) {
     dismiss(id === "")
     emit({ ...value, referrerProfessionalId: id || null })
+  }
+
+  function chooseWho(id: string) {
+    if (id === "other") {
+      emit({ ...value, referrerRelationshipId: null, referrerIsOther: true })
+      return
+    }
+    emit({ ...value, referrerRelationshipId: id || null, referrerIsOther: false, referrerOther: "" })
   }
 
   function onProfessionalSaved(professional: ProfessionalOption) {
@@ -123,13 +136,20 @@ export function ReasonFields({
 
   return (
     <>
-      <TriStateField
-        id={`${idPrefix}_referred`}
-        label="Referred by a medical professional"
-        value={value.referredByMedicalProfessional}
-        onChange={setReferred}
-      />
-      {value.referredByMedicalProfessional === "yes" ? (
+      <SelectField
+        id={`${idPrefix}_type`}
+        label="Referral type"
+        value={value.referralType}
+        onChange={setType}
+      >
+        <option value="">Select…</option>
+        {REFERRAL_TYPES.map((type) => (
+          <option key={type} value={type}>
+            {REFERRAL_TYPE_LABELS[type]}
+          </option>
+        ))}
+      </SelectField>
+      {value.referralType === "medical" ? (
         <>
           <SelectField
             id={`${idPrefix}_professional`}
@@ -161,32 +181,36 @@ export function ReasonFields({
           />
         </>
       ) : null}
-      <TriStateField
-        id={`${idPrefix}_family`}
-        label="Family involved in them attending"
-        value={value.familyInvolved}
-        onChange={setFamily}
-      />
-      {value.familyInvolved === "yes" ? (
-        <TextAreaField
-          id={`${idPrefix}_family_how`}
-          label="How were they involved?"
-          value={value.familyInvolvement}
-          onChange={(familyInvolvement) => emit({ ...value, familyInvolvement })}
-        />
+      {value.referralType === "family_or_friend" ? (
+        <>
+          <SelectField id={`${idPrefix}_who`} label="Who" value={who} onChange={chooseWho}>
+            <option value="">Select…</option>
+            {relationships.map((person) => {
+              const name = person.givenName.trim() || "Unnamed"
+              return (
+                <option key={person.relationshipRecordId} value={person.relationshipRecordId}>
+                  {name} ({personRoleLabel(person)})
+                </option>
+              )
+            })}
+            <option value="other">Other (describe)</option>
+          </SelectField>
+          {value.referrerIsOther ? (
+            <TextField
+              id={`${idPrefix}_who_other`}
+              label="Describe who referred them"
+              value={value.referrerOther}
+              onChange={(referrerOther) => emit({ ...value, referrerOther })}
+            />
+          ) : null}
+          <TextAreaField
+            id={`${idPrefix}_their_concerns`}
+            label="Their concerns"
+            value={value.theirConcerns}
+            onChange={(theirConcerns) => emit({ ...value, theirConcerns })}
+          />
+        </>
       ) : null}
-      <TriStateField
-        id={`${idPrefix}_initiative`}
-        label="Came on their own initiative"
-        value={value.ownInitiative}
-        onChange={(ownInitiative) => emit({ ...value, ownInitiative })}
-      />
-      <TextAreaField
-        id={`${idPrefix}_motivation`}
-        label="Client's motivation (optional)"
-        value={value.clientMotivation}
-        onChange={(clientMotivation) => emit({ ...value, clientMotivation })}
-      />
       <Sheet open={adding} onOpenChange={(next) => !next && setAdding(false)}>
         <SheetContent className="h-full w-full overflow-y-auto sm:max-w-3xl">
           <SheetHeader>
@@ -217,6 +241,7 @@ export function ReasonSection({
   professionals,
   professions,
   organisations,
+  relationships,
   suggestedProfessionalId,
 }: {
   clientId: string
@@ -225,6 +250,7 @@ export function ReasonSection({
   professionals: ProfessionalOption[]
   professions: ProfessionOption[]
   organisations: OrganisationOption[]
+  relationships: RelationshipRecord[]
   suggestedProfessionalId: string | null
 }) {
   const [options, setOptions] = useState(professionals)
@@ -238,7 +264,7 @@ export function ReasonSection({
         const next = applyKeptSuggestion(draft, { suggestedProfessionalId, dismissed })
         return saveReasonForAttendingAction(clientId, next)
       }}
-      read={(value) => <ReasonReadOnly value={value} professionals={options} />}
+      read={(value) => <ReasonReadOnly value={value} professionals={options} relationships={relationships} />}
       edit={(value, onChange) => (
         <ReasonFields
           idPrefix="background_reason"
@@ -248,6 +274,7 @@ export function ReasonSection({
           professionals={options}
           professions={professions}
           organisations={organisations}
+          relationships={relationships}
           suggestedProfessionalId={suggestedProfessionalId}
           onProfessionalsChange={setOptions}
           onSuggestionDismissedChange={setDismissed}

@@ -262,7 +262,7 @@ export function InterviewPage({
       <div className={cn("space-y-4 py-4", page !== "background" && "hidden")}>
         <Card id="check-reason" className="scroll-mt-28">
           <CardHeader>
-            <CardTitle>Reason for attending</CardTitle>
+            <CardTitle>Referral</CardTitle>
           </CardHeader>
           <CardContent>
             <AutosaveFields
@@ -295,6 +295,7 @@ export function InterviewPage({
                     professionals={professionals}
                     professions={reasonSupport.professions}
                     organisations={reasonSupport.organisations}
+                    relationships={data.relationships}
                     suggestedProfessionalId={reasonSupport.suggestedProfessionalId}
                     onProfessionalsChange={setProfessionals}
                     onSuggestionDismissedChange={(dismissed) => {

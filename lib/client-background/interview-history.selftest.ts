@@ -110,13 +110,9 @@ assert.deepEqual(
 )
 
 const gaps = unansweredInterviewLabels({}, [], null, emptyMedication(), emptyStressors(), emptyReasonForAttending())
-assert.deepEqual(gaps.slice(0, 3), [
-  "Referred by a medical professional",
-  "Family involved in them attending",
-  "Came on their own initiative",
-])
-assert.equal(gaps[3], "Illness / injury")
-assert.equal(gaps[4], "Traumatic events")
+assert.deepEqual(gaps.slice(0, 2), ["Referral type", "Illness / injury"])
+assert.equal(gaps[1], "Illness / injury")
+assert.equal(gaps[2], "Traumatic events")
 assert.ok(gaps.includes("Medication"))
 assert.ok(gaps.indexOf("Medication") > gaps.indexOf("Previous therapy"))
 assert.ok(gaps.indexOf("Medication") < gaps.indexOf("Other significant events"))
@@ -130,12 +126,13 @@ assert.ok(gaps.indexOf("Family") > gaps.indexOf("Emotional problems"))
 assert.equal(gaps.at(-1), "Legal matters, police or accidents")
 assert.equal(gaps.includes("Currently taking medication"), false)
 assert.equal(gaps.filter((label) => label === "Family").length, 1)
-assert.equal(gaps.length, HISTORY_QUESTION_KEYS.length + 3 + 9)
+assert.equal(gaps.length, HISTORY_QUESTION_KEYS.length + 1 + 9)
 
 const answeredMedication: MedicationRecord = { ...emptyMedication(), currentlyTaking: "not_asked" }
 const answeredStressors: StressorsRecord = { ...emptyStressors(), family: "yes", financial: "no" }
 const answeredReason: ReasonForAttending = {
   ...emptyReasonForAttending(),
+  referralType: "self",
   referredByMedicalProfessional: "no",
   familyInvolved: "not_asked",
   ownInitiative: "yes",
@@ -145,14 +142,14 @@ const answeredReason: ReasonForAttending = {
 const remaining = unansweredInterviewLabels({}, [], null, answeredMedication, answeredStressors, answeredReason)
 assert.equal(remaining[0], "Illness / injury")
 assert.equal(remaining.includes("Medication"), true)
-assert.equal(remaining.includes("Referred by a medical professional"), false)
+assert.equal(remaining.includes("Referral type"), false)
 assert.equal(remaining.includes("Attended willingly"), false)
 assert.equal(remaining.includes("Currently taking medication"), false)
 assert.equal(remaining.includes("Family"), false)
 assert.equal(remaining.includes("Financial"), false)
 assert.ok(remaining.includes("Social life"))
 assert.equal(remaining.length, HISTORY_QUESTION_KEYS.length + 7)
-assert.equal(INTERVIEW_ANSWER_TOTAL, 27)
+assert.equal(INTERVIEW_ANSWER_TOTAL, 25)
 assert.equal(gaps.length, INTERVIEW_ANSWER_TOTAL)
 assert.equal(
   answeredInterviewCount({}, [], null, emptyMedication(), emptyStressors(), emptyReasonForAttending()),

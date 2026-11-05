@@ -241,19 +241,11 @@ export function sanitizeScreening(value: unknown): ScreeningAnswers {
   return screening
 }
 
-/** The three counted Reason for attending questions. Client's motivation is optional and is not one of them. */
-const REASON_ANSWER_FIELDS = [
-  ["referredByMedicalProfessional", "Referred by a medical professional"],
-  ["familyInvolved", "Family involved in them attending"],
-  ["ownInitiative", "Came on their own initiative"],
-] as const satisfies readonly (readonly [keyof ReasonForAttending, string])[]
-
 /**
- * Reason for attending (3), client and family history (15, including Medication),
- * and the nine stressors.
+ * Referral (1), client and family history (15, including Medication),
+ * and the nine stressors. The main reason for attending is optional and is not counted.
  */
-export const INTERVIEW_ANSWER_TOTAL =
-  REASON_ANSWER_FIELDS.length + HISTORY_QUESTION_KEYS.length + STRESSOR_ITEMS.length
+export const INTERVIEW_ANSWER_TOTAL = 1 + HISTORY_QUESTION_KEYS.length + STRESSOR_ITEMS.length
 
 export type BackgroundInterviewAnswerSource = {
   status: "in_progress" | "completed"
@@ -303,10 +295,10 @@ export function unansweredQuestionLabels(
 }
 
 function unansweredReasonLabels(reason: ReasonForAttending): string[] {
-  return REASON_ANSWER_FIELDS.filter(([key]) => reason[key] == null).map(([, label]) => label)
+  return reason.referralType ? [] : ["Referral type"]
 }
 
-/** Unanswered items in page order: Reason for attending, then the rest of Background, then History, then Stressors. */
+/** Unanswered items in page order: Referral, then the rest of Background, then History, then Stressors. */
 export function unansweredInterviewLabels(
   screening: ScreeningAnswers,
   events: Pick<EventRecord, "eventType" | "attribution" | "startPrecision" | "startValue">[],

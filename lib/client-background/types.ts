@@ -704,14 +704,33 @@ export type StressorsRecord = Record<StressorKey, TriStateAnswer | null> & {
   mainReason: string
 }
 
-/** Why the client came. Cleared fields stay empty unless the matching answer is Yes. */
+export const REFERRAL_TYPES = ["medical", "family_or_friend", "self"] as const
+export type ReferralType = (typeof REFERRAL_TYPES)[number]
+
+export const REFERRAL_TYPE_LABELS: Record<ReferralType, string> = {
+  medical: "Medical professional",
+  family_or_friend: "Family or friend",
+  self: "Self-referral",
+}
+
+/**
+ * Why the client came. The old Yes/No answers stay on the record and are not edited.
+ * Referral type decides which of the new fields are kept.
+ */
 export type ReasonForAttending = {
-  referredByMedicalProfessional: TriStateAnswer | null
+  referralType: ReferralType | ""
   /** professionals.professional_id in the same practice, or null. */
   referrerProfessionalId: string | null
   /** Partial date: YYYY, YYYY-MM, or YYYY-MM-DD. */
   referralDate: string
   referrerConcerns: string
+  /** A person on this client's relationships, when a family member or friend referred them. */
+  referrerRelationshipId: string | null
+  /** True when Who is Other (describe) rather than a recorded person. */
+  referrerIsOther: boolean
+  referrerOther: string
+  theirConcerns: string
+  referredByMedicalProfessional: TriStateAnswer | null
   familyInvolved: TriStateAnswer | null
   familyInvolvement: string
   ownInitiative: TriStateAnswer | null
@@ -958,10 +977,15 @@ export function emptyStressors(): StressorsRecord {
 
 export function emptyReasonForAttending(): ReasonForAttending {
   return {
-    referredByMedicalProfessional: null,
+    referralType: "",
     referrerProfessionalId: null,
     referralDate: "",
     referrerConcerns: "",
+    referrerRelationshipId: null,
+    referrerIsOther: false,
+    referrerOther: "",
+    theirConcerns: "",
+    referredByMedicalProfessional: null,
     familyInvolved: null,
     familyInvolvement: "",
     ownInitiative: null,

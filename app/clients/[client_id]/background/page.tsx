@@ -61,7 +61,7 @@ export default async function ClientBackgroundRoute({
       <EntityPageHeader
         kicker="Client Background"
         name={clientName}
-        subheading="Reason for attending, demographics, relationships, history, and risk"
+        subheading="Referral, demographics, relationships, history, and risk"
       />
       <ClientBackgroundPage
         clientId={clientId}

@@ -1,4 +1,4 @@
-import { HISTORY_QUESTIONS, historyQuestionKeyForEvent } from "@/lib/client-background/interview-history"
+import { HISTORY_QUESTIONS, historyQuestionKeyForEvent, resolvedAbout } from "@/lib/client-background/interview-history"
 import {
   CONDITION_EVENT_TYPES,
   TREATMENT_EVENT_TYPES,
@@ -22,10 +22,14 @@ export function entryHasWhen(event: Pick<EventRecord, "startPrecision" | "startV
   return Boolean(event.startPrecision && event.startValue.trim())
 }
 
-/** Null when the entry has both a title and a when (date or age). */
+/**
+ * Null when the entry has both a title and a when (date or age).
+ * Significant-other entries are not dated in the report, so a missing start date is not a gap.
+ * The client's own entries are dated from startPrecision and startValue, which is also what the report reads.
+ */
 export function entryDetailGap(event: EventRecord): "title" | "date" | "both" | null {
   const title = entryHasTitle(event)
-  const when = entryHasWhen(event)
+  const when = entryHasWhen(event) || resolvedAbout(event) === "significant_other"
   if (title && when) return null
   if (!title && !when) return "both"
   return title ? "date" : "title"

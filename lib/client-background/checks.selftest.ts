@@ -1,6 +1,7 @@
 import assert from "node:assert/strict"
 
 import { backgroundChecks, type BackgroundCheckInput } from "@/lib/client-background/checks"
+import { entryDetailMessage } from "@/lib/client-background/history-links"
 import { sanitizeReasonForAttending } from "@/lib/client-background/sanitize"
 import {
   emptyClientRelationshipStatus,
@@ -470,5 +471,17 @@ const laterMissing = backgroundChecks(
   })
 )
 assert.ok(laterMissing.some((check) => check.message === "Mother: later relationships not recorded"))
+
+const datedDepression = { ...emptyEvent("emotional_problems", 0), eventRecordId: "dated", title: "Depression", startPrecision: "year" as const, startValue: "2000", about: "self" as const }
+assert.equal(entryDetailMessage(datedDepression, "1970-03-12"), null)
+
+const familyDepression = {
+  ...emptyEvent("emotional_problems", 1),
+  eventRecordId: "family",
+  title: "Depression",
+  about: "significant_other" as const,
+  attribution: "family" as const,
+}
+assert.equal(entryDetailMessage(familyDepression, "1970-03-12"), null)
 
 console.log("client background checks selftest passed")

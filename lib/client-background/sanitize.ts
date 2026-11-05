@@ -2,6 +2,7 @@ import { HOW_ENDED, mapHowEnded, type HowEnded } from "@/lib/client-background/h
 import { LATER_RELATIONSHIPS, type LaterRelationships } from "@/lib/client-background/later-relationships"
 import {
   ADMISSION_TYPES,
+  BLOCK_ROLES,
   CHILD_TYPES,
   HISTORY_ABOUT,
   ATTRIBUTIONS,
@@ -44,6 +45,7 @@ import {
   emptyOccupation,
   emptyRisk,
   type AdmissionType,
+  type BlockRole,
   type Attribution,
   type CaregiverRelationship,
   type ClientRelationshipStatus,
@@ -493,6 +495,11 @@ export function sanitizeRelationship(value: unknown, fallbackId = ""): Relations
     otherParentDetail: str(raw.otherParentDetail),
     linkedPartnerRecordId: str(raw.linkedPartnerRecordId) || null,
     partnershipRecordId: str(raw.partnershipRecordId) || null,
+    relationshipBlockId: str(raw.relationshipBlockId) || null,
+    blockRole: oneOf<BlockRole>(raw.blockRole, BLOCK_ROLES),
+    blockRoleType: str(raw.blockRoleType),
+    placementReview:
+      raw.placementReview === "unlinked_child" || raw.placementReview === "unplaced" ? raw.placementReview : "",
   }
   if (!record.howEnded && record.relationshipStatus) {
     const mapped = mapHowEnded(record.relationshipStatus)

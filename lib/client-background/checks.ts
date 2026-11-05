@@ -1,3 +1,4 @@
+import { needLabel, needsForBlock, needsForMember, isPartneredClientStatus } from "@/lib/client-background/relationship-blocks"
 import { entryDetailMessage, unlinkedTreatmentMessage } from "@/lib/client-background/history-links"
 import { eventsForQuestion, historyQuestionAcceptsEntries, historyQuestionCheckLabel, HISTORY_QUESTION_KEYS, type ScreeningAnswers } from "@/lib/client-background/interview-history"
 import { HOW_ENDED } from "@/lib/client-background/how-ended"
@@ -115,20 +116,29 @@ export function backgroundChecks(input: BackgroundCheckInput): BackgroundCheck[]
     })
   }
 
+  const blocks = data.relationshipBlocks ?? []
   const endedCode =
     status === "separated" || status === "divorced" || status === "widowed" ? ENDED_STATUS_CODE[status] : undefined
   if (status && endedCode) {
-    const prior = data.relationships.filter((person) => person.relationshipToClient === "prior_partner")
-    const matched = prior.some((person) => person.howEnded === endedCode)
+    const matched =
+      blocks.length > 0
+        ? blocks.some((block) => {
+            if (block.kind !== "client_previous") return false
+            if (endedCode === "separated") return block.status === "married_separated" || block.status === "defacto_separated"
+            if (endedCode === "divorced") return block.status === "divorced"
+            return block.status === "widowed" || block.status === "partner_died"
+          })
+        : data.relationships.some((person) => person.relationshipToClient === "prior_partner" && person.howEnded === endedCode)
     if (!matched) {
       checks.push({
         id: "partner-ended",
-        message: `Relationship status is ${CLIENT_RELATIONSHIP_STATUS_LABELS[status]}, but no prior partner has a matching How it ended.`,
+        message: `Relationship status is ${CLIENT_RELATIONSHIP_STATUS_LABELS[status]}, but no previous relationship has a matching ending.`,
         target: "relationships",
       })
     }
   }
 
+  if (blocks.length === 0) {
   for (const person of data.relationships) {
     if (person.relationshipToClient !== "prior_partner" || person.startedOn.trim()) continue
     const name = person.givenName.trim()
@@ -201,6 +211,7 @@ export function backgroundChecks(input: BackgroundCheckInput): BackgroundCheck[]
       message: name ? `Child ${name}: type not recorded` : "Child: type not recorded",
       target: "relationships",
     })
+  }
   }
 
   if (input.numberOfChildren != null) {
@@ -278,6 +289,58 @@ export function backgroundChecks(input: BackgroundCheckInput): BackgroundCheck[]
     }
   }
 
+  if (blocks.length > 0) {
+    const current = blocks.filter((block) => block.kind === "client_current").sort((a, b) => a.displayOrder - b.displayOrder)
+    const lockedId = isPartneredClientStatus(status) ? current[0]?.relationshipBlockId ?? null : null
+    for (const block of blocks) {
+      const title =
+        block.kind === "client_current"
+          ? "Current relationship"
+          : block.kind === "client_previous"
+            ? "Previous relationship"
+            : block.kind === "caregiver_arrangement" && block.arrangementType === "adoption"
+              ? "Adoption"
+              : "Relationship"
+      for (const need of needsForBlock(block, block.relationshipBlockId === lockedId)) {
+        checks.push({
+          id: `block-${block.relationshipBlockId}-${need}`,
+          message: `${title}: ${needLabel(need).toLowerCase()}`,
+          target: "relationships",
+        })
+      }
+      for (const person of data.relationships.filter((item) => item.relationshipBlockId === block.relationshipBlockId)) {
+        const name = person.givenName.trim()
+        for (const need of needsForMember(block, person)) {
+          checks.push({
+            id: `member-${person.relationshipRecordId}-${need}`,
+            message: `${name || person.blockRole || "Person"}: ${needLabel(need).toLowerCase()}`,
+            target: "relationships",
+          })
+        }
+      }
+    }
+    for (const person of data.relationships) {
+      if (person.placementReview !== "unplaced" && person.relationshipBlockId) continue
+      if (person.relationshipBlockId) continue
+      const name = person.givenName.trim()
+      checks.push({
+        id: `unplaced-${person.relationshipRecordId}`,
+        message: name ? `${name} could not be placed in a relationship.` : "A person could not be placed in a relationship.",
+        target: "relationships",
+      })
+    }
+    for (const person of data.relationships) {
+      if (person.placementReview !== "unlinked_child") continue
+      const name = person.givenName.trim()
+      checks.push({
+        id: `unlinked-child-${person.relationshipRecordId}`,
+        message: name ? `Child ${name} was not linked to a partner.` : "A child was not linked to a partner.",
+        target: "relationships",
+      })
+    }
+  }
+
+  if (blocks.length === 0) {
   const tree = buildRelationshipTree(data.relationships, data.partnerships)
   for (const item of needsLinkingItems(tree)) {
     const relationship = personRoleLabel(item.person)
@@ -288,6 +351,7 @@ export function backgroundChecks(input: BackgroundCheckInput): BackgroundCheck[]
       message: `${subject} needs linking to ${linkingWhat(item.action)}.`,
       target: "relationships",
     })
+  }
   }
 
   return checks

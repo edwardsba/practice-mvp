@@ -1,10 +1,15 @@
 import {
+  emptyBlockAnswers,
   isOneOf,
   RELATIONSHIP_TO_CLIENT,
+  type BlockAnswer,
+  type BlockKind,
   type ClientRelationshipStatusValue,
   type EventRecord,
   type EventType,
   type PartnershipRecord,
+  type RelationshipBlock,
+  type RelationshipBlockAnswers,
   type RelationshipRecord,
   type RelationshipToClient,
 } from "@/lib/client-background/types"
@@ -53,6 +58,10 @@ export function toRelationship(row: {
   otherParentDetail: string | null
   linkedPartnerRecordId: string | null
   partnershipRecordId: string | null
+  relationshipBlockId?: string | null
+  blockRole?: string | null
+  blockRoleType?: string | null
+  placementReview?: string | null
 }): RelationshipRecord {
   const role: RelationshipToClient = isOneOf(row.relationshipToClient, RELATIONSHIP_TO_CLIENT)
     ? row.relationshipToClient
@@ -89,6 +98,10 @@ export function toRelationship(row: {
     notKnown: row.notKnown,
     otherParentKind: row.otherParentKind ?? "",
     otherParentDetail: row.otherParentDetail ?? "",
+    relationshipBlockId: row.relationshipBlockId ?? null,
+    blockRole: row.blockRole ?? "",
+    blockRoleType: row.blockRoleType ?? "",
+    placementReview: row.placementReview ?? "",
   })
 }
 
@@ -102,6 +115,77 @@ export function toClientRelationshipStatus(
     relationshipStatus: row?.relationshipStatus ?? "",
     relationshipStatusOther: row?.relationshipStatusOther ?? "",
   })
+}
+
+export function toRelationshipBlock(row: {
+  relationshipBlockId: string
+  kind: string
+  parentRecordId: string | null
+  parentSide: string | null
+  status: string | null
+  statusDetail: string | null
+  arrangementType: string | null
+  arrangementDetail: string | null
+  startedOn: string | null
+  endedOn: string | null
+  noChildren: boolean
+  displayOrder: number
+}): RelationshipBlock {
+  const kind: BlockKind = isOneOf(row.kind, [
+    "client_current",
+    "client_previous",
+    "client_other_children",
+    "biological_parents",
+    "parent_other",
+    "caregiver_arrangement",
+  ] as const)
+    ? row.kind
+    : "client_current"
+  const side = row.parentSide === "mother" || row.parentSide === "father" ? row.parentSide : ""
+  const rawArrangement = row.arrangementType ?? ""
+  const arrangement = isOneOf(rawArrangement, [
+    "adoption",
+    "grandparent_care",
+    "kinship_care",
+    "foster_care",
+    "residential",
+    "other",
+  ] as const)
+    ? rawArrangement
+    : ""
+  return {
+    relationshipBlockId: row.relationshipBlockId,
+    kind,
+    parentRecordId: row.parentRecordId,
+    parentSide: side,
+    status: row.status ?? "",
+    statusDetail: row.statusDetail ?? "",
+    arrangementType: arrangement,
+    arrangementDetail: row.arrangementDetail ?? "",
+    startedOn: row.startedOn ?? "",
+    endedOn: row.endedOn ?? "",
+    noChildren: row.noChildren,
+    displayOrder: row.displayOrder,
+  }
+}
+
+export function toBlockAnswers(row: {
+  previousRelationships: string | null
+  otherChildren: string | null
+  motherOtherRelationships: string | null
+  fatherOtherRelationships: string | null
+  caregiverArrangements: string | null
+} | null): RelationshipBlockAnswers {
+  const answer = (value: string | null | undefined): BlockAnswer | "" =>
+    value === "yes" || value === "none" || value === "not_asked" ? value : ""
+  if (!row) return emptyBlockAnswers()
+  return {
+    previousRelationships: answer(row.previousRelationships) || "not_asked",
+    otherChildren: answer(row.otherChildren) || "not_asked",
+    motherOtherRelationships: answer(row.motherOtherRelationships) || "not_asked",
+    fatherOtherRelationships: answer(row.fatherOtherRelationships) || "not_asked",
+    caregiverArrangements: answer(row.caregiverArrangements) || "not_asked",
+  }
 }
 
 export function toPartnership(row: {

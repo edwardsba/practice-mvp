@@ -41,6 +41,12 @@ export const clientBackgrounds = pgTable("client_backgrounds", {
   /** Client's current relationship status. Not a field of any relative. */
   relationshipStatus: text("relationship_status"),
   relationshipStatusOther: text("relationship_status_other"),
+  /** Yes / None / Not asked for relationship blocks. Adding a block sets Yes; removing the last sets Not asked. */
+  previousRelationships: text("previous_relationships"),
+  otherChildren: text("other_children"),
+  motherOtherRelationships: text("mother_other_relationships"),
+  fatherOtherRelationships: text("father_other_relationships"),
+  caregiverArrangements: text("caregiver_arrangements"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 })
@@ -105,6 +111,38 @@ export const clientRelationshipRecords = pgTable("client_relationship_records", 
   otherParentDetail: text("other_parent_detail"),
   linkedPartnerRecordId: uuid("linked_partner_record_id"),
   partnershipRecordId: uuid("partnership_record_id"),
+  /** The relationship block this person belongs to. Null when they could not be placed. */
+  relationshipBlockId: uuid("relationship_block_id"),
+  /** partner, child, parent, sibling, or caregiver. */
+  blockRole: text("block_role"),
+  /** Role-specific type: child type, sibling type, mother/father, or caregiver relationship. */
+  blockRoleType: text("block_role_type"),
+  /** unlinked_child or unplaced. Cleared when the person is moved. */
+  placementReview: text("placement_review"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+})
+
+/** One relationship: its status and dates, and the people who belong to it. */
+export const clientRelationshipBlocks = pgTable("client_relationship_blocks", {
+  relationshipBlockId: uuid("relationship_block_id").primaryKey().defaultRandom(),
+  clientId: uuid("client_id")
+    .notNull()
+    .references(() => clients.clientId),
+  practiceId: uuid("practice_id")
+    .notNull()
+    .references(() => practices.practiceId),
+  kind: text("kind").notNull(),
+  parentRecordId: uuid("parent_record_id"),
+  parentSide: text("parent_side"),
+  status: text("status"),
+  statusDetail: text("status_detail"),
+  arrangementType: text("arrangement_type"),
+  arrangementDetail: text("arrangement_detail"),
+  startedOn: text("started_on"),
+  endedOn: text("ended_on"),
+  noChildren: boolean("no_children").notNull().default(false),
+  displayOrder: integer("display_order").notNull().default(0),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 })

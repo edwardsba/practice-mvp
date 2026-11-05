@@ -18,7 +18,7 @@ import {
 } from "@/components/client-background/demographics-section"
 import { AutosaveFields, type SavePhase } from "@/components/client-background/interview-autosave"
 import { InterviewHistory } from "@/components/client-background/interview-history"
-import { InterviewRelationships } from "@/components/client-background/interview-relationships"
+import { RelationshipBlocksSection } from "@/components/client-background/relationship-blocks-section"
 import { ReasonFields } from "@/components/client-background/reason-section"
 import { scrollToBackgroundCheck } from "@/components/client-background/worth-checking"
 import { Button } from "@/components/ui/button"
@@ -39,7 +39,6 @@ import type {
   ClientBackgroundData,
   EventRecord,
   MedicationRecord,
-  PartnershipRecord,
   RelationshipRecord,
   StressorsRecord,
 } from "@/lib/client-background/types"
@@ -86,7 +85,8 @@ export function InterviewPage({
   const [page, setPage] = useState<InterviewPageId>(initialPage)
   const [relationships, setRelationships] = useState(data.relationships)
   const [professionals, setProfessionals] = useState(reasonSupport.professionals)
-  const [relationshipsOpen, setRelationshipsOpen] = useState(0)
+  const blocksRef = useRef(data.relationshipBlocks ?? [])
+  const answersRef = useRef(data.blockAnswers)
   const [scrollNonce, setScrollNonce] = useState(0)
   const [phases, setPhases] = useState<Record<string, { phase: SavePhase; retry: (() => void) | null }>>({})
   const flushers = useRef(new Set<() => Promise<void>>())
@@ -111,12 +111,16 @@ export function InterviewPage({
     setRelationships(next)
   }, [])
 
-  const onPartnerships = useCallback((next: PartnershipRecord[]) => {
-    partnershipsRef.current = next
-  }, [])
-
   const onRelationshipStatus = useCallback((next: ClientBackgroundData["relationshipStatus"]) => {
     statusRef.current = next
+  }, [])
+
+  const onBlocks = useCallback((next: NonNullable<ClientBackgroundData["relationshipBlocks"]>) => {
+    blocksRef.current = next
+  }, [])
+
+  const onBlockAnswers = useCallback((next: NonNullable<ClientBackgroundData["blockAnswers"]>) => {
+    answersRef.current = next
   }, [])
 
   const registerComplete = useCallback((open: () => void) => {
@@ -136,6 +140,8 @@ export function InterviewPage({
           relationshipStatus: statusRef.current,
           relationships: relationshipsRef.current,
           partnerships: partnershipsRef.current,
+          relationshipBlocks: blocksRef.current,
+          blockAnswers: answersRef.current,
           demographics: {
             ...data.demographics,
             identity: identityRef.current,
@@ -181,7 +187,6 @@ export function InterviewPage({
 
   function jumpToCheck(check: BackgroundCheck) {
     const next = interviewPageForCheck(check.target)
-    if (check.target === "relationships") setRelationshipsOpen((count) => count + 1)
     pendingCheck.current = check
     setScrollNonce((count) => count + 1)
     if (next !== page) {
@@ -392,15 +397,16 @@ export function InterviewPage({
             </AutosaveFields>
           </CardContent>
         </Card>
-        <InterviewRelationships
+        <RelationshipBlocksSection
           clientId={clientId}
-          relationships={data.relationships}
-          partnerships={data.partnerships}
+          relationships={relationships}
+          blocks={data.relationshipBlocks}
+          blockAnswers={data.blockAnswers}
           relationshipStatus={data.relationshipStatus}
           onRelationships={onRelationships}
-          onPartnerships={onPartnerships}
+          onBlocks={onBlocks}
+          onBlockAnswers={onBlockAnswers}
           onRelationshipStatus={onRelationshipStatus}
-          openRequest={relationshipsOpen}
           onPhase={onPhase}
           registerFlush={registerFlush}
           relationshipClient={suggestions?.relationshipStatus}

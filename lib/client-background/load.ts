@@ -10,6 +10,7 @@ import {
   clientBackgrounds,
   clientEventRecords,
   clientPartnershipRecords,
+  clientRelationshipBlocks,
   clientRelationshipRecords,
   clients,
   fundingApprovals,
@@ -27,7 +28,7 @@ import {
   sanitizeScreening,
   type BackgroundInterviewAnswerSource,
 } from "@/lib/client-background/interview-history"
-import { toClientRelationshipStatus, toEvent, toPartnership, toRelationship } from "@/lib/client-background/map"
+import { toBlockAnswers, toClientRelationshipStatus, toEvent, toPartnership, toRelationship, toRelationshipBlock } from "@/lib/client-background/map"
 import {
   demographicsFromStored,
   sanitizeMedication,
@@ -110,6 +111,17 @@ export async function loadClientBackground(
       )
     )
 
+  const blockRows = await db
+    .select()
+    .from(clientRelationshipBlocks)
+    .where(
+      and(
+        eq(clientRelationshipBlocks.clientId, clientId),
+        eq(clientRelationshipBlocks.practiceId, practiceId)
+      )
+    )
+    .orderBy(asc(clientRelationshipBlocks.displayOrder))
+
   const eventRows = await db
     .select()
     .from(clientEventRecords)
@@ -137,6 +149,8 @@ export async function loadClientBackground(
     reason: background ? sanitizeReasonForAttending(background.reasonForAttendingJson) : emptyReasonForAttending(),
     relationships: relationshipRows.map(toRelationship),
     partnerships: partnershipRows.map(toPartnership),
+    relationshipBlocks: blockRows.map(toRelationshipBlock),
+    blockAnswers: toBlockAnswers(background ?? null),
     events: eventRows.map((row) => settleEventDates(toEvent(row), client.dateOfBirth)),
     risk: background?.riskJson ? sanitizeRisk(background.riskJson) : emptyRisk(),
   }

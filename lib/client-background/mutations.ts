@@ -2,7 +2,7 @@ import "server-only"
 
 import { and, eq, inArray, or } from "drizzle-orm"
 
-import { auditEvents, assessmentDefinitions, assessmentInstances, assessmentResults, clientBackgroundInterviews, clientBackgrounds, clientEventRecords, clientPartnershipRecords, clientRelationshipRecords, clients, professionals } from "@/db/schema"
+import { auditEvents, assessmentDefinitions, assessmentInstances, assessmentResults, clientBackgroundInterviews, clientBackgrounds, clientEventRecords, clientPartnershipRecords, clientRelationshipBlocks, clientRelationshipRecords, clients, professionals } from "@/db/schema"
 import { BACKGROUND_ASSESSMENT_CODE } from "@/lib/background-questionnaire/types"
 import { db } from "@/lib/db"
 import { settleEventDates } from "@/lib/client-background/age"
@@ -395,6 +395,50 @@ export async function ensureFamilyOfOrigin(input: {
 
       if (!mother) mother = await insertOrigin("mother")
       if (!father) father = await insertOrigin("father")
+
+      const [biological] = await tx
+        .select({ relationshipBlockId: clientRelationshipBlocks.relationshipBlockId })
+        .from(clientRelationshipBlocks)
+        .where(
+          and(
+            eq(clientRelationshipBlocks.clientId, input.clientId),
+            eq(clientRelationshipBlocks.practiceId, input.practiceId),
+            eq(clientRelationshipBlocks.kind, "biological_parents")
+          )
+        )
+        .limit(1)
+      let biologicalId = biological?.relationshipBlockId
+      if (!biologicalId) {
+        const [createdBlock] = await tx
+          .insert(clientRelationshipBlocks)
+          .values({
+            clientId: input.clientId,
+            practiceId: input.practiceId,
+            kind: "biological_parents",
+          })
+          .returning()
+        biologicalId = createdBlock.relationshipBlockId
+        await writeAudit(tx, {
+          practiceId: input.practiceId,
+          userId: input.userId,
+          clientId: input.clientId,
+          eventType: "client_relationship_block.created",
+          entityType: "client_relationship_block",
+          entityId: biologicalId,
+        })
+      }
+      for (const person of [mother, father]) {
+        if (person.relationshipBlockId) continue
+        await tx
+          .update(clientRelationshipRecords)
+          .set({
+            relationshipBlockId: biologicalId,
+            blockRole: "parent",
+            blockRoleType: person.relationshipToClient,
+            updatedAt: new Date(),
+          })
+          .where(eq(clientRelationshipRecords.relationshipRecordId, person.relationshipRecordId))
+      }
 
       const [existing] = await tx
         .select()

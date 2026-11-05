@@ -8,7 +8,7 @@ import { HistorySection } from "@/components/client-background/history-section"
 import { BackgroundInterviewCard } from "@/components/client-background/interview-card"
 import { BackgroundStressorsSection } from "@/components/client-background/medication-stressors"
 import { ReasonSection } from "@/components/client-background/reason-section"
-import { RelationshipsSection } from "@/components/client-background/relationships-section"
+import { RelationshipBlocksSection } from "@/components/client-background/relationship-blocks-section"
 import { scrollToBackgroundCheck } from "@/components/client-background/worth-checking"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { backgroundChecks, backgroundSectionForCheck, type BackgroundCheck } from "@/lib/client-background/checks"
@@ -113,11 +113,21 @@ export function ClientBackgroundPage({
             />
           ) : null}
           {item.id === "relationships" ? (
-            <RelationshipsSection
+            <RelationshipBlocksSection
               clientId={clientId}
               relationships={data.relationships}
-              partnerships={data.partnerships}
+              blocks={data.relationshipBlocks}
+              blockAnswers={data.blockAnswers}
               relationshipStatus={data.relationshipStatus}
+              childrenPrompt={
+                numberOfChildren == null
+                  ? null
+                  : numberOfChildren === 0
+                    ? "no children"
+                    : numberOfChildren === 1
+                      ? "1 child"
+                      : `${numberOfChildren} children (including step-children)`
+              }
             />
           ) : null}
           {item.id === "history" ? (

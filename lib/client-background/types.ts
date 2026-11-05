@@ -327,6 +327,151 @@ export type ClientRelationshipStatusValue = {
   relationshipStatusOther: string
 }
 
+/** A relationship is the unit. People sit in one block, and their role comes from that block. */
+export const BLOCK_KINDS = [
+  "client_current",
+  "client_previous",
+  "client_other_children",
+  "biological_parents",
+  "parent_other",
+  "caregiver_arrangement",
+] as const
+export type BlockKind = (typeof BLOCK_KINDS)[number]
+
+export const BLOCK_ROLES = ["partner", "child", "parent", "sibling", "caregiver"] as const
+export type BlockRole = (typeof BLOCK_ROLES)[number]
+
+export const BLOCK_ANSWERS = ["yes", "none", "not_asked"] as const
+export type BlockAnswer = (typeof BLOCK_ANSWERS)[number]
+
+export const CURRENT_BLOCK_STATUSES = [
+  "married",
+  "defacto",
+  "engaged",
+  "dating",
+  "in_relationship_not_living_together",
+  "other",
+] as const
+export type CurrentBlockStatus = (typeof CURRENT_BLOCK_STATUSES)[number]
+
+export const PREVIOUS_BLOCK_STATUSES = [
+  "divorced",
+  "married_separated",
+  "defacto_separated",
+  "engagement_ended",
+  "relationship_ended",
+  "widowed",
+  "partner_died",
+  "other",
+] as const
+export type PreviousBlockStatus = (typeof PREVIOUS_BLOCK_STATUSES)[number]
+
+/** Biological parents only. A parent's other relationship uses both lists without this. */
+export const NEVER_IN_A_RELATIONSHIP = "never_in_a_relationship" as const
+
+export const ARRANGEMENT_TYPES = [
+  "adoption",
+  "grandparent_care",
+  "kinship_care",
+  "foster_care",
+  "residential",
+  "other",
+] as const
+export type ArrangementType = (typeof ARRANGEMENT_TYPES)[number]
+
+export const SIBLING_BLOCK_TYPES = ["full", "half", "step", "adoptive", "foster", "other"] as const
+export type SiblingBlockType = (typeof SIBLING_BLOCK_TYPES)[number]
+
+export const PARENT_BLOCK_TYPES = ["mother", "father"] as const
+export type ParentBlockType = (typeof PARENT_BLOCK_TYPES)[number]
+
+export const CURRENT_BLOCK_STATUS_LABELS: Record<CurrentBlockStatus, string> = {
+  married: "Married",
+  defacto: "De facto",
+  engaged: "Engaged",
+  dating: "Dating",
+  in_relationship_not_living_together: "In a relationship, not living together",
+  other: "Other",
+}
+
+export const PREVIOUS_BLOCK_STATUS_LABELS: Record<PreviousBlockStatus, string> = {
+  divorced: "Divorced",
+  married_separated: "Married, separated",
+  defacto_separated: "De facto, separated",
+  engagement_ended: "Engagement ended",
+  relationship_ended: "Relationship ended",
+  widowed: "Widowed",
+  partner_died: "Partner died",
+  other: "Other",
+}
+
+export const ARRANGEMENT_TYPE_LABELS: Record<ArrangementType, string> = {
+  adoption: "Adoption",
+  grandparent_care: "Grandparent care",
+  kinship_care: "Kinship care",
+  foster_care: "Foster care",
+  residential: "Residential / out-of-home care",
+  other: "Other",
+}
+
+export const SIBLING_BLOCK_TYPE_LABELS: Record<SiblingBlockType, string> = {
+  full: "Full",
+  half: "Half",
+  step: "Step",
+  adoptive: "Adoptive",
+  foster: "Foster",
+  other: "Other",
+}
+
+export const BLOCK_ANSWER_LABELS: Record<BlockAnswer, string> = {
+  yes: "Yes",
+  none: "None",
+  not_asked: "Not asked",
+}
+
+/** Statuses that open the client's first current relationship. */
+export const PARTNERED_CLIENT_STATUSES = [
+  "in_relationship_not_living_together",
+  "engaged",
+  "dating",
+  "defacto",
+  "married",
+] as const
+
+export type RelationshipBlock = {
+  relationshipBlockId: string
+  kind: BlockKind
+  /** Parent's other relationship: the mother or father this block belongs to. */
+  parentRecordId: string | null
+  parentSide: ParentBlockType | ""
+  status: string
+  statusDetail: string
+  arrangementType: ArrangementType | ""
+  arrangementDetail: string
+  startedOn: string
+  endedOn: string
+  noChildren: boolean
+  displayOrder: number
+}
+
+export type RelationshipBlockAnswers = {
+  previousRelationships: BlockAnswer | ""
+  otherChildren: BlockAnswer | ""
+  motherOtherRelationships: BlockAnswer | ""
+  fatherOtherRelationships: BlockAnswer | ""
+  caregiverArrangements: BlockAnswer | ""
+}
+
+export function emptyBlockAnswers(): RelationshipBlockAnswers {
+  return {
+    previousRelationships: "not_asked",
+    otherChildren: "not_asked",
+    motherOtherRelationships: "not_asked",
+    fatherOtherRelationships: "not_asked",
+    caregiverArrangements: "not_asked",
+  }
+}
+
 /** Ratings on a relationship record. Empty means not recorded. */
 export const RELATIONSHIP_RATING_VALUES = ["no", "somewhat", "yes"] as const
 export type RelationshipRating = (typeof RELATIONSHIP_RATING_VALUES)[number]
@@ -621,6 +766,13 @@ export type RelationshipRecord = {
   otherParentDetail: string
   linkedPartnerRecordId: string | null
   partnershipRecordId: string | null
+  /** Block this person sits in. Empty when they could not be placed. */
+  relationshipBlockId?: string | null
+  blockRole?: BlockRole | ""
+  /** Child type, sibling type, parent side, or caregiver relationship, depending on blockRole. */
+  blockRoleType?: string
+  /** Set by migration: unlinked_child or unplaced. Cleared when the person is moved. */
+  placementReview?: "" | "unlinked_child" | "unplaced"
 }
 
 export type PartnershipRecord = {
@@ -681,6 +833,8 @@ export type ClientBackgroundData = {
   reason: ReasonForAttending
   relationships: RelationshipRecord[]
   partnerships: PartnershipRecord[]
+  relationshipBlocks?: RelationshipBlock[]
+  blockAnswers?: RelationshipBlockAnswers
   events: EventRecord[]
   risk: RiskRatings
 }

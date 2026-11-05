@@ -4,6 +4,17 @@ import { revalidatePath } from "next/cache"
 
 import { requirePractitionerContext } from "@/lib/auth"
 import {
+  addBlockMember,
+  createRelationshipBlock,
+  deleteRelationshipBlock,
+  moveBlockMember,
+  removeBlockMember,
+  saveRelationshipStatusWithCurrentBlock,
+  setRelationshipBlockAnswer,
+  updateBlockMember,
+  updateRelationshipBlock,
+} from "@/lib/client-background/block-mutations"
+import {
   completeBackgroundInterview,
   createEvent,
   createRelationship,
@@ -26,7 +37,7 @@ import {
   updatePartnership,
   updateRelationshipDetail,
 } from "@/lib/client-background/mutations"
-import type { RelationshipRelink } from "@/lib/client-background/types"
+import type { BlockKind, BlockRole, RelationshipBlockAnswers, RelationshipRelink } from "@/lib/client-background/types"
 
 function refresh(clientId: string) {
   revalidatePath(`/clients/${clientId}/background`)
@@ -303,6 +314,98 @@ export async function updateEventAction(clientId: string, event: unknown) {
     event,
   })
   if (!result.error) refresh(clientId)
+  return result
+}
+
+function scope(clientId: string, context: { practiceId: string; userId: string }) {
+  return { clientId, practiceId: context.practiceId, userId: context.userId }
+}
+
+export async function saveRelationshipStatusBlockAction(clientId: string, relationshipStatus: unknown) {
+  const context = await requirePractitionerContext()
+  const result = await saveRelationshipStatusWithCurrentBlock({ ...scope(clientId, context), relationshipStatus })
+  if (result && !("error" in result && result.error)) refresh(clientId)
+  return result
+}
+
+export async function createRelationshipBlockAction(
+  clientId: string,
+  kind: BlockKind,
+  options?: { parentSide?: "mother" | "father" | ""; arrangementType?: string }
+) {
+  const context = await requirePractitionerContext()
+  const result = await createRelationshipBlock({ ...scope(clientId, context), kind, ...options })
+  if (result && !("error" in result && result.error)) refresh(clientId)
+  return result
+}
+
+export async function updateRelationshipBlockAction(clientId: string, block: unknown) {
+  const context = await requirePractitionerContext()
+  const result = await updateRelationshipBlock({ ...scope(clientId, context), block })
+  if (result && !("error" in result && result.error)) refresh(clientId)
+  return result
+}
+
+export async function deleteRelationshipBlockAction(clientId: string, relationshipBlockId: string) {
+  const context = await requirePractitionerContext()
+  const result = await deleteRelationshipBlock({ ...scope(clientId, context), relationshipBlockId })
+  if (result && !("error" in result && result.error)) refresh(clientId)
+  return result
+}
+
+export async function setRelationshipBlockAnswerAction(
+  clientId: string,
+  key: keyof RelationshipBlockAnswers,
+  value: string
+) {
+  const context = await requirePractitionerContext()
+  const result = await setRelationshipBlockAnswer({ ...scope(clientId, context), key, value })
+  if (result && !("error" in result && result.error)) refresh(clientId)
+  return result
+}
+
+export async function addBlockMemberAction(
+  clientId: string,
+  relationshipBlockId: string,
+  role: BlockRole,
+  roleType?: string
+) {
+  const context = await requirePractitionerContext()
+  const result = await addBlockMember({ ...scope(clientId, context), relationshipBlockId, role, roleType })
+  if (result && !("error" in result && result.error)) refresh(clientId)
+  return result
+}
+
+export async function updateBlockMemberAction(clientId: string, relationship: unknown) {
+  const context = await requirePractitionerContext()
+  const result = await updateBlockMember({ ...scope(clientId, context), relationship })
+  if (result && !("error" in result && result.error)) refresh(clientId)
+  return result
+}
+
+export async function removeBlockMemberAction(clientId: string, relationshipRecordId: string) {
+  const context = await requirePractitionerContext()
+  const result = await removeBlockMember({ ...scope(clientId, context), relationshipRecordId })
+  if (result && !("error" in result && result.error)) refresh(clientId)
+  return result
+}
+
+export async function moveBlockMemberAction(
+  clientId: string,
+  relationshipRecordId: string,
+  relationshipBlockId: string,
+  role: BlockRole,
+  roleType?: string
+) {
+  const context = await requirePractitionerContext()
+  const result = await moveBlockMember({
+    ...scope(clientId, context),
+    relationshipRecordId,
+    relationshipBlockId,
+    role,
+    roleType,
+  })
+  if (result && !("error" in result && result.error)) refresh(clientId)
   return result
 }
 

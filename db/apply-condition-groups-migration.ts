@@ -31,12 +31,11 @@ async function main() {
       event_type: string
       title: string | null
       about: string | null
-      attribution: string
       relationship_record_id: string | null
       about_other: string | null
     }>(
       `SELECT e.event_record_id, e.client_id, c.first_name, c.last_name, e.event_type, e.title,
-              e.about, e.attribution, e.relationship_record_id, e.about_other
+              e.about, e.relationship_record_id, e.about_other
          FROM client_event_records e
          JOIN clients c ON c.client_id = e.client_id
         WHERE e.condition_group_id IS NULL
@@ -51,7 +50,6 @@ async function main() {
           eventRecordId: row.event_record_id,
           title: row.title ?? "",
           about: row.about === "significant_other" ? "significant_other" : "self",
-          attribution: row.attribution === "family" || row.attribution === "self_linked" ? row.attribution : "self",
           relationshipRecordId: row.relationship_record_id,
           aboutOther: row.about_other ?? "",
         }

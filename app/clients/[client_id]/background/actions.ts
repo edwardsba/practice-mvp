@@ -17,15 +17,12 @@ import {
 import {
   completeBackgroundInterview,
   createEvent,
-  createRelationship,
   deleteEvent,
-  deleteRelationship,
   saveClientRelationshipStatus,
   saveDemographics,
   saveEducation,
   saveIdentity,
   saveLivingSituation,
-  saveMedication,
   saveOccupation,
   saveRisk,
   saveReasonForAttending,
@@ -33,11 +30,8 @@ import {
   saveInterviewScreening,
   startBackgroundInterview,
   updateEvent,
-  createParentsPartnership,
-  updatePartnership,
-  updateRelationshipDetail,
 } from "@/lib/client-background/mutations"
-import type { BlockKind, BlockRole, RelationshipBlockAnswers, RelationshipRelink } from "@/lib/client-background/types"
+import type { BlockKind, BlockRole, RelationshipBlockAnswers } from "@/lib/client-background/types"
 
 function refresh(clientId: string) {
   revalidatePath(`/clients/${clientId}/background`)
@@ -76,18 +70,6 @@ export async function saveEducationAction(clientId: string, education: unknown) 
     practiceId: context.practiceId,
     userId: context.userId,
     education,
-  })
-  if (!result.error) refresh(clientId)
-  return result
-}
-
-export async function saveMedicationAction(clientId: string, medication: unknown) {
-  const context = await requirePractitionerContext()
-  const result = await saveMedication({
-    clientId,
-    practiceId: context.practiceId,
-    userId: context.userId,
-    medication,
   })
   if (!result.error) refresh(clientId)
   return result
@@ -167,91 +149,6 @@ export async function saveRiskAction(clientId: string, risk: unknown) {
     practiceId: context.practiceId,
     userId: context.userId,
     risk,
-  })
-  if (!result.error) refresh(clientId)
-  return result
-}
-
-export async function createRelationshipAction(
-  clientId: string,
-  relationship: unknown,
-  associatedParentId?: string | null,
-  clientRelationshipStatus?: unknown
-) {
-  const context = await requirePractitionerContext()
-  const result = await createRelationship({
-    clientId,
-    practiceId: context.practiceId,
-    userId: context.userId,
-    relationship,
-    associatedParentId,
-    clientRelationshipStatus,
-  })
-  if (!result.error) refresh(clientId)
-  return result
-}
-
-export async function updateRelationshipAction(
-  clientId: string,
-  relationship: unknown,
-  partnerships: unknown,
-  options?: {
-    associatedParentId?: string | null
-    relink?: RelationshipRelink | null
-    clientRelationshipStatus?: unknown
-  }
-) {
-  const context = await requirePractitionerContext()
-  const result = await updateRelationshipDetail({
-    clientId,
-    practiceId: context.practiceId,
-    userId: context.userId,
-    relationship,
-    partnerships,
-    associatedParentId: options?.associatedParentId,
-    relink: options?.relink,
-    clientRelationshipStatus: options?.clientRelationshipStatus,
-  })
-  if (!result.error) refresh(clientId)
-  return result
-}
-
-export async function createParentsPartnershipAction(
-  clientId: string,
-  partnerAId: string,
-  partnerBId: string
-) {
-  const context = await requirePractitionerContext()
-  const result = await createParentsPartnership({
-    clientId,
-    practiceId: context.practiceId,
-    userId: context.userId,
-    partnerAId,
-    partnerBId,
-  })
-  if (!result.error) refresh(clientId)
-  return result
-}
-
-export async function updatePartnershipAction(clientId: string, partnership: unknown) {
-  const context = await requirePractitionerContext()
-  const result = await updatePartnership({
-    clientId,
-    practiceId: context.practiceId,
-    userId: context.userId,
-    partnership,
-  })
-  if (!result.error) refresh(clientId)
-  return result
-}
-
-export async function deleteRelationshipAction(clientId: string, relationshipRecordId: string) {
-  const context = await requirePractitionerContext()
-  const result = await deleteRelationship({
-    clientId,
-    practiceId: context.practiceId,
-    userId: context.userId,
-    relationshipRecordId,
   })
   if (!result.error) refresh(clientId)
   return result

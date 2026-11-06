@@ -1,22 +1,14 @@
-import { HOW_ENDED, mapHowEnded, type HowEnded } from "@/lib/client-background/how-ended"
-import { LATER_RELATIONSHIPS, type LaterRelationships } from "@/lib/client-background/later-relationships"
 import {
   ADMISSION_TYPES,
   BLOCK_ROLES,
   CHILD_TYPES,
   HISTORY_ABOUT,
-  ATTRIBUTIONS,
   CAREGIVER_RELATIONSHIPS,
   DEPENDENCY_VALUES,
   EVENT_TYPES,
-  FAMILY_SIDES,
   HEALTH_STATUSES,
   isOneOf,
   NECESSITY_KEYS,
-  OTHER_PARENT_KINDS,
-  PARENT_TYPES,
-  PARTNER_TYPES,
-  PARTNERSHIP_STATUSES,
   RATED_FACTOR_KEYS,
   RATED_VALUES,
   RELATIONSHIP_TO_CLIENT,
@@ -40,14 +32,12 @@ import {
   emptyEvent,
   emptyIdentity,
   emptyLivingSituation,
-  emptyMedication,
   emptyStressors,
   emptyNecessities,
   emptyOccupation,
   emptyRisk,
   type AdmissionType,
   type BlockRole,
-  type Attribution,
   type CaregiverRelationship,
   type ClientRelationshipStatus,
   type ClientRelationshipStatusValue,
@@ -56,26 +46,18 @@ import {
   type EducationFields,
   type EventRecord,
   type EventType,
-  type FamilySide,
   type HealthStatus,
   type IdentityFields,
   type LivesWith,
   type LivingSituationFields,
-  type MedicationRecord,
   type OccupationFields,
   type ReasonForAttending,
   type StressorsRecord,
   type TriStateAnswer,
-  type WillingnessAnswer,
   type RelationshipRating,
   type WorkStatus,
-  type OtherParentKind,
   type ChildType,
   type HistoryAbout,
-  type ParentType,
-  type PartnerType,
-  type PartnershipRecord,
-  type PartnershipStatus,
   type PreviousJob,
   type RatedValue,
   type RelationshipRecord,
@@ -295,24 +277,11 @@ function triState(value: unknown): TriStateAnswer | null {
   return value === "yes" || value === "no" || value === "not_asked" ? value : null
 }
 
-function willingness(value: unknown): WillingnessAnswer | null {
-  return value === "yes" || value === "somewhat" || value === "no" || value === "not_asked" ? value : null
-}
-
 const PROFESSIONAL_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 function professionalId(value: unknown): string | null {
   const text = str(value)
   return PROFESSIONAL_ID.test(text) ? text : null
-}
-
-export function sanitizeMedication(value: unknown): MedicationRecord {
-  const raw = isRecord(value) ? value : {}
-  return {
-    currentlyTaking: triState(raw.currentlyTaking),
-    previouslyTaken: triState(raw.previouslyTaken),
-    supervisedBy: str(raw.supervisedBy),
-  }
 }
 
 export function sanitizeStressors(value: unknown): StressorsRecord {
@@ -328,16 +297,11 @@ export function sanitizeStressors(value: unknown): StressorsRecord {
 function referralTypeOf(raw: Record<string, unknown>): ReasonForAttending["referralType"] {
   const explicit = str(raw.referralType)
   if (explicit === "medical" || explicit === "family_or_friend" || explicit === "self") return explicit
-  if (triState(raw.referredByMedicalProfessional) === "yes") return "medical"
-  if (triState(raw.familyInvolved) === "yes") return "family_or_friend"
-  if (triState(raw.ownInitiative) === "yes") return "self"
   return ""
 }
 
 export function sanitizeReasonForAttending(value: unknown): ReasonForAttending {
   const raw = isRecord(value) ? value : {}
-  const referredByMedicalProfessional = triState(raw.referredByMedicalProfessional)
-  const familyInvolved = triState(raw.familyInvolved)
   const referralType = referralTypeOf(raw)
   const medical = referralType === "medical"
   const family = referralType === "family_or_friend"
@@ -351,15 +315,7 @@ export function sanitizeReasonForAttending(value: unknown): ReasonForAttending {
     referrerRelationshipId,
     referrerIsOther,
     referrerOther: referrerIsOther ? str(raw.referrerOther) : "",
-    theirConcerns: family
-      ? str(raw.theirConcerns) || (str(raw.referralType) ? "" : str(raw.familyInvolvement))
-      : "",
-    referredByMedicalProfessional,
-    familyInvolved,
-    familyInvolvement: familyInvolved === "yes" ? str(raw.familyInvolvement) : "",
-    ownInitiative: triState(raw.ownInitiative),
-    attendedWillingly: willingness(raw.attendedWillingly),
-    clientMotivation: str(raw.clientMotivation),
+    theirConcerns: family ? str(raw.theirConcerns) : "",
   }
 }
 
@@ -368,12 +324,8 @@ export function markUnansweredReason(reason: ReasonForAttending): { reason: Reas
   return { reason, changed: false }
 }
 
-export function markUnansweredMedicationAndStressors(
-  medication: MedicationRecord,
-  stressors: StressorsRecord
-): { medication: MedicationRecord; stressors: StressorsRecord; changed: boolean } {
+export function markUnansweredStressors(stressors: StressorsRecord): { stressors: StressorsRecord; changed: boolean } {
   let changed = false
-  const nextMedication = { ...medication }
   const nextStressors = { ...stressors }
   for (const item of STRESSOR_ITEMS) {
     if (nextStressors[item.key] == null) {
@@ -381,7 +333,7 @@ export function markUnansweredMedicationAndStressors(
       changed = true
     }
   }
-  return { medication: nextMedication, stressors: nextStressors, changed }
+  return { stressors: nextStressors, changed }
 }
 
 export function sanitizeDemographics(value: unknown): Demographics {
@@ -503,13 +455,8 @@ export function sanitizeRelationship(value: unknown, fallbackId = ""): Relations
     ageAtDeath: deceased ? intOrNull(raw.ageAtDeath) : null,
     dateOfDeath: deceased ? canonicalPartialDate(str(raw.dateOfDeath)) : "",
     healthOrCauseOfDeath: deceased ? str(raw.healthOrCauseOfDeath) : "",
-    lengthOfRelationship: str(raw.lengthOfRelationship),
-    relationshipStatus: str(raw.relationshipStatus),
-    howEnded: oneOf<HowEnded>(raw.howEnded, HOW_ENDED),
-    laterRelationships: oneOf<LaterRelationships>(raw.laterRelationships, LATER_RELATIONSHIPS),
     childType: oneOf<ChildType>(raw.childType, CHILD_TYPES),
     childTypeDetail: str(raw.childTypeDetail),
-    timeSinceEnded: str(raw.timeSinceEnded),
     supportive: oneOf<RelationshipRating>(raw.supportive, RELATIONSHIP_RATING_VALUES),
     conflict: oneOf<RelationshipRating>(raw.conflict, RELATIONSHIP_RATING_VALUES),
     qualityOfRelationship: str(raw.qualityOfRelationship),
@@ -517,25 +464,12 @@ export function sanitizeRelationship(value: unknown, fallbackId = ""): Relations
     livingSituation: normalizeLivingSituation(raw.livingSituation),
     caregiverRelationship: str(raw.caregiverRelationship),
     caregiverRelationshipDetail: str(raw.caregiverRelationshipDetail),
-    startedOn: canonicalPartialDate(str(raw.startedOn)),
-    endedOn: canonicalPartialDate(str(raw.endedOn)),
-    partnerType: oneOf<PartnerType>(raw.partnerType, PARTNER_TYPES),
-    parentType: oneOf<ParentType>(raw.parentType, PARENT_TYPES),
-    adoptedOn: canonicalPartialDate(str(raw.adoptedOn)),
     notKnown: bool(raw.notKnown),
-    otherParentKind: oneOf<OtherParentKind>(raw.otherParentKind, OTHER_PARENT_KINDS),
-    otherParentDetail: str(raw.otherParentDetail),
-    linkedPartnerRecordId: str(raw.linkedPartnerRecordId) || null,
-    partnershipRecordId: str(raw.partnershipRecordId) || null,
     relationshipBlockId: str(raw.relationshipBlockId) || null,
     blockRole: oneOf<BlockRole>(raw.blockRole, BLOCK_ROLES),
     blockRoleType: str(raw.blockRoleType),
     placementReview:
       raw.placementReview === "unlinked_child" || raw.placementReview === "unplaced" ? raw.placementReview : "",
-  }
-  if (!record.howEnded && record.relationshipStatus) {
-    const mapped = mapHowEnded(record.relationshipStatus)
-    record.howEnded = mapped.howEnded
   }
   const caregiver = normalizeCaregiverRelationship(record.caregiverRelationship, record.caregiverRelationshipDetail)
   record.caregiverRelationship = caregiver.kind
@@ -546,19 +480,6 @@ export function sanitizeRelationship(value: unknown, fallbackId = ""): Relations
     record.healthOrCauseOfDeath = ""
   }
   return applyRelationshipVisibilityDefaults(record)
-}
-
-export function sanitizePartnership(value: unknown, fallbackId = ""): PartnershipRecord {
-  const raw = isRecord(value) ? value : {}
-  return {
-    partnershipRecordId: str(raw.partnershipRecordId) || fallbackId,
-    partnerAId: str(raw.partnerAId),
-    partnerBId: str(raw.partnerBId),
-    relationshipStatus: oneOf<PartnershipStatus>(raw.relationshipStatus, PARTNERSHIP_STATUSES),
-    started: canonicalPartialDate(str(raw.started)),
-    ended: canonicalPartialDate(str(raw.ended)),
-    qualityOfRelationship: str(raw.qualityOfRelationship),
-  }
 }
 
 function sanitizePrecision(value: unknown): StartPrecision | "" {
@@ -589,19 +510,12 @@ export function sanitizeEvent(value: unknown, fallbackId = ""): EventRecord {
   let resolvedOrOngoing = oneOf<ResolvedOrOngoing>(raw.resolvedOrOngoing, RESOLVED_OR_ONGOING)
   if (!resolvedOrOngoing && bool(raw.endOngoing)) resolvedOrOngoing = "ongoing"
   const ongoing = resolvedOrOngoing === "ongoing"
-  const storedAttribution = oneOf<Attribution>(raw.attribution, ATTRIBUTIONS)
-  const legacyOther = storedAttribution === "family" || storedAttribution === "self_linked" || eventType === "family_events"
   const about: HistoryAbout =
-    oneOf<HistoryAbout>(raw.about, HISTORY_ABOUT) === "significant_other" || legacyOther
+    oneOf<HistoryAbout>(raw.about, HISTORY_ABOUT) === "significant_other" || eventType === "family_events"
       ? "significant_other"
       : "self"
   const relationshipRecordId = about === "significant_other" ? str(raw.relationshipRecordId) || null : null
-  const aboutOther =
-    about === "significant_other" && !relationshipRecordId
-      ? str(raw.aboutOther) || str(raw.familyRelation)
-      : ""
-  const attribution: Attribution =
-    about === "self" ? "self" : relationshipRecordId ? "self_linked" : "family"
+  const aboutOther = about === "significant_other" && !relationshipRecordId ? str(raw.aboutOther) : ""
 
   const event: EventRecord = {
     ...base,
@@ -618,11 +532,8 @@ export function sanitizeEvent(value: unknown, fallbackId = ""): EventRecord {
     treatmentType: treated === true ? str(raw.treatmentType) : "",
     treatmentDetail: treated === true ? str(raw.treatmentDetail) : "",
     outcome: treated === true ? str(raw.outcome) : "",
-    attribution,
     about,
     aboutOther,
-    familyRelation: attribution === "family" ? str(raw.familyRelation) || aboutOther : "",
-    familySide: attribution === "family" ? oneOf<FamilySide>(raw.familySide, FAMILY_SIDES) : "",
     relationshipRecordId,
     conditionEventId: str(raw.conditionEventId) || null,
     conditionGroupId: str(raw.conditionGroupId) || null,

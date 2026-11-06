@@ -38,7 +38,6 @@ import type { ScreeningAnswers } from "@/lib/client-background/interview-history
 import type {
   ClientBackgroundData,
   EventRecord,
-  MedicationRecord,
   RelationshipRecord,
   StressorsRecord,
 } from "@/lib/client-background/types"
@@ -72,13 +71,11 @@ export function InterviewPage({
   reasonSupport: ReasonSupport
 }) {
   const router = useRouter()
-  const medicationRef = useRef(data.medication)
   const identityRef = useRef(data.demographics.identity)
   const occupationRef = useRef(data.demographics.occupation)
   const livingRef = useRef(data.demographics.livingSituation)
   const reasonRef = useRef(data.reason)
   const relationshipsRef = useRef(data.relationships)
-  const partnershipsRef = useRef(data.partnerships)
   const statusRef = useRef(data.relationshipStatus)
   const suggestionDismissed = useRef(false)
   const pendingCheck = useRef<BackgroundCheck | null>(null)
@@ -132,14 +129,12 @@ export function InterviewPage({
       screening: ScreeningAnswers
       events: EventRecord[]
       stressors: StressorsRecord
-      medication: MedicationRecord
     }) =>
       backgroundChecks({
         data: {
           ...data,
           relationshipStatus: statusRef.current,
           relationships: relationshipsRef.current,
-          partnerships: partnershipsRef.current,
           relationshipBlocks: blocksRef.current,
           blockAnswers: answersRef.current,
           demographics: {
@@ -148,7 +143,6 @@ export function InterviewPage({
             livingSituation: livingRef.current,
             occupation: occupationRef.current,
           },
-          medication: current.medication,
           stressors: current.stressors,
           events: current.events,
           reason: reasonRef.current,
@@ -458,7 +452,6 @@ export function InterviewPage({
           events={data.events}
           relationships={relationships}
           screening={screening}
-          medicationRef={medicationRef}
           reasonRef={reasonRef}
           stressors={data.stressors}
           selfReportId={selfReport?.resultId ?? null}

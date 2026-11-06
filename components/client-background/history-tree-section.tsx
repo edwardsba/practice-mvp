@@ -94,7 +94,6 @@ export function HistoryTreeSection({
       ...emptyEvent("emotional_problems", 0),
       eventRecordId: "",
       about,
-      attribution: about === "significant_other" ? "family" : "self",
     })
     setMode("edit")
     setIsNew(true)
@@ -107,10 +106,8 @@ export function HistoryTreeSection({
       ...emptyEvent("psychiatric_admission", 0),
       eventRecordId: "",
       about: condition.about,
-      attribution: condition.attribution,
       relationshipRecordId: condition.relationshipRecordId,
       aboutOther: condition.aboutOther,
-      familyRelation: condition.familyRelation,
       conditionEventId: condition.eventRecordId,
     })
     setMode("edit")

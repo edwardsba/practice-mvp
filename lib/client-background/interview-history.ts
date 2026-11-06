@@ -2,7 +2,6 @@ import {
   STRESSOR_ITEMS,
   type EventRecord,
   type EventType,
-  type MedicationRecord,
   type ReasonForAttending,
   type StressorsRecord,
 } from "@/lib/client-background/types"
@@ -52,7 +51,6 @@ type QuestionDefinition = {
   key: HistoryQuestionKey
   label: string
   eventType: EventType | null
-  attribution: "self" | "family" | null
   about: "self" | "significant_other"
 }
 
@@ -63,105 +61,90 @@ export const HISTORY_QUESTIONS: Record<HistoryQuestionKey, QuestionDefinition> =
     key: "emotional_problems",
     label: "Emotional problems",
     eventType: "emotional_problems",
-    attribution: "self",
     about: "self",
   },
   self_harm: {
     key: "self_harm",
     label: "Self-harm",
     eventType: "self_harm",
-    attribution: "self",
     about: "self",
   },
   substance_use: {
     key: "substance_use",
     label: "Substance use",
     eventType: "substance_use",
-    attribution: "self",
     about: "self",
   },
   psychiatric_admission: {
     key: "psychiatric_admission",
     label: "Hospital admission",
     eventType: "psychiatric_admission",
-    attribution: "self",
     about: "self",
   },
   previous_therapy: {
     key: "previous_therapy",
     label: "Previous therapy",
     eventType: "previous_therapy",
-    attribution: "self",
     about: "self",
   },
   illness_injury: {
     key: "illness_injury",
     label: "Illness / injury",
     eventType: "illness_injury",
-    attribution: "self",
     about: "self",
   },
   traumatic_events: {
     key: "traumatic_events",
     label: "Traumatic events",
     eventType: "traumatic_event",
-    attribution: "self",
     about: "self",
   },
   medication_history: {
     key: "medication_history",
     label: "Medication",
     eventType: "medication",
-    attribution: "self",
     about: "self",
   },
   other_significant_events: {
     key: "other_significant_events",
     label: "Other significant events",
     eventType: "significant_history",
-    attribution: "self",
     about: "self",
   },
   family_emotional_problems: {
     key: "family_emotional_problems",
     label: "Emotional problems",
     eventType: "emotional_problems",
-    attribution: "family",
     about: "significant_other",
   },
   family_self_harm: {
     key: "family_self_harm",
     label: "Self-harm",
     eventType: "self_harm",
-    attribution: "family",
     about: "significant_other",
   },
   family_substance_use: {
     key: "family_substance_use",
     label: "Substance use",
     eventType: "substance_use",
-    attribution: "family",
     about: "significant_other",
   },
   family_psychiatric_admission: {
     key: "family_psychiatric_admission",
     label: "Hospital admission",
     eventType: "psychiatric_admission",
-    attribution: "family",
     about: "significant_other",
   },
   family_illness: {
     key: "family_illness",
     label: "Illness / injury",
     eventType: "illness_injury",
-    attribution: "family",
     about: "significant_other",
   },
   family_significant_events: {
     key: "family_significant_events",
     label: "Significant events",
     eventType: "significant_history",
-    attribution: "family",
     about: "significant_other",
   },
 }
@@ -185,14 +168,9 @@ const FAMILY_QUESTION: Partial<Record<EventType, HistoryQuestionKey>> = {
   illness_injury: "family_illness",
 }
 
-/**
- * Legacy rows stored a family member on attribution. An explicit significant-other
- * About wins when attribution is still self.
- */
-export function resolvedAbout(event: { attribution?: string; about?: string }): "self" | "significant_other" {
-  if (event.attribution && event.attribution !== "self") return "significant_other"
-  if (event.about === "significant_other") return "significant_other"
-  return "self"
+/** About is Self unless the entry says Significant other. */
+export function resolvedAbout(event: { about?: string }): "self" | "significant_other" {
+  return event.about === "significant_other" ? "significant_other" : "self"
 }
 
 /** Worth-checking text. Significant others keeps its group name so the two Hospital admission rows stay distinct. */
@@ -208,7 +186,7 @@ export function historyQuestionCheckLabel(key: HistoryQuestionKey): string {
  * A significant-other type with no heading of its own lands on Significant events.
  */
 export function historyQuestionKeyForEvent(
-  event: Pick<EventRecord, "eventType" | "attribution" | "startPrecision" | "startValue"> & {
+  event: Pick<EventRecord, "eventType" | "startPrecision" | "startValue"> & {
     about?: string
   },
   _dateOfBirth: string | null
@@ -261,7 +239,7 @@ export function backgroundInterviewSourceLine(source: BackgroundInterviewAnswerS
 
 export function screeningAnsweredCount(
   screening: ScreeningAnswers,
-  events: Pick<EventRecord, "eventType" | "attribution" | "startPrecision" | "startValue">[],
+  events: Pick<EventRecord, "eventType" | "startPrecision" | "startValue">[],
   dateOfBirth: string | null
 ): number {
   const withEntries = new Set(events.map((event) => historyQuestionKeyForEvent(event, dateOfBirth)))
@@ -270,7 +248,7 @@ export function screeningAnsweredCount(
 
 export function finalScreeningAnswers(
   screening: ScreeningAnswers,
-  events: Pick<EventRecord, "eventType" | "attribution" | "startPrecision" | "startValue">[],
+  events: Pick<EventRecord, "eventType" | "startPrecision" | "startValue">[],
   dateOfBirth: string | null
 ): Record<ScreeningQuestionKey, ScreeningAnswer> {
   const withEntries = new Set(events.map((event) => historyQuestionKeyForEvent(event, dateOfBirth)))
@@ -284,9 +262,8 @@ export function finalScreeningAnswers(
 
 export function unansweredQuestionLabels(
   screening: ScreeningAnswers,
-  events: Pick<EventRecord, "eventType" | "attribution" | "startPrecision" | "startValue">[],
-  dateOfBirth: string | null,
-  _medication: MedicationRecord
+  events: Pick<EventRecord, "eventType" | "startPrecision" | "startValue">[],
+  dateOfBirth: string | null
 ): string[] {
   const withEntries = new Set(events.map((event) => historyQuestionKeyForEvent(event, dateOfBirth)))
   return HISTORY_QUESTION_KEYS.filter((key) => !withEntries.has(key) && screening[key] == null).map(
@@ -301,14 +278,13 @@ function unansweredReasonLabels(reason: ReasonForAttending): string[] {
 /** Unanswered items in page order: Referral, then the rest of Background, then History, then Stressors. */
 export function unansweredInterviewLabels(
   screening: ScreeningAnswers,
-  events: Pick<EventRecord, "eventType" | "attribution" | "startPrecision" | "startValue">[],
+  events: Pick<EventRecord, "eventType" | "startPrecision" | "startValue">[],
   dateOfBirth: string | null,
-  medication: MedicationRecord,
   stressors: StressorsRecord,
   reason: ReasonForAttending
 ): string[] {
   const labels: string[] = unansweredReasonLabels(reason)
-  labels.push(...unansweredQuestionLabels(screening, events, dateOfBirth, medication))
+  labels.push(...unansweredQuestionLabels(screening, events, dateOfBirth))
   for (const item of STRESSOR_ITEMS) {
     if (stressors[item.key] == null) labels.push(item.label)
   }
@@ -318,14 +294,13 @@ export function unansweredInterviewLabels(
 /** Answered items, counted the same way {@link unansweredInterviewLabels} leaves gaps. */
 export function answeredInterviewCount(
   screening: ScreeningAnswers,
-  events: Pick<EventRecord, "eventType" | "attribution" | "startPrecision" | "startValue">[],
+  events: Pick<EventRecord, "eventType" | "startPrecision" | "startValue">[],
   dateOfBirth: string | null,
-  medication: MedicationRecord,
   stressors: StressorsRecord,
   reason: ReasonForAttending
 ): number {
   return (
     INTERVIEW_ANSWER_TOTAL -
-    unansweredInterviewLabels(screening, events, dateOfBirth, medication, stressors, reason).length
+    unansweredInterviewLabels(screening, events, dateOfBirth, stressors, reason).length
   )
 }

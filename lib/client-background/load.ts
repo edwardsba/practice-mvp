@@ -9,7 +9,6 @@ import {
   clientBackgroundInterviews,
   clientBackgrounds,
   clientEventRecords,
-  clientPartnershipRecords,
   clientRelationshipBlocks,
   clientRelationshipRecords,
   clients,
@@ -28,10 +27,9 @@ import {
   sanitizeScreening,
   type BackgroundInterviewAnswerSource,
 } from "@/lib/client-background/interview-history"
-import { toBlockAnswers, toClientRelationshipStatus, toEvent, toPartnership, toRelationship, toRelationshipBlock } from "@/lib/client-background/map"
+import { toBlockAnswers, toClientRelationshipStatus, toEvent, toRelationship, toRelationshipBlock } from "@/lib/client-background/map"
 import {
   demographicsFromStored,
-  sanitizeMedication,
   sanitizeReasonForAttending,
   sanitizeRisk,
   sanitizeStressors,
@@ -45,12 +43,10 @@ import {
 import {
   emptyDemographics,
   emptyClientRelationshipStatus,
-  emptyMedication,
   emptyReasonForAttending,
   emptyRisk,
   emptyStressors,
   type ClientBackgroundData,
-  type MedicationRecord,
 } from "@/lib/client-background/types"
 
 async function clientInPractice(clientId: string, practiceId: string) {
@@ -101,16 +97,6 @@ export async function loadClientBackground(
     )
     .orderBy(asc(clientRelationshipRecords.displayOrder))
 
-  const partnershipRows = await db
-    .select()
-    .from(clientPartnershipRecords)
-    .where(
-      and(
-        eq(clientPartnershipRecords.clientId, clientId),
-        eq(clientPartnershipRecords.practiceId, practiceId)
-      )
-    )
-
   const blockRows = await db
     .select()
     .from(clientRelationshipBlocks)
@@ -144,11 +130,9 @@ export async function loadClientBackground(
     demographics: background
       ? demographicsFromStored(background)
       : emptyDemographics(),
-    medication: background ? sanitizeMedication(background.medicationJson) : emptyMedication(),
     stressors: background ? sanitizeStressors(background.stressorsJson) : emptyStressors(),
     reason: background ? sanitizeReasonForAttending(background.reasonForAttendingJson) : emptyReasonForAttending(),
     relationships: relationshipRows.map(toRelationship),
-    partnerships: partnershipRows.map(toPartnership),
     relationshipBlocks: blockRows.map(toRelationshipBlock),
     blockAnswers: toBlockAnswers(background ?? null),
     events: eventRows.map((row) => settleEventDates(toEvent(row), client.dateOfBirth)),
@@ -254,14 +238,12 @@ export async function loadBackgroundInterviewCard(
 
   const [background] = await db
     .select({
-      medicationJson: clientBackgrounds.medicationJson,
       stressorsJson: clientBackgrounds.stressorsJson,
       reasonForAttendingJson: clientBackgrounds.reasonForAttendingJson,
     })
     .from(clientBackgrounds)
     .where(and(eq(clientBackgrounds.clientId, clientId), eq(clientBackgrounds.practiceId, practiceId)))
     .limit(1)
-  const medication = sanitizeMedication(background?.medicationJson)
   const stressors = sanitizeStressors(background?.stressorsJson)
   const reason = sanitizeReasonForAttending(background?.reasonForAttendingJson)
 
@@ -279,7 +261,6 @@ export async function loadBackgroundInterviewCard(
             sanitizeScreening(inProgress.screeningJson),
             events,
             client.dateOfBirth,
-            medication,
             stressors,
             reason
           ),
@@ -328,20 +309,6 @@ export async function loadInProgressInterview(clientId: string, practiceId: stri
     .limit(1)
   if (!row) return null
   return { interviewId: row.interviewId, screening: sanitizeScreening(row.screeningJson) }
-}
-
-export async function loadMedicationRecord(
-  clientId: string,
-  practiceId: string
-): Promise<MedicationRecord | null> {
-  const client = await clientInPractice(clientId, practiceId)
-  if (!client) return null
-  const [background] = await db
-    .select({ medicationJson: clientBackgrounds.medicationJson })
-    .from(clientBackgrounds)
-    .where(and(eq(clientBackgrounds.clientId, clientId), eq(clientBackgrounds.practiceId, practiceId)))
-    .limit(1)
-  return sanitizeMedication(background?.medicationJson)
 }
 
 /** The client's most recent BACKGROUND_SR result, or null when they have none. */

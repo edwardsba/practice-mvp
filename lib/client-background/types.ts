@@ -1,6 +1,3 @@
-import type { HowEnded } from "@/lib/client-background/how-ended"
-import type { LaterRelationships } from "@/lib/client-background/later-relationships"
-
 export const RELATIONSHIP_TO_CLIENT = [
   "mother",
   "father",
@@ -45,16 +42,6 @@ export const DEPENDENCY_VALUES = [
 ] as const
 export type DependencyValue = (typeof DEPENDENCY_VALUES)[number]
 
-export const PARTNERSHIP_STATUSES = [
-  "married",
-  "defacto",
-  "separated",
-  "divorced",
-  "widowed",
-  "never_formalised",
-] as const
-export type PartnershipStatus = (typeof PARTNERSHIP_STATUSES)[number]
-
 export const EVENT_TYPES = [
   "self_harm",
   "illness_injury",
@@ -74,24 +61,6 @@ export type StartPrecision = (typeof START_PRECISIONS)[number]
 
 export const RESOLVED_OR_ONGOING = ["ongoing", "resolved"] as const
 export type ResolvedOrOngoing = (typeof RESOLVED_OR_ONGOING)[number]
-
-export const ATTRIBUTIONS = ["self", "family", "self_linked"] as const
-export type Attribution = (typeof ATTRIBUTIONS)[number]
-
-export const FAMILY_SIDES = ["maternal", "paternal", "unspecified"] as const
-export type FamilySide = (typeof FAMILY_SIDES)[number]
-
-export const FAMILY_RELATION_PICKS = [
-  "Mother",
-  "Father",
-  "Sibling",
-  "Grandmother",
-  "Grandfather",
-  "Aunt",
-  "Uncle",
-  "Cousin",
-  "Other",
-] as const
 
 export const SELF_HARM_TYPES = ["non_lethal", "potentially_lethal"] as const
 export type SelfHarmType = (typeof SELF_HARM_TYPES)[number]
@@ -125,35 +94,6 @@ export const DEPENDENCY_LABELS: Record<DependencyValue, string> = {
   mutual: "Mutual",
 }
 
-export const PARTNERSHIP_STATUS_LABELS: Record<PartnershipStatus, string> = {
-  married: "Married",
-  defacto: "De facto",
-  separated: "Separated",
-  divorced: "Divorced",
-  widowed: "Widowed",
-  never_formalised: "Never formalised",
-}
-
-/** Prior partner relationship type. The current partner's type is the client's relationship status. */
-export const PARTNER_TYPES = ["married", "defacto", "engaged", "dating", "other"] as const
-export type PartnerType = (typeof PARTNER_TYPES)[number]
-
-export const PARTNER_TYPE_LABELS: Record<PartnerType, string> = {
-  married: "Married",
-  defacto: "De facto",
-  engaged: "Engaged",
-  dating: "Dating",
-  other: "Other",
-}
-
-export const PARENT_TYPES = ["biological", "adoptive"] as const
-export type ParentType = (typeof PARENT_TYPES)[number]
-
-export const PARENT_TYPE_LABELS: Record<ParentType, string> = {
-  biological: "Biological",
-  adoptive: "Adoptive",
-}
-
 export const CHILD_TYPES = ["biological", "adopted", "step_child", "foster", "other"] as const
 export type ChildType = (typeof CHILD_TYPES)[number]
 
@@ -167,16 +107,6 @@ export const CHILD_TYPE_LABELS: Record<ChildType, string> = {
 
 export const HISTORY_ABOUT = ["self", "significant_other"] as const
 export type HistoryAbout = (typeof HISTORY_ABOUT)[number]
-
-/** Biological child whose other parent is not one of the recorded partners. */
-export const OTHER_PARENT_KINDS = ["donor_conception", "adopted_sole", "other"] as const
-export type OtherParentKind = (typeof OTHER_PARENT_KINDS)[number]
-
-export const OTHER_PARENT_KIND_LABELS: Record<OtherParentKind, string> = {
-  donor_conception: "Donor conception",
-  adopted_sole: "Adopted as a sole parent",
-  other: "Other",
-}
 
 export const CAREGIVER_RELATIONSHIPS = [
   "grandparent",
@@ -252,12 +182,6 @@ export const SUBSTANCE_STATUS_LABELS: Record<SubstanceStatus, string> = {
   active: "Active use",
   in_recovery: "In recovery",
   abstinent: "Abstinent since",
-}
-
-export const FAMILY_SIDE_LABELS: Record<FamilySide, string> = {
-  maternal: "Maternal",
-  paternal: "Paternal",
-  unspecified: "Unspecified",
 }
 
 export const RATED_VALUE_LABELS: Record<RatedValue, string> = {
@@ -676,16 +600,6 @@ export type NecessityAccess = Record<NecessityKey, boolean>
 export const TRI_STATE_ANSWERS = ["yes", "no", "not_asked"] as const
 export type TriStateAnswer = (typeof TRI_STATE_ANSWERS)[number]
 
-/** Attended willingly. Somewhat is only used here. */
-export const WILLINGNESS_ANSWERS = ["yes", "somewhat", "no", "not_asked"] as const
-export type WillingnessAnswer = (typeof WILLINGNESS_ANSWERS)[number]
-
-export type MedicationRecord = {
-  currentlyTaking: TriStateAnswer | null
-  previouslyTaken: TriStateAnswer | null
-  supervisedBy: string
-}
-
 /** Form labels stay as the client sees them. reportNoun is the noun after "difficulties with". */
 export const STRESSOR_ITEMS = [
   { key: "family", label: "Family", reportNoun: "family" },
@@ -714,10 +628,7 @@ export const REFERRAL_TYPE_LABELS: Record<ReferralType, string> = {
   self: "Self-referral",
 }
 
-/**
- * Why the client came. The old Yes/No answers stay on the record and are not edited.
- * Referral type decides which of the new fields are kept.
- */
+/** Why the client came. Referral type decides which fields are kept. */
 export type ReasonForAttending = {
   referralType: ReferralType | ""
   /** professionals.professional_id in the same practice, or null. */
@@ -731,12 +642,6 @@ export type ReasonForAttending = {
   referrerIsOther: boolean
   referrerOther: string
   theirConcerns: string
-  referredByMedicalProfessional: TriStateAnswer | null
-  familyInvolved: TriStateAnswer | null
-  familyInvolvement: string
-  ownInitiative: TriStateAnswer | null
-  attendedWillingly: WillingnessAnswer | null
-  clientMotivation: string
 }
 
 export type OccupationFields = {
@@ -774,18 +679,10 @@ export type RelationshipRecord = {
   /** Partial date: YYYY, YYYY-MM, or YYYY-MM-DD. Cleared unless the person is deceased. */
   dateOfDeath: string
   healthOrCauseOfDeath: string
-  lengthOfRelationship: string
-  /** Prior partner: free text kept for Other (describe), and for values mapped before howEnded existed. */
-  relationshipStatus: string
-  /** Prior partner: Separated, Divorced, Partner died, or Other. */
-  howEnded: HowEnded | ""
-  /** Parent records: Yes, None, or Not asked. */
-  laterRelationships: LaterRelationships | ""
   /** Child records. Blank is worth checking. */
   childType: ChildType | ""
   /** Description when child type is Other. */
   childTypeDetail: string
-  timeSinceEnded: string
   supportive: RelationshipRating | ""
   conflict: RelationshipRating | ""
   /** Free-text comment under the supportive and conflict ratings. */
@@ -796,23 +693,8 @@ export type RelationshipRecord = {
   caregiverRelationship: string
   /** Description when the caregiver relationship is Other. */
   caregiverRelationshipDetail: string
-  /** Partial date. Partner start, or the date care began. */
-  startedOn: string
-  /** Partial date. Partner end, or the date care ended. */
-  endedOn: string
-  /** Prior partner relationship type. Cleared for every other role. */
-  partnerType: PartnerType | ""
-  /** Biological or adoptive. Used on parent records. */
-  parentType: ParentType | ""
-  /** Partial date an adoptive parent adopted the client. */
-  adoptedOn: string
   /** Parent is not known. Other fields stay stored and are hidden. */
   notKnown: boolean
-  /** Set when a biological child's other parent is not a recorded partner. */
-  otherParentKind: OtherParentKind | ""
-  otherParentDetail: string
-  linkedPartnerRecordId: string | null
-  partnershipRecordId: string | null
   /** Block this person sits in. Empty when they could not be placed. */
   relationshipBlockId?: string | null
   blockRole?: BlockRole | ""
@@ -820,16 +702,6 @@ export type RelationshipRecord = {
   blockRoleType?: string
   /** Set by migration: unlinked_child or unplaced. Cleared when the person is moved. */
   placementReview?: "" | "unlinked_child" | "unplaced"
-}
-
-export type PartnershipRecord = {
-  partnershipRecordId: string
-  partnerAId: string
-  partnerBId: string
-  relationshipStatus: PartnershipStatus | ""
-  started: string
-  ended: string
-  qualityOfRelationship: string
 }
 
 export type EventRecord = {
@@ -847,13 +719,10 @@ export type EventRecord = {
   treatmentType: string
   treatmentDetail: string
   outcome: string
-  attribution: Attribution
   /** Self, or a significant other. */
   about: HistoryAbout
   /** Who, when the significant other is not a recorded person. */
   aboutOther: string
-  familyRelation: string
-  familySide: FamilySide | ""
   relationshipRecordId: string | null
   /** Treatment entries: the condition entry this treatment is for. */
   conditionEventId: string | null
@@ -877,11 +746,9 @@ export type ClientBackgroundData = {
   backgroundCapturedAt: string | null
   relationshipStatus: ClientRelationshipStatusValue
   demographics: Demographics
-  medication: MedicationRecord
   stressors: StressorsRecord
   reason: ReasonForAttending
   relationships: RelationshipRecord[]
-  partnerships: PartnershipRecord[]
   relationshipBlocks?: RelationshipBlock[]
   blockAnswers?: RelationshipBlockAnswers
   events: EventRecord[]
@@ -955,14 +822,6 @@ export function emptyNecessities(): NecessityAccess {
   }
 }
 
-export function emptyMedication(): MedicationRecord {
-  return {
-    currentlyTaking: null,
-    previouslyTaken: null,
-    supervisedBy: "",
-  }
-}
-
 export function emptyStressors(): StressorsRecord {
   return {
     family: null,
@@ -988,25 +847,11 @@ export function emptyReasonForAttending(): ReasonForAttending {
     referrerIsOther: false,
     referrerOther: "",
     theirConcerns: "",
-    referredByMedicalProfessional: null,
-    familyInvolved: null,
-    familyInvolvement: "",
-    ownInitiative: null,
-    attendedWillingly: null,
-    clientMotivation: "",
   }
 }
 
 export function triStateLabel(value: TriStateAnswer | null): string {
   if (value === "yes") return "Yes"
-  if (value === "no") return "No"
-  if (value === "not_asked") return "Not asked"
-  return "Not recorded"
-}
-
-export function willingnessLabel(value: WillingnessAnswer | null): string {
-  if (value === "yes") return "Yes"
-  if (value === "somewhat") return "Somewhat"
   if (value === "no") return "No"
   if (value === "not_asked") return "Not asked"
   return "Not recorded"
@@ -1049,11 +894,8 @@ export function emptyEvent(eventType: EventType, displayOrder: number): Omit<Eve
     treatmentType: "",
     treatmentDetail: "",
     outcome: "",
-    attribution: eventType === "family_events" ? "self_linked" : "self",
     about: eventType === "family_events" ? "significant_other" : "self",
     aboutOther: "",
-    familyRelation: "",
-    familySide: "",
     relationshipRecordId: null,
     conditionEventId: null,
     conditionGroupId: null,

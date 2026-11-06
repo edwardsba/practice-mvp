@@ -12,12 +12,10 @@ import {
 } from "@/lib/client-background/interview-history"
 import {
   emptyEvent,
-  emptyMedication,
   emptyReasonForAttending,
   emptyStressors,
   type EventRecord,
   type EventType,
-  type MedicationRecord,
   type ReasonForAttending,
   type StressorsRecord,
 } from "@/lib/client-background/types"
@@ -27,46 +25,46 @@ const BIRTH = "2000-06-15"
 function entry(
   eventType: EventType,
   partial: Partial<EventRecord> = {}
-): Pick<EventRecord, "eventType" | "attribution" | "startPrecision" | "startValue"> {
+): Pick<EventRecord, "eventType" | "about" | "startPrecision" | "startValue"> {
   return { ...emptyEvent(eventType, 0), ...partial }
 }
 
 const expected: { key: HistoryQuestionKey; event: ReturnType<typeof entry> }[] = [
-  { key: "emotional_problems", event: entry("emotional_problems", { attribution: "self" }) },
-  { key: "self_harm", event: entry("self_harm", { attribution: "self" }) },
-  { key: "substance_use", event: entry("substance_use", { attribution: "self" }) },
-  { key: "psychiatric_admission", event: entry("psychiatric_admission", { attribution: "self" }) },
-  { key: "previous_therapy", event: entry("previous_therapy", { attribution: "self" }) },
-  { key: "medication_history", event: entry("medication", { attribution: "self" }) },
-  { key: "illness_injury", event: entry("illness_injury", { attribution: "self" }) },
-  { key: "traumatic_events", event: entry("traumatic_event", { attribution: "self" }) },
+  { key: "emotional_problems", event: entry("emotional_problems", { about: "self" }) },
+  { key: "self_harm", event: entry("self_harm", { about: "self" }) },
+  { key: "substance_use", event: entry("substance_use", { about: "self" }) },
+  { key: "psychiatric_admission", event: entry("psychiatric_admission", { about: "self" }) },
+  { key: "previous_therapy", event: entry("previous_therapy", { about: "self" }) },
+  { key: "medication_history", event: entry("medication", { about: "self" }) },
+  { key: "illness_injury", event: entry("illness_injury", { about: "self" }) },
+  { key: "traumatic_events", event: entry("traumatic_event", { about: "self" }) },
   {
     key: "other_significant_events",
-    event: entry("significant_history", { attribution: "self", startPrecision: "date", startValue: "2018-06-14" }),
+    event: entry("significant_history", { about: "self", startPrecision: "date", startValue: "2018-06-14" }),
   },
   {
     key: "family_emotional_problems",
-    event: entry("family_events", { attribution: "self_linked", startPrecision: "date", startValue: "2010-01-01" }),
+    event: entry("family_events", { about: "significant_other", startPrecision: "date", startValue: "2010-01-01" }),
   },
   {
     key: "other_significant_events",
-    event: entry("significant_history", { attribution: "self", startPrecision: "", startValue: "" }),
+    event: entry("significant_history", { about: "self", startPrecision: "", startValue: "" }),
   },
   {
     key: "other_significant_events",
-    event: entry("significant_history", { attribution: "self", startPrecision: "date", startValue: "2018-06-15" }),
+    event: entry("significant_history", { about: "self", startPrecision: "date", startValue: "2018-06-15" }),
   },
   {
     key: "family_emotional_problems",
-    event: entry("family_events", { attribution: "family", startPrecision: "date", startValue: "2020-01-01" }),
+    event: entry("family_events", { about: "significant_other", startPrecision: "date", startValue: "2020-01-01" }),
   },
-  { key: "family_emotional_problems", event: entry("emotional_problems", { attribution: "family" }) },
-  { key: "family_self_harm", event: entry("self_harm", { attribution: "family" }) },
-  { key: "family_substance_use", event: entry("substance_use", { attribution: "family" }) },
-  { key: "family_psychiatric_admission", event: entry("psychiatric_admission", { attribution: "family" }) },
-  { key: "family_illness", event: entry("illness_injury", { attribution: "family" }) },
-  { key: "family_significant_events", event: entry("significant_history", { attribution: "family" }) },
-  { key: "family_significant_events", event: entry("previous_therapy", { attribution: "family" }) },
+  { key: "family_emotional_problems", event: entry("emotional_problems", { about: "significant_other" }) },
+  { key: "family_self_harm", event: entry("self_harm", { about: "significant_other" }) },
+  { key: "family_substance_use", event: entry("substance_use", { about: "significant_other" }) },
+  { key: "family_psychiatric_admission", event: entry("psychiatric_admission", { about: "significant_other" }) },
+  { key: "family_illness", event: entry("illness_injury", { about: "significant_other" }) },
+  { key: "family_significant_events", event: entry("significant_history", { about: "significant_other" }) },
+  { key: "family_significant_events", event: entry("previous_therapy", { about: "significant_other" }) },
 ]
 
 const seen = new Set<HistoryQuestionKey>()
@@ -109,7 +107,7 @@ assert.deepEqual(
   ]
 )
 
-const gaps = unansweredInterviewLabels({}, [], null, emptyMedication(), emptyStressors(), emptyReasonForAttending())
+const gaps = unansweredInterviewLabels({}, [], null, emptyStressors(), emptyReasonForAttending())
 assert.deepEqual(gaps.slice(0, 2), ["Referral type", "Illness / injury"])
 assert.equal(gaps[1], "Illness / injury")
 assert.equal(gaps[2], "Traumatic events")
@@ -128,18 +126,12 @@ assert.equal(gaps.includes("Currently taking medication"), false)
 assert.equal(gaps.filter((label) => label === "Family").length, 1)
 assert.equal(gaps.length, HISTORY_QUESTION_KEYS.length + 1 + 9)
 
-const answeredMedication: MedicationRecord = { ...emptyMedication(), currentlyTaking: "not_asked" }
 const answeredStressors: StressorsRecord = { ...emptyStressors(), family: "yes", financial: "no" }
 const answeredReason: ReasonForAttending = {
   ...emptyReasonForAttending(),
   referralType: "self",
-  referredByMedicalProfessional: "no",
-  familyInvolved: "not_asked",
-  ownInitiative: "yes",
-  attendedWillingly: "somewhat",
-  clientMotivation: "Wants to understand what is going on",
 }
-const remaining = unansweredInterviewLabels({}, [], null, answeredMedication, answeredStressors, answeredReason)
+const remaining = unansweredInterviewLabels({}, [], null, answeredStressors, answeredReason)
 assert.equal(remaining[0], "Illness / injury")
 assert.equal(remaining.includes("Medication"), true)
 assert.equal(remaining.includes("Referral type"), false)
@@ -152,15 +144,11 @@ assert.equal(remaining.length, HISTORY_QUESTION_KEYS.length + 7)
 assert.equal(INTERVIEW_ANSWER_TOTAL, 25)
 assert.equal(gaps.length, INTERVIEW_ANSWER_TOTAL)
 assert.equal(
-  answeredInterviewCount({}, [], null, emptyMedication(), emptyStressors(), emptyReasonForAttending()),
+  answeredInterviewCount({}, [], null, emptyStressors(), emptyReasonForAttending()),
   0
 )
 assert.equal(
-  answeredInterviewCount({}, [], null, emptyMedication(), emptyStressors(), {
-    ...emptyReasonForAttending(),
-    attendedWillingly: "somewhat",
-    clientMotivation: "Still not counted",
-  }),
+  answeredInterviewCount({}, [], null, emptyStressors(), emptyReasonForAttending()),
   0
 )
 assert.equal(
@@ -168,14 +156,13 @@ assert.equal(
     { medication_history: "yes" },
     [],
     null,
-    emptyMedication(),
     emptyStressors(),
     emptyReasonForAttending()
   ),
   1
 )
 assert.equal(
-  answeredInterviewCount({}, [], null, answeredMedication, answeredStressors, answeredReason),
+  answeredInterviewCount({}, [], null, answeredStressors, answeredReason),
   INTERVIEW_ANSWER_TOTAL - remaining.length
 )
 assert.equal(backgroundInterviewSourceLine(null), "No background interview yet.")

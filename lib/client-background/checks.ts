@@ -1,11 +1,6 @@
 import { needLabel, needsForBlock, needsForMember, isPartneredClientStatus } from "@/lib/client-background/relationship-blocks"
 import { entryDetailMessage, unlinkedTreatmentMessage } from "@/lib/client-background/history-links"
 import { eventsForQuestion, historyQuestionAcceptsEntries, historyQuestionCheckLabel, HISTORY_QUESTION_KEYS, type ScreeningAnswers } from "@/lib/client-background/interview-history"
-import { HOW_ENDED } from "@/lib/client-background/how-ended"
-import { needsLinkingItems } from "@/lib/client-background/relationship-groups"
-import { buildRelationshipTree, personRoleLabel } from "@/lib/client-background/tree"
-import { estimatedCurrentAge } from "@/lib/client-background/visibility"
-import { todayDateString } from "@/lib/dates/practice-time"
 import {
   CLIENT_RELATIONSHIP_STATUS_LABELS,
   EMPLOYED_WORK_STATUSES,
@@ -19,11 +14,11 @@ import {
 } from "@/lib/client-background/types"
 
 export type BackgroundCheckTarget =
+  | "reason"
   | "identity"
   | "occupation"
   | "living"
   | "relationships"
-  | "medication"
   | "history"
 
 export type BackgroundCheck = {
@@ -48,7 +43,7 @@ const PARTNER_EXPECTED: readonly ClientRelationshipStatus[] = [
   "married",
 ]
 
-const ENDED_STATUS_CODE: Partial<Record<ClientRelationshipStatus, (typeof HOW_ENDED)[number]>> = {
+const ENDED_STATUS_CODE: Partial<Record<ClientRelationshipStatus, "separated" | "divorced" | "partner_died">> = {
   separated: "separated",
   divorced: "divorced",
   widowed: "partner_died",
@@ -67,6 +62,7 @@ const LIVES_WITH_KINDS: Partial<Record<LivesWith, readonly RelationshipToClient[
 export function backgroundSectionForCheck(
   target: BackgroundCheckTarget
 ): "reason" | "demographics" | "relationships" | "history" {
+  if (target === "reason") return "reason"
   if (target === "relationships") return "relationships"
   if (target === "history") return "history"
   return "demographics"
@@ -90,14 +86,16 @@ function markedLivingWith(person: RelationshipRecord): boolean {
   )
 }
 
-function linkingWhat(action: string): string {
-  const core = action.replace(/^Choose\s+/, "").replace(/\s*›\s*$/, "").trim()
-  return core ? `a ${core}` : "a record"
-}
-
 export function backgroundChecks(input: BackgroundCheckInput): BackgroundCheck[] {
   const { data } = input
   const checks: BackgroundCheck[] = []
+  if (!data.reason.referralType) {
+    checks.push({
+      id: "referral-type",
+      message: "Referral type not recorded",
+      target: "reason",
+    })
+  }
   const status = data.relationshipStatus.relationshipStatus
   const hasCurrentPartner = data.relationships.some((person) => person.relationshipToClient === "current_partner")
 
@@ -120,15 +118,12 @@ export function backgroundChecks(input: BackgroundCheckInput): BackgroundCheck[]
   const endedCode =
     status === "separated" || status === "divorced" || status === "widowed" ? ENDED_STATUS_CODE[status] : undefined
   if (status && endedCode) {
-    const matched =
-      blocks.length > 0
-        ? blocks.some((block) => {
-            if (block.kind !== "client_previous") return false
-            if (endedCode === "separated") return block.status === "married_separated" || block.status === "defacto_separated"
-            if (endedCode === "divorced") return block.status === "divorced"
-            return block.status === "widowed" || block.status === "partner_died"
-          })
-        : data.relationships.some((person) => person.relationshipToClient === "prior_partner" && person.howEnded === endedCode)
+    const matched = blocks.some((block) => {
+      if (block.kind !== "client_previous") return false
+      if (endedCode === "separated") return block.status === "married_separated" || block.status === "defacto_separated"
+      if (endedCode === "divorced") return block.status === "divorced"
+      return block.status === "widowed" || block.status === "partner_died"
+    })
     if (!matched) {
       checks.push({
         id: "partner-ended",
@@ -136,82 +131,6 @@ export function backgroundChecks(input: BackgroundCheckInput): BackgroundCheck[]
         target: "relationships",
       })
     }
-  }
-
-  if (blocks.length === 0) {
-  for (const person of data.relationships) {
-    if (person.relationshipToClient !== "prior_partner" || person.startedOn.trim()) continue
-    const name = person.givenName.trim()
-    checks.push({
-      id: `partner-start-${person.relationshipRecordId}`,
-      message: name ? `Prior partner ${name}: no start date` : "Prior partner: no start date",
-      target: "relationships",
-    })
-  }
-
-  for (const child of data.relationships) {
-    if (child.relationshipToClient !== "child_biological") continue
-    if (child.linkedPartnerRecordId || child.otherParentKind) continue
-    const age = estimatedCurrentAge(child, todayDateString())
-    const aged = age == null ? "" : ` (aged ${age})`
-    checks.push({
-      id: `other-parent-${child.relationshipRecordId}`,
-      message: `Child${aged}: other parent not recorded`,
-      target: "relationships",
-    })
-  }
-
-  for (const parent of data.relationships) {
-    const isParent =
-      parent.relationshipToClient === "mother" ||
-      parent.relationshipToClient === "father" ||
-      parent.relationshipToClient === "parent"
-    if (!isParent || parent.parentType !== "adoptive" || parent.notKnown || parent.adoptedOn.trim()) continue
-    const sex = parent.sex.trim().toLowerCase()
-    const role =
-      parent.relationshipToClient === "mother" || sex === "female"
-        ? "mother"
-        : parent.relationshipToClient === "father" || sex === "male"
-          ? "father"
-          : "parent"
-    const name = parent.givenName.trim()
-    checks.push({
-      id: `adoption-${parent.relationshipRecordId}`,
-      message: name ? `Adoptive ${role} (${name}): no adoption date` : `Adoptive ${role}: no adoption date`,
-      target: "relationships",
-    })
-  }
-
-  for (const parent of data.relationships) {
-    const isParent =
-      parent.relationshipToClient === "mother" ||
-      parent.relationshipToClient === "father" ||
-      parent.relationshipToClient === "parent"
-    if (!isParent || parent.notKnown) continue
-    if (parent.laterRelationships === "yes" || parent.laterRelationships === "none") continue
-    const role =
-      parent.relationshipToClient === "mother"
-        ? "Mother"
-        : parent.relationshipToClient === "father"
-          ? "Father"
-          : "Parent"
-    checks.push({
-      id: `later-${parent.relationshipRecordId}`,
-      message: `${role}: later relationships not recorded`,
-      target: "relationships",
-    })
-  }
-
-  for (const child of data.relationships) {
-    if (child.relationshipToClient !== "child_biological" && child.relationshipToClient !== "child_step") continue
-    if (child.childType) continue
-    const name = child.givenName.trim()
-    checks.push({
-      id: `child-type-${child.relationshipRecordId}`,
-      message: name ? `Child ${name}: type not recorded` : "Child: type not recorded",
-      target: "relationships",
-    })
-  }
   }
 
   if (input.numberOfChildren != null) {
@@ -338,20 +257,6 @@ export function backgroundChecks(input: BackgroundCheckInput): BackgroundCheck[]
         target: "relationships",
       })
     }
-  }
-
-  if (blocks.length === 0) {
-  const tree = buildRelationshipTree(data.relationships, data.partnerships)
-  for (const item of needsLinkingItems(tree)) {
-    const relationship = personRoleLabel(item.person)
-    const name = item.person.givenName.trim()
-    const subject = name ? `${relationship} ${name}` : relationship
-    checks.push({
-      id: `linking-${item.person.relationshipRecordId}`,
-      message: `${subject} needs linking to ${linkingWhat(item.action)}.`,
-      target: "relationships",
-    })
-  }
   }
 
   return checks

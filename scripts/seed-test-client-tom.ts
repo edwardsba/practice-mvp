@@ -136,10 +136,10 @@ async function main() {
       await db.query(
         `INSERT INTO client_event_records (
            event_record_id, client_id, practice_id, event_type, title, start_precision, start_value,
-           end_precision, end_value, end_ongoing, resolved_or_ongoing, about, about_other, attribution,
+           end_precision, end_value, end_ongoing, resolved_or_ongoing, about, about_other,
            relationship_record_id, condition_event_id, admission_type, admission_length, prescriber_name,
            prescriber_professional_id, self_harm_type, substance_status, display_order
-         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)`,
+         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)`,
         [
           ids.get(event.eventRecordId),
           clientId,
@@ -154,7 +154,6 @@ async function main() {
           text(event.resolvedOrOngoing),
           text(event.about),
           text(event.aboutOther),
-          text(event.attribution),
           event.relationshipRecordId ? ids.get(event.relationshipRecordId) : null,
           event.conditionEventId ? ids.get(event.conditionEventId) : null,
           text(event.admissionType),

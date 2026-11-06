@@ -109,9 +109,7 @@ export function HistorySection({
     setDraft({
       ...emptyEvent(eventType, 0),
       eventRecordId: "",
-      ...(about
-        ? { about, attribution: about === "significant_other" ? "family" : "self" }
-        : {}),
+      ...(about ? { about } : {}),
     })
     setEditing(true)
     setMobileScreen("edit")
@@ -235,7 +233,7 @@ export function HistorySection({
               ) : (
                 <ul className="space-y-1">
                   {chronological
-                    .filter((entry) => !(entry.conditionEventId && isTreatmentEvent(entry.eventType) && entry.attribution === "self"))
+                    .filter((entry) => !(entry.conditionEventId && isTreatmentEvent(entry.eventType) && resolvedAbout(entry) === "self"))
                     .map((entry) => (
                     <li key={entry.eventRecordId} className="space-y-1">
                       <HistoryRow
@@ -603,7 +601,7 @@ function attributionLabel(entry: EventRecord, relationships: RelationshipRecord[
   if (resolvedAbout(entry) === "self") return "Self"
   const person = relationships.find((item) => item.relationshipRecordId === entry.relationshipRecordId)
   if (person) return personName(person)
-  return entry.aboutOther.trim() || entry.familyRelation.trim() || "Significant other"
+  return entry.aboutOther.trim() || "Significant other"
 }
 
 function yesNoLabel(value: boolean | null) {
@@ -627,7 +625,7 @@ function EventReadOnly({
     <div className="space-y-4">
       <ReadOnlyField label="About" value={resolvedAbout(draft) === "self" ? "Self" : "Significant other"} />
       {resolvedAbout(draft) === "significant_other" ? (
-        <ReadOnlyField label="Who" value={linked ? personName(linked) : draft.aboutOther || draft.familyRelation} />
+        <ReadOnlyField label="Who" value={linked ? personName(linked) : draft.aboutOther} />
       ) : null}
       <ReadOnlyField label="Event type" value={EVENT_TYPE_LABELS[draft.eventType]} />
       {draft.eventType === "self_harm" ? (
@@ -722,19 +720,10 @@ export function EventEditor({
     const next = { ...draft, ...partial }
     if (next.about !== "significant_other") {
       next.about = "self"
-      next.attribution = "self"
       next.relationshipRecordId = null
       next.aboutOther = ""
-      next.familyRelation = ""
-      next.familySide = ""
     } else if (next.relationshipRecordId) {
-      next.attribution = "self_linked"
       next.aboutOther = ""
-      next.familyRelation = ""
-      next.familySide = ""
-    } else {
-      next.attribution = "family"
-      next.familyRelation = next.aboutOther
     }
     if (next.eventType !== "self_harm") {
       next.selfHarmType = ""

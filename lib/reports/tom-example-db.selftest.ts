@@ -53,7 +53,7 @@ async function main() {
   if (!source) throw new Error("The report loader returned no source for Tom.")
   const letter = numberedLetterOutline(generateBackgroundReport(source).document).join("\n")
   const expected = readFileSync(new URL("./tom-example-report.txt", import.meta.url), "utf8").trim()
-  assert.equal(letter, expected)
+  assert.equal(letter.replaceAll("\r\n", "\n"), expected.replaceAll("\r\n", "\n"))
   console.log(letter)
   console.log("tom example database selftest passed")
   const shared = (globalThis as { pool?: { end: () => Promise<void> } }).pool

@@ -3,13 +3,12 @@
 import { useState } from "react"
 
 import { saveStressorsAction } from "@/app/clients/[client_id]/background/actions"
-import { ClientAnswer, ReadOnlyField, SaveRow, SelectField, TextAreaField, TextField } from "@/components/client-background/fields"
+import { ClientAnswer, ReadOnlyField, SaveRow, SelectField, TextAreaField } from "@/components/client-background/fields"
 import { Button } from "@/components/ui/button"
 import type { ClientBackgroundSuggestions } from "@/lib/background-questionnaire/to-client-background"
 import {
   STRESSOR_ITEMS,
   triStateLabel,
-  type MedicationRecord,
   type StressorsRecord,
   type TriStateAnswer,
 } from "@/lib/client-background/types"
@@ -60,54 +59,6 @@ export function TriStateField({
       <option value="no">No</option>
       <option value="not_asked">Not asked</option>
     </SelectField>
-  )
-}
-
-export function MedicationFields({
-  idPrefix,
-  value,
-  onChange,
-  onCommit,
-  client,
-}: {
-  idPrefix: string
-  value: MedicationRecord
-  onChange: (value: MedicationRecord) => void
-  onCommit?: () => void
-  client?: ClientBackgroundSuggestions["medication"]
-}) {
-  function apply(next: MedicationRecord) {
-    onChange(next)
-    onCommit?.()
-  }
-  const current = client?.currentlyTaking
-  return (
-    <>
-      <TriStateField
-        id={`${idPrefix}_currently_taking`}
-        label="Currently taking medication"
-        value={value.currentlyTaking}
-        client={
-          current ? (
-            <ClientAnswer
-              label={current.label}
-              matches={value.currentlyTaking === current.apply}
-              onUse={() => apply({ ...value, currentlyTaking: current.apply })}
-            />
-          ) : undefined
-        }
-        onChange={(currentlyTaking) => onChange({ ...value, currentlyTaking })}
-      />
-      {value.currentlyTaking === "yes" ? (
-        <TextField
-          id={`${idPrefix}_supervised_by`}
-          label="Supervised by"
-          value={value.supervisedBy}
-          placeholder="e.g. Dr Patel (GP)"
-          onChange={(supervisedBy) => onChange({ ...value, supervisedBy })}
-        />
-      ) : null}
-    </>
   )
 }
 
@@ -227,17 +178,6 @@ export function BackgroundStressorsSection({
         </div>
       )}
     />
-  )
-}
-
-export function MedicationReadOnly({ value }: { value: MedicationRecord }) {
-  return (
-    <div className="space-y-3">
-      <ReadOnlyField label="Currently taking medication" value={triStateLabel(value.currentlyTaking)} />
-      {value.currentlyTaking === "yes" && value.supervisedBy.trim() ? (
-        <ReadOnlyField label="Supervised by" value={value.supervisedBy} />
-      ) : null}
-    </div>
   )
 }
 

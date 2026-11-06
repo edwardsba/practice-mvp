@@ -4,7 +4,6 @@ import {
   emptyClientRelationshipStatus,
   emptyDemographics,
   emptyEvent,
-  emptyMedication,
   emptyReasonForAttending,
   emptyRisk,
   emptyStressors,
@@ -34,13 +33,8 @@ function person(
     ageAtDeath: null,
     dateOfDeath: "",
     healthOrCauseOfDeath: "",
-    lengthOfRelationship: "",
-    relationshipStatus: "",
-    howEnded: "",
-    laterRelationships: "",
     childType: "",
     childTypeDetail: "",
-    timeSinceEnded: "",
     supportive: "",
     conflict: "",
     qualityOfRelationship: "",
@@ -48,16 +42,7 @@ function person(
     livingSituation: "",
     caregiverRelationship: "",
     caregiverRelationshipDetail: "",
-    startedOn: "",
-    endedOn: "",
-    partnerType: "",
-    parentType: "",
-    adoptedOn: "",
     notKnown: false,
-    otherParentKind: "",
-    otherParentDetail: "",
-    linkedPartnerRecordId: null,
-    partnershipRecordId: null,
     relationshipBlockId: null,
     blockRole: "",
     blockRoleType: "",
@@ -136,9 +121,9 @@ export function tomEvents(): EventRecord[] {
     history({ eventRecordId: "tom-cutting", eventType: "self_harm", title: "Cutting", selfHarmType: "non_lethal", startPrecision: "year", startValue: "1984", endPrecision: "year", endValue: "1986", displayOrder: 9, about: "self" }),
     history({ eventRecordId: "tom-accident", eventType: "traumatic_event", title: "Serious car accident", startPrecision: "year", startValue: "1989", endPrecision: "year", endValue: "1989", displayOrder: 10, about: "self" }),
     history({ eventRecordId: "tom-moved", eventType: "significant_history", title: "Moved interstate", startPrecision: "year", startValue: "1985", endPrecision: "year", endValue: "1985", displayOrder: 11, about: "self" }),
-    history({ eventRecordId: "tom-sally-depression", eventType: "emotional_problems", title: "Depression", about: "significant_other", relationshipRecordId: "tom-sally", attribution: "family", displayOrder: 12 }),
-    history({ eventRecordId: "tom-john-alcohol", eventType: "substance_use", title: "Alcohol", about: "significant_other", relationshipRecordId: "tom-john", attribution: "family", displayOrder: 13 }),
-    history({ eventRecordId: "tom-friend-alcohol", eventType: "substance_use", title: "Alcohol", about: "significant_other", aboutOther: "close friend", attribution: "family", displayOrder: 14 }),
+    history({ eventRecordId: "tom-sally-depression", eventType: "emotional_problems", title: "Depression", about: "significant_other", relationshipRecordId: "tom-sally", displayOrder: 12 }),
+    history({ eventRecordId: "tom-john-alcohol", eventType: "substance_use", title: "Alcohol", about: "significant_other", relationshipRecordId: "tom-john", displayOrder: 13 }),
+    history({ eventRecordId: "tom-friend-alcohol", eventType: "substance_use", title: "Alcohol", about: "significant_other", aboutOther: "close friend", displayOrder: 14 }),
   ]
 }
 
@@ -201,11 +186,6 @@ export function tomExampleSource(): BackgroundReportSource {
   reason.referrerProfessionalId = "tom-prescriber"
   reason.referralDate = "2026-10-03"
   reason.referrerConcerns = "low mood and stress"
-  reason.referredByMedicalProfessional = "yes"
-  reason.familyInvolved = "yes"
-  reason.familyInvolvement = "His wife encouraged him to attend."
-  reason.ownInitiative = "no"
-  reason.clientMotivation = "Sleep better and stop arguing at home"
   const answers = emptyBlockAnswers()
   answers.previousRelationships = "yes"
   answers.otherChildren = "none"
@@ -225,11 +205,9 @@ export function tomExampleSource(): BackgroundReportSource {
       backgroundCapturedAt: "2026-11-05T00:00:00.000Z",
       relationshipStatus: { ...emptyClientRelationshipStatus(), relationshipStatus: "married" },
       demographics,
-      medication: emptyMedication(),
       stressors,
       reason,
       relationships: tomRelationships(),
-      partnerships: [],
       relationshipBlocks: tomBlocks(),
       blockAnswers: answers,
       events: tomEvents(),

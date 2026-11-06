@@ -40,7 +40,7 @@ import {
   type ScreeningAnswer,
   type ScreeningAnswers,
 } from "@/lib/client-background/interview-history"
-import { emptyEvent, type EventRecord, type MedicationRecord, type ReasonForAttending, type RelationshipRecord, type StressorsRecord } from "@/lib/client-background/types"
+import { emptyEvent, type EventRecord, type ReasonForAttending, type RelationshipRecord, type StressorsRecord } from "@/lib/client-background/types"
 
 export function InterviewHistory({
   clientId,
@@ -48,7 +48,6 @@ export function InterviewHistory({
   events,
   relationships,
   screening,
-  medicationRef,
   reasonRef,
   stressors,
   selfReportId,
@@ -68,7 +67,6 @@ export function InterviewHistory({
   events: EventRecord[]
   relationships: RelationshipRecord[]
   screening: ScreeningAnswers
-  medicationRef: RefObject<MedicationRecord>
   reasonRef: RefObject<ReasonForAttending>
   stressors: StressorsRecord
   selfReportId: string | null
@@ -84,7 +82,6 @@ export function InterviewHistory({
     screening: ScreeningAnswers
     events: EventRecord[]
     stressors: StressorsRecord
-    medication: MedicationRecord
   }) => BackgroundCheck[]
   onJumpToCheck: (check: BackgroundCheck) => void
 }) {
@@ -117,7 +114,6 @@ export function InterviewHistory({
           answersRef.current,
           entriesRef.current,
           dateOfBirth,
-          medicationRef.current,
           stressorsRef.current,
           reasonRef.current
         )
@@ -127,13 +123,12 @@ export function InterviewHistory({
           screening: answersRef.current,
           events: entriesRef.current,
           stressors: stressorsRef.current,
-          medication: medicationRef.current,
         })
       )
       setCompleteError(null)
       setConfirmOpen(true)
     })
-  }, [dateOfBirth, getChecks, medicationRef, reasonRef, registerComplete])
+  }, [dateOfBirth, getChecks, reasonRef, registerComplete])
 
   useEffect(() => {
     return registerFlush(async () => {
@@ -199,10 +194,8 @@ export function InterviewHistory({
         ...emptyEvent("psychiatric_admission", 0),
         eventRecordId: "",
         about: condition.about,
-        attribution: condition.attribution,
         relationshipRecordId: condition.relationshipRecordId,
         aboutOther: condition.aboutOther,
-        familyRelation: condition.familyRelation,
         conditionEventId: condition.eventRecordId,
       },
       editing: true,
@@ -220,7 +213,6 @@ export function InterviewHistory({
         ...emptyEvent(question.eventType, 0),
         eventRecordId: "",
         about: question.about,
-        attribution: question.about === "significant_other" ? "family" : "self",
       },
       editing: true,
       isNew: true,

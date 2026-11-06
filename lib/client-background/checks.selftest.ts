@@ -7,7 +7,6 @@ import {
   emptyClientRelationshipStatus,
   emptyDemographics,
   emptyEvent,
-  emptyMedication,
   emptyReasonForAttending,
   emptyRisk,
   emptyStressors,
@@ -33,15 +32,6 @@ function person(
     ageAtDeath: null,
     dateOfDeath: "",
     healthOrCauseOfDeath: "",
-    lengthOfRelationship: "",
-    relationshipStatus: "",
-    howEnded: "",
-    laterRelationships:
-      partial.relationshipToClient === "mother" ||
-      partial.relationshipToClient === "father" ||
-      partial.relationshipToClient === "parent"
-        ? "none"
-        : "",
     childType:
       partial.relationshipToClient === "child_step"
         ? "step_child"
@@ -49,7 +39,6 @@ function person(
           ? "biological"
           : "",
     childTypeDetail: "",
-    timeSinceEnded: "",
     supportive: "",
     conflict: "",
     qualityOfRelationship: "",
@@ -57,16 +46,7 @@ function person(
     livingSituation: "",
     caregiverRelationship: "",
     caregiverRelationshipDetail: "",
-    startedOn: "",
-    endedOn: "",
-    partnerType: "",
-    parentType: "",
-    adoptedOn: "",
     notKnown: false,
-    otherParentKind: "",
-    otherParentDetail: "",
-    linkedPartnerRecordId: null,
-    partnershipRecordId: null,
     ...partial,
   }
 }
@@ -75,7 +55,6 @@ function event(partial: Partial<EventRecord> & Pick<EventRecord, "eventType">): 
   return {
     ...emptyEvent(partial.eventType, 0),
     eventRecordId: "event-1",
-    attribution: "self",
     ...partial,
   }
 }
@@ -86,11 +65,9 @@ function data(overrides: Partial<ClientBackgroundData> = {}): ClientBackgroundDa
     dateOfBirth: "1990-01-01",
     backgroundCapturedAt: null,
     relationshipStatus: emptyClientRelationshipStatus(),
-    medication: emptyMedication(),
     stressors: emptyStressors(),
-    reason: emptyReasonForAttending(),
+    reason: { ...emptyReasonForAttending(), referralType: "self" },
     relationships: [],
-    partnerships: [],
     events: [],
     risk: emptyRisk(),
     ...overrides,
@@ -116,36 +93,36 @@ function ids(partial: Partial<BackgroundCheckInput>) {
 }
 
 const cleared = sanitizeReasonForAttending({
-  referredByMedicalProfessional: "no",
-  referrerProfessionalId: REFERRER,
-  referralDate: "2026-10-03",
-  referrerConcerns: "Sleep",
-  familyInvolved: "no",
-  familyInvolvement: "Drove them",
-  ownInitiative: "yes",
-  attendedWillingly: "somewhat",
-  clientMotivation: "Wants to sleep",
-})
-assert.equal(cleared.referrerProfessionalId, null)
-assert.equal(cleared.referralDate, "")
-assert.equal(cleared.referrerConcerns, "")
-assert.equal(cleared.familyInvolvement, "")
-assert.equal(cleared.clientMotivation, "Wants to sleep")
-assert.equal(cleared.attendedWillingly, "somewhat")
-
-const kept = sanitizeReasonForAttending({
   referredByMedicalProfessional: "yes",
   referrerProfessionalId: REFERRER,
   referralDate: "2026-10-03",
   referrerConcerns: "Sleep",
-  familyInvolved: "yes",
   familyInvolvement: "Drove them",
+  clientMotivation: "Wants to sleep",
 })
+assert.equal(cleared.referralType, "")
+assert.equal(cleared.referrerProfessionalId, null)
+assert.equal(cleared.referralDate, "")
+assert.equal(cleared.referrerConcerns, "")
+assert.equal(cleared.theirConcerns, "")
+
+const kept = sanitizeReasonForAttending({
+  referralType: "medical",
+  referrerProfessionalId: REFERRER,
+  referralDate: "2026-10-03",
+  referrerConcerns: "Sleep",
+})
+assert.equal(kept.referralType, "medical")
 assert.equal(kept.referrerProfessionalId, REFERRER)
 assert.equal(kept.referralDate, "2026-10-03")
 assert.equal(kept.referrerConcerns, "Sleep")
-assert.equal(kept.familyInvolvement, "Drove them")
-assert.equal(sanitizeReasonForAttending({ referredByMedicalProfessional: "yes", referrerProfessionalId: "nope" }).referrerProfessionalId, null)
+assert.equal(sanitizeReasonForAttending({ referralType: "medical", referrerProfessionalId: "nope" }).referrerProfessionalId, null)
+
+const missingReferral = backgroundChecks(input({ data: data({ reason: emptyReasonForAttending() }) }))
+assert.deepEqual(
+  missingReferral.map((check) => ({ id: check.id, message: check.message, target: check.target })),
+  [{ id: "referral-type", message: "Referral type not recorded", target: "reason" }]
+)
 
 assert.deepEqual(backgroundChecks(input()), [])
 
@@ -203,13 +180,11 @@ assert.deepEqual(
           relationshipRecordId: "child-1",
           relationshipToClient: "child_biological",
           givenName: "Ari",
-          otherParentKind: "donor_conception",
         }),
         person({
           relationshipRecordId: "child-2",
           relationshipToClient: "child_biological",
           givenName: "Bo",
-          otherParentKind: "donor_conception",
         }),
       ],
     }),
@@ -223,7 +198,6 @@ assert.deepEqual(
         person({
           relationshipRecordId: "child",
           relationshipToClient: "child_biological",
-          otherParentKind: "donor_conception",
         }),
       ],
     }),
@@ -358,13 +332,6 @@ assert.deepEqual(
   []
 )
 
-assert.deepEqual(
-  ids({
-    data: data({ medication: { currentlyTaking: "yes", previouslyTaken: null, supervisedBy: "" } }),
-  }),
-  []
-)
-
 const disability = backgroundChecks(
   input({
     data: data({
@@ -396,30 +363,9 @@ const unlinked = backgroundChecks(
     }),
   })
 )
-assert.equal(unlinked[0]?.message, "Step-child Alex needs linking to a partner.")
-assert.equal(unlinked[0]?.id, "linking-step-child")
-assert.equal(unlinked[0]?.target, "relationships")
-assert.deepEqual(
-  ids({
-    data: data({
-      relationships: [
-        person({ relationshipRecordId: "partner", relationshipToClient: "current_partner", givenName: "Sam" }),
-        person({
-          relationshipRecordId: "step-child",
-          relationshipToClient: "child_step",
-          givenName: "Alex",
-          linkedPartnerRecordId: "partner",
-        }),
-        person({
-          relationshipRecordId: "child",
-          relationshipToClient: "child_biological",
-          givenName: "Ari",
-          otherParentKind: "donor_conception",
-        }),
-      ],
-    }),
-  }),
-  []
+assert.equal(
+  unlinked.some((check) => check.message.includes("needs linking")),
+  false
 )
 
 const ben01 = backgroundChecks(
@@ -435,42 +381,9 @@ assert.deepEqual(
   ben01.map((check) => check.message),
   [
     "Relationship status is De facto, but no current partner is recorded.",
-    "Child: other parent not recorded",
     "Client reported 2 children; 1 recorded.",
   ]
 )
-
-const blankType = backgroundChecks(
-  input({
-    data: data({
-      relationships: [
-        person({
-          relationshipRecordId: "child-blank",
-          relationshipToClient: "child_biological",
-          givenName: "Ari",
-          childType: "",
-          otherParentKind: "donor_conception",
-        }),
-      ],
-    }),
-  })
-)
-assert.ok(blankType.some((check) => check.id === "child-type-child-blank" && check.message === "Child Ari: type not recorded"))
-
-const laterMissing = backgroundChecks(
-  input({
-    data: data({
-      relationships: [
-        person({
-          relationshipRecordId: "mum",
-          relationshipToClient: "mother",
-          laterRelationships: "",
-        }),
-      ],
-    }),
-  })
-)
-assert.ok(laterMissing.some((check) => check.message === "Mother: later relationships not recorded"))
 
 const datedDepression = { ...emptyEvent("emotional_problems", 0), eventRecordId: "dated", title: "Depression", startPrecision: "year" as const, startValue: "2000", about: "self" as const }
 assert.equal(entryDetailMessage(datedDepression, "1970-03-12"), null)
@@ -480,7 +393,6 @@ const familyDepression = {
   eventRecordId: "family",
   title: "Depression",
   about: "significant_other" as const,
-  attribution: "family" as const,
 }
 assert.equal(entryDetailMessage(familyDepression, "1970-03-12"), null)
 

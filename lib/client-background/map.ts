@@ -7,7 +7,6 @@ import {
   type ClientRelationshipStatusValue,
   type EventRecord,
   type EventType,
-  type PartnershipRecord,
   type RelationshipBlock,
   type RelationshipBlockAnswers,
   type RelationshipRecord,
@@ -16,7 +15,6 @@ import {
 import {
   sanitizeClientRelationshipStatus,
   sanitizeEvent,
-  sanitizePartnership,
   sanitizeRelationship,
 } from "@/lib/client-background/sanitize"
 
@@ -34,13 +32,8 @@ export function toRelationship(row: {
   ageAtDeath: number | null
   dateOfDeath: string | null
   healthOrCauseOfDeath: string | null
-  lengthOfRelationship: string | null
-  relationshipStatus: string | null
-  howEnded: string | null
-  laterRelationships: string | null
   childType: string | null
   childTypeDetail: string | null
-  timeSinceEnded: string | null
   supportive: string | null
   conflict: string | null
   qualityOfRelationship: string | null
@@ -48,16 +41,7 @@ export function toRelationship(row: {
   livingSituation: string | null
   caregiverRelationship: string | null
   caregiverRelationshipDetail: string | null
-  startedOn: string | null
-  endedOn: string | null
-  partnerType: string | null
-  parentType: string | null
-  adoptedOn: string | null
   notKnown: boolean
-  otherParentKind: string | null
-  otherParentDetail: string | null
-  linkedPartnerRecordId: string | null
-  partnershipRecordId: string | null
   relationshipBlockId?: string | null
   blockRole?: string | null
   blockRoleType?: string | null
@@ -76,13 +60,8 @@ export function toRelationship(row: {
     approximateAgeRecordedOn: row.approximateAgeRecordedOn ?? "",
     dateOfDeath: row.dateOfDeath ?? "",
     healthOrCauseOfDeath: row.healthOrCauseOfDeath ?? "",
-    lengthOfRelationship: row.lengthOfRelationship ?? "",
-    relationshipStatus: row.relationshipStatus ?? "",
-    howEnded: row.howEnded ?? "",
-    laterRelationships: row.laterRelationships ?? "",
     childType: row.childType ?? "",
     childTypeDetail: row.childTypeDetail ?? "",
-    timeSinceEnded: row.timeSinceEnded ?? "",
     supportive: row.supportive ?? "",
     conflict: row.conflict ?? "",
     qualityOfRelationship: row.qualityOfRelationship ?? "",
@@ -90,14 +69,7 @@ export function toRelationship(row: {
     livingSituation: row.livingSituation ?? "",
     caregiverRelationship: row.caregiverRelationship ?? "",
     caregiverRelationshipDetail: row.caregiverRelationshipDetail ?? "",
-    startedOn: row.startedOn ?? "",
-    endedOn: row.endedOn ?? "",
-    partnerType: row.partnerType ?? "",
-    parentType: row.parentType ?? "",
-    adoptedOn: row.adoptedOn ?? "",
     notKnown: row.notKnown,
-    otherParentKind: row.otherParentKind ?? "",
-    otherParentDetail: row.otherParentDetail ?? "",
     relationshipBlockId: row.relationshipBlockId ?? null,
     blockRole: row.blockRole ?? "",
     blockRoleType: row.blockRoleType ?? "",
@@ -188,24 +160,6 @@ export function toBlockAnswers(row: {
   }
 }
 
-export function toPartnership(row: {
-  partnershipRecordId: string
-  partnerAId: string
-  partnerBId: string
-  relationshipStatus: string | null
-  started: string | null
-  ended: string | null
-  qualityOfRelationship: string | null
-}): PartnershipRecord {
-  return sanitizePartnership({
-    ...row,
-    relationshipStatus: row.relationshipStatus ?? "",
-    started: row.started ?? "",
-    ended: row.ended ?? "",
-    qualityOfRelationship: row.qualityOfRelationship ?? "",
-  })
-}
-
 export function toEvent(row: {
   eventRecordId: string
   eventType: string
@@ -221,11 +175,8 @@ export function toEvent(row: {
   treatmentType: string | null
   treatmentDetail: string | null
   outcome: string | null
-  attribution: string
   about: string | null
   aboutOther: string | null
-  familyRelation: string | null
-  familySide: string | null
   relationshipRecordId: string | null
   conditionEventId: string | null
   conditionGroupId: string | null
@@ -255,8 +206,6 @@ export function toEvent(row: {
     outcome: row.outcome ?? "",
     about: row.about ?? "",
     aboutOther: row.aboutOther ?? "",
-    familyRelation: row.familyRelation ?? "",
-    familySide: row.familySide ?? "",
     conditionEventId: row.conditionEventId,
     conditionGroupId: row.conditionGroupId,
     admissionType: row.admissionType ?? "",

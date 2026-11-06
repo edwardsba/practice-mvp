@@ -188,7 +188,7 @@ function personHeading(event: EventRecord, people: RelationshipRecord[]): string
     ? people.find((item) => item.relationshipRecordId === event.relationshipRecordId)
     : undefined
   if (!person) {
-    const other = event.aboutOther.trim() || event.familyRelation.trim()
+    const other = event.aboutOther.trim()
     if (!other) return "Significant other"
     return other.slice(0, 1).toUpperCase() + other.slice(1)
   }

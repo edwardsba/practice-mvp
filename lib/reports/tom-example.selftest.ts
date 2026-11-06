@@ -10,7 +10,7 @@ import type { ReportVoice } from "@/lib/reports/background-report-prose"
 const source = tomExampleSource()
 const letter = numberedLetterOutline(generateBackgroundReport(source).document).join("\n")
 const expected = readFileSync(new URL("./tom-example-report.txt", import.meta.url), "utf8").trim()
-assert.equal(letter, expected)
+assert.equal(letter.replaceAll("\r\n", "\n"), expected.replaceAll("\r\n", "\n"))
 
 function opening(patch: (identity: typeof source.data.demographics.identity) => void): string {
   const next = tomExampleSource()

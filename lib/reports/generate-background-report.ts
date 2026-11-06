@@ -1,4 +1,4 @@
-import { assessAge, clientAgeAtStart, compareEventsChronologically } from "@/lib/client-background/age"
+import { assessAge, compareEventsChronologically } from "@/lib/client-background/age"
 import { backgroundChecks } from "@/lib/client-background/checks"
 import type { ProfessionalOption } from "@/lib/client-background/professionals"
 import {
@@ -9,10 +9,9 @@ import {
   type HistoryQuestionKey,
   type ScreeningAnswers,
 } from "@/lib/client-background/interview-history"
-import { parsePartialDate, precisionForPartialDate } from "@/lib/client-background/partial-date"
-import { canonicalParentsLink, personRoleLabel } from "@/lib/client-background/tree"
+import { parsePartialDate } from "@/lib/client-background/partial-date"
+import { personRoleLabel } from "@/lib/client-background/tree"
 import {
-  CLIENT_RELATIONSHIP_STATUS_LABELS,
   LIVES_WITH_LABELS,
   NECESSITY_KEYS,
   NECESSITY_LABELS,
@@ -22,16 +21,8 @@ import {
   type EventRecord,
   type RelationshipRecord,
   type RelationshipToClient,
-  type StartPrecision,
 } from "@/lib/client-background/types"
-import {
-  childrenTotalParagraph,
-  parentsParagraph,
-  parentsSeparationMissing,
-  partnersParagraph,
-  siblingsParagraph,
-  significantOtherParagraphs,
-} from "@/lib/reports/background-family-paragraphs"
+import { significantOtherParagraphs } from "@/lib/reports/background-family-paragraphs"
 import {
   childrenFromBlocks,
   parentsFromBlocks,
@@ -166,10 +157,6 @@ export type BackgroundReportDraft = {
   omitted: BackgroundReportOmission[]
 }
 
-const PARENT_ROLES: readonly RelationshipToClient[] = ["mother", "father", "parent", "step_parent"]
-const CHILD_ROLES: readonly RelationshipToClient[] = ["child_biological", "child_step"]
-const COUNT_WORDS = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"]
-
 /** Housing labels as they read after "in". Own home is built from the client's voice. */
 const HOUSING_PHRASES: Record<string, string> = {
   "Private rental": "a private rental",
@@ -178,14 +165,6 @@ const HOUSING_PHRASES: Record<string, string> = {
   "Shared housing": "shared housing",
   "Temporary housing": "temporary housing",
   Other: "other housing",
-}
-
-const HISTORY_NOUN: Partial<Record<HistoryQuestionKey, string>> = {
-  illness_injury: "a history of illness or injury",
-  traumatic_events: "experiencing traumatic events",
-  emotional_problems: "a history of emotional problems",
-  substance_use: "a history of substance use",
-  other_significant_events: "other significant life events",
 }
 
 type VoiceKind = "he" | "she" | "they" | "name"
@@ -228,21 +207,10 @@ function speaker(voice: Voice, firstName: string, lead: boolean): Speaker {
   return { text: voice.Subject, plural: voice.kind === "they" }
 }
 
-function countWord(count: number): string {
-  if (count >= 0 && count <= 9) return COUNT_WORDS[count] ?? String(count)
-  return String(count)
-}
-
 function joinList(items: string[], conjunction: "and" | "or"): string {
   if (items.length <= 1) return items[0] ?? ""
   if (items.length === 2) return `${items[0]} ${conjunction} ${items[1]}`
   return `${items.slice(0, -1).join(", ")} ${conjunction} ${items[items.length - 1]}`
-}
-
-function sentence(text: string): string {
-  const trimmed = text.trim()
-  if (!trimmed) return ""
-  return /[.!?]"?$/.test(trimmed) ? trimmed : `${trimmed}.`
 }
 
 function lowerFirst(value: string): string {
@@ -289,34 +257,6 @@ function ageYears(dateOfBirth: string, asOf: string): number | null {
   if (reading.kind === "exact" || reading.kind === "approximate") return reading.years
   if (reading.kind === "ambiguous") return reading.high
   return null
-}
-
-function ageIsApproximate(dateOfBirth: string): boolean {
-  return parsePartialDate(dateOfBirth).month == null
-}
-
-/** A year-only date is the client's age at 1 July of that year. */
-function ageAtRecordedDate(
-  dateOfBirth: string | null,
-  precision: StartPrecision | "",
-  value: string
-): number | null {
-  if (!dateOfBirth) return null
-  const trimmed = value.trim()
-  if (!trimmed || !precision) return null
-  if (precision === "year") {
-    const year = /^(\d{4})/.exec(trimmed)?.[1]
-    if (!year) return null
-    return clientAgeAtStart(dateOfBirth, "date", `${year}-07-01`)
-  }
-  return clientAgeAtStart(dateOfBirth, precision, trimmed)
-}
-
-function clientAgeOn(dateOfBirth: string | null, when: string): number | null {
-  if (!dateOfBirth || !when.trim()) return null
-  const precision = precisionForPartialDate(parsePartialDate(when))
-  if (!precision) return null
-  return ageAtRecordedDate(dateOfBirth, precision, when.trim())
 }
 
 function textNode(text: string): LetterBodyNode {
@@ -380,61 +320,6 @@ function answerFor(source: BackgroundReportSource, key: HistoryQuestionKey): "ye
   return source.screening?.[key] ?? null
 }
 
-function eventWhen(event: EventRecord, dateOfBirth: string | null): string {
-  const year = /^\d{4}/.exec(event.startValue.trim())?.[0]
-  const age = ageAtRecordedDate(dateOfBirth, event.startPrecision, event.startValue)
-  if (!year || age == null) return ""
-  const around = event.startPrecision === "year" || event.startPrecision === "age"
-  return `${around ? "at around age" : "at age"} ${age} (${year})`
-}
-
-function joinWhens(whens: string[]): string {
-  const parts = whens.filter(Boolean)
-  if (parts.length === 0) return ""
-  const rest = parts.slice(1).map((part) => part.replace(/^at\s+/, ""))
-  return joinList([parts[0], ...rest], "and")
-}
-
-function describeWhens(events: EventRecord[], dateOfBirth: string | null): string {
-  const sorted = [...events].sort((a, b) => compareEventsChronologically(a, b, dateOfBirth))
-  return joinWhens(sorted.map((event) => eventWhen(event, dateOfBirth)))
-}
-
-function familyRoles(events: EventRecord[], relationships: RelationshipRecord[], voice: Voice): string {
-  const roles: string[] = []
-  for (const event of [...events].sort((a, b) => compareEventsChronologically(a, b, null))) {
-    let role = ""
-    if (event.relationshipRecordId) {
-      const person = relationships.find((row) => row.relationshipRecordId === event.relationshipRecordId)
-      if (person) role = lowerKeepingTypedCase(personRoleLabel(person))
-    }
-    if (!role) role = lowerKeepingTypedCase(event.familyRelation.trim())
-    if (!role) role = "family member"
-    if (!roles.includes(role)) roles.push(role)
-  }
-  return `${voice.possessive} ${joinList(roles, "and")}`
-}
-
-function historyEntryPhrase(events: EventRecord[], dateOfBirth: string | null, noun: string, fromWhen: boolean): string {
-  const sorted = [...events].sort((a, b) => compareEventsChronologically(a, b, dateOfBirth))
-  const titled: string[] = []
-  const whens: string[] = []
-  for (const event of sorted) {
-    const title = event.title.trim()
-    const when = eventWhen(event, dateOfBirth)
-    if (title) titled.push([lowerFirst(title), when].filter(Boolean).join(" "))
-    else if (when) whens.push(when)
-  }
-  if (titled.length === 0 && whens.length === 0) return noun
-  if (titled.length === 0) {
-    let whenText = joinWhens(whens)
-    if (fromWhen) whenText = whenText.replace(/^at\s+/, "from ")
-    return `${noun}, ${whenText}`
-  }
-  const parts = whens.length > 0 ? [...titled, joinWhens(whens)] : titled
-  return `${noun}, including ${joinList(parts, "and")}`
-}
-
 function familyHistoryLine(
   key: HistoryQuestionKey,
   events: EventRecord[],
@@ -450,7 +335,7 @@ function familyHistoryLine(
         const person = relationships.find((row) => row.relationshipRecordId === event.relationshipRecordId)
         if (person) role = lowerKeepingTypedCase(personRoleLabel(person))
       }
-      if (!role) role = lowerKeepingTypedCase(event.familyRelation.trim())
+      if (!role) role = lowerKeepingTypedCase(event.aboutOther.trim())
       if (!role) role = "family member"
       const owner = index === 0 && leadName ? `${leadName}'s` : voice.Possessive
       const title = event.title.trim()
@@ -463,38 +348,6 @@ function familyHistoryLine(
       return `${owner} ${role} has a history of ${topic}.`
     })
     .join(" ")
-}
-
-function historySentence(
-  key: HistoryQuestionKey,
-  events: EventRecord[],
-  dateOfBirth: string | null,
-  who: Speaker,
-  voice: Voice,
-  relationships: RelationshipRecord[],
-  family: boolean
-): string {
-  if (family) {
-    return familyHistoryLine(key, events, relationships, voice, null)
-  }
-  if (key === "medication_history") {
-    return `${who.text} ${verb(who.plural, "has", "have")} previously taken medication for emotional problems.`
-  }
-  if (key === "psychiatric_admission") {
-    const whens = describeWhens(events, dateOfBirth)
-    return `${who.text} ${verb(who.plural, "has", "have")} previously been admitted to a psychiatric hospital or rehabilitation service${whens ? `, ${whens}` : ""}.`
-  }
-  if (key === "previous_therapy") {
-    const whens = describeWhens(events, dateOfBirth)
-    return `${who.text} ${verb(who.plural, "has", "have")} previously attended therapy${whens ? `, ${whens}` : ""}.`
-  }
-  if (key === "self_harm") {
-    const whens = describeWhens(events, dateOfBirth)
-    return `${who.text} reported a history of self-harm${whens ? `, ${whens}` : ""}.`
-  }
-  const noun = HISTORY_NOUN[key] ?? `a history of ${lowerKeepingTypedCase(HISTORY_QUESTIONS[key].label)}`
-  const phrase = historyEntryPhrase(events, dateOfBirth, noun, key === "substance_use")
-  return `${who.text} reported ${phrase}.`
 }
 
 function historyItems(
@@ -675,7 +528,7 @@ function referrerPerson(person: RelationshipRecord, voice: Voice, clientStatus: 
     person.relationshipToClient === "prior_partner"
   let role = "relative"
   if (partner) {
-    const married = clientStatus === "married" || person.partnerType === "married"
+    const married = clientStatus === "married"
     role = married ? (female ? "wife" : male ? "husband" : "partner") : female ? "female partner" : male ? "male partner" : "partner"
   } else if (person.relationshipToClient === "mother" || person.blockRoleType === "mother") role = "mother"
   else if (person.relationshipToClient === "father" || person.blockRoleType === "father") role = "father"
@@ -689,6 +542,11 @@ function referrerPerson(person: RelationshipRecord, voice: Voice, clientStatus: 
   return `${voice.possessive} ${role}${name ? ` (${name})` : ""}`
 }
 
+
+function people(records: RelationshipRecord[], roles: readonly RelationshipToClient[]): RelationshipRecord[] {
+  return records.filter((row) => roles.includes(row.relationshipToClient))
+}
+
 function partnerNoun(status: ClientRelationshipStatus | "", sex: string): string {
   const value = sex.trim().toLowerCase()
   if (status === "married") {
@@ -698,141 +556,6 @@ function partnerNoun(status: ClientRelationshipStatus | "", sex: string): string
   if (value === "female") return "female partner"
   if (value === "male") return "male partner"
   return "partner"
-}
-
-function partnerLength(partner: RelationshipRecord | undefined): string {
-  const value = partner?.lengthOfRelationship.trim() ?? ""
-  if (!value) return ""
-  if (/^\d+$/.test(value)) return `${value} years`
-  return value.replace(/^of\s+/i, "")
-}
-
-function people(records: RelationshipRecord[], roles: readonly RelationshipToClient[]): RelationshipRecord[] {
-  return records.filter((row) => roles.includes(row.relationshipToClient))
-}
-
-function ageList(rows: RelationshipRecord[], asOf: string): string[] {
-  return rows
-    .map((row) => {
-      if (!row.dateOfBirth) return null
-      const years = ageYears(row.dateOfBirth, asOf)
-      if (years == null) return null
-      return { years, about: ageIsApproximate(row.dateOfBirth) }
-    })
-    .filter((row): row is { years: number; about: boolean } => Boolean(row))
-    .sort((a, b) => b.years - a.years)
-    .map((row) => (row.about ? `about ${row.years}` : String(row.years)))
-}
-
-function relationshipItem(source: BackgroundReportSource, voice: Voice, who: Speaker): string | null {
-  const status = source.data.relationshipStatus.relationshipStatus
-  if (!status) return null
-  const partner = source.data.relationships.find((row) => row.relationshipToClient === "current_partner")
-  const prior = source.data.relationships.filter((row) => row.relationshipToClient === "prior_partner")
-  const length = partnerLength(partner)
-  const noun = partnerNoun(status, partner?.sex ?? "")
-  const has = verb(who.plural, "has", "have")
-  const is = verb(who.plural, "is", "are")
-  let line = ""
-  if (status === "single" || status === "separated" || status === "divorced" || status === "widowed") {
-    line = `${who.text} ${is} ${lowerKeepingTypedCase(CLIENT_RELATIONSHIP_STATUS_LABELS[status])}`
-  } else if (status === "married") {
-    line = partner
-      ? length
-        ? `${who.text} ${has} been married to ${voice.possessive} ${noun} for ${length}`
-        : `${who.text} ${is} married to ${voice.possessive} ${noun}`
-      : `${who.text} ${is} married`
-  } else if (status === "defacto") {
-    line = `${who.text} ${is} in a de facto relationship with ${voice.possessive} ${noun}${length ? ` of ${length}` : ""}`
-  } else if (status === "engaged") {
-    line = `${who.text} ${is} engaged${partner ? ` to ${voice.possessive} ${noun}` : ""}`
-  } else if (status === "in_relationship_not_living_together") {
-    line = `${who.text} ${is} in a relationship${partner ? ` with ${voice.possessive} ${noun}` : ""}${length ? ` of ${length}` : ""}`
-  } else {
-    const other = source.data.relationshipStatus.relationshipStatusOther.trim()
-    line = `${who.text} ${is} ${other ? lowerFirst(other) : "in another relationship"}`
-  }
-  if (prior.length > 0) {
-    const nounCount = prior.length === 1 ? "relationship" : "relationships"
-    line += `, and ${has} had ${countWord(prior.length)} previous significant ${nounCount}`
-  }
-  return `${line}.`
-}
-
-function parentsItem(
-  source: BackgroundReportSource,
-  voice: Voice,
-  first: string,
-  omitted: BackgroundReportOmission[]
-): string | null {
-  const bits: string[] = []
-  const link = canonicalParentsLink(source.data.relationships, source.data.partnerships)
-  const status = link.partnership?.relationshipStatus
-  if (status === "separated" || status === "divorced") {
-    const ended = link.partnership?.ended.trim() ?? ""
-    const age = ended ? clientAgeOn(source.dateOfBirth, ended) : null
-    const verbWas = verb(voice.kind === "they", "was", "were")
-    if (age != null) {
-      bits.push(`${voice.Possessive} parents ${status} when ${voice.subject} ${verbWas} ${age}.`)
-    } else {
-      bits.push(`${voice.Possessive} parents are ${status}.`)
-      omitted.push({
-        id: "parents-ended",
-        message: `When ${voice.possessive} parents separated not recorded`,
-        target: "relationships",
-      })
-    }
-  }
-  for (const parent of people(source.data.relationships, PARENT_ROLES)) {
-    if (parent.healthStatus !== "deceased" && !parent.deceased) continue
-    const role = lowerKeepingTypedCase(personRoleLabel(parent))
-    const age = parent.dateOfDeath ? clientAgeOn(source.dateOfBirth, parent.dateOfDeath) : null
-    if (parent.dateOfDeath && age != null) {
-      bits.push(`${voice.Possessive} ${role} died when ${first} was ${age}.`)
-    } else if (!parent.dateOfDeath) {
-      bits.push(`${voice.Possessive} ${role} is deceased.`)
-      omitted.push({
-        id: `death-${parent.relationshipRecordId || role}`,
-        message: `${personRoleLabel(parent)}'s year of death not recorded`,
-        target: "relationships",
-      })
-    } else {
-      const year = parsePartialDate(parent.dateOfDeath).year
-      bits.push(year ? `${voice.Possessive} ${role} died in ${year}.` : `${voice.Possessive} ${role} is deceased.`)
-    }
-  }
-  return bits.length > 0 ? bits.join(" ") : null
-}
-
-function countedPhrase(count: number, singular: string, plural: string, ages: string[]): string {
-  const noun = `${countWord(count)} ${count === 1 ? singular : plural}`
-  if (ages.length === 0) return noun
-  if (ages.length === count) return `${noun}, aged ${joinList(ages, "and")}`
-  return `${noun}, ${countWord(ages.length)} aged ${joinList(ages, "and")}`
-}
-
-function siblingItem(source: BackgroundReportSource, who: Speaker): string | null {
-  const groups: { roles: RelationshipToClient[]; singular: string; plural: string }[] = [
-    { roles: ["sibling_full"], singular: "sibling", plural: "siblings" },
-    { roles: ["sibling_half"], singular: "half-sibling", plural: "half-siblings" },
-    { roles: ["sibling_step"], singular: "step-sibling", plural: "step-siblings" },
-  ]
-  const parts: string[] = []
-  for (const group of groups) {
-    const rows = people(source.data.relationships, group.roles)
-    if (rows.length === 0) continue
-    parts.push(countedPhrase(rows.length, group.singular, group.plural, ageList(rows, source.reportDate)))
-  }
-  if (parts.length === 0) return null
-  const listed = parts.length === 1 ? parts[0] : `${parts.slice(0, -1).join(", ")}, and ${parts[parts.length - 1]}`
-  return `${who.text} ${verb(who.plural, "has", "have")} ${listed}.`
-}
-
-function childrenItem(source: BackgroundReportSource, who: Speaker): string | null {
-  const rows = people(source.data.relationships, CHILD_ROLES)
-  if (rows.length === 0) return null
-  const phrase = countedPhrase(rows.length, "child", "children", ageList(rows, source.reportDate))
-  return `${who.text} ${verb(who.plural, "has", "have")} ${phrase}.`
 }
 
 function cultureItem(source: BackgroundReportSource, voice: Voice): string | null {
@@ -853,7 +576,7 @@ function cultureItem(source: BackgroundReportSource, voice: Voice): string | nul
   return null
 }
 
-function ageItem(source: BackgroundReportSource, voice: Voice): string | null {
+function ageItem(source: BackgroundReportSource): string | null {
   const identity = source.data.demographics.identity
   const years = source.dateOfBirth ? ageYears(source.dateOfBirth, source.reportDate) : null
   const sex = identity.sex.trim().toLowerCase()
@@ -1072,7 +795,7 @@ function demographicItems(
     items.push(text)
   }
 
-  const age = ageItem(source, voice)
+  const age = ageItem(source)
   const culture = cultureItem(source, voice)
   const identity = [age, culture].filter(Boolean).join(" ")
   if (identity) {
@@ -1095,21 +818,13 @@ function demographicItems(
           source.data.relationships,
           source.reportDate
         )
-      : partnersParagraph(
-          first,
-          voice as ReportVoice,
-          source.data.relationshipStatus.relationshipStatus,
-          source.data.relationships,
-          source.reportDate
-        )
+      : null
   if (relationships) {
     named = true
     items.push(relationships)
   }
   const childrenTotal =
-    blocks.length > 0
-      ? childrenFromBlocks(first, blocks, source.data.relationships, source.reportDate)
-      : childrenTotalParagraph(first, source.data.relationships, source.reportDate)
+    blocks.length > 0 ? childrenFromBlocks(first, blocks, source.data.relationships, source.reportDate) : null
   if (childrenTotal) {
     named = true
     items.push(childrenTotal)
@@ -1123,11 +838,7 @@ function demographicItems(
       })
     }
   }
-  if (
-    blocks.length > 0
-      ? parentsSeparationMissingFromBlocks(blocks)
-      : parentsSeparationMissing(source.data.relationships, source.data.partnerships)
-  ) {
+  if (blocks.length > 0 && parentsSeparationMissingFromBlocks(blocks)) {
     omitted.push({
       id: "parents-ended",
       message: `When ${voice.possessive} parents separated not recorded`,
@@ -1145,14 +856,7 @@ function demographicItems(
           source.data.blockAnswers,
           source.reportDate
         )
-      : parentsParagraph(
-          first,
-          voice as ReportVoice,
-          source.dateOfBirth,
-          source.data.relationships,
-          source.data.partnerships,
-          source.reportDate
-        )
+      : null
   if (family) {
     named = true
     items.push(family)
@@ -1167,14 +871,7 @@ function demographicItems(
           source.data.relationships,
           source.reportDate
         )
-      : siblingsParagraph(
-          first,
-          voice as ReportVoice,
-          source.dateOfBirth,
-          source.data.relationships,
-          source.data.partnerships,
-          source.reportDate
-        )
+      : null
   if (siblings) {
     named = true
     items.push(siblings)

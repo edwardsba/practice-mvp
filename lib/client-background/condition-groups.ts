@@ -17,7 +17,7 @@ export type ConditionGroup = {
 }
 
 export function personKey(
-  event: Pick<EventRecord, "about" | "attribution" | "relationshipRecordId" | "aboutOther">
+  event: Pick<EventRecord, "about" | "relationshipRecordId" | "aboutOther">
 ): string {
   if (resolvedAbout(event) === "self") return "self"
   if (event.relationshipRecordId) return `person:${event.relationshipRecordId}`
@@ -25,8 +25,8 @@ export function personKey(
 }
 
 export function samePerson(
-  a: Pick<EventRecord, "about" | "attribution" | "relationshipRecordId" | "aboutOther">,
-  b: Pick<EventRecord, "about" | "attribution" | "relationshipRecordId" | "aboutOther">
+  a: Pick<EventRecord, "about" | "relationshipRecordId" | "aboutOther">,
+  b: Pick<EventRecord, "about" | "relationshipRecordId" | "aboutOther">
 ): boolean {
   return personKey(a) === personKey(b)
 }

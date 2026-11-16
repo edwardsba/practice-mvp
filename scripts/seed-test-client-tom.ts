@@ -278,6 +278,49 @@ async function repairTom(pool: Pool, clientId: string, practiceId: string) {
        WHERE client_id = $1 AND practice_id = $2 AND title = 'Sertraline'`,
       [clientId, practiceId, harry]
     )
+    // Round M: Jordan Yes, Pam None, Kim Yes; bio/Phil siblings Yes; Larry/Joan None.
+    await db.query(
+      `UPDATE client_relationship_blocks
+       SET children_answer = 'yes', no_children = false, updated_at = now()
+       WHERE client_id = $1 AND practice_id = $2 AND kind = 'client_current'`,
+      [clientId, practiceId]
+    )
+    await db.query(
+      `UPDATE client_relationship_blocks
+       SET children_answer = 'none', no_children = true, updated_at = now()
+       WHERE client_id = $1 AND practice_id = $2 AND kind = 'client_previous' AND status = 'defacto_separated'`,
+      [clientId, practiceId]
+    )
+    await db.query(
+      `UPDATE client_relationship_blocks
+       SET children_answer = 'yes', no_children = false, updated_at = now()
+       WHERE client_id = $1 AND practice_id = $2 AND kind = 'client_previous' AND status = 'divorced'`,
+      [clientId, practiceId]
+    )
+    await db.query(
+      `UPDATE client_relationship_blocks
+       SET siblings_answer = 'yes', updated_at = now()
+       WHERE client_id = $1 AND practice_id = $2 AND kind = 'biological_parents'`,
+      [clientId, practiceId]
+    )
+    await db.query(
+      `UPDATE client_relationship_blocks
+       SET siblings_answer = 'yes', updated_at = now()
+       WHERE client_id = $1 AND practice_id = $2 AND kind = 'parent_other' AND status = 'divorced'`,
+      [clientId, practiceId]
+    )
+    await db.query(
+      `UPDATE client_relationship_blocks
+       SET siblings_answer = 'none', updated_at = now()
+       WHERE client_id = $1 AND practice_id = $2 AND kind = 'parent_other' AND status = 'defacto'`,
+      [clientId, practiceId]
+    )
+    await db.query(
+      `UPDATE client_relationship_blocks
+       SET siblings_answer = 'none', updated_at = now()
+       WHERE client_id = $1 AND practice_id = $2 AND kind = 'caregiver_arrangement'`,
+      [clientId, practiceId]
+    )
     await db.query("COMMIT")
   } catch (error) {
     await db.query("ROLLBACK")

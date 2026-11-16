@@ -1,0 +1,33 @@
+name: Round M DB verify
+
+# One-shot: migration 0074 + Tom seed + tom-example-db.selftest.
+# Requires repository secret DATABASE_URL (same Postgres as Vercel).
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/diagnostic-intake
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Migration 0074 + Tom seed + db selftest
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "DATABASE_URL repository secret is not set"
+            exit 1
+          fi
+          npm run db:round-m-verify

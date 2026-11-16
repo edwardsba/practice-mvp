@@ -53,6 +53,10 @@ async function ownedClient(clientId: string, practiceId: string) {
 
 export async function loadBlockEditorState(clientId: string, practiceId: string): Promise<BlockEditorState | null> {
   if (!(await ownedClient(clientId, practiceId))) return null
+  const { ensureChildrenSiblingsAnswersColumns } = await import(
+    "@/lib/client-background/ensure-children-siblings-answers"
+  )
+  await ensureChildrenSiblingsAnswersColumns()
   const [background] = await db
     .select()
     .from(clientBackgrounds)

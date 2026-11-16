@@ -75,6 +75,11 @@ export async function loadClientBackground(
   const client = await clientInPractice(clientId, practiceId)
   if (!client) return null
 
+  const { ensureChildrenSiblingsAnswersColumns } = await import(
+    "@/lib/client-background/ensure-children-siblings-answers"
+  )
+  await ensureChildrenSiblingsAnswersColumns()
+
   const [background] = await db
     .select()
     .from(clientBackgrounds)

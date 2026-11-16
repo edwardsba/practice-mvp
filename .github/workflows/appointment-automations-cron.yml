@@ -14,3 +14,18 @@ jobs:
           curl -sf -X POST \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
             https://practice-mvp.vercel.app/api/cron/appointment-automations
+
+      - name: Round M DB verify on preview
+        # Applies migration 0074, repairs Tom answers, checks Background report wording.
+        # Uses the stable preview alias for feature/diagnostic-intake.
+        # Optional Vercel protection bypass when the project requires SSO for previews.
+        continue-on-error: true
+        run: |
+          BYPASS_HEADER=()
+          if [ -n "${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}" ]; then
+            BYPASS_HEADER=(-H "x-vercel-protection-bypass: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}")
+          fi
+          curl -sf -X POST \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${BYPASS_HEADER[@]}" \
+            "https://practice-mvp-git-feature-diagnost-a2e920-benedwards-practicemvp.vercel.app/api/cron/round-m-db-verify"

@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useRef, useState, type ReactNode } from "react"
 import { createPortal } from "react-dom"
 
 import {
@@ -450,80 +450,55 @@ export function RelationshipBlocksSection({
           {error && !selection ? <p className="text-sm text-destructive">{error}</p> : null}
           <section className="space-y-3">
             <h3 className="text-sm font-semibold">Current intimate relationship and children</h3>
-            <SelectField
-              id="client_relationship_status"
-              label="Current relationship status"
-              value={status.relationshipStatus}
-              client={
-                relationshipClient ? (
-                  <ClientAnswer
-                    label={relationshipClient.label}
-                    matches={
-                      status.relationshipStatus === relationshipClient.apply.relationshipStatus &&
-                      (relationshipClient.apply.relationshipStatus !== "other" ||
-                        status.relationshipStatusOther === relationshipClient.apply.relationshipStatusOther)
-                    }
-                    onUse={() => {
-                      setStatus(relationshipClient.apply)
-                      void run(() => saveRelationshipStatusBlockAction(clientId, relationshipClient.apply))
-                    }}
-                  />
-                ) : undefined
-              }
-              onChange={(relationshipStatus) => {
-                const next = {
-                  relationshipStatus: relationshipStatus as ClientRelationshipStatus | "",
-                  relationshipStatusOther: relationshipStatus === "other" ? status.relationshipStatusOther : "",
-                }
-                setStatus(next)
-                void run(() => saveRelationshipStatusBlockAction(clientId, next))
-              }}
-            >
-              <option value="">Not recorded</option>
-              {CLIENT_RELATIONSHIP_STATUSES.map((option) => (
-                <option key={option} value={option}>
-                  {CLIENT_RELATIONSHIP_STATUS_LABELS[option]}
-                </option>
-              ))}
-            </SelectField>
-            {status.relationshipStatus === "other" ? (
-              <TextField
-                id="client_relationship_status_other"
-                label="Other relationship status"
-                value={status.relationshipStatusOther}
-                onChange={(relationshipStatusOther) => {
-                  const next = { ...status, relationshipStatusOther }
-                  setStatus(next)
-                  void run(() => saveRelationshipStatusBlockAction(clientId, next))
-                }}
-              />
-            ) : null}
             {childrenPrompt ? (
               <p className="text-sm text-blue-800">
                 Client: {childrenPrompt} · {recordedChildren} recorded
               </p>
             ) : null}
-            {currentBlocks.map((block) => (
-              <CurrentBlockTree
-                key={block.relationshipBlockId}
-                block={block}
-                people={people}
-                locked={block.relationshipBlockId === lockedId}
-                onOpenBlock={() => openBlock(block.relationshipBlockId)}
-                onOpenPerson={openPerson}
-                onAddPartner={() => void addPerson(block.relationshipBlockId, "partner")}
-                onAddChild={() => void addPerson(block.relationshipBlockId, "child", "biological")}
-                onChildrenAnswer={(childrenAnswer) =>
-                  void run(() =>
-                    updateRelationshipBlockAction(clientId, {
-                      ...block,
-                      childrenAnswer,
-                      noChildren: childrenAnswer === "none",
-                    })
-                  )
-                }
-              />
-            ))}
+            {!isPartneredClientStatus(status.relationshipStatus) && currentBlocks.length === 0 ? (
+              <div className="space-y-2 rounded-[8px] bg-[#f4f4f5] p-3">
+                <ClientStatusSelect
+                  status={status}
+                  relationshipClient={relationshipClient}
+                  onChange={(next) => {
+                    setStatus(next)
+                    void run(() => saveRelationshipStatusBlockAction(clientId, next))
+                  }}
+                />
+              </div>
+            ) : (
+              currentBlocks.map((block, index) => (
+                <CurrentBlockTree
+                  key={block.relationshipBlockId}
+                  block={block}
+                  people={people}
+                  locked={block.relationshipBlockId === lockedId}
+                  statusSource={index === 0}
+                  clientStatus={status}
+                  relationshipClient={relationshipClient}
+                  onClientStatus={(next) => {
+                    setStatus(next)
+                    void run(() => saveRelationshipStatusBlockAction(clientId, next))
+                  }}
+                  onBlockStatus={(nextStatus) =>
+                    void run(() => updateRelationshipBlockAction(clientId, { ...block, status: nextStatus }))
+                  }
+                  onOpenBlock={() => openBlock(block.relationshipBlockId)}
+                  onOpenPerson={openPerson}
+                  onAddPartner={() => void addPerson(block.relationshipBlockId, "partner")}
+                  onAddChild={() => void addPerson(block.relationshipBlockId, "child", "biological")}
+                  onChildrenAnswer={(childrenAnswer) =>
+                    void run(() =>
+                      updateRelationshipBlockAction(clientId, {
+                        ...block,
+                        childrenAnswer,
+                        noChildren: childrenAnswer === "none",
+                      })
+                    )
+                  }
+                />
+              ))
+            )}
             {isPartneredClientStatus(status.relationshipStatus) || currentBlocks.length > 0 ? (
               <button type="button" className={linkClass} onClick={() => void addBlock("client_current")}>
                 {currentBlocks.length > 0 ? "+ Add another current relationship" : "+ Add current relationship"}
@@ -1072,6 +1047,81 @@ function DatesControl({
   )
 }
 
+function ClientStatusSelect({
+  status,
+  relationshipClient,
+  onChange,
+  id = "client_relationship_status",
+}: {
+  status: ClientRelationshipStatusValue
+  relationshipClient?: AppliedAnswer<ClientRelationshipStatusValue>
+  onChange: (next: ClientRelationshipStatusValue) => void
+  id?: string
+}) {
+  return (
+    <>
+      <SelectField
+        id={id}
+        label="Current relationship status"
+        value={status.relationshipStatus}
+        client={
+          relationshipClient ? (
+            <ClientAnswer
+              label={relationshipClient.label}
+              matches={
+                status.relationshipStatus === relationshipClient.apply.relationshipStatus &&
+                (relationshipClient.apply.relationshipStatus !== "other" ||
+                  status.relationshipStatusOther === relationshipClient.apply.relationshipStatusOther)
+              }
+              onUse={() => onChange(relationshipClient.apply)}
+            />
+          ) : undefined
+        }
+        onChange={(relationshipStatus) =>
+          onChange({
+            relationshipStatus: relationshipStatus as ClientRelationshipStatus | "",
+            relationshipStatusOther: relationshipStatus === "other" ? status.relationshipStatusOther : "",
+          })
+        }
+      >
+        <option value="">Not recorded</option>
+        {CLIENT_RELATIONSHIP_STATUSES.map((option) => (
+          <option key={option} value={option}>
+            {CLIENT_RELATIONSHIP_STATUS_LABELS[option]}
+          </option>
+        ))}
+      </SelectField>
+      {status.relationshipStatus === "other" ? (
+        <TextField
+          id={`${id}_other`}
+          label="Other relationship status"
+          value={status.relationshipStatusOther}
+          onChange={(relationshipStatusOther) => onChange({ ...status, relationshipStatusOther })}
+        />
+      ) : null}
+    </>
+  )
+}
+
+/** Nest Children / Siblings under the last leader line (board AA). */
+function withNestedQuestion(
+  leaders: RelationshipRecord[],
+  renderLeader: (person: RelationshipRecord) => ReactNode,
+  question: ReactNode
+) {
+  if (leaders.length === 0) return <>{question}</>
+  return (
+    <>
+      {leaders.map((person, index) => (
+        <div key={person.relationshipRecordId} className="space-y-2">
+          {renderLeader(person)}
+          {index === leaders.length - 1 ? question : null}
+        </div>
+      ))}
+    </>
+  )
+}
+
 function ChildrenQuestion({
   block,
   people,
@@ -1162,6 +1212,11 @@ function CurrentBlockTree({
   block,
   people,
   locked,
+  statusSource,
+  clientStatus,
+  relationshipClient,
+  onClientStatus,
+  onBlockStatus,
   onOpenBlock,
   onOpenPerson,
   onAddPartner,
@@ -1171,6 +1226,11 @@ function CurrentBlockTree({
   block: RelationshipBlock
   people: RelationshipRecord[]
   locked: boolean
+  statusSource: boolean
+  clientStatus: ClientRelationshipStatusValue
+  relationshipClient?: AppliedAnswer<ClientRelationshipStatusValue>
+  onClientStatus: (next: ClientRelationshipStatusValue) => void
+  onBlockStatus: (status: string) => void
   onOpenBlock: () => void
   onOpenPerson: (id: string) => void
   onAddPartner: () => void
@@ -1179,27 +1239,59 @@ function CurrentBlockTree({
 }) {
   const partners = membersOf(block, people, "partner")
   const needs = needsForBlock(block, locked).map(needLabel)
+  const statuses = statusesForBlock(block.kind)
+  const children = (
+    <ChildrenQuestion
+      block={block}
+      people={people}
+      onOpenPerson={onOpenPerson}
+      onAddChild={onAddChild}
+      onAnswer={onChildrenAnswer}
+    />
+  )
   return (
     <div className="space-y-2 rounded-[8px] bg-[#f4f4f5] p-3">
-      <DatesControl block={block} needs={needs} onOpen={onOpenBlock} />
-      {partners.map((person) => (
-        <PersonLine
-          key={person.relationshipRecordId}
-          person={person}
-          block={block}
-          onOpen={() => onOpenPerson(person.relationshipRecordId)}
-        />
-      ))}
+      <div className="flex flex-wrap items-end gap-3">
+        <div className="min-w-[12rem] flex-1">
+          {statusSource ? (
+            <ClientStatusSelect
+              id={`client_relationship_status_${block.relationshipBlockId}`}
+              status={clientStatus}
+              relationshipClient={relationshipClient}
+              onChange={onClientStatus}
+            />
+          ) : (
+            <SelectField
+              id={`${block.relationshipBlockId}-status-inline`}
+              label="Status"
+              value={block.status}
+              onChange={onBlockStatus}
+            >
+              <option value="">Not recorded</option>
+              {statuses.map((status) => (
+                <option key={status} value={status}>
+                  {statusLabel(status)}
+                </option>
+              ))}
+            </SelectField>
+          )}
+        </div>
+        <DatesControl block={block} needs={needs} onOpen={onOpenBlock} />
+      </div>
+      {withNestedQuestion(
+        partners,
+        (person) => (
+          <PersonLine
+            person={person}
+            block={block}
+            onOpen={() => onOpenPerson(person.relationshipRecordId)}
+          />
+        ),
+        children
+      )}
       <button type="button" className={linkClass} onClick={onAddPartner}>
         + Add another partner
       </button>
-      <ChildrenQuestion
-        block={block}
-        people={people}
-        onOpenPerson={onOpenPerson}
-        onAddChild={onAddChild}
-        onAnswer={onChildrenAnswer}
-      />
     </div>
   )
 }
@@ -1226,6 +1318,15 @@ function PreviousBlockTree({
   const partners = membersOf(block, people, "partner")
   const needs = needsForBlock(block, false)
   const statuses = statusesForBlock(block.kind)
+  const children = (
+    <ChildrenQuestion
+      block={block}
+      people={people}
+      onOpenPerson={onOpenPerson}
+      onAddChild={onAddChild}
+      onAnswer={onChildrenAnswer}
+    />
+  )
   return (
     <div className="space-y-2 rounded-[8px] bg-[#f4f4f5] p-3">
       <div className="flex flex-wrap items-end gap-3">
@@ -1251,24 +1352,20 @@ function PreviousBlockTree({
         />
         {needs.includes("status") ? <Needs need={needLabel("status")} /> : null}
       </div>
-      {partners.map((person) => (
-        <PersonLine
-          key={person.relationshipRecordId}
-          person={person}
-          block={block}
-          onOpen={() => onOpenPerson(person.relationshipRecordId)}
-        />
-      ))}
+      {withNestedQuestion(
+        partners,
+        (person) => (
+          <PersonLine
+            person={person}
+            block={block}
+            onOpen={() => onOpenPerson(person.relationshipRecordId)}
+          />
+        ),
+        children
+      )}
       <button type="button" className={linkClass} onClick={onAddPartner}>
         + Add partner
       </button>
-      <ChildrenQuestion
-        block={block}
-        people={people}
-        onOpenPerson={onOpenPerson}
-        onAddChild={onAddChild}
-        onAnswer={onChildrenAnswer}
-      />
     </div>
   )
 }
@@ -1346,6 +1443,15 @@ function ParentsBlockTree({
   )
   const statuses = statusesForBlock(block.kind)
   const needs = needsForBlock(block, false).map(needLabel)
+  const siblings = (
+    <SiblingsQuestion
+      block={block}
+      people={people}
+      onOpenPerson={onOpenPerson}
+      onAddSibling={onAddSibling}
+      onAnswer={onSiblingsAnswer}
+    />
+  )
   return (
     <section className="space-y-3">
       <h3 className="text-sm font-semibold">Biological parents</h3>
@@ -1363,21 +1469,17 @@ function ParentsBlockTree({
           </div>
           <DatesControl block={block} needs={needs} onOpen={onOpenBlock} />
         </div>
-        {parents.map((person) => (
-          <PersonLine
-            key={person.relationshipRecordId}
-            person={person}
-            block={block}
-            onOpen={() => onOpenPerson(person.relationshipRecordId)}
-          />
-        ))}
-        <SiblingsQuestion
-          block={block}
-          people={people}
-          onOpenPerson={onOpenPerson}
-          onAddSibling={onAddSibling}
-          onAnswer={onSiblingsAnswer}
-        />
+        {withNestedQuestion(
+          parents,
+          (person) => (
+            <PersonLine
+              person={person}
+              block={block}
+              onOpen={() => onOpenPerson(person.relationshipRecordId)}
+            />
+          ),
+          siblings
+        )}
       </div>
     </section>
   )
@@ -1405,6 +1507,15 @@ function ParentOtherTree({
   const partners = membersOf(block, people, "partner")
   const statuses = statusesForBlock(block.kind)
   const needs = needsForBlock(block, false)
+  const siblings = (
+    <SiblingsQuestion
+      block={block}
+      people={people}
+      onOpenPerson={onOpenPerson}
+      onAddSibling={onAddSibling}
+      onAnswer={onSiblingsAnswer}
+    />
+  )
   return (
     <div className="space-y-2 rounded-[8px] bg-[#f4f4f5] p-3">
       <div className="flex flex-wrap items-end gap-3">
@@ -1425,24 +1536,20 @@ function ParentOtherTree({
         />
         {needs.includes("status") ? <Needs need={needLabel("status")} /> : null}
       </div>
-      {partners.map((person) => (
-        <PersonLine
-          key={person.relationshipRecordId}
-          person={person}
-          block={block}
-          onOpen={() => onOpenPerson(person.relationshipRecordId)}
-        />
-      ))}
+      {withNestedQuestion(
+        partners,
+        (person) => (
+          <PersonLine
+            person={person}
+            block={block}
+            onOpen={() => onOpenPerson(person.relationshipRecordId)}
+          />
+        ),
+        siblings
+      )}
       <button type="button" className={linkClass} onClick={onAddPartner}>
         + Add partner
       </button>
-      <SiblingsQuestion
-        block={block}
-        people={people}
-        onOpenPerson={onOpenPerson}
-        onAddSibling={onAddSibling}
-        onAnswer={onSiblingsAnswer}
-      />
     </div>
   )
 }
@@ -1468,6 +1575,15 @@ function CaregiverTree({
 }) {
   const caregivers = membersOf(block, people, "caregiver")
   const needs = needsForBlock(block, false)
+  const siblings = (
+    <SiblingsQuestion
+      block={block}
+      people={people}
+      onOpenPerson={onOpenPerson}
+      onAddSibling={onAddSibling}
+      onAnswer={onSiblingsAnswer}
+    />
+  )
   return (
     <div className="space-y-2 rounded-[8px] bg-[#f4f4f5] p-3">
       <div className="flex flex-wrap items-end gap-3">
@@ -1493,24 +1609,20 @@ function CaregiverTree({
         />
         {needs.includes("type") ? <Needs need={needLabel("type")} /> : null}
       </div>
-      {caregivers.map((person) => (
-        <PersonLine
-          key={person.relationshipRecordId}
-          person={person}
-          block={block}
-          onOpen={() => onOpenPerson(person.relationshipRecordId)}
-        />
-      ))}
+      {withNestedQuestion(
+        caregivers,
+        (person) => (
+          <PersonLine
+            person={person}
+            block={block}
+            onOpen={() => onOpenPerson(person.relationshipRecordId)}
+          />
+        ),
+        siblings
+      )}
       <button type="button" className={linkClass} onClick={onAddCaregiver}>
         + Add caregiver
       </button>
-      <SiblingsQuestion
-        block={block}
-        people={people}
-        onOpenPerson={onOpenPerson}
-        onAddSibling={onAddSibling}
-        onAnswer={onSiblingsAnswer}
-      />
     </div>
   )
 }

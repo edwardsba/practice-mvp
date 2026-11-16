@@ -308,6 +308,26 @@ export function InterviewHistory({
     router.push(`/clients/${clientId}/background`)
   }
 
+  const liveChecks = getChecks({
+    screening: answers,
+    events: entries,
+    stressors: stressorsRef.current,
+  })
+
+  function historyGroupNeeds(group: (typeof HISTORY_QUESTION_GROUPS)[number]): number {
+    const keys = new Set<string>(group.keys)
+    return liveChecks.filter((check) => {
+      if (check.target !== "history") return false
+      if (check.id.startsWith("history-")) return keys.has(check.id.slice("history-".length))
+      const match = /^(?:detail|unlinked)-(.+)$/.exec(check.id)
+      if (!match) return false
+      const event = entries.find((item) => item.eventRecordId === match[1])
+      if (!event) return false
+      const about = event.about === "significant_other" ? "significant_other" : "self"
+      return group.keys.some((key) => HISTORY_QUESTIONS[key].about === about)
+    }).length
+  }
+
   return (
     <div className="space-y-4">
       {HISTORY_QUESTION_GROUPS.map((group) => (
@@ -316,7 +336,7 @@ export function InterviewHistory({
           title={group.title}
           open={Boolean(sectionOpen[group.title])}
           onToggle={() => toggleHistorySection(group.title)}
-          badge={needsBadge(0)}
+          badge={needsBadge(historyGroupNeeds(group))}
         >
           <div className="space-y-4">
             {group.keys.map((key) => {

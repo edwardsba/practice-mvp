@@ -12,6 +12,7 @@ import {
   emptyStressors,
   type ClientBackgroundData,
   type EventRecord,
+  type RelationshipBlock,
   type RelationshipRecord,
 } from "@/lib/client-background/types"
 
@@ -384,6 +385,50 @@ assert.deepEqual(
     "Client reported 2 children; 1 recorded.",
   ]
 )
+
+const placeholderBlock: RelationshipBlock = {
+  relationshipBlockId: "bio-1",
+  kind: "biological_parents",
+  parentRecordId: null,
+  parentSide: "",
+  status: "divorced",
+  statusDetail: "",
+  arrangementType: "",
+  arrangementDetail: "",
+  startedOn: "",
+  endedOn: "",
+  noChildren: false,
+  childrenAnswer: "",
+  siblingsAnswer: "none",
+  displayOrder: 0,
+}
+const unplacedChecks = backgroundChecks(
+  input({
+    data: data({
+      relationshipBlocks: [placeholderBlock],
+      relationships: [
+        person({
+          relationshipRecordId: "unplaced-partner",
+          relationshipToClient: "prior_partner",
+          givenName: "Kim",
+          blockRole: "partner",
+          relationshipBlockId: null,
+          placementReview: "unplaced",
+        }),
+        person({
+          relationshipRecordId: "unplaced-sib",
+          relationshipToClient: "sibling_full",
+          givenName: "Pat",
+          blockRole: "sibling",
+          relationshipBlockId: null,
+          placementReview: "unplaced",
+        }),
+      ],
+    }),
+  })
+)
+assert.equal(unplacedChecks.find((check) => check.id === "unplaced-unplaced-partner")?.target, "relationships-intimate")
+assert.equal(unplacedChecks.find((check) => check.id === "unplaced-unplaced-sib")?.target, "relationships-caregivers")
 
 const datedDepression = { ...emptyEvent("emotional_problems", 0), eventRecordId: "dated", title: "Depression", startPrecision: "year" as const, startValue: "2000", about: "self" as const }
 assert.equal(entryDetailMessage(datedDepression, "1970-03-12"), null)

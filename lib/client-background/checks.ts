@@ -92,6 +92,17 @@ function intimateBlock(kind: string): boolean {
   return kind === "client_current" || kind === "client_previous" || kind === "client_other_children"
 }
 
+/** Same split as the interview Unplaced groups — partner/child roles go to Intimate. */
+function intimateUnplacedPerson(person: RelationshipRecord): boolean {
+  if (person.blockRole === "partner" || person.blockRole === "child") return true
+  return (
+    person.relationshipToClient === "current_partner" ||
+    person.relationshipToClient === "prior_partner" ||
+    person.relationshipToClient === "child_biological" ||
+    person.relationshipToClient === "child_step"
+  )
+}
+
 function childrenAnswerMissing(block: RelationshipBlock, people: RelationshipRecord[]): string | null {
   if (block.kind !== "client_current" && block.kind !== "client_previous") return null
   const hasChildren = people.some((person) => person.relationshipBlockId === block.relationshipBlockId && person.blockRole === "child")
@@ -295,7 +306,7 @@ export function backgroundChecks(input: BackgroundCheckInput): BackgroundCheck[]
       checks.push({
         id: `unplaced-${person.relationshipRecordId}`,
         message: name ? `${name} could not be placed in a relationship.` : "A person could not be placed in a relationship.",
-        target: "relationships-caregivers",
+        target: intimateUnplacedPerson(person) ? "relationships-intimate" : "relationships-caregivers",
       })
     }
     for (const person of data.relationships) {

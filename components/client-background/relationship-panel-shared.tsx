@@ -477,8 +477,14 @@ export function BlockFields({
         <label className="flex min-h-10 items-center gap-2 text-sm">
           <input
             type="checkbox"
-            checked={block.noChildren}
-            onChange={(event) => onChange({ ...block, noChildren: event.target.checked })}
+            checked={block.noChildren || block.childrenAnswer === "none"}
+            onChange={(event) =>
+              onChange({
+                ...block,
+                noChildren: event.target.checked,
+                childrenAnswer: event.target.checked ? "none" : block.childrenAnswer === "none" ? "" : block.childrenAnswer,
+              })
+            }
           />
           No children
         </label>

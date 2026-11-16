@@ -231,16 +231,15 @@ export function RelationshipBlocksSection({
   const [status, setStatus] = useState(relationshipStatus)
   const [error, setError] = useState<string | null>(null)
   const [selection, setSelection] = useState<Selection | null>(null)
-  const [ready, setReady] = useState(false)
   const [intimateOpenLocal, setIntimateOpenLocal] = useState(true)
   const [caregiversOpenLocal, setCaregiversOpenLocal] = useState(true)
   const intimateOpen = sectionOpen?.intimate ?? intimateOpenLocal
   const caregiversOpen = sectionOpen?.caregivers ?? caregiversOpenLocal
+  const portalReady = typeof document !== "undefined"
   const inflight = useRef<Promise<void> | null>(null)
   const personTimer = useRef<number | null>(null)
   const blockTimer = useRef<number | null>(null)
 
-  useEffect(() => setReady(true), [])
   useEffect(() => {
     if (!registerFlush) return
     return registerFlush(() => inflight.current ?? Promise.resolve())
@@ -746,7 +745,7 @@ export function RelationshipBlocksSection({
         </div>
       </InterviewSectionCard>
 
-      {ready && selection
+      {portalReady && selection
         ? createPortal(
             <RelationshipPanelShell
               ariaLabel={
@@ -766,6 +765,7 @@ export function RelationshipBlocksSection({
                     onClose={closePanel}
                   />
                   <MoveStep
+                    key={`move-${selectedPerson.relationshipRecordId}`}
                     name={selectedPerson.givenName.trim() || "Person"}
                     person={selectedPerson}
                     blocks={blockList}
@@ -789,6 +789,7 @@ export function RelationshipBlocksSection({
                 </>
               ) : selection.type === "person" && selectedPerson ? (
                 <InterviewPersonPanel
+                  key={selectedPerson.relationshipRecordId}
                   person={selectedPerson}
                   block={blockList.find((item) => item.relationshipBlockId === selectedPerson.relationshipBlockId) ?? null}
                   addAnotherRole={selection.addAnotherRole}
@@ -808,6 +809,7 @@ export function RelationshipBlocksSection({
                 />
               ) : selection.type === "block" && selectedBlock ? (
                 <InterviewBlockPanel
+                  key={selectedBlock.relationshipBlockId}
                   block={selectedBlock}
                   locked={selectedBlock.relationshipBlockId === lockedId}
                   error={error}
@@ -865,7 +867,6 @@ function InterviewPersonPanel({
   onDone: (draft: PersonDraft) => Promise<void>
 }) {
   const [draft, setDraft] = useState(() => draftFromPerson(person))
-  useEffect(() => setDraft(draftFromPerson(person)), [person])
   const name = person.notKnown && person.blockRole === "parent"
     ? person.blockRoleType === "father"
       ? "Father"
@@ -951,7 +952,6 @@ function InterviewBlockPanel({
   onDone: (draft: RelationshipBlock) => Promise<void>
 }) {
   const [draft, setDraft] = useState(block)
-  useEffect(() => setDraft(block), [block])
   return (
     <>
       <PanelHeader
@@ -1287,16 +1287,28 @@ function OtherChildrenTree({
   onAddChild: () => void
 }) {
   const children = membersOf(block, people, "child")
+  const [detail, setDetail] = useState(block.statusDetail)
+  const timer = useRef<number | null>(null)
+  useEffect(
+    () => () => {
+      if (timer.current) window.clearTimeout(timer.current)
+    },
+    []
+  )
   return (
     <div className="space-y-2 rounded-[8px] bg-[#f4f4f5] p-3">
       <TextField
         id={`${block.relationshipBlockId}-relationship-inline`}
         label="Relationship"
         placeholder="e.g. IVF with a donor, sole adoption"
-        value={block.statusDetail}
-        onChange={onStatusDetail}
+        value={detail}
+        onChange={(statusDetail) => {
+          setDetail(statusDetail)
+          if (timer.current) window.clearTimeout(timer.current)
+          timer.current = window.setTimeout(() => onStatusDetail(statusDetail), 400)
+        }}
       />
-      {!block.statusDetail.trim() ? <Needs need="Unrecorded relationship" /> : null}
+      {!detail.trim() ? <Needs need="Unrecorded relationship" /> : null}
       {children.map((person) => (
         <PersonLine
           key={person.relationshipRecordId}

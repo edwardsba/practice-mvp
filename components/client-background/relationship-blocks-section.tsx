@@ -455,7 +455,7 @@ export function RelationshipBlocksSection({
                 Client: {childrenPrompt} · {recordedChildren} recorded
               </p>
             ) : null}
-            {!isPartneredClientStatus(status.relationshipStatus) && currentBlocks.length === 0 ? (
+            {currentBlocks.length === 0 ? (
               <div className="space-y-2 rounded-[8px] bg-[#f4f4f5] p-3">
                 <ClientStatusSelect
                   status={status}

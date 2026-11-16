@@ -105,8 +105,8 @@ async function main() {
       await db.query(
         `INSERT INTO client_relationship_blocks (
            relationship_block_id, client_id, practice_id, kind, parent_side, status, arrangement_type,
-           started_on, ended_on, no_children, display_order
-         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+           started_on, ended_on, no_children, children_answer, siblings_answer, display_order
+         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
         [
           ids.get(block.relationshipBlockId),
           clientId,
@@ -118,6 +118,8 @@ async function main() {
           text(block.startedOn),
           text(block.endedOn),
           block.noChildren,
+          text(block.childrenAnswer),
+          text(block.siblingsAnswer),
           block.displayOrder,
         ]
       )

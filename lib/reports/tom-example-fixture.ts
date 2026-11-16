@@ -62,6 +62,8 @@ function block(partial: Partial<RelationshipBlock> & Pick<RelationshipBlock, "re
     startedOn: "",
     endedOn: "",
     noChildren: false,
+    childrenAnswer: "",
+    siblingsAnswer: "",
     displayOrder: 0,
     ...partial,
   }
@@ -98,13 +100,46 @@ export function tomRelationships(): RelationshipRecord[] {
 
 export function tomBlocks(): RelationshipBlock[] {
   return [
-    block({ relationshipBlockId: "tom-current", kind: "client_current", status: "married", startedOn: "2014", displayOrder: 0 }),
-    block({ relationshipBlockId: "tom-pam", kind: "client_previous", status: "defacto_separated", startedOn: "2005", endedOn: "2011", noChildren: true, displayOrder: 0 }),
-    block({ relationshipBlockId: "tom-kim", kind: "client_previous", status: "divorced", startedOn: "1998", endedOn: "2003", displayOrder: 1 }),
-    block({ relationshipBlockId: "tom-bio", kind: "biological_parents", status: "divorced", startedOn: "1965", endedOn: "1978" }),
-    block({ relationshipBlockId: "tom-phil", kind: "parent_other", parentRecordId: "tom-sally", parentSide: "mother", status: "divorced", startedOn: "1981", endedOn: "1990" }),
-    block({ relationshipBlockId: "tom-larry", kind: "parent_other", parentRecordId: "tom-sally", parentSide: "mother", status: "defacto", startedOn: "2010" }),
-    block({ relationshipBlockId: "tom-joan", kind: "caregiver_arrangement", arrangementType: "grandparent_care", startedOn: "1978", endedOn: "1982" }),
+    block({ relationshipBlockId: "tom-current", kind: "client_current", status: "married", startedOn: "2014", displayOrder: 0, childrenAnswer: "yes" }),
+    block({
+      relationshipBlockId: "tom-pam",
+      kind: "client_previous",
+      status: "defacto_separated",
+      startedOn: "2005",
+      endedOn: "2011",
+      noChildren: true,
+      childrenAnswer: "none",
+      displayOrder: 0,
+    }),
+    block({ relationshipBlockId: "tom-kim", kind: "client_previous", status: "divorced", startedOn: "1998", endedOn: "2003", displayOrder: 1, childrenAnswer: "yes" }),
+    block({ relationshipBlockId: "tom-bio", kind: "biological_parents", status: "divorced", startedOn: "1965", endedOn: "1978", siblingsAnswer: "yes" }),
+    block({
+      relationshipBlockId: "tom-phil",
+      kind: "parent_other",
+      parentRecordId: "tom-sally",
+      parentSide: "mother",
+      status: "divorced",
+      startedOn: "1981",
+      endedOn: "1990",
+      siblingsAnswer: "yes",
+    }),
+    block({
+      relationshipBlockId: "tom-larry",
+      kind: "parent_other",
+      parentRecordId: "tom-sally",
+      parentSide: "mother",
+      status: "defacto",
+      startedOn: "2010",
+      siblingsAnswer: "none",
+    }),
+    block({
+      relationshipBlockId: "tom-joan",
+      kind: "caregiver_arrangement",
+      arrangementType: "grandparent_care",
+      startedOn: "1978",
+      endedOn: "1982",
+      siblingsAnswer: "none",
+    }),
   ]
 }
 

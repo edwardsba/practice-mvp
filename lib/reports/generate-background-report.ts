@@ -1,5 +1,5 @@
 import { assessAge, compareEventsChronologically } from "@/lib/client-background/age"
-import { backgroundChecks } from "@/lib/client-background/checks"
+import { backgroundChecks, type BackgroundCheckTarget } from "@/lib/client-background/checks"
 import type { ProfessionalOption } from "@/lib/client-background/professionals"
 import {
   HISTORY_QUESTION_GROUPS,
@@ -60,6 +60,11 @@ export type BackgroundReportOmission = {
   id: string
   message: string
   target: BackgroundReportOmissionTarget
+}
+
+function omissionTargetForCheck(target: BackgroundCheckTarget): BackgroundReportOmissionTarget {
+  if (target === "relationships-intimate" || target === "relationships-caregivers") return "relationships"
+  return target
 }
 
 export type BackgroundReportReferral = {
@@ -941,7 +946,11 @@ export function generateBackgroundReport(source: BackgroundReportSource): Backgr
   })) {
     if (seen.has(check.id)) continue
     seen.add(check.id)
-    omitted.push(check)
+    omitted.push({
+      id: check.id,
+      message: check.message,
+      target: omissionTargetForCheck(check.target),
+    })
   }
   const content: LetterBodyNode[] = []
 

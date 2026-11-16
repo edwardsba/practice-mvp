@@ -174,8 +174,8 @@ function DemographicsReadOnly({
       <Subsection title="Identity" id="check-identity">
         <ReadOnlyField label="Sex" value={value.identity.sex} />
         <ReadOnlyField label="Gender identity" value={value.identity.genderIdentity} />
-        <ReadOnlyField label="Sexual orientation" value={orientationText(value.identity)} />
         <ReadOnlyField label="Pronouns" value={pronouns} />
+        <ReadOnlyField label="Sexual orientation" value={orientationText(value.identity)} />
         <ReadOnlyField label="Race/Ethnicity" value={value.identity.raceEthnicity} />
         <ReadOnlyField label="Religion" value={value.identity.religion} />
         <ReadOnlyField label="Primary language" value={value.identity.primaryLanguage} />
@@ -187,11 +187,11 @@ function DemographicsReadOnly({
       </Subsection>
       <Subsection title="Education" divided>
         <ReadOnlyField label="Level of education" value={value.education.level} />
+        <ReadOnlyField label="Field of study" value={value.education.fieldOfStudy} />
         <ReadOnlyField
           label="Currently studying"
           value={yesNoText(value.education.currentlyStudying, value.education.currentlyStudyingDetail)}
         />
-        <ReadOnlyField label="Field of study" value={value.education.fieldOfStudy} />
         <ReadOnlyField
           label="Disruption to education"
           value={yesNoText(value.education.disruption, value.education.disruptionDetail)}
@@ -358,6 +358,21 @@ export function IdentityFieldsEditor({
         }
         onChange={(genderIdentity) => onChange({ ...value, genderIdentity })}
       />
+      <TextField
+        id="pronouns"
+        label="Pronouns"
+        value={value.pronouns}
+        client={
+          client?.pronouns ? (
+            <ClientAnswer
+              label={client.pronouns.label}
+              matches={value.pronouns === client.pronouns.apply}
+              onUse={() => apply({ ...value, pronouns: client.pronouns!.apply })}
+            />
+          ) : undefined
+        }
+        onChange={(pronouns) => onChange({ ...value, pronouns })}
+      />
       <SelectField
         id="sexual_orientation"
         label="Sexual orientation"
@@ -403,21 +418,6 @@ export function IdentityFieldsEditor({
           onChange={(sexualOrientationOther) => onChange({ ...value, sexualOrientationOther })}
         />
       ) : null}
-      <TextField
-        id="pronouns"
-        label="Pronouns"
-        value={value.pronouns}
-        client={
-          client?.pronouns ? (
-            <ClientAnswer
-              label={client.pronouns.label}
-              matches={value.pronouns === client.pronouns.apply}
-              onUse={() => apply({ ...value, pronouns: client.pronouns!.apply })}
-            />
-          ) : undefined
-        }
-        onChange={(pronouns) => onChange({ ...value, pronouns })}
-      />
       <TextField
         id="race_ethnicity"
         label="Race/Ethnicity"
@@ -658,6 +658,21 @@ export function EducationFieldsEditor({
           </option>
         ))}
       </SelectField>
+      <TextField
+        id="field_of_study"
+        label="Field of study"
+        value={value.fieldOfStudy}
+        client={
+          fieldOfStudy ? (
+            <ClientAnswer
+              label={fieldOfStudy.label}
+              matches={value.fieldOfStudy === fieldOfStudy.apply}
+              onUse={() => apply({ ...value, fieldOfStudy: fieldOfStudy.apply })}
+            />
+          ) : undefined
+        }
+        onChange={(next) => onChange({ ...value, fieldOfStudy: next })}
+      />
       <YesNoDetail
         id="currently_studying"
         label="Currently studying"
@@ -684,21 +699,6 @@ export function EducationFieldsEditor({
         }
         onChange={(next) => onChange({ ...value, currentlyStudying: next })}
         onDetail={(currentlyStudyingDetail) => onChange({ ...value, currentlyStudyingDetail })}
-      />
-      <TextField
-        id="field_of_study"
-        label="Field of study"
-        value={value.fieldOfStudy}
-        client={
-          fieldOfStudy ? (
-            <ClientAnswer
-              label={fieldOfStudy.label}
-              matches={value.fieldOfStudy === fieldOfStudy.apply}
-              onUse={() => apply({ ...value, fieldOfStudy: fieldOfStudy.apply })}
-            />
-          ) : undefined
-        }
-        onChange={(next) => onChange({ ...value, fieldOfStudy: next })}
       />
       <YesNoDetail
         id="disruption"

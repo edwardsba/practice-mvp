@@ -9,6 +9,7 @@ import {
   type ClientBackgroundData,
   type ClientRelationshipStatus,
   type LivesWith,
+  type RelationshipBlock,
   type RelationshipRecord,
   type RelationshipToClient,
 } from "@/lib/client-background/types"
@@ -19,6 +20,8 @@ export type BackgroundCheckTarget =
   | "occupation"
   | "living"
   | "relationships"
+  | "relationships-intimate"
+  | "relationships-caregivers"
   | "history"
 
 export type BackgroundCheck = {
@@ -63,7 +66,9 @@ export function backgroundSectionForCheck(
   target: BackgroundCheckTarget
 ): "reason" | "demographics" | "relationships" | "history" {
   if (target === "reason") return "reason"
-  if (target === "relationships") return "relationships"
+  if (target === "relationships" || target === "relationships-intimate" || target === "relationships-caregivers") {
+    return "relationships"
+  }
   if (target === "history") return "history"
   return "demographics"
 }
@@ -76,7 +81,35 @@ export function interviewPageForCheck(target: BackgroundCheckTarget): "backgroun
 export function checkElementIds(check: BackgroundCheck): string[] {
   const specific = `check-${check.id}`
   const section = `check-${check.target}`
-  return specific === section ? [section] : [specific, section]
+  const ids = specific === section ? [section] : [specific, section]
+  if (check.target === "relationships-intimate" || check.target === "relationships-caregivers") {
+    ids.push("check-relationships")
+  }
+  return ids
+}
+
+function intimateBlock(kind: string): boolean {
+  return kind === "client_current" || kind === "client_previous" || kind === "client_other_children"
+}
+
+function childrenAnswerMissing(block: RelationshipBlock, people: RelationshipRecord[]): string | null {
+  if (block.kind !== "client_current" && block.kind !== "client_previous") return null
+  const hasChildren = people.some((person) => person.relationshipBlockId === block.relationshipBlockId && person.blockRole === "child")
+  if (hasChildren || block.childrenAnswer === "yes" || block.childrenAnswer === "none" || block.childrenAnswer === "not_asked" || block.noChildren) {
+    return null
+  }
+  return block.status.trim() || "this relationship"
+}
+
+function siblingsAnswerMissing(block: RelationshipBlock, people: RelationshipRecord[]): string | null {
+  if (block.kind !== "biological_parents" && block.kind !== "parent_other" && block.kind !== "caregiver_arrangement") return null
+  const hasSiblings = people.some((person) => person.relationshipBlockId === block.relationshipBlockId && person.blockRole === "sibling")
+  if (hasSiblings || block.siblingsAnswer === "yes" || block.siblingsAnswer === "none" || block.siblingsAnswer === "not_asked") {
+    return null
+  }
+  if (block.kind === "biological_parents") return "biological parents"
+  if (block.kind === "caregiver_arrangement") return "this caregiver arrangement"
+  return block.parentSide === "father" ? "father's other relationship" : "mother's other relationship"
 }
 
 function markedLivingWith(person: RelationshipRecord): boolean {
@@ -103,14 +136,14 @@ export function backgroundChecks(input: BackgroundCheckInput): BackgroundCheck[]
     checks.push({
       id: "partner-missing",
       message: `Relationship status is ${CLIENT_RELATIONSHIP_STATUS_LABELS[status]}, but no current partner is recorded.`,
-      target: "relationships",
+      target: "relationships-intimate",
     })
   }
   if (status && (PARTNER_UNEXPECTED as readonly string[]).includes(status) && hasCurrentPartner) {
     checks.push({
       id: "partner-unexpected",
       message: `Relationship status is ${CLIENT_RELATIONSHIP_STATUS_LABELS[status]}, but a current partner is recorded.`,
-      target: "relationships",
+      target: "relationships-intimate",
     })
   }
 
@@ -128,7 +161,7 @@ export function backgroundChecks(input: BackgroundCheckInput): BackgroundCheck[]
       checks.push({
         id: "partner-ended",
         message: `Relationship status is ${CLIENT_RELATIONSHIP_STATUS_LABELS[status]}, but no previous relationship has a matching ending.`,
-        target: "relationships",
+        target: "relationships-intimate",
       })
     }
   }
@@ -141,7 +174,7 @@ export function backgroundChecks(input: BackgroundCheckInput): BackgroundCheck[]
       checks.push({
         id: "children-count",
         message: `Client reported ${input.numberOfChildren} children; ${recorded} recorded.`,
-        target: "relationships",
+        target: "relationships-intimate",
       })
     }
   }
@@ -220,11 +253,12 @@ export function backgroundChecks(input: BackgroundCheckInput): BackgroundCheck[]
             : block.kind === "caregiver_arrangement" && block.arrangementType === "adoption"
               ? "Adoption"
               : "Relationship"
+      const target = intimateBlock(block.kind) ? "relationships-intimate" : "relationships-caregivers"
       for (const need of needsForBlock(block, block.relationshipBlockId === lockedId)) {
         checks.push({
           id: `block-${block.relationshipBlockId}-${need}`,
           message: `${title}: ${needLabel(need).toLowerCase()}`,
-          target: "relationships",
+          target,
         })
       }
       for (const person of data.relationships.filter((item) => item.relationshipBlockId === block.relationshipBlockId)) {
@@ -233,9 +267,25 @@ export function backgroundChecks(input: BackgroundCheckInput): BackgroundCheck[]
           checks.push({
             id: `member-${person.relationshipRecordId}-${need}`,
             message: `${name || person.blockRole || "Person"}: ${needLabel(need).toLowerCase()}`,
-            target: "relationships",
+            target,
           })
         }
+      }
+      const childrenMissing = childrenAnswerMissing(block, data.relationships)
+      if (childrenMissing) {
+        checks.push({
+          id: `children-${block.relationshipBlockId}`,
+          message: `Children not recorded for ${childrenMissing}.`,
+          target: "relationships-intimate",
+        })
+      }
+      const siblingsMissing = siblingsAnswerMissing(block, data.relationships)
+      if (siblingsMissing) {
+        checks.push({
+          id: `siblings-${block.relationshipBlockId}`,
+          message: `Siblings not recorded for ${siblingsMissing}.`,
+          target: "relationships-caregivers",
+        })
       }
     }
     for (const person of data.relationships) {
@@ -245,7 +295,7 @@ export function backgroundChecks(input: BackgroundCheckInput): BackgroundCheck[]
       checks.push({
         id: `unplaced-${person.relationshipRecordId}`,
         message: name ? `${name} could not be placed in a relationship.` : "A person could not be placed in a relationship.",
-        target: "relationships",
+        target: "relationships-caregivers",
       })
     }
     for (const person of data.relationships) {
@@ -254,7 +304,7 @@ export function backgroundChecks(input: BackgroundCheckInput): BackgroundCheck[]
       checks.push({
         id: `unlinked-child-${person.relationshipRecordId}`,
         message: name ? `Child ${name} was not linked to a partner.` : "A child was not linked to a partner.",
-        target: "relationships",
+        target: "relationships-intimate",
       })
     }
   }

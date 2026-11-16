@@ -130,6 +130,7 @@ export function RelationshipTreeSection({
     blockAnswers: answers,
     dateOfBirth,
     asOf: todayDateString(),
+    relationshipStatus,
   })
   const [selection, setSelection] = useState<Selection | null>(null)
   const [mode, setMode] = useState<"view" | "edit" | "move">("view")
@@ -440,12 +441,25 @@ function TreeNode({
   }
   if (node.kind === "section") return null
   if (node.kind === "block") {
+    const band = (
+      <>
+        <span className="text-sm font-medium">{node.heading}</span>
+        {node.meta ? <span className="text-xs text-muted-foreground">{node.meta}</span> : null}
+      </>
+    )
     return (
       <>
-        <button type="button" className="flex min-h-10 w-full flex-col justify-center rounded-[8px] bg-[#f4f4f5] px-3 py-2 text-left hover:bg-[#e4e4e7]" onClick={() => onBlock(node.id)}>
-          <span className="text-sm font-medium">{node.heading}</span>
-          {node.meta ? <span className="text-xs text-muted-foreground">{node.meta}</span> : null}
-        </button>
+        {node.interactive === false || !node.id ? (
+          <div className="flex min-h-10 w-full flex-col justify-center rounded-[8px] bg-[#f4f4f5] px-3 py-2">{band}</div>
+        ) : (
+          <button
+            type="button"
+            className="flex min-h-10 w-full flex-col justify-center rounded-[8px] bg-[#f4f4f5] px-3 py-2 text-left hover:bg-[#e4e4e7]"
+            onClick={() => onBlock(node.id)}
+          >
+            {band}
+          </button>
+        )}
         {node.children.length > 0 ? <BranchList nodes={node.children} onPerson={onPerson} onBlock={onBlock} /> : null}
       </>
     )
@@ -512,7 +526,7 @@ function PersonPanel({
         onClose={onClose}
       />
       {mode === "move" ? (
-        <MoveStep name={nodeName} person={person} blocks={blocks} saving={saving} error={error} onCancel={onCancel} onMove={onMove} />
+        <MoveStep name={nodeName} person={person} blocks={blocks} people={people} saving={saving} error={error} onCancel={onCancel} onMove={onMove} />
       ) : (
       <>
       <div className="min-h-0 flex-1 overflow-y-auto p-4">
@@ -897,6 +911,15 @@ function BlockFields({
       {block.status === "other" ? (
         <TextField id={`${block.relationshipBlockId}-other`} label="Other status" value={block.statusDetail} onChange={(statusDetail) => onChange({ ...block, statusDetail })} />
       ) : null}
+      {block.kind === "client_other_children" ? (
+        <TextField
+          id={`${block.relationshipBlockId}-relationship`}
+          label="Relationship"
+          placeholder="e.g. IVF with a donor, sole adoption"
+          value={block.statusDetail}
+          onChange={(statusDetail) => onChange({ ...block, statusDetail })}
+        />
+      ) : null}
       {block.kind === "caregiver_arrangement" ? (
         <SelectField id={`${block.relationshipBlockId}-arrangement`} label="Arrangement" value={block.arrangementType} onChange={(arrangementType) => onChange({ ...block, arrangementType: arrangementType as ArrangementType | "" })}>
           <option value="">Not recorded</option>
@@ -928,6 +951,7 @@ function MoveStep({
   name,
   person,
   blocks,
+  people,
   saving,
   error,
   onCancel,
@@ -936,12 +960,13 @@ function MoveStep({
   name: string
   person: RelationshipRecord
   blocks: RelationshipBlock[]
+  people: RelationshipRecord[]
   saving: boolean
   error: string
   onCancel: () => void
   onMove: (destinationId: string, role: BlockRole, roleType: string) => Promise<void>
 }) {
-  const targets = moveTargets(blocks, person.relationshipBlockId ?? null)
+  const targets = moveTargets(blocks, person.relationshipBlockId ?? null, people)
   const [blockId, setBlockId] = useState("")
   const [role, setRole] = useState<BlockRole | "">("")
   const [roleType, setRoleType] = useState("")
@@ -1207,6 +1232,8 @@ function blankBlock(kind: BlockKind): RelationshipBlock {
     startedOn: "",
     endedOn: "",
     noChildren: false,
+    childrenAnswer: "",
+    siblingsAnswer: "",
     displayOrder: 0,
   }
 }

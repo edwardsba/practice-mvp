@@ -135,7 +135,7 @@ assert.deepEqual(
   partnerMissing.map((check) => check.message),
   ["Relationship status is De facto, but no current partner is recorded."]
 )
-assert.equal(partnerMissing[0]?.target, "relationships")
+assert.equal(partnerMissing[0]?.target, "relationships-intimate")
 assert.deepEqual(
   ids({
     data: data({
@@ -170,7 +170,7 @@ assert.equal(
   childrenMismatch.find((check) => check.id === "children-count")?.message,
   "Client reported 2 children; 1 recorded."
 )
-assert.equal(childrenMismatch.find((check) => check.id === "children-count")?.target, "relationships")
+assert.equal(childrenMismatch.find((check) => check.id === "children-count")?.target, "relationships-intimate")
 assert.deepEqual(
   ids({
     numberOfChildren: 2,

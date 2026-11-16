@@ -2,11 +2,15 @@ import { NEW_CURRENT_RELATIONSHIP, NEW_PREVIOUS_RELATIONSHIP, previousBlocksInOr
 import {
   ARRANGEMENT_TYPE_LABELS,
   CAREGIVER_RELATIONSHIP_LABELS,
+  CLIENT_RELATIONSHIP_STATUS_LABELS,
   CURRENT_BLOCK_STATUS_LABELS,
   NEVER_IN_A_RELATIONSHIP,
   PREVIOUS_BLOCK_STATUS_LABELS,
   type ArrangementType,
+  type BlockAnswer,
   type BlockKind,
+  type ClientRelationshipStatus,
+  type ClientRelationshipStatusValue,
   type RelationshipBlock,
   type RelationshipBlockAnswers,
   type RelationshipRecord,
@@ -40,6 +44,8 @@ export type RelationshipTreeBlock = {
   heading: string
   meta: string
   children: RelationshipTreeNode[]
+  /** False for the client's status-only row when there is no current block. */
+  interactive?: boolean
 }
 
 export type RelationshipTreeNote = {
@@ -78,24 +84,39 @@ type TreeInput = {
   asOf: string
   /** The client's own record is never drawn, even if one is passed in. */
   clientId?: string
+  /** Client's own relationship status — used when there is no current block. */
+  relationshipStatus?: ClientRelationshipStatusValue
 }
 
 export function buildRelationshipTree(input: TreeInput): RelationshipTree {
   const people = input.relationships.filter((person) => person.relationshipRecordId !== input.clientId)
   const partners: RelationshipTreeNode[] = []
-  for (const block of input.blocks.filter((item) => item.kind === "client_current")) {
-    partners.push(blockNode(block, people, input))
+
+  const currentBlocks = input.blocks
+    .filter((item) => item.kind === "client_current")
+    .sort((a, b) => a.displayOrder - b.displayOrder)
+  const currentChildren: RelationshipTreeNode[] =
+    currentBlocks.length > 0
+      ? currentBlocks.map((block) => blockNode(block, people, input, "status"))
+      : [clientStatusRow(input)]
+  partners.push(section("Current intimate relationship and children", currentChildren))
+
+  const previous = previousBlocksInOrder(input.blocks)
+  const previousNodes = blocksOrAnswer(previous, input.blockAnswers.previousRelationships, people, input)
+  if (previous.length > 0 || input.blockAnswers.previousRelationships === "none" || input.blockAnswers.previousRelationships === "not_asked") {
+    partners.push(section("Previous intimate relationships and children", previousNodes))
   }
-  for (const block of previousBlocksInOrder(input.blocks)) {
-    partners.push(blockNode(block, people, input))
-  }
-  const otherChildren = input.blocks.filter((item) => item.kind === "client_other_children")
+
+  const otherChildren = input.blocks
+    .filter((item) => item.kind === "client_other_children")
+    .sort((a, b) => a.displayOrder - b.displayOrder)
   if (otherChildren.length > 0) {
-    for (const block of otherChildren) partners.push(blockNode(block, people, input))
-  } else if (input.blockAnswers.otherChildren === "none") {
-    partners.push({ kind: "note", text: "Other children: none" })
-  } else if (input.blockAnswers.otherChildren === "not_asked") {
-    partners.push({ kind: "note", text: "Other children: not asked" })
+    partners.push(
+      section(
+        "Other children",
+        otherChildren.map((block) => blockNode(block, people, input, "other"))
+      )
+    )
   }
 
   const parents: RelationshipTreeNode[] = [
@@ -125,8 +146,8 @@ export function buildRelationshipTree(input: TreeInput): RelationshipTree {
   }
 
   return {
-    partners: { title: "Partners and children", children: partners },
-    parents: { title: "Parents, caregivers and siblings", children: parents },
+    partners: { title: "Intimate relationships and children", children: partners },
+    parents: { title: "Primary caregivers and siblings", children: parents },
   }
 }
 
@@ -160,6 +181,24 @@ export function linesAboutPerson(
 
 function section(title: string, children: RelationshipTreeNode[]): RelationshipTreeSection {
   return { kind: "section", title, children }
+}
+
+function clientStatusRow(input: TreeInput): RelationshipTreeBlock {
+  const status = input.relationshipStatus?.relationshipStatus ?? ""
+  const other = input.relationshipStatus?.relationshipStatusOther?.trim() ?? ""
+  let heading = "Status not recorded"
+  if (status === "other") heading = other || "Other"
+  else if (status && status in CLIENT_RELATIONSHIP_STATUS_LABELS) {
+    heading = CLIENT_RELATIONSHIP_STATUS_LABELS[status as ClientRelationshipStatus]
+  }
+  return {
+    kind: "block",
+    id: "",
+    heading,
+    meta: "",
+    children: [],
+    interactive: false,
+  }
 }
 
 function blocksOrAnswer(
@@ -201,22 +240,16 @@ function mostRecent(a: RelationshipBlock, b: RelationshipBlock): number {
   return byDate || a.displayOrder - b.displayOrder
 }
 
-function sideBlocks(blocks: RelationshipBlock[], side: "mother" | "father"): RelationshipBlock[] {
-  return blocks
-    .filter((block) => block.kind === "parent_other" && block.parentSide === side)
-    .sort((a, b) => a.startedOn.localeCompare(b.startedOn) || a.displayOrder - b.displayOrder)
-}
-
 function blockNode(
   block: RelationshipBlock,
   people: RelationshipRecord[],
   input: TreeInput,
-  band: "full" | "status" = "full"
+  band: "full" | "status" | "other" = "full"
 ): RelationshipTreeBlock {
   return {
     kind: "block",
     id: block.relationshipBlockId,
-    heading: band === "status" ? statusHeading(block) : headingFor(block),
+    heading: band === "status" ? statusHeading(block) : band === "other" ? otherChildrenHeading(block) : headingFor(block, people),
     meta: metaFor(block, input.dateOfBirth, input.asOf),
     children: childrenFor(block, people, input),
   }
@@ -224,9 +257,13 @@ function blockNode(
 
 function statusHeading(block: RelationshipBlock): string {
   const status = block.kind === "caregiver_arrangement" ? arrangementText(block) : statusText(block)
-  const label = status || (block.kind === "caregiver_arrangement" ? "Caregiver arrangement" : "Not recorded")
+  const label = status || (block.kind === "caregiver_arrangement" ? "Caregiver arrangement" : "Status not recorded")
   if (block.kind === "parent_other" && !block.endedOn.trim()) return `${label} · current`
   return label
+}
+
+function otherChildrenHeading(block: RelationshipBlock): string {
+  return block.statusDetail.trim() || "Unrecorded relationship"
 }
 
 function childrenFor(block: RelationshipBlock, people: RelationshipRecord[], input: TreeInput): RelationshipTreeNode[] {
@@ -234,27 +271,58 @@ function childrenFor(block: RelationshipBlock, people: RelationshipRecord[], inp
     const parents = members(block, people, "parent")
       .sort((a, b) => parentRank(a) - parentRank(b) || a.displayOrder - b.displayOrder)
       .map((person) => personNode(person, block, people, input))
-    const siblings = siblingPeople(block, people, input.asOf).map((person) => personNode(person, block, people, input))
-    return nestUnderLast(parents, siblings.length > 0 ? siblings : [{ kind: "note", text: "No siblings" }])
+    return nestUnderLast(parents, siblingNodes(block, people, input))
   }
   if (block.kind === "parent_other") {
     const partners = members(block, people, "partner").map((person) => personNode(person, block, people, input))
-    const siblings = siblingPeople(block, people, input.asOf).map((person) => personNode(person, block, people, input))
-    return nestUnderLast(partners, siblings.length > 0 ? siblings : [{ kind: "note", text: "No siblings" }])
+    return nestUnderLast(partners, siblingNodes(block, people, input))
   }
   if (block.kind === "caregiver_arrangement") {
     const caregivers = members(block, people, "caregiver").map((person) => personNode(person, block, people, input))
-    const siblings = siblingPeople(block, people, input.asOf).map((person) => personNode(person, block, people, input))
+    const siblings = siblingNodes(block, people, input)
     if (siblings.length === 0) return caregivers
     return nestUnderLast(caregivers, siblings)
   }
   if (block.kind === "client_other_children") {
     const children = members(block, people, "child").map((person) => personNode(person, block, people, input))
-    return children.length > 0 ? children : [{ kind: "note", text: "No children" }]
+    return children.length > 0 ? children : childAnswerNodes(block)
   }
   const partners = members(block, people, "partner").map((person) => personNode(person, block, people, input))
   const children = members(block, people, "child").map((person) => personNode(person, block, people, input))
-  return nestUnderLast(partners, children.length > 0 ? children : [{ kind: "note", text: "No children" }])
+  return nestUnderLast(partners, children.length > 0 ? children : childAnswerNodes(block))
+}
+
+function childAnswerNodes(block: RelationshipBlock): RelationshipTreeNode[] {
+  const answer = resolvedChildrenAnswer(block)
+  if (answer === "none") return [{ kind: "note", text: "No children" }]
+  if (answer === "not_asked") return [{ kind: "note", text: "Children not asked" }]
+  return []
+}
+
+function siblingNodes(block: RelationshipBlock, people: RelationshipRecord[], input: TreeInput): RelationshipTreeNode[] {
+  const siblings = siblingPeople(block, people, input.asOf).map((person) => personNode(person, block, people, input))
+  if (siblings.length > 0) return siblings
+  const answer = resolvedSiblingsAnswer(block)
+  if (answer === "none") return [{ kind: "note", text: "No siblings" }]
+  if (answer === "not_asked") return [{ kind: "note", text: "Siblings not asked" }]
+  // Biological parents previously always showed "No siblings" when empty; keep that when answer is blank
+  // only after the interview answer is set. Blank answer shows nothing (Worth checking).
+  return []
+}
+
+function resolvedChildrenAnswer(block: RelationshipBlock): BlockAnswer | "" {
+  if (block.childrenAnswer === "yes" || block.childrenAnswer === "none" || block.childrenAnswer === "not_asked") {
+    return block.childrenAnswer
+  }
+  if (block.noChildren) return "none"
+  return ""
+}
+
+function resolvedSiblingsAnswer(block: RelationshipBlock): BlockAnswer | "" {
+  if (block.siblingsAnswer === "yes" || block.siblingsAnswer === "none" || block.siblingsAnswer === "not_asked") {
+    return block.siblingsAnswer
+  }
+  return ""
 }
 
 /** The nested people hang off the last partner, parent, or caregiver. With none yet, they sit on the first level. */
@@ -421,34 +489,62 @@ function blockContext(block: RelationshipBlock): string {
 }
 
 /** Blocks a person can move to, in tree order, without their current block. */
-export function moveTargets(blocks: RelationshipBlock[], currentBlockId: string | null): { id: string; label: string; kind: BlockKind }[] {
+export function moveTargets(
+  blocks: RelationshipBlock[],
+  currentBlockId: string | null,
+  people: RelationshipRecord[] = []
+): { id: string; label: string; kind: BlockKind }[] {
   const targets: { id: string; label: string; kind: BlockKind }[] = []
   const add = (block: RelationshipBlock) => {
     if (currentBlockId && block.relationshipBlockId === currentBlockId) return
-    targets.push({ id: block.relationshipBlockId, label: headingFor(block), kind: block.kind })
+    targets.push({ id: block.relationshipBlockId, label: moveLabel(block, people), kind: block.kind })
   }
   const byOrder = (a: RelationshipBlock, b: RelationshipBlock) => a.displayOrder - b.displayOrder
   for (const block of blocks.filter((item) => item.kind === "client_current").sort(byOrder)) add(block)
   for (const block of previousBlocksInOrder(blocks)) add(block)
   for (const block of blocks.filter((item) => item.kind === "client_other_children").sort(byOrder)) add(block)
   for (const block of blocks.filter((item) => item.kind === "biological_parents").sort(byOrder)) add(block)
-  for (const block of sideBlocks(blocks, "mother")) add(block)
-  for (const block of sideBlocks(blocks, "father")) add(block)
-  for (const block of blocks
-    .filter((item) => item.kind === "caregiver_arrangement")
-    .sort((a, b) => a.startedOn.localeCompare(b.startedOn) || a.displayOrder - b.displayOrder)) {
-    add(block)
-  }
+  for (const block of parentOtherInOrder(blocks, "mother")) add(block)
+  for (const block of parentOtherInOrder(blocks, "father")) add(block)
+  for (const block of caregiversInOrder(blocks)) add(block)
   targets.push({ id: NEW_CURRENT_RELATIONSHIP, label: "+ New current relationship", kind: "client_current" })
   targets.push({ id: NEW_PREVIOUS_RELATIONSHIP, label: "+ New previous relationship", kind: "client_previous" })
   return targets
 }
 
-export function headingFor(block: RelationshipBlock): string {
-  const status = block.kind === "caregiver_arrangement" ? arrangementText(block) : statusText(block)
-  const title = blockContext(block).replace("Previous relationship", "Previous")
-  if (!status || block.kind === "client_other_children") return title
-  return `${title} · ${status}`
+export function moveLabel(block: RelationshipBlock, people: RelationshipRecord[] = []): string {
+  if (block.kind === "client_current") {
+    const status = statusText(block) || "Status not recorded"
+    return `Current · ${status}`
+  }
+  if (block.kind === "client_previous") {
+    const status = statusText(block) || "Status not recorded"
+    const partner = members(block, people, "partner").find((item) => item.givenName.trim())
+    const who = partner ? ` (${partner.givenName.trim()})` : ""
+    return `Previous · ${status}${who}`
+  }
+  if (block.kind === "client_other_children") {
+    return `Other children · ${block.statusDetail.trim() || "Unrecorded relationship"}`
+  }
+  if (block.kind === "biological_parents") {
+    const status = statusText(block)
+    return status ? `Biological parents · ${status}` : "Biological parents"
+  }
+  if (block.kind === "parent_other") {
+    const side = block.parentSide === "father" ? "Father" : "Mother"
+    const status = statusText(block) || "Status not recorded"
+    const current = !block.endedOn.trim() ? " · current" : ""
+    const partner = members(block, people, "partner").find((item) => item.givenName.trim())
+    const who = partner ? ` (${partner.givenName.trim()})` : ""
+    return `${side}'s other · ${status}${current}${who}`
+  }
+  const arrangement = arrangementText(block) || "Caregiver arrangement"
+  return `Caregiver · ${arrangement}`
+}
+
+export function headingFor(block: RelationshipBlock, people: RelationshipRecord[] = []): string {
+  if (block.kind === "client_other_children") return otherChildrenHeading(block)
+  return moveLabel(block, people)
 }
 
 function metaFor(block: RelationshipBlock, dateOfBirth: string | null, asOf: string): string {

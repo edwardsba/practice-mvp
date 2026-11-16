@@ -101,6 +101,8 @@ export function toRelationshipBlock(row: {
   startedOn: string | null
   endedOn: string | null
   noChildren: boolean
+  childrenAnswer?: string | null
+  siblingsAnswer?: string | null
   displayOrder: number
 }): RelationshipBlock {
   const kind: BlockKind = isOneOf(row.kind, [
@@ -137,8 +139,14 @@ export function toRelationshipBlock(row: {
     startedOn: row.startedOn ?? "",
     endedOn: row.endedOn ?? "",
     noChildren: row.noChildren,
+    childrenAnswer: isBlockAnswer(row.childrenAnswer) ? row.childrenAnswer : "",
+    siblingsAnswer: isBlockAnswer(row.siblingsAnswer) ? row.siblingsAnswer : "",
     displayOrder: row.displayOrder,
   }
+}
+
+function isBlockAnswer(value: string | null | undefined): value is "yes" | "none" | "not_asked" {
+  return value === "yes" || value === "none" || value === "not_asked"
 }
 
 export function toBlockAnswers(row: {

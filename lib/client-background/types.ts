@@ -376,6 +376,10 @@ export type RelationshipBlock = {
   startedOn: string
   endedOn: string
   noChildren: boolean
+  /** Explicit Children question: yes / none / not_asked. Kept in step with noChildren (none ⇔ true). */
+  childrenAnswer: BlockAnswer | ""
+  /** Explicit Siblings question: yes / none / not_asked. */
+  siblingsAnswer: BlockAnswer | ""
   displayOrder: number
 }
 

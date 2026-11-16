@@ -121,6 +121,10 @@ export const clientRelationshipBlocks = pgTable("client_relationship_blocks", {
   startedOn: text("started_on"),
   endedOn: text("ended_on"),
   noChildren: boolean("no_children").notNull().default(false),
+  /** Explicit Children question (yes / none / not_asked). Kept in step with no_children. */
+  childrenAnswer: text("children_answer"),
+  /** Explicit Siblings question (yes / none / not_asked). */
+  siblingsAnswer: text("siblings_answer"),
   displayOrder: integer("display_order").notNull().default(0),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),

@@ -82,6 +82,8 @@ function block(partial: Partial<RelationshipBlock> & Pick<RelationshipBlock, "re
     startedOn: "",
     endedOn: "",
     noChildren: false,
+    childrenAnswer: "",
+    siblingsAnswer: "",
     displayOrder: 0,
     ...partial,
   }

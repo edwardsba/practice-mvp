@@ -18,11 +18,16 @@ import {
 } from "@/components/client-background/demographics-section"
 import { AutosaveFields, type SavePhase } from "@/components/client-background/interview-autosave"
 import { InterviewHistory } from "@/components/client-background/interview-history"
+import {
+  InterviewSectionCard,
+  needsBadge,
+  readSectionOpenState,
+  writeSectionOpenState,
+} from "@/components/client-background/interview-section-card"
 import { RelationshipBlocksSection } from "@/components/client-background/relationship-blocks-section"
 import { ReasonFields } from "@/components/client-background/reason-section"
 import { scrollToBackgroundCheck } from "@/components/client-background/worth-checking"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { backgroundAnswersToClientBackground } from "@/lib/background-questionnaire/to-client-background"
 import type { BackgroundSelfReport } from "@/lib/background-questionnaire/types"
 import { assessAge, displayedAge } from "@/lib/client-background/age"
@@ -88,9 +93,75 @@ export function InterviewPage({
   const [phases, setPhases] = useState<Record<string, { phase: SavePhase; retry: (() => void) | null }>>({})
   const flushers = useRef(new Set<() => Promise<void>>())
   const completeRef = useRef<() => void>(() => {})
+  const [sectionOpen, setSectionOpen] = useState<Record<string, boolean>>({})
   const age = clientAge(data.dateOfBirth)
   const suggestions = selfReport ? backgroundAnswersToClientBackground(selfReport.answers) : null
   const received = selfReport ? formatReceived(selfReport.assessmentDate) : ""
+  const backgroundSectionIds = [
+    "reason",
+    "identity",
+    "education",
+    "occupation",
+    "relationships-intimate",
+    "relationships-caregivers",
+    "living",
+  ] as const
+
+  useEffect(() => {
+    setSectionOpen(readSectionOpenState(clientId, "background"))
+  }, [clientId])
+
+  function setSection(id: string, open: boolean) {
+    setSectionOpen((current) => {
+      const next = { ...current, [id]: open }
+      writeSectionOpenState(clientId, "background", next)
+      return next
+    })
+  }
+
+  function toggleSection(id: string) {
+    setSection(id, !sectionOpen[id])
+  }
+
+  function openAllSections() {
+    if (page === "history") {
+      const next = {
+        "Client history": true,
+        "Significant others": true,
+        Stressors: true,
+      }
+      writeSectionOpenState(clientId, "history", next)
+      setScrollNonce((count) => count + 1)
+      return
+    }
+    const next = Object.fromEntries(backgroundSectionIds.map((id) => [id, true]))
+    setSectionOpen(next)
+    writeSectionOpenState(clientId, "background", next)
+  }
+
+  function closeAllSections() {
+    if (page === "history") {
+      const next = {
+        "Client history": false,
+        "Significant others": false,
+        Stressors: false,
+      }
+      writeSectionOpenState(clientId, "history", next)
+      setScrollNonce((count) => count + 1)
+      return
+    }
+    const next = Object.fromEntries(backgroundSectionIds.map((id) => [id, false]))
+    setSectionOpen(next)
+    writeSectionOpenState(clientId, "background", next)
+  }
+
+  const historyOpenState = page === "history" ? readSectionOpenState(clientId, "history") : {}
+  const allHistoryOpen =
+    Boolean(historyOpenState["Client history"]) &&
+    Boolean(historyOpenState["Significant others"]) &&
+    Boolean(historyOpenState.Stressors)
+  const allSectionsOpen = page === "history" ? allHistoryOpen : backgroundSectionIds.every((id) => sectionOpen[id])
+  const openAllLabel = allSectionsOpen ? "Close all" : "Open all"
 
   const onPhase = useCallback((id: string, phase: SavePhase, retry: (() => void) | null) => {
     setPhases((current) => ({ ...current, [id]: { phase, retry } }))
@@ -153,6 +224,16 @@ export function InterviewPage({
     [data, selfReport]
   )
 
+  const liveChecks = getChecks({
+    screening,
+    events: data.events,
+    stressors: data.stressors,
+  })
+  function sectionNeeds(target: BackgroundCheck["target"] | BackgroundCheck["target"][]) {
+    const targets = Array.isArray(target) ? target : [target]
+    return liveChecks.filter((check) => targets.includes(check.target)).length
+  }
+
   useEffect(() => {
     const check = pendingCheck.current
     if (!check) return
@@ -181,6 +262,32 @@ export function InterviewPage({
 
   function jumpToCheck(check: BackgroundCheck) {
     const next = interviewPageForCheck(check.target)
+    if (next === "background") {
+      const sectionId =
+        check.target === "reason"
+          ? "reason"
+          : check.target === "identity"
+            ? "identity"
+            : check.target === "occupation"
+              ? "occupation"
+              : check.target === "living"
+                ? "living"
+                : check.target === "relationships-caregivers"
+                  ? "relationships-caregivers"
+                  : check.target === "relationships-intimate" || check.target === "relationships"
+                    ? "relationships-intimate"
+                    : null
+      if (sectionId) setSection(sectionId, true)
+    } else {
+      // Open every history group so the target check is reachable; History page owns finer state.
+      const historyOpen = readSectionOpenState(clientId, "history")
+      writeSectionOpenState(clientId, "history", {
+        ...historyOpen,
+        "Client history": true,
+        "Significant others": true,
+        Stressors: true,
+      })
+    }
     pendingCheck.current = check
     setScrollNonce((count) => count + 1)
     if (next !== page) {
@@ -231,6 +338,13 @@ export function InterviewPage({
               History
             </PageButton>
           </div>
+          <button
+            type="button"
+            className="min-h-11 text-sm underline"
+            onClick={() => (allSectionsOpen ? closeAllSections() : openAllSections())}
+          >
+            {openAllLabel}
+          </button>
           {failed.length > 0 && !saving ? (
             <button type="button" className="min-h-11 text-sm text-destructive underline" onClick={retryFailed}>
               {saveLabel}
@@ -254,144 +368,147 @@ export function InterviewPage({
       ) : null}
 
       <div className={cn("space-y-4 py-4", page !== "background" && "hidden")}>
-        <Card id="check-reason" className="scroll-mt-28">
-          <CardHeader>
-            <CardTitle>Referral</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <AutosaveFields
-              saved={data.reason}
-              save={async (value) => {
-                const next = applyKeptSuggestion(value, {
-                  suggestedProfessionalId: reasonSupport.suggestedProfessionalId,
-                  dismissed: suggestionDismissed.current,
-                })
-                reasonRef.current = next
-                const result = await saveReasonForAttendingAction(clientId, next)
-                if (result.error || !("reason" in result) || !result.reason) {
-                  return { error: result.error ?? "Could not save reason for attending." }
-                }
-                reasonRef.current = result.reason
-                return { value: result.reason }
-              }}
-              onPhase={(phase, retry) => onPhase("reason", phase, retry)}
-              registerFlush={registerFlush}
-            >
-              {(value, onChange, commit) => {
-                reasonRef.current = value
-                return (
-                  <ReasonFields
-                    idPrefix="interview_reason"
-                    practiceId={practiceId}
-                    value={value}
-                    onChange={onChange}
-                    onCommit={commit}
-                    professionals={professionals}
-                    professions={reasonSupport.professions}
-                    organisations={reasonSupport.organisations}
-                    relationships={data.relationships}
-                    suggestedProfessionalId={reasonSupport.suggestedProfessionalId}
-                    onProfessionalsChange={setProfessionals}
-                    onSuggestionDismissedChange={(dismissed) => {
-                      suggestionDismissed.current = dismissed
-                    }}
-                  />
-                )
-              }}
-            </AutosaveFields>
-          </CardContent>
-        </Card>
-        <Card id="check-identity" className="scroll-mt-28">
-          <CardHeader>
-            <CardTitle>Identity</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <AutosaveFields
-              saved={data.demographics.identity}
-              save={async (value) => {
-                identityRef.current = value
-                const result = await saveIdentityAction(clientId, value)
-                if ("error" in result && result.error) return { error: result.error }
-                if (!("identity" in result) || !result.identity) return { error: "Could not save." }
-                identityRef.current = result.identity
-                return { value: result.identity }
-              }}
-              onPhase={(phase, retry) => onPhase("identity", phase, retry)}
-              registerFlush={registerFlush}
-            >
-              {(value, onChange, commit) => {
-                identityRef.current = value
-                return (
-                  <IdentityFieldsEditor
-                    value={value}
-                    onChange={onChange}
-                    onCommit={commit}
-                    client={suggestions?.identity}
-                  />
-                )
-              }}
-            </AutosaveFields>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>Education</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <AutosaveFields
-              saved={data.demographics.education}
-              save={async (value) => {
-                const result = await saveEducationAction(clientId, value)
-                if ("error" in result && result.error) return { error: result.error }
-                if (!("education" in result) || !result.education) return { error: "Could not save." }
-                return { value: result.education }
-              }}
-              onPhase={(phase, retry) => onPhase("education", phase, retry)}
-              registerFlush={registerFlush}
-            >
-              {(value, onChange, commit) => (
-                <EducationFieldsEditor
+        <InterviewSectionCard
+          id="check-reason"
+          title="Referral"
+          open={Boolean(sectionOpen.reason)}
+          onToggle={() => toggleSection("reason")}
+          badge={needsBadge(sectionNeeds("reason"))}
+        >
+          <AutosaveFields
+            saved={data.reason}
+            save={async (value) => {
+              const next = applyKeptSuggestion(value, {
+                suggestedProfessionalId: reasonSupport.suggestedProfessionalId,
+                dismissed: suggestionDismissed.current,
+              })
+              reasonRef.current = next
+              const result = await saveReasonForAttendingAction(clientId, next)
+              if (result.error || !("reason" in result) || !result.reason) {
+                return { error: result.error ?? "Could not save reason for attending." }
+              }
+              reasonRef.current = result.reason
+              return { value: result.reason }
+            }}
+            onPhase={(phase, retry) => onPhase("reason", phase, retry)}
+            registerFlush={registerFlush}
+          >
+            {(value, onChange, commit) => {
+              reasonRef.current = value
+              return (
+                <ReasonFields
+                  idPrefix="interview_reason"
+                  practiceId={practiceId}
                   value={value}
                   onChange={onChange}
                   onCommit={commit}
-                  client={suggestions?.education}
+                  professionals={professionals}
+                  professions={reasonSupport.professions}
+                  organisations={reasonSupport.organisations}
+                  relationships={data.relationships}
+                  suggestedProfessionalId={reasonSupport.suggestedProfessionalId}
+                  onProfessionalsChange={setProfessionals}
+                  onSuggestionDismissedChange={(dismissed) => {
+                    suggestionDismissed.current = dismissed
+                  }}
                 />
-              )}
-            </AutosaveFields>
-          </CardContent>
-        </Card>
-        <Card id="check-occupation" className="scroll-mt-28">
-          <CardHeader>
-            <CardTitle>Occupation and financial</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <AutosaveFields
-              saved={data.demographics.occupation}
-              save={async (value) => {
-                occupationRef.current = value
-                const result = await saveOccupationAction(clientId, value)
-                if ("error" in result && result.error) return { error: result.error }
-                if (!("occupation" in result) || !result.occupation) return { error: "Could not save." }
-                occupationRef.current = result.occupation
-                return { value: result.occupation }
-              }}
-              onPhase={(phase, retry) => onPhase("occupation", phase, retry)}
-              registerFlush={registerFlush}
-            >
-              {(value, onChange, commit) => {
-                occupationRef.current = value
-                return (
-                  <OccupationFieldsEditor
-                    value={value}
-                    onChange={onChange}
-                    onCommit={commit}
-                    client={suggestions?.occupation}
-                  />
-                )
-              }}
-            </AutosaveFields>
-          </CardContent>
-        </Card>
+              )
+            }}
+          </AutosaveFields>
+        </InterviewSectionCard>
+        <InterviewSectionCard
+          id="check-identity"
+          title="Identity"
+          open={Boolean(sectionOpen.identity)}
+          onToggle={() => toggleSection("identity")}
+          badge={needsBadge(sectionNeeds("identity"))}
+        >
+          <AutosaveFields
+            saved={data.demographics.identity}
+            save={async (value) => {
+              identityRef.current = value
+              const result = await saveIdentityAction(clientId, value)
+              if ("error" in result && result.error) return { error: result.error }
+              if (!("identity" in result) || !result.identity) return { error: "Could not save." }
+              identityRef.current = result.identity
+              return { value: result.identity }
+            }}
+            onPhase={(phase, retry) => onPhase("identity", phase, retry)}
+            registerFlush={registerFlush}
+          >
+            {(value, onChange, commit) => {
+              identityRef.current = value
+              return (
+                <IdentityFieldsEditor
+                  value={value}
+                  onChange={onChange}
+                  onCommit={commit}
+                  client={suggestions?.identity}
+                />
+              )
+            }}
+          </AutosaveFields>
+        </InterviewSectionCard>
+        <InterviewSectionCard
+          title="Education"
+          open={Boolean(sectionOpen.education)}
+          onToggle={() => toggleSection("education")}
+          badge={needsBadge(0)}
+        >
+          <AutosaveFields
+            saved={data.demographics.education}
+            save={async (value) => {
+              const result = await saveEducationAction(clientId, value)
+              if ("error" in result && result.error) return { error: result.error }
+              if (!("education" in result) || !result.education) return { error: "Could not save." }
+              return { value: result.education }
+            }}
+            onPhase={(phase, retry) => onPhase("education", phase, retry)}
+            registerFlush={registerFlush}
+          >
+            {(value, onChange, commit) => (
+              <EducationFieldsEditor
+                value={value}
+                onChange={onChange}
+                onCommit={commit}
+                client={suggestions?.education}
+              />
+            )}
+          </AutosaveFields>
+        </InterviewSectionCard>
+        <InterviewSectionCard
+          id="check-occupation"
+          title="Occupation and financial"
+          open={Boolean(sectionOpen.occupation)}
+          onToggle={() => toggleSection("occupation")}
+          badge={needsBadge(sectionNeeds("occupation"))}
+        >
+          <AutosaveFields
+            saved={data.demographics.occupation}
+            save={async (value) => {
+              occupationRef.current = value
+              const result = await saveOccupationAction(clientId, value)
+              if ("error" in result && result.error) return { error: result.error }
+              if (!("occupation" in result) || !result.occupation) return { error: "Could not save." }
+              occupationRef.current = result.occupation
+              return { value: result.occupation }
+            }}
+            onPhase={(phase, retry) => onPhase("occupation", phase, retry)}
+            registerFlush={registerFlush}
+          >
+            {(value, onChange, commit) => {
+              occupationRef.current = value
+              return (
+                <OccupationFieldsEditor
+                  value={value}
+                  onChange={onChange}
+                  onCommit={commit}
+                  client={suggestions?.occupation}
+                />
+              )
+            }}
+          </AutosaveFields>
+        </InterviewSectionCard>
         <RelationshipBlocksSection
           clientId={clientId}
           relationships={relationships}
@@ -406,40 +523,50 @@ export function InterviewPage({
           registerFlush={registerFlush}
           relationshipClient={suggestions?.relationshipStatus}
           childrenPrompt={suggestions?.numberOfChildren?.label ?? null}
+          sectionOpen={{
+            intimate: Boolean(sectionOpen["relationships-intimate"]),
+            caregivers: Boolean(sectionOpen["relationships-caregivers"]),
+          }}
+          onToggleSection={(id) => toggleSection(id === "intimate" ? "relationships-intimate" : "relationships-caregivers")}
+          sectionBadge={{
+            intimate: needsBadge(sectionNeeds(["relationships-intimate", "relationships"])),
+            caregivers: needsBadge(sectionNeeds("relationships-caregivers")),
+          }}
         />
-        <Card id="check-living" className="scroll-mt-28">
-          <CardHeader>
-            <CardTitle>Living situation</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <AutosaveFields
-              saved={data.demographics.livingSituation}
-              save={async (value) => {
-                livingRef.current = value
-                const result = await saveLivingSituationAction(clientId, value)
-                if ("error" in result && result.error) return { error: result.error }
-                if (!("livingSituation" in result) || !result.livingSituation) return { error: "Could not save." }
-                livingRef.current = result.livingSituation
-                return { value: result.livingSituation }
-              }}
-              onPhase={(phase, retry) => onPhase("living", phase, retry)}
-              registerFlush={registerFlush}
-            >
-              {(value, onChange, commit) => {
-                livingRef.current = value
-                return (
-                  <LivingFieldsEditor
-                    value={value}
-                    relationships={relationships}
-                    onChange={onChange}
-                    onCommit={commit}
-                    client={suggestions?.living}
-                  />
-                )
-              }}
-            </AutosaveFields>
-          </CardContent>
-        </Card>
+        <InterviewSectionCard
+          id="check-living"
+          title="Living situation"
+          open={Boolean(sectionOpen.living)}
+          onToggle={() => toggleSection("living")}
+          badge={needsBadge(sectionNeeds("living"))}
+        >
+          <AutosaveFields
+            saved={data.demographics.livingSituation}
+            save={async (value) => {
+              livingRef.current = value
+              const result = await saveLivingSituationAction(clientId, value)
+              if ("error" in result && result.error) return { error: result.error }
+              if (!("livingSituation" in result) || !result.livingSituation) return { error: "Could not save." }
+              livingRef.current = result.livingSituation
+              return { value: result.livingSituation }
+            }}
+            onPhase={(phase, retry) => onPhase("living", phase, retry)}
+            registerFlush={registerFlush}
+          >
+            {(value, onChange, commit) => {
+              livingRef.current = value
+              return (
+                <LivingFieldsEditor
+                  value={value}
+                  relationships={relationships}
+                  onChange={onChange}
+                  onCommit={commit}
+                  client={suggestions?.living}
+                />
+              )
+            }}
+          </AutosaveFields>
+        </InterviewSectionCard>
         <Button type="button" className="min-h-11" onClick={() => show("history")}>
           Continue to History
         </Button>
@@ -465,6 +592,7 @@ export function InterviewPage({
           registerComplete={registerComplete}
           getChecks={getChecks}
           onJumpToCheck={jumpToCheck}
+          sectionSyncKey={scrollNonce}
         />
       </div>
     </div>

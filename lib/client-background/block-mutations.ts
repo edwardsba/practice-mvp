@@ -224,17 +224,32 @@ export async function updateRelationshipBlock(input: Scope & { block: unknown })
   const arrangementDetail = typeof raw?.arrangementDetail === "string" ? raw.arrangementDetail : existing.arrangementDetail
   const startedOn = typeof raw?.startedOn === "string" ? raw.startedOn : existing.startedOn
   const endedOn = typeof raw?.endedOn === "string" ? raw.endedOn : existing.endedOn
-  const noChildren = typeof raw?.noChildren === "boolean" ? raw.noChildren : existing.noChildren
+  const childrenAnswerRaw = typeof raw?.childrenAnswer === "string" ? raw.childrenAnswer : existing.childrenAnswer
+  const siblingsAnswerRaw = typeof raw?.siblingsAnswer === "string" ? raw.siblingsAnswer : existing.siblingsAnswer
+  const childrenAnswer = isBlockAnswer(childrenAnswerRaw ?? "") ? childrenAnswerRaw : null
+  const siblingsAnswer = isBlockAnswer(siblingsAnswerRaw ?? "") ? siblingsAnswerRaw : null
+  // Keep no_children in step with children_answer so main keeps working.
+  const noChildren =
+    childrenAnswer === "none"
+      ? true
+      : childrenAnswer === "yes" || childrenAnswer === "not_asked"
+        ? false
+        : typeof raw?.noChildren === "boolean"
+          ? raw.noChildren
+          : existing.noChildren
+  const keepStatusDetail = existing.kind === "client_other_children" || status === "other"
   await db
     .update(clientRelationshipBlocks)
     .set({
       status: status || null,
-      statusDetail: status === "other" ? statusDetail || null : null,
+      statusDetail: keepStatusDetail ? statusDetail || null : null,
       arrangementType: arrangementType || null,
       arrangementDetail: arrangementType === "other" ? arrangementDetail || null : null,
       startedOn: startedOn || null,
       endedOn: endedOn || null,
       noChildren,
+      childrenAnswer,
+      siblingsAnswer,
       updatedAt: new Date(),
     })
     .where(eq(clientRelationshipBlocks.relationshipBlockId, existing.relationshipBlockId))
@@ -326,7 +341,13 @@ export async function addBlockMember(input: Scope & { relationshipBlockId: strin
   if (input.role === "child") {
     await db
       .update(clientRelationshipBlocks)
-      .set({ noChildren: false, updatedAt: new Date() })
+      .set({ noChildren: false, childrenAnswer: "yes", updatedAt: new Date() })
+      .where(eq(clientRelationshipBlocks.relationshipBlockId, block.relationshipBlockId))
+  }
+  if (input.role === "sibling") {
+    await db
+      .update(clientRelationshipBlocks)
+      .set({ siblingsAnswer: "yes", updatedAt: new Date() })
       .where(eq(clientRelationshipBlocks.relationshipBlockId, block.relationshipBlockId))
   }
   return loadBlockEditorState(input.clientId, input.practiceId)
@@ -380,6 +401,8 @@ export async function removeBlockMember(input: Scope & { relationshipRecordId: s
   if (existing.blockRole === "parent" && (existing.relationshipToClient === "mother" || existing.relationshipToClient === "father")) {
     return { error: "Mark a parent as not known instead of removing them." }
   }
+  const blockId = existing.relationshipBlockId
+  const role = existing.blockRole
   await db
     .delete(clientRelationshipRecords)
     .where(
@@ -389,7 +412,37 @@ export async function removeBlockMember(input: Scope & { relationshipRecordId: s
       )
     )
   await writeAudit(input, "client_relationship.deleted", "client_relationship", existing.relationshipRecordId)
+  if (blockId && (role === "child" || role === "sibling")) {
+    await refreshMemberAnswer(input, blockId, role)
+  }
   return loadBlockEditorState(input.clientId, input.practiceId)
+}
+
+/** Removing the last child/sibling sets Not asked, never None. */
+async function refreshMemberAnswer(scope: Scope, blockId: string, role: "child" | "sibling") {
+  const remaining = await db
+    .select({ relationshipRecordId: clientRelationshipRecords.relationshipRecordId })
+    .from(clientRelationshipRecords)
+    .where(
+      and(
+        eq(clientRelationshipRecords.relationshipBlockId, blockId),
+        eq(clientRelationshipRecords.clientId, scope.clientId),
+        eq(clientRelationshipRecords.practiceId, scope.practiceId),
+        eq(clientRelationshipRecords.blockRole, role)
+      )
+    )
+  if (remaining.length > 0) return
+  if (role === "child") {
+    await db
+      .update(clientRelationshipBlocks)
+      .set({ childrenAnswer: "not_asked", noChildren: false, updatedAt: new Date() })
+      .where(eq(clientRelationshipBlocks.relationshipBlockId, blockId))
+    return
+  }
+  await db
+    .update(clientRelationshipBlocks)
+    .set({ siblingsAnswer: "not_asked", updatedAt: new Date() })
+    .where(eq(clientRelationshipBlocks.relationshipBlockId, blockId))
 }
 
 export async function moveBlockMember(input: Scope & {
@@ -425,6 +478,8 @@ export async function moveBlockMember(input: Scope & {
   ) {
     return { error: "Choose a type for this relationship." }
   }
+  const previousBlockId = person.relationshipBlockId
+  const previousRole = person.blockRole
   await db
     .update(clientRelationshipRecords)
     .set({
@@ -439,6 +494,25 @@ export async function moveBlockMember(input: Scope & {
     })
     .where(eq(clientRelationshipRecords.relationshipRecordId, person.relationshipRecordId))
   await writeAudit(input, "client_relationship.moved", "client_relationship", person.relationshipRecordId)
+  if (input.role === "child") {
+    await db
+      .update(clientRelationshipBlocks)
+      .set({ noChildren: false, childrenAnswer: "yes", updatedAt: new Date() })
+      .where(eq(clientRelationshipBlocks.relationshipBlockId, block.relationshipBlockId))
+  }
+  if (input.role === "sibling") {
+    await db
+      .update(clientRelationshipBlocks)
+      .set({ siblingsAnswer: "yes", updatedAt: new Date() })
+      .where(eq(clientRelationshipBlocks.relationshipBlockId, block.relationshipBlockId))
+  }
+  if (
+    previousBlockId &&
+    previousBlockId !== block.relationshipBlockId &&
+    (previousRole === "child" || previousRole === "sibling")
+  ) {
+    await refreshMemberAnswer(input, previousBlockId, previousRole)
+  }
   return loadBlockEditorState(input.clientId, input.practiceId)
 }
 

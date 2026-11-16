@@ -14,10 +14,15 @@ import {
 import { AddButton, ClientAnswer, SelectField } from "@/components/client-background/fields"
 import { HistoryPanel, HistoryTags, historyEntryLines } from "@/components/client-background/history-section"
 import { AutosaveFields, type SavePhase } from "@/components/client-background/interview-autosave"
+import {
+  InterviewSectionCard,
+  needsBadge,
+  readSectionOpenState,
+  writeSectionOpenState,
+} from "@/components/client-background/interview-section-card"
 import { StressorsFields } from "@/components/client-background/medication-stressors"
 import { WorthCheckingLinks } from "@/components/client-background/worth-checking"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   Dialog,
   DialogContent,
@@ -61,6 +66,7 @@ export function InterviewHistory({
   registerComplete,
   getChecks,
   onJumpToCheck,
+  sectionSyncKey = 0,
 }: {
   clientId: string
   dateOfBirth: string | null
@@ -84,6 +90,8 @@ export function InterviewHistory({
     stressors: StressorsRecord
   }) => BackgroundCheck[]
   onJumpToCheck: (check: BackgroundCheck) => void
+  /** Bumped when Worth checking opens a history section via sessionStorage. */
+  sectionSyncKey?: number
 }) {
   const [answers, setAnswers] = useState(screening)
   const [entries, setEntries] = useState(events)
@@ -95,9 +103,21 @@ export function InterviewHistory({
   const [checks, setChecks] = useState<BackgroundCheck[]>([])
   const [completing, setCompleting] = useState(false)
   const [completeError, setCompleteError] = useState<string | null>(null)
+  const [sectionOpen, setSectionOpen] = useState<Record<string, boolean>>({})
   const router = useRouter()
   const opener = useRef<HTMLElement | null>(null)
   const scrollY = useRef(0)
+  useEffect(() => {
+    setSectionOpen(readSectionOpenState(clientId, "history"))
+  }, [clientId, sectionSyncKey])
+
+  function toggleHistorySection(id: string) {
+    setSectionOpen((current) => {
+      const next = { ...current, [id]: !current[id] }
+      writeSectionOpenState(clientId, "history", next)
+      return next
+    })
+  }
   const answersRef = useRef(answers)
   const entriesRef = useRef(entries)
   const stressorsRef = useRef(stressors)
@@ -291,11 +311,14 @@ export function InterviewHistory({
   return (
     <div className="space-y-4">
       {HISTORY_QUESTION_GROUPS.map((group) => (
-        <Card key={group.title}>
-          <CardHeader>
-            <CardTitle>{group.title}</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
+        <InterviewSectionCard
+          key={group.title}
+          title={group.title}
+          open={Boolean(sectionOpen[group.title])}
+          onToggle={() => toggleHistorySection(group.title)}
+          badge={needsBadge(0)}
+        >
+          <div className="space-y-4">
             {group.keys.map((key) => {
               const question = HISTORY_QUESTIONS[key]
               const suggestion = historyClient?.[key]
@@ -402,44 +425,44 @@ export function InterviewHistory({
                 </div>
               )
             })}
-          </CardContent>
-        </Card>
+          </div>
+        </InterviewSectionCard>
       ))}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Stressors</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <AutosaveFields
-            saved={stressors}
-            save={async (value) => {
-              stressorsRef.current = value
-              const result = await saveStressorsAction(clientId, value)
-              if (result.error || !("stressors" in result) || !result.stressors) {
-                return { error: result.error ?? "Could not save stressors." }
-              }
-              stressorsRef.current = result.stressors
-              return { value: result.stressors }
-            }}
-            onPhase={(phase, retry) => onPhase("stressors", phase, retry)}
-            registerFlush={registerFlush}
-          >
-            {(value, onChange, commit) => {
-              stressorsRef.current = value
-              return (
-                <StressorsFields
-                  idPrefix="interview_stressors"
-                  value={value}
-                  onChange={onChange}
-                  onCommit={commit}
-                  client={stressorsClient}
-                />
-              )
-            }}
-          </AutosaveFields>
-        </CardContent>
-      </Card>
+      <InterviewSectionCard
+        title="Stressors"
+        open={Boolean(sectionOpen.Stressors)}
+        onToggle={() => toggleHistorySection("Stressors")}
+        badge={needsBadge(0)}
+      >
+        <AutosaveFields
+          saved={stressors}
+          save={async (value) => {
+            stressorsRef.current = value
+            const result = await saveStressorsAction(clientId, value)
+            if (result.error || !("stressors" in result) || !result.stressors) {
+              return { error: result.error ?? "Could not save stressors." }
+            }
+            stressorsRef.current = result.stressors
+            return { value: result.stressors }
+          }}
+          onPhase={(phase, retry) => onPhase("stressors", phase, retry)}
+          registerFlush={registerFlush}
+        >
+          {(value, onChange, commit) => {
+            stressorsRef.current = value
+            return (
+              <StressorsFields
+                idPrefix="interview_stressors"
+                value={value}
+                onChange={onChange}
+                onCommit={commit}
+                client={stressorsClient}
+              />
+            )
+          }}
+        </AutosaveFields>
+      </InterviewSectionCard>
 
       <Sheet open={sheet != null} onOpenChange={(next) => !next && closeSheet()}>
         <SheetContent className="h-full w-full overflow-y-auto sm:max-w-xl">

@@ -1,6 +1,7 @@
 "use client"
 
-import { createContext, useContext, useEffect, useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
+import { createPortal } from "react-dom"
 
 import {
   addBlockMemberAction,
@@ -13,48 +14,40 @@ import {
   updateBlockMemberAction,
   updateRelationshipBlockAction,
 } from "@/app/clients/[client_id]/background/actions"
-import { ClientAnswer, Field, PartialDatePicker, SelectField, TextField, selectClassName } from "@/components/client-background/fields"
+import { ClientAnswer, SelectField, TextField } from "@/components/client-background/fields"
 import type { SavePhase } from "@/components/client-background/interview-autosave"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { InterviewSectionCard, needsBadge } from "@/components/client-background/interview-section-card"
+import {
+  BlockFields,
+  MoveStep,
+  PanelHeader,
+  PersonFields,
+  RelationshipPanelShell,
+  ROLE_LABELS,
+  draftFromPerson,
+  personFromDraft,
+  statusLabel,
+  type PersonDraft,
+} from "@/components/client-background/relationship-panel-shared"
 import type { AppliedAnswer } from "@/lib/background-questionnaire/to-client-background"
 import {
-  answerKeyForBlock,
-  childTypesForBlock,
   isPartneredClientStatus,
-  moveDestinationKind,
-  moveDestinations,
   needLabel,
   needsForBlock,
   needsForMember,
   previousBlocksInOrder,
-  rolesForBlock,
   siblingTypesForBlock,
   statusesForBlock,
 } from "@/lib/client-background/relationship-blocks"
+import { relationshipDuration } from "@/lib/reports/relationship-block-report"
+import { todayDateString } from "@/lib/dates/practice-time"
 import {
   ARRANGEMENT_TYPE_LABELS,
-  ARRANGEMENT_TYPES,
   BLOCK_ANSWER_LABELS,
   BLOCK_ANSWERS,
-  CAREGIVER_RELATIONSHIP_LABELS,
-  CAREGIVER_RELATIONSHIPS,
-  CHILD_TYPE_LABELS,
   CLIENT_RELATIONSHIP_STATUSES,
   CLIENT_RELATIONSHIP_STATUS_LABELS,
-  CURRENT_BLOCK_STATUS_LABELS,
-  DEPENDENCY_LABELS,
-  DEPENDENCY_VALUES,
-  HEALTH_STATUS_LABELS,
-  HEALTH_STATUSES,
-  PREVIOUS_BLOCK_STATUS_LABELS,
-  RELATIONSHIP_LIVING_SITUATION_LABELS,
-  RELATIONSHIP_LIVING_SITUATIONS,
-  RELATIONSHIP_RATING_LABELS,
-  RELATIONSHIP_RATING_VALUES,
-  SEX_OPTIONS,
-  SIBLING_BLOCK_TYPE_LABELS,
   emptyBlockAnswers,
-  type ArrangementType,
   type BlockAnswer,
   type BlockKind,
   type BlockRole,
@@ -74,39 +67,126 @@ type EditorState = {
   error?: string
 }
 
+type Selection =
+  | { type: "person"; id: string; addAnotherRole?: BlockRole }
+  | { type: "block"; id: string }
+  | { type: "move"; id: string }
+
 const linkClass = "text-sm text-primary underline-offset-2 hover:underline"
-
-const BlocksContext = createContext<RelationshipBlock[]>([])
-
-const ROLE_LABELS: Record<BlockRole, string> = {
-  partner: "Partner",
-  child: "Child",
-  parent: "Parent",
-  sibling: "Sibling",
-  caregiver: "Caregiver",
-}
-
-function statusLabel(status: string): string {
-  if (status === "never_in_a_relationship") return "Never in a relationship"
-  if (status in CURRENT_BLOCK_STATUS_LABELS) return CURRENT_BLOCK_STATUS_LABELS[status as keyof typeof CURRENT_BLOCK_STATUS_LABELS]
-  if (status in PREVIOUS_BLOCK_STATUS_LABELS) return PREVIOUS_BLOCK_STATUS_LABELS[status as keyof typeof PREVIOUS_BLOCK_STATUS_LABELS]
-  return status
-}
-
-function blockTitle(block: RelationshipBlock): string {
-  if (block.kind === "client_current") return "Current relationship"
-  if (block.kind === "client_previous") return "Previous relationship"
-  if (block.kind === "client_other_children") return "Other children"
-  if (block.kind === "biological_parents") return "Biological parents"
-  if (block.kind === "parent_other") return block.parentSide === "father" ? "Father's other relationship" : "Mother's other relationship"
-  if (block.arrangementType && block.arrangementType in ARRANGEMENT_TYPE_LABELS) {
-    return ARRANGEMENT_TYPE_LABELS[block.arrangementType]
-  }
-  return "Care arrangement"
-}
 
 function Needs({ need }: { need: string }) {
   return <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-950">{need}</span>
+}
+
+function resolvedChildrenAnswer(block: RelationshipBlock): BlockAnswer | "" {
+  if (block.childrenAnswer === "yes" || block.childrenAnswer === "none" || block.childrenAnswer === "not_asked") {
+    return block.childrenAnswer
+  }
+  if (block.noChildren) return "none"
+  return ""
+}
+
+function resolvedSiblingsAnswer(block: RelationshipBlock): BlockAnswer | "" {
+  if (block.siblingsAnswer === "yes" || block.siblingsAnswer === "none" || block.siblingsAnswer === "not_asked") {
+    return block.siblingsAnswer
+  }
+  return ""
+}
+
+function membersOf(block: RelationshipBlock, people: RelationshipRecord[], role: BlockRole) {
+  return people
+    .filter((person) => person.relationshipBlockId === block.relationshipBlockId && person.blockRole === role)
+    .sort((a, b) => a.displayOrder - b.displayOrder)
+}
+
+function parentRank(person: RelationshipRecord): number {
+  if (person.blockRoleType === "mother" || person.relationshipToClient === "mother") return 0
+  if (person.blockRoleType === "father" || person.relationshipToClient === "father") return 1
+  return 2
+}
+
+function yearSpan(block: RelationshipBlock): string {
+  const year = (value: string) => /^(\d{4})/.exec(value.trim())?.[1] ?? ""
+  const start = year(block.startedOn)
+  const end = year(block.endedOn)
+  if (start && end && block.endedOn.trim() && block.kind !== "client_current") return `${start}–${end}`
+  if (start && (block.kind === "client_current" || !block.endedOn.trim())) return `since ${start}`
+  if (start) return start
+  if (end) return `until ${end}`
+  return ""
+}
+
+function blockMeta(block: RelationshipBlock): string {
+  const span = yearSpan(block)
+  if (block.kind === "client_current" || block.kind === "client_previous") {
+    const duration = relationshipDuration(
+      block.startedOn,
+      block.kind === "client_current" ? "" : block.endedOn,
+      todayDateString()
+    )
+    return [span, duration].filter(Boolean).join(" · ")
+  }
+  return span
+}
+
+function intimateUnplaced(person: RelationshipRecord): boolean {
+  if (person.blockRole === "partner" || person.blockRole === "child") return true
+  return (
+    person.relationshipToClient === "current_partner" ||
+    person.relationshipToClient === "prior_partner" ||
+    person.relationshipToClient === "child_biological" ||
+    person.relationshipToClient === "child_step"
+  )
+}
+
+function countCardNeeds(
+  blocks: RelationshipBlock[],
+  people: RelationshipRecord[],
+  lockedId: string | null
+): number {
+  let count = 0
+  for (const block of blocks) {
+    count += needsForBlock(block, block.relationshipBlockId === lockedId).length
+    for (const person of people.filter((item) => item.relationshipBlockId === block.relationshipBlockId)) {
+      count += needsForMember(block, person).length
+    }
+  }
+  return count
+}
+
+function AnswerSelect({
+  id,
+  label,
+  value,
+  locked,
+  onChange,
+}: {
+  id: string
+  label: string
+  value: BlockAnswer | ""
+  locked: boolean
+  onChange: (value: BlockAnswer) => void
+}) {
+  return (
+    <SelectField
+      id={id}
+      label={label}
+      value={value || ""}
+      disabled={locked && value === "yes"}
+      onChange={(next) => {
+        if (!next) return
+        if (locked && next !== "yes") return
+        onChange(next as BlockAnswer)
+      }}
+    >
+      <option value="">Select…</option>
+      {BLOCK_ANSWERS.map((option) => (
+        <option key={option} value={option} disabled={locked && option !== "yes"}>
+          {BLOCK_ANSWER_LABELS[option]}
+        </option>
+      ))}
+    </SelectField>
+  )
 }
 
 export function RelationshipBlocksSection({
@@ -123,6 +203,9 @@ export function RelationshipBlocksSection({
   registerFlush,
   relationshipClient,
   childrenPrompt,
+  sectionOpen,
+  onToggleSection,
+  sectionBadge,
 }: {
   clientId: string
   relationships: RelationshipRecord[]
@@ -137,18 +220,46 @@ export function RelationshipBlocksSection({
   registerFlush?: (flush: () => Promise<void>) => () => void
   relationshipClient?: AppliedAnswer<ClientRelationshipStatusValue>
   childrenPrompt?: string | null
+  /** Optional controlled open state from the interview page Open all / Close all. */
+  sectionOpen?: { intimate: boolean; caregivers: boolean }
+  onToggleSection?: (id: "intimate" | "caregivers") => void
+  sectionBadge?: { intimate: string; caregivers: string }
 }) {
   const [people, setPeople] = useState(relationships)
   const [blockList, setBlockList] = useState(blocks ?? [])
   const [answers, setAnswers] = useState(blockAnswers ?? emptyBlockAnswers())
   const [status, setStatus] = useState(relationshipStatus)
   const [error, setError] = useState<string | null>(null)
+  const [selection, setSelection] = useState<Selection | null>(null)
+  const [ready, setReady] = useState(false)
+  const [intimateOpenLocal, setIntimateOpenLocal] = useState(true)
+  const [caregiversOpenLocal, setCaregiversOpenLocal] = useState(true)
+  const intimateOpen = sectionOpen?.intimate ?? intimateOpenLocal
+  const caregiversOpen = sectionOpen?.caregivers ?? caregiversOpenLocal
   const inflight = useRef<Promise<void> | null>(null)
+  const personTimer = useRef<number | null>(null)
+  const blockTimer = useRef<number | null>(null)
 
+  useEffect(() => setReady(true), [])
   useEffect(() => {
     if (!registerFlush) return
     return registerFlush(() => inflight.current ?? Promise.resolve())
   }, [registerFlush])
+  useEffect(() => {
+    if (!selection) return
+    function onKey(event: KeyboardEvent) {
+      if (event.key === "Escape") setSelection(null)
+    }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [selection])
+  useEffect(
+    () => () => {
+      if (personTimer.current) window.clearTimeout(personTimer.current)
+      if (blockTimer.current) window.clearTimeout(blockTimer.current)
+    },
+    []
+  )
 
   function apply(result: EditorState | null) {
     if (!result || !result.relationships || !result.blocks || !result.blockAnswers) {
@@ -173,350 +284,958 @@ export function RelationshipBlocksSection({
     return true
   }
 
-  function run(work: () => Promise<EditorState | null>) {
+  function run(work: () => Promise<EditorState | null>): Promise<EditorState | null> {
     const task = (async () => {
       onPhase?.("relationships", "saving", null)
       const result = await work()
       const ok = apply(result)
-      onPhase?.("relationships", ok ? "saved" : "error", ok ? null : () => run(work))
+      onPhase?.("relationships", ok ? "saved" : "error", ok ? null : () => void run(work))
+      return ok ? result : null
     })()
-    inflight.current = task
+    inflight.current = task.then(() => undefined)
     return task
   }
 
   const currentBlocks = blockList
     .filter((block) => block.kind === "client_current")
     .sort((a, b) => a.displayOrder - b.displayOrder)
-  const lockedId = isPartneredClientStatus(status.relationshipStatus) ? currentBlocks[0]?.relationshipBlockId ?? null : null
-  const recordedChildren = people.filter(
-    (person) => person.blockRole === "child" || person.relationshipToClient === "child_biological" || person.relationshipToClient === "child_step"
-  ).length
-  const unplaced = people.filter((person) => !person.relationshipBlockId)
+  const lockedId = isPartneredClientStatus(status.relationshipStatus)
+    ? currentBlocks[0]?.relationshipBlockId ?? null
+    : null
+  const previous = previousBlocksInOrder(blockList)
+  const otherChildren = blockList
+    .filter((block) => block.kind === "client_other_children")
+    .sort((a, b) => a.displayOrder - b.displayOrder)
   const biological = blockList.find((block) => block.kind === "biological_parents")
-  const otherChildren = blockList.find((block) => block.kind === "client_other_children")
+  const motherOther = blockList
+    .filter((block) => block.kind === "parent_other" && block.parentSide === "mother")
+    .sort((a, b) => {
+      const ongoing = Number(!a.endedOn.trim()) - Number(!b.endedOn.trim())
+      if (ongoing) return -ongoing
+      return (b.startedOn.trim() || b.endedOn.trim()).localeCompare(a.startedOn.trim() || a.endedOn.trim())
+    })
+  const fatherOther = blockList
+    .filter((block) => block.kind === "parent_other" && block.parentSide === "father")
+    .sort((a, b) => {
+      const ongoing = Number(!a.endedOn.trim()) - Number(!b.endedOn.trim())
+      if (ongoing) return -ongoing
+      return (b.startedOn.trim() || b.endedOn.trim()).localeCompare(a.startedOn.trim() || a.endedOn.trim())
+    })
+  const caregivers = blockList
+    .filter((block) => block.kind === "caregiver_arrangement")
+    .sort((a, b) => (b.startedOn.trim() || b.endedOn.trim()).localeCompare(a.startedOn.trim() || a.endedOn.trim()))
 
-  return (
-    <BlocksContext.Provider value={blockList}>
-    <Card id="check-relationships" className="scroll-mt-28">
-      <CardHeader>
-        <CardTitle>Relationships</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-8">
-        {error ? <p className="text-sm text-destructive">{error}</p> : null}
-        <section className="space-y-4">
-          <h3 className="text-sm font-medium">Partners and children</h3>
-          <StatusFields
-            value={status}
-            client={relationshipClient}
-            onChange={(next) => {
-              setStatus(next)
-              void run(() => saveRelationshipStatusBlockAction(clientId, next))
-            }}
-          />
-          {childrenPrompt ? (
-            <p className="text-sm text-blue-800">
-              Client: {childrenPrompt} · {recordedChildren} recorded
-            </p>
-          ) : null}
-          {currentBlocks.map((block) => (
-            <BlockCard
-              key={block.relationshipBlockId}
-              clientId={clientId}
-              block={block}
-              people={people}
-              lockedStatus={block.relationshipBlockId === lockedId}
-              run={run}
-            />
-          ))}
-          <button type="button" className={linkClass} onClick={() => void run(() => createRelationshipBlockAction(clientId, "client_current"))}>
-            + Add another current relationship
-          </button>
-          <AnsweredBlocks
-            clientId={clientId}
-            title="Previous significant relationships"
-            answer={answers.previousRelationships}
-            answerKey="previousRelationships"
-            kind="client_previous"
-            blocks={previousBlocksInOrder(blockList)}
-            people={people}
-            run={run}
-          />
-          <OtherChildren
-            clientId={clientId}
-            answer={answers.otherChildren}
-            block={otherChildren}
-            people={people}
-            run={run}
-          />
-        </section>
-        <section className="space-y-4">
-          <h3 className="text-sm font-medium">Primary caregivers and siblings</h3>
-          {biological ? <BlockCard clientId={clientId} block={biological} people={people} lockedStatus={false} run={run} /> : null}
-          <AnsweredBlocks
-            clientId={clientId}
-            title="Mother's other relationships"
-            answer={answers.motherOtherRelationships}
-            answerKey="motherOtherRelationships"
-            kind="parent_other"
-            parentSide="mother"
-            blocks={blockList.filter((block) => block.kind === "parent_other" && block.parentSide === "mother")}
-            people={people}
-            run={run}
-          />
-          <AnsweredBlocks
-            clientId={clientId}
-            title="Father's other relationships"
-            answer={answers.fatherOtherRelationships}
-            answerKey="fatherOtherRelationships"
-            kind="parent_other"
-            parentSide="father"
-            blocks={blockList.filter((block) => block.kind === "parent_other" && block.parentSide === "father")}
-            people={people}
-            run={run}
-          />
-          <AnsweredBlocks
-            clientId={clientId}
-            title="Other primary caregiver arrangements"
-            answer={answers.caregiverArrangements}
-            answerKey="caregiverArrangements"
-            kind="caregiver_arrangement"
-            blocks={blockList.filter((block) => block.kind === "caregiver_arrangement")}
-            people={people}
-            run={run}
-          />
-        </section>
-        {unplaced.length > 0 ? (
-          <section className="space-y-3 rounded-md border border-amber-300 bg-amber-50 p-3">
-            <h3 className="text-sm font-medium text-amber-950">Unplaced</h3>
-            <p className="text-sm text-amber-950">These people could not be placed in a relationship.</p>
-            {unplaced.map((person) => (
-              <UnplacedRow key={person.relationshipRecordId} clientId={clientId} person={person} run={run} />
-            ))}
-          </section>
-        ) : null}
-      </CardContent>
-    </Card>
-    </BlocksContext.Provider>
-  )
-}
+  const placed = new Set(blockList.map((block) => block.relationshipBlockId))
+  const unplaced = people.filter((person) => !person.relationshipBlockId || !placed.has(person.relationshipBlockId))
+  const unplacedIntimate = unplaced.filter(intimateUnplaced)
+  const unplacedCaregivers = unplaced.filter((person) => !intimateUnplaced(person))
 
-function StatusFields({
-  value,
-  client,
-  onChange,
-}: {
-  value: ClientRelationshipStatusValue
-  client?: AppliedAnswer<ClientRelationshipStatusValue>
-  onChange: (value: ClientRelationshipStatusValue) => void
-}) {
+  const intimateBlocks = [...currentBlocks, ...previous, ...otherChildren]
+  const caregiverBlocks = [
+    ...(biological ? [biological] : []),
+    ...motherOther,
+    ...fatherOther,
+    ...caregivers,
+  ]
+  const intimateNeeds =
+    countCardNeeds(intimateBlocks, people, lockedId) + unplacedIntimate.length
+  const caregiverNeeds =
+    countCardNeeds(caregiverBlocks, people, null) + unplacedCaregivers.length
+  const intimateBadge = sectionBadge?.intimate ?? needsBadge(intimateNeeds)
+  const caregiversBadge = sectionBadge?.caregivers ?? needsBadge(caregiverNeeds)
+
+  const recordedChildren = people.filter(
+    (person) =>
+      person.blockRole === "child" ||
+      person.relationshipToClient === "child_biological" ||
+      person.relationshipToClient === "child_step"
+  ).length
+
+  const selectedPerson =
+    selection?.type === "person" || selection?.type === "move"
+      ? people.find((item) => item.relationshipRecordId === selection.id)
+      : undefined
+  const selectedBlock =
+    selection?.type === "block" ? blockList.find((item) => item.relationshipBlockId === selection.id) : undefined
+
+  function closePanel() {
+    setSelection(null)
+    setError(null)
+  }
+
+  function openPerson(id: string, addAnotherRole?: BlockRole) {
+    setSelection({ type: "person", id, addAnotherRole })
+    setError(null)
+  }
+
+  function openBlock(id: string) {
+    setSelection({ type: "block", id })
+    setError(null)
+  }
+
+  async function addPerson(blockId: string, role: BlockRole, roleType = "") {
+    const before = people.map((item) => item.relationshipRecordId)
+    const result = await run(() => addBlockMemberAction(clientId, blockId, role, roleType))
+    const created = result?.relationships?.find((item) => !before.includes(item.relationshipRecordId))
+    if (created) openPerson(created.relationshipRecordId, role)
+  }
+
+  async function addBlock(kind: BlockKind, options?: { parentSide?: "mother" | "father" }) {
+    const before = blockList.map((item) => item.relationshipBlockId)
+    const result = await run(() => createRelationshipBlockAction(clientId, kind, options))
+    const created = result?.blocks?.find((item) => !before.includes(item.relationshipBlockId))
+    if (created) openBlock(created.relationshipBlockId)
+  }
+
+  function schedulePersonSave(person: RelationshipRecord, draft: PersonDraft) {
+    if (personTimer.current) window.clearTimeout(personTimer.current)
+    personTimer.current = window.setTimeout(() => {
+      void run(() => updateBlockMemberAction(clientId, personFromDraft(person, draft)))
+    }, 400)
+  }
+
+  function scheduleBlockSave(draft: RelationshipBlock) {
+    if (blockTimer.current) window.clearTimeout(blockTimer.current)
+    blockTimer.current = window.setTimeout(() => {
+      void run(() => updateRelationshipBlockAction(clientId, draft))
+    }, 400)
+  }
+
+  async function flushPersonSave(person: RelationshipRecord, draft: PersonDraft) {
+    if (personTimer.current) {
+      window.clearTimeout(personTimer.current)
+      personTimer.current = null
+    }
+    return run(() => updateBlockMemberAction(clientId, personFromDraft(person, draft)))
+  }
+
+  async function addAnother(person: RelationshipRecord, role: BlockRole, draft: PersonDraft) {
+    const blockId = person.relationshipBlockId
+    if (!blockId) return
+    await flushPersonSave(person, draft)
+    const defaultType =
+      role === "sibling"
+        ? siblingTypesForBlock(blockList.find((item) => item.relationshipBlockId === blockId)?.kind ?? "biological_parents")[0] ??
+          ""
+        : role === "child"
+          ? "biological"
+          : role === "parent"
+            ? "mother"
+            : ""
+    await addPerson(blockId, role, defaultType)
+  }
+
+  const motherName =
+    biological &&
+    membersOf(biological, people, "parent").find(
+      (item) => item.blockRoleType === "mother" || item.relationshipToClient === "mother"
+    )?.givenName.trim()
+  const fatherName =
+    biological &&
+    membersOf(biological, people, "parent").find(
+      (item) => item.blockRoleType === "father" || item.relationshipToClient === "father"
+    )?.givenName.trim()
+
   return (
     <>
-      <SelectField
-        id="client_relationship_status"
-        label="Current relationship status"
-        value={value.relationshipStatus}
-        client={
-          client ? (
-            <ClientAnswer
-              label={client.label}
-              matches={
-                value.relationshipStatus === client.apply.relationshipStatus &&
-                (client.apply.relationshipStatus !== "other" || value.relationshipStatusOther === client.apply.relationshipStatusOther)
-              }
-              onUse={() => onChange(client.apply)}
-            />
-          ) : undefined
+      <InterviewSectionCard
+        id="check-relationships-intimate"
+        title="Intimate relationships and children"
+        open={intimateOpen}
+        onToggle={() =>
+          onToggleSection ? onToggleSection("intimate") : setIntimateOpenLocal((open) => !open)
         }
-        onChange={(relationshipStatus) =>
-          onChange({
-            relationshipStatus: relationshipStatus as ClientRelationshipStatus | "",
-            relationshipStatusOther: relationshipStatus === "other" ? value.relationshipStatusOther : "",
-          })
-        }
+        badge={intimateBadge}
       >
-        <option value="">Not recorded</option>
-        {CLIENT_RELATIONSHIP_STATUSES.map((option) => (
-          <option key={option} value={option}>
-            {CLIENT_RELATIONSHIP_STATUS_LABELS[option]}
-          </option>
-        ))}
-      </SelectField>
-      {value.relationshipStatus === "other" ? (
-        <TextField
-          id="client_relationship_status_other"
-          label="Other relationship status"
-          value={value.relationshipStatusOther}
-          onChange={(relationshipStatusOther) => onChange({ ...value, relationshipStatusOther })}
-        />
-      ) : null}
+        <div id="check-relationships" className="space-y-6">
+          {error && !selection ? <p className="text-sm text-destructive">{error}</p> : null}
+          <section className="space-y-3">
+            <h3 className="text-sm font-semibold">Current intimate relationship and children</h3>
+            <SelectField
+              id="client_relationship_status"
+              label="Current relationship status"
+              value={status.relationshipStatus}
+              client={
+                relationshipClient ? (
+                  <ClientAnswer
+                    label={relationshipClient.label}
+                    matches={
+                      status.relationshipStatus === relationshipClient.apply.relationshipStatus &&
+                      (relationshipClient.apply.relationshipStatus !== "other" ||
+                        status.relationshipStatusOther === relationshipClient.apply.relationshipStatusOther)
+                    }
+                    onUse={() => {
+                      setStatus(relationshipClient.apply)
+                      void run(() => saveRelationshipStatusBlockAction(clientId, relationshipClient.apply))
+                    }}
+                  />
+                ) : undefined
+              }
+              onChange={(relationshipStatus) => {
+                const next = {
+                  relationshipStatus: relationshipStatus as ClientRelationshipStatus | "",
+                  relationshipStatusOther: relationshipStatus === "other" ? status.relationshipStatusOther : "",
+                }
+                setStatus(next)
+                void run(() => saveRelationshipStatusBlockAction(clientId, next))
+              }}
+            >
+              <option value="">Not recorded</option>
+              {CLIENT_RELATIONSHIP_STATUSES.map((option) => (
+                <option key={option} value={option}>
+                  {CLIENT_RELATIONSHIP_STATUS_LABELS[option]}
+                </option>
+              ))}
+            </SelectField>
+            {status.relationshipStatus === "other" ? (
+              <TextField
+                id="client_relationship_status_other"
+                label="Other relationship status"
+                value={status.relationshipStatusOther}
+                onChange={(relationshipStatusOther) => {
+                  const next = { ...status, relationshipStatusOther }
+                  setStatus(next)
+                  void run(() => saveRelationshipStatusBlockAction(clientId, next))
+                }}
+              />
+            ) : null}
+            {childrenPrompt ? (
+              <p className="text-sm text-blue-800">
+                Client: {childrenPrompt} · {recordedChildren} recorded
+              </p>
+            ) : null}
+            {currentBlocks.map((block) => (
+              <CurrentBlockTree
+                key={block.relationshipBlockId}
+                block={block}
+                people={people}
+                locked={block.relationshipBlockId === lockedId}
+                onOpenBlock={() => openBlock(block.relationshipBlockId)}
+                onOpenPerson={openPerson}
+                onAddPartner={() => void addPerson(block.relationshipBlockId, "partner")}
+                onAddChild={() => void addPerson(block.relationshipBlockId, "child", "biological")}
+                onChildrenAnswer={(childrenAnswer) =>
+                  void run(() =>
+                    updateRelationshipBlockAction(clientId, {
+                      ...block,
+                      childrenAnswer,
+                      noChildren: childrenAnswer === "none",
+                    })
+                  )
+                }
+              />
+            ))}
+            {isPartneredClientStatus(status.relationshipStatus) || currentBlocks.length > 0 ? (
+              <button type="button" className={linkClass} onClick={() => void addBlock("client_current")}>
+                {currentBlocks.length > 0 ? "+ Add another current relationship" : "+ Add current relationship"}
+              </button>
+            ) : null}
+          </section>
+
+          <section className="space-y-3">
+            <AnswerSelect
+              id="previous_relationships_answer"
+              label="Previous significant relationships"
+              value={previous.length > 0 ? "yes" : answers.previousRelationships || ""}
+              locked={previous.length > 0}
+              onChange={(value) => void run(() => setRelationshipBlockAnswerAction(clientId, "previousRelationships", value))}
+            />
+            {(previous.length > 0 || answers.previousRelationships === "yes") &&
+              previous.map((block) => (
+                <PreviousBlockTree
+                  key={block.relationshipBlockId}
+                  block={block}
+                  people={people}
+                  onOpenBlock={() => openBlock(block.relationshipBlockId)}
+                  onOpenPerson={openPerson}
+                  onStatus={(statusValue) =>
+                    void run(() => updateRelationshipBlockAction(clientId, { ...block, status: statusValue }))
+                  }
+                  onAddPartner={() => void addPerson(block.relationshipBlockId, "partner")}
+                  onAddChild={() => void addPerson(block.relationshipBlockId, "child", "biological")}
+                  onChildrenAnswer={(childrenAnswer) =>
+                    void run(() =>
+                      updateRelationshipBlockAction(clientId, {
+                        ...block,
+                        childrenAnswer,
+                        noChildren: childrenAnswer === "none",
+                      })
+                    )
+                  }
+                />
+              ))}
+            {answers.previousRelationships !== "none" ? (
+              <button type="button" className={linkClass} onClick={() => void addBlock("client_previous")}>
+                + Add previous relationship
+              </button>
+            ) : null}
+          </section>
+
+          <section className="space-y-3">
+            <AnswerSelect
+              id="other_children_answer"
+              label="Other children"
+              value={otherChildren.length > 0 ? "yes" : answers.otherChildren || ""}
+              locked={otherChildren.length > 0}
+              onChange={(value) => void run(() => setRelationshipBlockAnswerAction(clientId, "otherChildren", value))}
+            />
+            {(otherChildren.length > 0 || answers.otherChildren === "yes") &&
+              otherChildren.map((block) => (
+                <OtherChildrenTree
+                  key={block.relationshipBlockId}
+                  block={block}
+                  people={people}
+                  onOpenPerson={openPerson}
+                  onStatusDetail={(statusDetail) => {
+                    const next = { ...block, statusDetail }
+                    void run(() => updateRelationshipBlockAction(clientId, next))
+                  }}
+                  onAddChild={() => void addPerson(block.relationshipBlockId, "child", "biological")}
+                />
+              ))}
+            {answers.otherChildren === "yes" || otherChildren.length > 0 ? (
+              <button type="button" className={linkClass} onClick={() => void addBlock("client_other_children")}>
+                + Add relationship
+              </button>
+            ) : null}
+          </section>
+
+          {unplacedIntimate.length > 0 ? (
+            <UnplacedGroup people={unplacedIntimate} onOpenPerson={openPerson} onMove={(id) => setSelection({ type: "move", id })} />
+          ) : null}
+        </div>
+      </InterviewSectionCard>
+
+      <InterviewSectionCard
+        id="check-relationships-caregivers"
+        title="Primary caregivers and siblings"
+        open={caregiversOpen}
+        onToggle={() =>
+          onToggleSection ? onToggleSection("caregivers") : setCaregiversOpenLocal((open) => !open)
+        }
+        badge={caregiversBadge}
+      >
+        <div className="space-y-6">
+          {biological ? (
+            <ParentsBlockTree
+              block={biological}
+              people={people}
+              onOpenBlock={() => openBlock(biological.relationshipBlockId)}
+              onOpenPerson={openPerson}
+              onStatus={(statusValue) =>
+                void run(() => updateRelationshipBlockAction(clientId, { ...biological, status: statusValue }))
+              }
+              onAddSibling={() =>
+                void addPerson(
+                  biological.relationshipBlockId,
+                  "sibling",
+                  siblingTypesForBlock("biological_parents")[0] ?? "full"
+                )
+              }
+              onSiblingsAnswer={(siblingsAnswer) =>
+                void run(() => updateRelationshipBlockAction(clientId, { ...biological, siblingsAnswer }))
+              }
+            />
+          ) : null}
+
+          <AnsweredSideSection
+            id="mother_other_answer"
+            label={motherName ? `Mother (${motherName}) · other relationships` : "Mother · other relationships"}
+            answer={motherOther.length > 0 ? "yes" : answers.motherOtherRelationships || ""}
+            locked={motherOther.length > 0}
+            onAnswer={(value) =>
+              void run(() => setRelationshipBlockAnswerAction(clientId, "motherOtherRelationships", value))
+            }
+            onAdd={() => void addBlock("parent_other", { parentSide: "mother" })}
+            addLabel="+ Add relationship"
+            hideAdd={answers.motherOtherRelationships === "none"}
+          >
+            {motherOther.map((block) => (
+              <ParentOtherTree
+                key={block.relationshipBlockId}
+                block={block}
+                people={people}
+                onOpenBlock={() => openBlock(block.relationshipBlockId)}
+                onOpenPerson={openPerson}
+                onStatus={(statusValue) =>
+                  void run(() => updateRelationshipBlockAction(clientId, { ...block, status: statusValue }))
+                }
+                onAddPartner={() => void addPerson(block.relationshipBlockId, "partner")}
+                onAddSibling={() => void addPerson(block.relationshipBlockId, "sibling", "half")}
+                onSiblingsAnswer={(siblingsAnswer) =>
+                  void run(() => updateRelationshipBlockAction(clientId, { ...block, siblingsAnswer }))
+                }
+              />
+            ))}
+          </AnsweredSideSection>
+
+          <AnsweredSideSection
+            id="father_other_answer"
+            label={fatherName ? `Father (${fatherName}) · other relationships` : "Father · other relationships"}
+            answer={fatherOther.length > 0 ? "yes" : answers.fatherOtherRelationships || ""}
+            locked={fatherOther.length > 0}
+            onAnswer={(value) =>
+              void run(() => setRelationshipBlockAnswerAction(clientId, "fatherOtherRelationships", value))
+            }
+            onAdd={() => void addBlock("parent_other", { parentSide: "father" })}
+            addLabel="+ Add relationship"
+            hideAdd={answers.fatherOtherRelationships === "none"}
+          >
+            {fatherOther.map((block) => (
+              <ParentOtherTree
+                key={block.relationshipBlockId}
+                block={block}
+                people={people}
+                onOpenBlock={() => openBlock(block.relationshipBlockId)}
+                onOpenPerson={openPerson}
+                onStatus={(statusValue) =>
+                  void run(() => updateRelationshipBlockAction(clientId, { ...block, status: statusValue }))
+                }
+                onAddPartner={() => void addPerson(block.relationshipBlockId, "partner")}
+                onAddSibling={() => void addPerson(block.relationshipBlockId, "sibling", "half")}
+                onSiblingsAnswer={(siblingsAnswer) =>
+                  void run(() => updateRelationshipBlockAction(clientId, { ...block, siblingsAnswer }))
+                }
+              />
+            ))}
+          </AnsweredSideSection>
+
+          <AnsweredSideSection
+            id="caregiver_arrangements_answer"
+            label="Other caregiver arrangements"
+            answer={caregivers.length > 0 ? "yes" : answers.caregiverArrangements || ""}
+            locked={caregivers.length > 0}
+            onAnswer={(value) =>
+              void run(() => setRelationshipBlockAnswerAction(clientId, "caregiverArrangements", value))
+            }
+            onAdd={() => void addBlock("caregiver_arrangement")}
+            addLabel="+ Add arrangement"
+            hideAdd={answers.caregiverArrangements === "none"}
+          >
+            {caregivers.map((block) => (
+              <CaregiverTree
+                key={block.relationshipBlockId}
+                block={block}
+                people={people}
+                onOpenBlock={() => openBlock(block.relationshipBlockId)}
+                onOpenPerson={openPerson}
+                onArrangement={(arrangementType) =>
+                  void run(() =>
+                    updateRelationshipBlockAction(clientId, {
+                      ...block,
+                      arrangementType: arrangementType as RelationshipBlock["arrangementType"],
+                    })
+                  )
+                }
+                onAddCaregiver={() => void addPerson(block.relationshipBlockId, "caregiver")}
+                onAddSibling={() => void addPerson(block.relationshipBlockId, "sibling", "adoptive")}
+                onSiblingsAnswer={(siblingsAnswer) =>
+                  void run(() => updateRelationshipBlockAction(clientId, { ...block, siblingsAnswer }))
+                }
+              />
+            ))}
+          </AnsweredSideSection>
+
+          {unplacedCaregivers.length > 0 ? (
+            <UnplacedGroup
+              people={unplacedCaregivers}
+              onOpenPerson={openPerson}
+              onMove={(id) => setSelection({ type: "move", id })}
+            />
+          ) : null}
+        </div>
+      </InterviewSectionCard>
+
+      {ready && selection
+        ? createPortal(
+            <RelationshipPanelShell
+              ariaLabel={
+                selection.type === "block"
+                  ? selectedBlock?.relationshipBlockId || "Relationship"
+                  : selectedPerson?.givenName || "Person"
+              }
+              onDismiss={closePanel}
+            >
+              {selection.type === "move" && selectedPerson ? (
+                <>
+                  <PanelHeader
+                    initial={(selectedPerson.givenName.trim() || "?").slice(0, 1).toUpperCase()}
+                    deceased={selectedPerson.deceased || selectedPerson.healthStatus === "deceased"}
+                    title={selectedPerson.givenName.trim() || "Person"}
+                    subtitle="Move to…"
+                    onClose={closePanel}
+                  />
+                  <MoveStep
+                    name={selectedPerson.givenName.trim() || "Person"}
+                    person={selectedPerson}
+                    blocks={blockList}
+                    people={people}
+                    saving={false}
+                    error={error ?? ""}
+                    onCancel={() => setSelection({ type: "person", id: selectedPerson.relationshipRecordId })}
+                    onMove={async (destinationId, role, roleType) => {
+                      const moved = await run(() =>
+                        moveBlockMemberAction(
+                          clientId,
+                          selectedPerson.relationshipRecordId,
+                          destinationId,
+                          role,
+                          roleType
+                        )
+                      )
+                      if (moved) setSelection({ type: "person", id: selectedPerson.relationshipRecordId })
+                    }}
+                  />
+                </>
+              ) : selection.type === "person" && selectedPerson ? (
+                <InterviewPersonPanel
+                  person={selectedPerson}
+                  block={blockList.find((item) => item.relationshipBlockId === selectedPerson.relationshipBlockId) ?? null}
+                  addAnotherRole={selection.addAnotherRole}
+                  error={error}
+                  onClose={closePanel}
+                  onDraftChange={(draft) => schedulePersonSave(selectedPerson, draft)}
+                  onMove={() => setSelection({ type: "move", id: selectedPerson.relationshipRecordId })}
+                  onRemove={async () => {
+                    const removed = await run(() => removeBlockMemberAction(clientId, selectedPerson.relationshipRecordId))
+                    if (removed) closePanel()
+                  }}
+                  onAddAnother={async (role, draft) => addAnother(selectedPerson, role, draft)}
+                  onDone={async (draft) => {
+                    await flushPersonSave(selectedPerson, draft)
+                    closePanel()
+                  }}
+                />
+              ) : selection.type === "block" && selectedBlock ? (
+                <InterviewBlockPanel
+                  block={selectedBlock}
+                  locked={selectedBlock.relationshipBlockId === lockedId}
+                  error={error}
+                  onClose={closePanel}
+                  onDraftChange={scheduleBlockSave}
+                  onRemove={
+                    selectedBlock.kind !== "biological_parents" && selectedBlock.kind !== "client_other_children"
+                      ? async () => {
+                          const removed = await run(() =>
+                            deleteRelationshipBlockAction(clientId, selectedBlock.relationshipBlockId)
+                          )
+                          if (removed) closePanel()
+                        }
+                      : undefined
+                  }
+                  onDone={async (draft) => {
+                    if (blockTimer.current) {
+                      window.clearTimeout(blockTimer.current)
+                      blockTimer.current = null
+                    }
+                    await run(() => updateRelationshipBlockAction(clientId, draft))
+                    closePanel()
+                  }}
+                />
+              ) : null}
+            </RelationshipPanelShell>,
+            document.body
+          )
+        : null}
     </>
   )
 }
 
-function AnsweredBlocks({
-  clientId,
-  title,
-  answer,
-  answerKey,
-  kind,
-  parentSide,
-  blocks,
-  people,
-  run,
-}: {
-  clientId: string
-  title: string
-  answer: RelationshipBlockAnswers[keyof RelationshipBlockAnswers]
-  answerKey: keyof RelationshipBlockAnswers
-  kind: BlockKind
-  parentSide?: "mother" | "father"
-  blocks: RelationshipBlock[]
-  people: RelationshipRecord[]
-  run: (work: () => Promise<EditorState | null>) => Promise<void>
-}) {
-  const shown = answer === "none" ? [] : blocks
-  return (
-    <div className="space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h4 className="text-sm font-medium">{title}</h4>
-        <AnswerControl
-          value={blocks.length > 0 ? "yes" : answer || "not_asked"}
-          disabled={blocks.length > 0}
-          onChange={(value) => void run(() => setRelationshipBlockAnswerAction(clientId, answerKey, value))}
-        />
-      </div>
-      {shown.map((block) => (
-        <BlockCard key={block.relationshipBlockId} clientId={clientId} block={block} people={people} lockedStatus={false} run={run} />
-      ))}
-      {answer !== "none" ? (
-        <button
-          type="button"
-          className={linkClass}
-          onClick={() =>
-            void run(() =>
-              createRelationshipBlockAction(clientId, kind, { parentSide })
-            )
-          }
-        >
-          {kind === "caregiver_arrangement" ? "+ Add arrangement" : "+ Add relationship"}
-        </button>
-      ) : null}
-    </div>
-  )
-}
-
-function AnswerControl({
-  value,
-  disabled,
-  onChange,
-}: {
-  value: string
-  disabled: boolean
-  onChange: (value: BlockAnswer) => void
-}) {
-  return (
-    <div className="flex gap-1">
-      {BLOCK_ANSWERS.map((option) => (
-        <button
-          key={option}
-          type="button"
-          disabled={disabled && option !== "yes"}
-          className={cn(
-            "rounded-md px-2 py-1 text-xs",
-            value === option ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
-          )}
-          onClick={() => onChange(option)}
-        >
-          {BLOCK_ANSWER_LABELS[option]}
-        </button>
-      ))}
-    </div>
-  )
-}
-
-function OtherChildren({
-  clientId,
-  answer,
+function InterviewPersonPanel({
+  person,
   block,
-  people,
-  run,
+  addAnotherRole,
+  error,
+  onClose,
+  onDraftChange,
+  onMove,
+  onRemove,
+  onAddAnother,
+  onDone,
 }: {
-  clientId: string
-  answer: RelationshipBlockAnswers["otherChildren"]
-  block: RelationshipBlock | undefined
-  people: RelationshipRecord[]
-  run: (work: () => Promise<EditorState | null>) => Promise<void>
+  person: RelationshipRecord
+  block: RelationshipBlock | null
+  addAnotherRole?: BlockRole
+  error: string | null
+  onClose: () => void
+  onDraftChange: (draft: PersonDraft) => void
+  onMove: () => void
+  onRemove: () => Promise<void>
+  onAddAnother: (role: BlockRole, draft: PersonDraft) => Promise<void>
+  onDone: (draft: PersonDraft) => Promise<void>
 }) {
+  const [draft, setDraft] = useState(() => draftFromPerson(person))
+  useEffect(() => setDraft(draftFromPerson(person)), [person])
+  const name = person.notKnown && person.blockRole === "parent"
+    ? person.blockRoleType === "father"
+      ? "Father"
+      : "Mother"
+    : person.givenName.trim() || "Person"
+  const role = (addAnotherRole || person.blockRole || "partner") as BlockRole
+  const addLabel =
+    role === "child" ? "Add another child" : role === "sibling" ? "Add another sibling" : role === "partner" ? "Add another partner" : role === "caregiver" ? "Add another caregiver" : null
+  const removable = !(person.blockRole === "parent" && (person.relationshipToClient === "mother" || person.relationshipToClient === "father"))
+
   return (
-    <div className="space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h4 className="text-sm font-medium">Other children</h4>
-        <AnswerControl
-          value={block ? "yes" : answer || "not_asked"}
-          disabled={Boolean(block)}
-          onChange={(value) => void run(() => setRelationshipBlockAnswerAction(clientId, "otherChildren", value))}
-        />
-      </div>
-      {answer !== "none" ? (
-        <MemberList
-          clientId={clientId}
+    <>
+      <PanelHeader
+        initial={name.slice(0, 1).toUpperCase() || "?"}
+        deceased={person.deceased || person.healthStatus === "deceased"}
+        title={name}
+        subtitle={ROLE_LABELS[person.blockRole as BlockRole] || "Person"}
+        onClose={onClose}
+      />
+      <div className="min-h-0 flex-1 overflow-y-auto p-4">
+        <PersonFields
+          idPrefix={person.relationshipRecordId}
+          person={person}
           block={block}
-          role="child"
-          people={people}
-          title="Children"
-          addLabel="+ Add child"
-          run={run}
-          ensureBlock={() => createRelationshipBlockAction(clientId, "client_other_children")}
+          draft={draft}
+          onChange={(next) => {
+            setDraft(next)
+            onDraftChange(next)
+          }}
         />
-      ) : null}
+        {error ? <p className="mt-3 text-sm text-destructive">{error}</p> : null}
+      </div>
+      <footer className="flex flex-wrap items-center gap-2 border-t p-4">
+        <button type="button" className="inline-flex min-h-10 items-center rounded-md border px-3 text-sm" onClick={onMove}>
+          Move to…
+        </button>
+        {removable ? (
+          <button
+            type="button"
+            className="inline-flex min-h-10 items-center text-sm text-destructive underline-offset-2 hover:underline"
+            onClick={() => void onRemove()}
+          >
+            Remove
+          </button>
+        ) : null}
+        {addLabel ? (
+          <button
+            type="button"
+            className={cn(linkClass, "min-h-10")}
+            onClick={() => void onAddAnother(role, draft)}
+          >
+            {addLabel}
+          </button>
+        ) : null}
+        <span className="flex-1" />
+        <button
+          type="button"
+          className="inline-flex min-h-10 items-center rounded-md bg-primary px-3 text-sm text-primary-foreground"
+          onClick={() => void onDone(draft)}
+        >
+          Done
+        </button>
+      </footer>
+    </>
+  )
+}
+
+function InterviewBlockPanel({
+  block,
+  locked,
+  error,
+  onClose,
+  onDraftChange,
+  onRemove,
+  onDone,
+}: {
+  block: RelationshipBlock
+  locked: boolean
+  error: string | null
+  onClose: () => void
+  onDraftChange: (draft: RelationshipBlock) => void
+  onRemove?: () => Promise<void>
+  onDone: (draft: RelationshipBlock) => Promise<void>
+}) {
+  const [draft, setDraft] = useState(block)
+  useEffect(() => setDraft(block), [block])
+  return (
+    <>
+      <PanelHeader
+        initial="D"
+        deceased={false}
+        title="Dates"
+        subtitle={blockMeta(block) || "Relationship"}
+        onClose={onClose}
+      />
+      <div className="min-h-0 flex-1 overflow-y-auto p-4">
+        <BlockFields
+          block={draft}
+          locked={locked}
+          showChildrenCheckbox={false}
+          onChange={(next) => {
+            setDraft(next)
+            onDraftChange(next)
+          }}
+        />
+        {error ? <p className="mt-3 text-sm text-destructive">{error}</p> : null}
+      </div>
+      <footer className="flex flex-wrap items-center gap-2 border-t p-4">
+        {onRemove ? (
+          <button
+            type="button"
+            className="inline-flex min-h-10 items-center text-sm text-destructive underline-offset-2 hover:underline"
+            onClick={() => void onRemove()}
+          >
+            Remove
+          </button>
+        ) : null}
+        <span className="flex-1" />
+        <button
+          type="button"
+          className="inline-flex min-h-10 items-center rounded-md bg-primary px-3 text-sm text-primary-foreground"
+          onClick={() => void onDone(draft)}
+        >
+          Done
+        </button>
+      </footer>
+    </>
+  )
+}
+
+function PersonLine({
+  person,
+  block,
+  onOpen,
+}: {
+  person: RelationshipRecord
+  block: RelationshipBlock | null
+  onOpen: () => void
+}) {
+  const needs = block ? needsForMember(block, person) : []
+  const name =
+    person.notKnown && person.blockRole === "parent"
+      ? person.blockRoleType === "father"
+        ? "Father"
+        : "Mother"
+      : person.givenName.trim() || ROLE_LABELS[person.blockRole as BlockRole] || "Person"
+  const deceased = person.deceased || person.healthStatus === "deceased"
+  return (
+    <div className="relative pl-4">
+      <span aria-hidden className="absolute top-0 left-0 h-full w-0.5 bg-[#a1a1aa]" />
+      <span aria-hidden className="absolute top-5 left-0 h-0.5 w-4 bg-[#a1a1aa]" />
+      <button
+        type="button"
+        className="flex min-h-10 w-full items-center gap-2 rounded-md px-1 text-left hover:bg-muted"
+        onClick={onOpen}
+      >
+        <span
+          className={cn(
+            "flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-medium",
+            deceased ? "border-2 border-dashed border-[#a1a1aa]" : "bg-muted"
+          )}
+          aria-hidden
+        >
+          {name.slice(0, 1).toUpperCase() || "?"}
+        </span>
+        <span className="min-w-0 flex-1 text-sm">
+          <span className="font-medium">{name}</span>
+          {person.blockRole ? (
+            <span className="text-muted-foreground"> · {ROLE_LABELS[person.blockRole as BlockRole] ?? person.blockRole}</span>
+          ) : null}
+        </span>
+        {needs.length > 0 ? (
+          <span className="flex flex-wrap gap-1">
+            {needs.map((need) => (
+              <Needs key={need} need={needLabel(need)} />
+            ))}
+          </span>
+        ) : null}
+      </button>
     </div>
   )
 }
 
-function BlockCard({
-  clientId,
+function DatesControl({
+  block,
+  needs,
+  onOpen,
+}: {
+  block: RelationshipBlock
+  needs: string[]
+  onOpen: () => void
+}) {
+  const meta = blockMeta(block)
+  return (
+    <div className="flex flex-wrap items-center gap-2 text-sm">
+      {meta ? <span className="text-muted-foreground">{meta}</span> : <span className="text-muted-foreground">Dates not recorded</span>}
+      <button type="button" className={linkClass} onClick={onOpen}>
+        Dates ›
+      </button>
+      {needs.map((need) => (
+        <Needs key={need} need={need} />
+      ))}
+    </div>
+  )
+}
+
+function ChildrenQuestion({
   block,
   people,
-  lockedStatus,
-  run,
+  onOpenPerson,
+  onAddChild,
+  onAnswer,
 }: {
-  clientId: string
   block: RelationshipBlock
   people: RelationshipRecord[]
-  lockedStatus: boolean
-  run: (work: () => Promise<EditorState | null>) => Promise<void>
+  onOpenPerson: (id: string) => void
+  onAddChild: () => void
+  onAnswer: (value: BlockAnswer) => void
 }) {
-  const needs = needsForBlock(block, lockedStatus)
-  const statuses = statusesForBlock(block.kind)
-  const showChildren = block.kind === "client_current" || block.kind === "client_previous"
-  const showPartners = rolesForBlock(block.kind).includes("partner")
-  const showParents = block.kind === "biological_parents"
-  const showCaregivers = block.kind === "caregiver_arrangement"
-  const showSiblings = siblingTypesForBlock(block.kind).length > 0
-  const children = people.filter((person) => person.relationshipBlockId === block.relationshipBlockId && person.blockRole === "child")
-
-  function save(patch: Partial<RelationshipBlock>) {
-    void run(() => updateRelationshipBlockAction(clientId, { ...block, ...patch }))
-  }
-
+  const children = membersOf(block, people, "child")
+  const answer = children.length > 0 ? "yes" : resolvedChildrenAnswer(block)
   return (
-    <section className="space-y-3 rounded-md border p-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h4 className="text-sm font-medium">{blockTitle(block)}</h4>
-        <span className="flex flex-wrap gap-1">
-          {needs.map((need) => (
-            <Needs key={need} need={needLabel(need)} />
+    <div className="space-y-2 pl-4">
+      <AnswerSelect
+        id={`${block.relationshipBlockId}-children`}
+        label="Children"
+        value={answer}
+        locked={children.length > 0}
+        onChange={onAnswer}
+      />
+      {answer === "yes" || children.length > 0 ? (
+        <>
+          {children.map((person) => (
+            <PersonLine
+              key={person.relationshipRecordId}
+              person={person}
+              block={block}
+              onOpen={() => onOpenPerson(person.relationshipRecordId)}
+            />
           ))}
-        </span>
-      </div>
-      {statuses.length > 0 ? (
-        lockedStatus ? (
-          <p className="text-sm">
-            {statusLabel(block.status) || "Not recorded"}
-            <span className="mt-1 block text-xs text-muted-foreground">Set by the client&apos;s relationship status.</span>
-          </p>
-        ) : (
-          <SelectField id={`${block.relationshipBlockId}-status`} label="Status" value={block.status} onChange={(status) => save({ status })}>
+          <button type="button" className={linkClass} onClick={onAddChild}>
+            + Add child
+          </button>
+        </>
+      ) : null}
+    </div>
+  )
+}
+
+function SiblingsQuestion({
+  block,
+  people,
+  onOpenPerson,
+  onAddSibling,
+  onAnswer,
+}: {
+  block: RelationshipBlock
+  people: RelationshipRecord[]
+  onOpenPerson: (id: string) => void
+  onAddSibling: () => void
+  onAnswer: (value: BlockAnswer) => void
+}) {
+  const siblings = membersOf(block, people, "sibling")
+  const answer = siblings.length > 0 ? "yes" : resolvedSiblingsAnswer(block)
+  return (
+    <div className="space-y-2 pl-4">
+      <AnswerSelect
+        id={`${block.relationshipBlockId}-siblings`}
+        label="Siblings"
+        value={answer}
+        locked={siblings.length > 0}
+        onChange={onAnswer}
+      />
+      {answer === "yes" || siblings.length > 0 ? (
+        <>
+          {siblings.map((person) => (
+            <PersonLine
+              key={person.relationshipRecordId}
+              person={person}
+              block={block}
+              onOpen={() => onOpenPerson(person.relationshipRecordId)}
+            />
+          ))}
+          <button type="button" className={linkClass} onClick={onAddSibling}>
+            + Add sibling
+          </button>
+        </>
+      ) : null}
+    </div>
+  )
+}
+
+function CurrentBlockTree({
+  block,
+  people,
+  locked,
+  onOpenBlock,
+  onOpenPerson,
+  onAddPartner,
+  onAddChild,
+  onChildrenAnswer,
+}: {
+  block: RelationshipBlock
+  people: RelationshipRecord[]
+  locked: boolean
+  onOpenBlock: () => void
+  onOpenPerson: (id: string) => void
+  onAddPartner: () => void
+  onAddChild: () => void
+  onChildrenAnswer: (value: BlockAnswer) => void
+}) {
+  const partners = membersOf(block, people, "partner")
+  const needs = needsForBlock(block, locked).map(needLabel)
+  return (
+    <div className="space-y-2 rounded-[8px] bg-[#f4f4f5] p-3">
+      <DatesControl block={block} needs={needs} onOpen={onOpenBlock} />
+      {partners.map((person) => (
+        <PersonLine
+          key={person.relationshipRecordId}
+          person={person}
+          block={block}
+          onOpen={() => onOpenPerson(person.relationshipRecordId)}
+        />
+      ))}
+      <button type="button" className={linkClass} onClick={onAddPartner}>
+        + Add another partner
+      </button>
+      <ChildrenQuestion
+        block={block}
+        people={people}
+        onOpenPerson={onOpenPerson}
+        onAddChild={onAddChild}
+        onAnswer={onChildrenAnswer}
+      />
+    </div>
+  )
+}
+
+function PreviousBlockTree({
+  block,
+  people,
+  onOpenBlock,
+  onOpenPerson,
+  onStatus,
+  onAddPartner,
+  onAddChild,
+  onChildrenAnswer,
+}: {
+  block: RelationshipBlock
+  people: RelationshipRecord[]
+  onOpenBlock: () => void
+  onOpenPerson: (id: string) => void
+  onStatus: (status: string) => void
+  onAddPartner: () => void
+  onAddChild: () => void
+  onChildrenAnswer: (value: BlockAnswer) => void
+}) {
+  const partners = membersOf(block, people, "partner")
+  const needs = needsForBlock(block, false)
+  const statuses = statusesForBlock(block.kind)
+  return (
+    <div className="space-y-2 rounded-[8px] bg-[#f4f4f5] p-3">
+      <div className="flex flex-wrap items-end gap-3">
+        <div className="min-w-[12rem] flex-1">
+          <SelectField
+            id={`${block.relationshipBlockId}-status-inline`}
+            label="Status"
+            value={block.status}
+            onChange={onStatus}
+          >
             <option value="">Not recorded</option>
             {statuses.map((status) => (
               <option key={status} value={status}>
@@ -524,453 +1243,327 @@ function BlockCard({
               </option>
             ))}
           </SelectField>
-        )
-      ) : null}
-      {block.status === "other" ? (
-        <TextField
-          id={`${block.relationshipBlockId}-status-detail`}
-          label="Other status"
-          value={block.statusDetail}
-          onChange={(statusDetail) => save({ statusDetail })}
-        />
-      ) : null}
-      {block.kind === "caregiver_arrangement" ? (
-        <SelectField
-          id={`${block.relationshipBlockId}-arrangement`}
-          label="Arrangement"
-          value={block.arrangementType}
-          onChange={(arrangementType) => save({ arrangementType: arrangementType as ArrangementType | "" })}
-        >
-          <option value="">Not recorded</option>
-          {ARRANGEMENT_TYPES.map((type) => (
-            <option key={type} value={type}>
-              {ARRANGEMENT_TYPE_LABELS[type]}
-            </option>
-          ))}
-        </SelectField>
-      ) : null}
-      {block.kind !== "client_other_children" ? (
-        <div className="grid gap-3 sm:grid-cols-2">
-          <PartialDatePicker
-            id={`${block.relationshipBlockId}-start`}
-            dateLabel={block.arrangementType === "adoption" ? "From (adoption date)" : block.kind === "caregiver_arrangement" ? "From" : "Started"}
-            mode="date-only"
-            value={block.startedOn}
-            onChange={(startedOn) => save({ startedOn })}
-          />
-          {block.kind !== "client_current" ? (
-            <PartialDatePicker
-              id={`${block.relationshipBlockId}-end`}
-              dateLabel={block.kind === "caregiver_arrangement" ? "Until" : "Ended"}
-              mode="date-only"
-              value={block.endedOn}
-              onChange={(endedOn) => save({ endedOn })}
-            />
-          ) : null}
         </div>
-      ) : null}
-      {showPartners ? (
-        <MemberList clientId={clientId} block={block} role="partner" people={people} title="Partners" addLabel="+ Add another partner" run={run} />
-      ) : null}
-      {showParents ? (
-        <MemberList clientId={clientId} block={block} role="parent" people={people} title="Parents" addLabel="+ Add parent" run={run} />
-      ) : null}
-      {showCaregivers ? (
-        <MemberList
-          clientId={clientId}
+        <DatesControl
           block={block}
-          role="caregiver"
-          people={people}
-          title={block.arrangementType === "adoption" ? "Adoptive parents" : "Caregivers"}
-          addLabel="+ Add caregiver"
-          run={run}
+          needs={needs.filter((need) => need !== "status").map(needLabel)}
+          onOpen={onOpenBlock}
         />
-      ) : null}
-      {showChildren ? (
-        <div className="space-y-2">
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={block.noChildren}
-              onChange={(event) => save({ noChildren: event.target.checked })}
-            />
-            No children
-          </label>
-          {block.noChildren ? null : (
-            <MemberList clientId={clientId} block={block} role="child" people={people} title="Children" addLabel="+ Add child" run={run} />
-          )}
-          {block.noChildren && children.length > 0 ? (
-            <MemberList clientId={clientId} block={block} role="child" people={people} title="Children" addLabel="+ Add child" run={run} />
-          ) : null}
+        {needs.includes("status") ? <Needs need={needLabel("status")} /> : null}
+      </div>
+      {partners.map((person) => (
+        <PersonLine
+          key={person.relationshipRecordId}
+          person={person}
+          block={block}
+          onOpen={() => onOpenPerson(person.relationshipRecordId)}
+        />
+      ))}
+      <button type="button" className={linkClass} onClick={onAddPartner}>
+        + Add partner
+      </button>
+      <ChildrenQuestion
+        block={block}
+        people={people}
+        onOpenPerson={onOpenPerson}
+        onAddChild={onAddChild}
+        onAnswer={onChildrenAnswer}
+      />
+    </div>
+  )
+}
+
+function OtherChildrenTree({
+  block,
+  people,
+  onOpenPerson,
+  onStatusDetail,
+  onAddChild,
+}: {
+  block: RelationshipBlock
+  people: RelationshipRecord[]
+  onOpenPerson: (id: string) => void
+  onStatusDetail: (value: string) => void
+  onAddChild: () => void
+}) {
+  const children = membersOf(block, people, "child")
+  return (
+    <div className="space-y-2 rounded-[8px] bg-[#f4f4f5] p-3">
+      <TextField
+        id={`${block.relationshipBlockId}-relationship-inline`}
+        label="Relationship"
+        placeholder="e.g. IVF with a donor, sole adoption"
+        value={block.statusDetail}
+        onChange={onStatusDetail}
+      />
+      {!block.statusDetail.trim() ? <Needs need="Unrecorded relationship" /> : null}
+      {children.map((person) => (
+        <PersonLine
+          key={person.relationshipRecordId}
+          person={person}
+          block={block}
+          onOpen={() => onOpenPerson(person.relationshipRecordId)}
+        />
+      ))}
+      <button type="button" className={linkClass} onClick={onAddChild}>
+        + Add child
+      </button>
+    </div>
+  )
+}
+
+function ParentsBlockTree({
+  block,
+  people,
+  onOpenBlock,
+  onOpenPerson,
+  onStatus,
+  onAddSibling,
+  onSiblingsAnswer,
+}: {
+  block: RelationshipBlock
+  people: RelationshipRecord[]
+  onOpenBlock: () => void
+  onOpenPerson: (id: string) => void
+  onStatus: (status: string) => void
+  onAddSibling: () => void
+  onSiblingsAnswer: (value: BlockAnswer) => void
+}) {
+  const parents = membersOf(block, people, "parent").sort(
+    (a, b) => parentRank(a) - parentRank(b) || a.displayOrder - b.displayOrder
+  )
+  const statuses = statusesForBlock(block.kind)
+  const needs = needsForBlock(block, false).map(needLabel)
+  return (
+    <section className="space-y-3">
+      <h3 className="text-sm font-semibold">Biological parents</h3>
+      <div className="space-y-2 rounded-[8px] bg-[#f4f4f5] p-3">
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="min-w-[12rem] flex-1">
+            <SelectField id={`${block.relationshipBlockId}-status-inline`} label="Status" value={block.status} onChange={onStatus}>
+              <option value="">Not recorded</option>
+              {statuses.map((status) => (
+                <option key={status} value={status}>
+                  {statusLabel(status)}
+                </option>
+              ))}
+            </SelectField>
+          </div>
+          <DatesControl block={block} needs={needs} onOpen={onOpenBlock} />
         </div>
-      ) : null}
-      {showSiblings ? (
-        <MemberList clientId={clientId} block={block} role="sibling" people={people} title="Siblings" addLabel="+ Add sibling" run={run} />
-      ) : null}
-      {block.kind !== "biological_parents" && block.kind !== "client_other_children" ? (
-        <button
-          type="button"
-          className="text-sm text-destructive underline-offset-2 hover:underline"
-          onClick={() => void run(() => deleteRelationshipBlockAction(clientId, block.relationshipBlockId))}
-        >
-          Remove relationship
+        {parents.map((person) => (
+          <PersonLine
+            key={person.relationshipRecordId}
+            person={person}
+            block={block}
+            onOpen={() => onOpenPerson(person.relationshipRecordId)}
+          />
+        ))}
+        <SiblingsQuestion
+          block={block}
+          people={people}
+          onOpenPerson={onOpenPerson}
+          onAddSibling={onAddSibling}
+          onAnswer={onSiblingsAnswer}
+        />
+      </div>
+    </section>
+  )
+}
+
+function ParentOtherTree({
+  block,
+  people,
+  onOpenBlock,
+  onOpenPerson,
+  onStatus,
+  onAddPartner,
+  onAddSibling,
+  onSiblingsAnswer,
+}: {
+  block: RelationshipBlock
+  people: RelationshipRecord[]
+  onOpenBlock: () => void
+  onOpenPerson: (id: string) => void
+  onStatus: (status: string) => void
+  onAddPartner: () => void
+  onAddSibling: () => void
+  onSiblingsAnswer: (value: BlockAnswer) => void
+}) {
+  const partners = membersOf(block, people, "partner")
+  const statuses = statusesForBlock(block.kind)
+  const needs = needsForBlock(block, false)
+  return (
+    <div className="space-y-2 rounded-[8px] bg-[#f4f4f5] p-3">
+      <div className="flex flex-wrap items-end gap-3">
+        <div className="min-w-[12rem] flex-1">
+          <SelectField id={`${block.relationshipBlockId}-status-inline`} label="Status" value={block.status} onChange={onStatus}>
+            <option value="">Not recorded</option>
+            {statuses.map((status) => (
+              <option key={status} value={status}>
+                {statusLabel(status)}
+              </option>
+            ))}
+          </SelectField>
+        </div>
+        <DatesControl
+          block={block}
+          needs={needs.filter((need) => need !== "status").map(needLabel)}
+          onOpen={onOpenBlock}
+        />
+        {needs.includes("status") ? <Needs need={needLabel("status")} /> : null}
+      </div>
+      {partners.map((person) => (
+        <PersonLine
+          key={person.relationshipRecordId}
+          person={person}
+          block={block}
+          onOpen={() => onOpenPerson(person.relationshipRecordId)}
+        />
+      ))}
+      <button type="button" className={linkClass} onClick={onAddPartner}>
+        + Add partner
+      </button>
+      <SiblingsQuestion
+        block={block}
+        people={people}
+        onOpenPerson={onOpenPerson}
+        onAddSibling={onAddSibling}
+        onAnswer={onSiblingsAnswer}
+      />
+    </div>
+  )
+}
+
+function CaregiverTree({
+  block,
+  people,
+  onOpenBlock,
+  onOpenPerson,
+  onArrangement,
+  onAddCaregiver,
+  onAddSibling,
+  onSiblingsAnswer,
+}: {
+  block: RelationshipBlock
+  people: RelationshipRecord[]
+  onOpenBlock: () => void
+  onOpenPerson: (id: string) => void
+  onArrangement: (value: string) => void
+  onAddCaregiver: () => void
+  onAddSibling: () => void
+  onSiblingsAnswer: (value: BlockAnswer) => void
+}) {
+  const caregivers = membersOf(block, people, "caregiver")
+  const needs = needsForBlock(block, false)
+  return (
+    <div className="space-y-2 rounded-[8px] bg-[#f4f4f5] p-3">
+      <div className="flex flex-wrap items-end gap-3">
+        <div className="min-w-[12rem] flex-1">
+          <SelectField
+            id={`${block.relationshipBlockId}-arrangement-inline`}
+            label="Arrangement"
+            value={block.arrangementType}
+            onChange={onArrangement}
+          >
+            <option value="">Not recorded</option>
+            {Object.entries(ARRANGEMENT_TYPE_LABELS).map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </SelectField>
+        </div>
+        <DatesControl
+          block={block}
+          needs={needs.filter((need) => need !== "type").map(needLabel)}
+          onOpen={onOpenBlock}
+        />
+        {needs.includes("type") ? <Needs need={needLabel("type")} /> : null}
+      </div>
+      {caregivers.map((person) => (
+        <PersonLine
+          key={person.relationshipRecordId}
+          person={person}
+          block={block}
+          onOpen={() => onOpenPerson(person.relationshipRecordId)}
+        />
+      ))}
+      <button type="button" className={linkClass} onClick={onAddCaregiver}>
+        + Add caregiver
+      </button>
+      <SiblingsQuestion
+        block={block}
+        people={people}
+        onOpenPerson={onOpenPerson}
+        onAddSibling={onAddSibling}
+        onAnswer={onSiblingsAnswer}
+      />
+    </div>
+  )
+}
+
+function AnsweredSideSection({
+  id,
+  label,
+  answer,
+  locked,
+  onAnswer,
+  onAdd,
+  addLabel,
+  hideAdd,
+  children,
+}: {
+  id: string
+  label: string
+  answer: BlockAnswer | ""
+  locked: boolean
+  onAnswer: (value: BlockAnswer) => void
+  onAdd: () => void
+  addLabel: string
+  hideAdd: boolean
+  children: import("react").ReactNode
+}) {
+  return (
+    <section className="space-y-3">
+      <AnswerSelect id={id} label={label} value={answer} locked={locked} onChange={onAnswer} />
+      {children}
+      {!hideAdd ? (
+        <button type="button" className={linkClass} onClick={onAdd}>
+          {addLabel}
         </button>
       ) : null}
     </section>
   )
 }
 
-function MemberList({
-  clientId,
-  block,
-  role,
+function UnplacedGroup({
   people,
-  title,
-  addLabel,
-  run,
-  ensureBlock,
+  onOpenPerson,
+  onMove,
 }: {
-  clientId: string
-  block?: RelationshipBlock
-  role: BlockRole
   people: RelationshipRecord[]
-  title: string
-  addLabel: string
-  run: (work: () => Promise<EditorState | null>) => Promise<void>
-  ensureBlock?: () => Promise<EditorState | null>
+  onOpenPerson: (id: string) => void
+  onMove: (id: string) => void
 }) {
-  const members = block ? people.filter((person) => person.relationshipBlockId === block.relationshipBlockId && person.blockRole === role) : []
-  const defaultType =
-    role === "sibling" && block ? siblingTypesForBlock(block.kind)[0] : role === "parent" ? "mother" : role === "child" ? "biological" : ""
   return (
-    <div className="space-y-2">
-      <h5 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">{title}</h5>
-      {members.map((person) => (
-        <PersonRow key={person.relationshipRecordId} clientId={clientId} person={person} block={block} run={run} />
-      ))}
-      <button
-        type="button"
-        className={linkClass}
-        onClick={() =>
-          void run(async () => {
-            let target = block
-            if (!target && ensureBlock) {
-              const created = await ensureBlock()
-              if (!created || !("blocks" in created) || !created.blocks) return created
-              target = created.blocks.find((item) => answerKeyForBlock(item) === "otherChildren") ?? created.blocks.at(-1)
-            }
-            if (!target) return { error: "Could not add." }
-            return addBlockMemberAction(clientId, target.relationshipBlockId, role, defaultType)
-          })
-        }
-      >
-        {addLabel}
-      </button>
-    </div>
-  )
-}
-
-function PersonRow({
-  clientId,
-  person,
-  block,
-  run,
-}: {
-  clientId: string
-  person: RelationshipRecord
-  block?: RelationshipBlock
-  run: (work: () => Promise<EditorState | null>) => Promise<void>
-}) {
-  const [draft, setDraft] = useState(person)
-  const timer = useRef<number | null>(null)
-  useEffect(() => setDraft(person), [person])
-  useEffect(() => () => {
-    if (timer.current) window.clearTimeout(timer.current)
-  }, [])
-  const needs = block ? needsForMember(block, draft) : []
-  const siblingTypes = block ? siblingTypesForBlock(block.kind) : []
-  const childTypes = block ? childTypesForBlock(block.kind) : []
-
-  function save(next: RelationshipRecord) {
-    if (timer.current) window.clearTimeout(timer.current)
-    timer.current = window.setTimeout(() => {
-      void run(() => updateBlockMemberAction(clientId, next))
-    }, 400)
-  }
-
-  function patch(partial: Partial<RelationshipRecord>) {
-    const next = { ...draft, ...partial }
-    setDraft(next)
-    save(next)
-  }
-
-  const removable = !(draft.blockRole === "parent" && (draft.relationshipToClient === "mother" || draft.relationshipToClient === "father"))
-
-  return (
-    <div className="space-y-2 rounded-md bg-muted/40 p-2">
-      <div className="flex flex-wrap gap-1">
-        {needs.map((need) => (
-          <Needs key={need} need={needLabel(need)} />
-        ))}
-      </div>
-      <div className="grid gap-3 sm:grid-cols-2">
-        <TextField id={`${draft.relationshipRecordId}-name`} label="Name" value={draft.givenName} onChange={(givenName) => patch({ givenName })} />
-        {draft.blockRole === "partner" || draft.blockRole === "parent" || draft.blockRole === "sibling" ? (
-          <SelectField id={`${draft.relationshipRecordId}-sex`} label="Sex" value={draft.sex} onChange={(sex) => patch({ sex })}>
-            <option value="">Not recorded</option>
-            {SEX_OPTIONS.map((option) => (
-              <option key={option} value={option}>
-                {option}
-              </option>
-            ))}
-          </SelectField>
-        ) : null}
-        <PartialDatePicker
-          id={`${draft.relationshipRecordId}-dob`}
-          dateLabel="Date of birth"
-          mode="person"
-          value={draft.dateOfBirth}
-          onChange={(dateOfBirth) => patch({ dateOfBirth })}
-        />
-        {draft.blockRole === "child" && childTypes.length > 0 ? (
-          <SelectField
-            id={`${draft.relationshipRecordId}-child-type`}
-            label="Type"
-            value={draft.blockRoleType || draft.childType}
-            onChange={(blockRoleType) => patch({ blockRoleType, childType: blockRoleType as RelationshipRecord["childType"] })}
+    <section className="space-y-3 rounded-md border border-amber-300 bg-amber-50 p-3">
+      <h3 className="text-sm font-medium text-amber-950">Not placed</h3>
+      {people.map((person) => (
+        <div key={person.relationshipRecordId} className="flex flex-wrap items-center gap-2 rounded-md bg-white p-2">
+          <button
+            type="button"
+            className="min-h-10 flex-1 text-left text-sm font-medium hover:underline"
+            onClick={() => onOpenPerson(person.relationshipRecordId)}
           >
-            <option value="">Not recorded</option>
-            {childTypes.map((type) => (
-              <option key={type} value={type}>
-                {CHILD_TYPE_LABELS[type]}
-              </option>
-            ))}
-          </SelectField>
-        ) : null}
-        {draft.blockRole === "sibling" && siblingTypes.length > 0 ? (
-          <SelectField
-            id={`${draft.relationshipRecordId}-sibling-type`}
-            label="Type"
-            value={draft.blockRoleType ?? ""}
-            onChange={(blockRoleType) => patch({ blockRoleType })}
-            disabled={siblingTypes.length === 1}
-          >
-            {siblingTypes.map((type) => (
-              <option key={type} value={type}>
-                {SIBLING_BLOCK_TYPE_LABELS[type]}
-              </option>
-            ))}
-          </SelectField>
-        ) : null}
-        {draft.blockRole === "parent" ? (
-          <SelectField
-            id={`${draft.relationshipRecordId}-parent-type`}
-            label="Parent"
-            value={draft.blockRoleType || (draft.relationshipToClient === "father" ? "father" : "mother")}
-            onChange={(blockRoleType) => patch({ blockRoleType })}
-          >
-            <option value="mother">Mother</option>
-            <option value="father">Father</option>
-          </SelectField>
-        ) : null}
-        {draft.blockRole === "caregiver" && block?.arrangementType !== "adoption" ? (
-          <SelectField
-            id={`${draft.relationshipRecordId}-caregiver-type`}
-            label="Relationship"
-            value={draft.blockRoleType || draft.caregiverRelationship}
-            onChange={(blockRoleType) => patch({ blockRoleType })}
-          >
-            <option value="">Not recorded</option>
-            {CAREGIVER_RELATIONSHIPS.map((type) => (
-              <option key={type} value={type}>
-                {CAREGIVER_RELATIONSHIP_LABELS[type]}
-              </option>
-            ))}
-          </SelectField>
-        ) : null}
-      </div>
-      {draft.blockRole === "parent" ? (
-        <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={draft.notKnown} onChange={(event) => patch({ notKnown: event.target.checked })} />
-          Not known
-        </label>
-      ) : null}
-      <details className="text-sm">
-        <summary className="cursor-pointer text-muted-foreground">Health, ratings, and living situation</summary>
-        <div className="mt-2 grid gap-3 sm:grid-cols-2">
-          <SelectField id={`${draft.relationshipRecordId}-health`} label="Health" value={draft.healthStatus} onChange={(healthStatus) => patch({ healthStatus: healthStatus as RelationshipRecord["healthStatus"] })}>
-            <option value="">Not recorded</option>
-            {HEALTH_STATUSES.map((option) => (
-              <option key={option} value={option}>
-                {HEALTH_STATUS_LABELS[option]}
-              </option>
-            ))}
-          </SelectField>
-          {draft.healthStatus === "deceased" ? (
-            <PartialDatePicker
-              id={`${draft.relationshipRecordId}-died`}
-              dateLabel="Year of death"
-              mode="date-only"
-              value={draft.dateOfDeath}
-              onChange={(dateOfDeath) => patch({ dateOfDeath })}
-            />
-          ) : null}
-          <SelectField id={`${draft.relationshipRecordId}-support`} label="Supportive" value={draft.supportive} onChange={(supportive) => patch({ supportive: supportive as RelationshipRecord["supportive"] })}>
-            <option value="">Not recorded</option>
-            {RELATIONSHIP_RATING_VALUES.map((option) => (
-              <option key={option} value={option}>
-                {RELATIONSHIP_RATING_LABELS[option]}
-              </option>
-            ))}
-          </SelectField>
-          <SelectField id={`${draft.relationshipRecordId}-conflict`} label="Conflict" value={draft.conflict} onChange={(conflict) => patch({ conflict: conflict as RelationshipRecord["conflict"] })}>
-            <option value="">Not recorded</option>
-            {RELATIONSHIP_RATING_VALUES.map((option) => (
-              <option key={option} value={option}>
-                {RELATIONSHIP_RATING_LABELS[option]}
-              </option>
-            ))}
-          </SelectField>
-          <SelectField id={`${draft.relationshipRecordId}-dependency`} label="Dependency" value={draft.dependency} onChange={(dependency) => patch({ dependency: dependency as RelationshipRecord["dependency"] })}>
-            <option value="">Not recorded</option>
-            {DEPENDENCY_VALUES.map((option) => (
-              <option key={option} value={option}>
-                {DEPENDENCY_LABELS[option]}
-              </option>
-            ))}
-          </SelectField>
-          <SelectField
-            id={`${draft.relationshipRecordId}-living`}
-            label="Living situation"
-            value={draft.livingSituation}
-            onChange={(livingSituation) => patch({ livingSituation: livingSituation as RelationshipRecord["livingSituation"] })}
-          >
-            <option value="">Not recorded</option>
-            {RELATIONSHIP_LIVING_SITUATIONS.map((option) => (
-              <option key={option} value={option}>
-                {RELATIONSHIP_LIVING_SITUATION_LABELS[option]}
-              </option>
-            ))}
-          </SelectField>
+            {person.givenName.trim() || person.relationshipToClient || "Person"}
+          </button>
+          <Needs need="Not placed" />
+          <button type="button" className={linkClass} onClick={() => onMove(person.relationshipRecordId)}>
+            Move to…
+          </button>
         </div>
-      </details>
-      <MoveControl clientId={clientId} person={draft} run={run} />
-      {removable ? (
-        <button
-          type="button"
-          className="text-sm text-destructive underline-offset-2 hover:underline"
-          onClick={() => void run(() => removeBlockMemberAction(clientId, draft.relationshipRecordId))}
-        >
-          Remove
-        </button>
-      ) : null}
-    </div>
-  )
-}
-
-function typeLabel(role: BlockRole, value: string): string {
-  if (role === "child" && value in CHILD_TYPE_LABELS) return CHILD_TYPE_LABELS[value as keyof typeof CHILD_TYPE_LABELS]
-  if (role === "sibling" && value in SIBLING_BLOCK_TYPE_LABELS) return SIBLING_BLOCK_TYPE_LABELS[value as keyof typeof SIBLING_BLOCK_TYPE_LABELS]
-  if (role === "parent") return value === "mother" ? "Mother" : value === "father" ? "Father" : value
-  if (role === "caregiver" && value in CAREGIVER_RELATIONSHIP_LABELS) {
-    return CAREGIVER_RELATIONSHIP_LABELS[value as keyof typeof CAREGIVER_RELATIONSHIP_LABELS]
-  }
-  return value
-}
-
-function typesForDestination(blocks: RelationshipBlock[], destinationId: string, role: BlockRole): string[] {
-  const kind = moveDestinationKind(blocks, destinationId)
-  const block = blocks.find((item) => item.relationshipBlockId === destinationId)
-  if (!kind) return []
-  if (role === "child") return [...childTypesForBlock(kind)]
-  if (role === "sibling") return [...siblingTypesForBlock(kind)]
-  if (role === "parent") return ["mother", "father"]
-  if (role === "caregiver") {
-    if (block?.arrangementType === "adoption") return ["", ...CAREGIVER_RELATIONSHIPS]
-    return [...CAREGIVER_RELATIONSHIPS]
-  }
-  return []
-}
-
-function MoveControl({
-  clientId,
-  person,
-  run,
-}: {
-  clientId: string
-  person: RelationshipRecord
-  run: (work: () => Promise<EditorState | null>) => Promise<void>
-}) {
-  const blocks = useContext(BlocksContext)
-  const destinations = moveDestinations(blocks)
-  const [destinationId, setDestinationId] = useState(
-    () => destinations.find((item) => item.id !== person.relationshipBlockId)?.id ?? destinations[0]?.id ?? ""
-  )
-  const kind = moveDestinationKind(blocks, destinationId)
-  const roles = kind ? rolesForBlock(kind) : []
-  const [roleChoice, setRoleChoice] = useState<BlockRole>(roles[0] ?? "partner")
-  const role = roles.includes(roleChoice) ? roleChoice : roles[0] ?? "partner"
-  const types = typesForDestination(blocks, destinationId, role)
-  const [typeChoice, setTypeChoice] = useState(types[0] ?? "")
-  const roleType = types.includes(typeChoice) ? typeChoice : types[0] ?? ""
-
-  return (
-    <div className="space-y-2">
-      <div className="grid gap-2 sm:grid-cols-3">
-        <Field label="Move to">
-          <select className={selectClassName} value={destinationId} onChange={(event) => setDestinationId(event.target.value)}>
-            {destinations.map((item) => (
-              <option key={item.id} value={item.id}>
-                {item.label}
-              </option>
-            ))}
-          </select>
-        </Field>
-        <Field label="Role">
-          <select className={selectClassName} value={role} onChange={(event) => setRoleChoice(event.target.value as BlockRole)}>
-            {roles.map((item) => (
-              <option key={item} value={item}>
-                {ROLE_LABELS[item]}
-              </option>
-            ))}
-          </select>
-        </Field>
-        {types.some((item) => item) ? (
-          <Field label="Type">
-            <select className={selectClassName} value={roleType} onChange={(event) => setTypeChoice(event.target.value)}>
-              {types.filter(Boolean).map((item) => (
-                <option key={item} value={item}>
-                  {typeLabel(role, item)}
-                </option>
-              ))}
-            </select>
-          </Field>
-        ) : null}
-      </div>
-      <button
-        type="button"
-        className={linkClass}
-        onClick={() => void run(() => moveBlockMemberAction(clientId, person.relationshipRecordId, destinationId, role, roleType))}
-      >
-        Move
-      </button>
-    </div>
-  )
-}
-
-function UnplacedRow({
-  clientId,
-  person,
-  run,
-}: {
-  clientId: string
-  person: RelationshipRecord
-  run: (work: () => Promise<EditorState | null>) => Promise<void>
-}) {
-  return (
-    <div className="space-y-2 rounded-md bg-white p-2 text-sm">
-      <p className="font-medium">{person.givenName.trim() || person.relationshipToClient}</p>
-      <MoveControl clientId={clientId} person={person} run={run} />
-    </div>
+      ))}
+    </section>
   )
 }

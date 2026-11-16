@@ -256,20 +256,44 @@ export async function updateRelationshipBlock(input: Scope & { block: unknown })
   return loadBlockEditorState(input.clientId, input.practiceId)
 }
 
+/** Unlink people from a block into Not placed — never silent-delete them with the block. */
+async function unplaceMembersOfBlock(scope: Scope, relationshipBlockId: string) {
+  const members = await db
+    .select({ relationshipRecordId: clientRelationshipRecords.relationshipRecordId })
+    .from(clientRelationshipRecords)
+    .where(
+      and(
+        eq(clientRelationshipRecords.relationshipBlockId, relationshipBlockId),
+        eq(clientRelationshipRecords.clientId, scope.clientId),
+        eq(clientRelationshipRecords.practiceId, scope.practiceId)
+      )
+    )
+  if (members.length === 0) return
+  await db
+    .update(clientRelationshipRecords)
+    .set({
+      relationshipBlockId: null,
+      placementReview: "unplaced",
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(clientRelationshipRecords.relationshipBlockId, relationshipBlockId),
+        eq(clientRelationshipRecords.clientId, scope.clientId),
+        eq(clientRelationshipRecords.practiceId, scope.practiceId)
+      )
+    )
+  for (const member of members) {
+    await writeAudit(scope, "client_relationship.unplaced", "client_relationship", member.relationshipRecordId)
+  }
+}
+
 export async function deleteRelationshipBlock(input: Scope & { relationshipBlockId: string }) {
   const existing = await ownedBlock(input, input.relationshipBlockId)
   if (!existing) return { error: "Relationship was not found." }
   if (existing.kind === "biological_parents") return { error: "The biological parents block stays." }
   const block = toRelationshipBlock(existing)
-  await db
-    .delete(clientRelationshipRecords)
-    .where(
-      and(
-        eq(clientRelationshipRecords.relationshipBlockId, existing.relationshipBlockId),
-        eq(clientRelationshipRecords.clientId, input.clientId),
-        eq(clientRelationshipRecords.practiceId, input.practiceId)
-      )
-    )
+  await unplaceMembersOfBlock(input, existing.relationshipBlockId)
   await db
     .delete(clientRelationshipBlocks)
     .where(eq(clientRelationshipBlocks.relationshipBlockId, existing.relationshipBlockId))
@@ -525,11 +549,11 @@ export async function saveRelationshipStatusWithCurrentBlock(input: Scope & { re
   })
   if (saved.error) return { error: saved.error }
   const status = saved.relationshipStatus ?? ""
+  const state = await loadBlockEditorState(input.clientId, input.practiceId)
+  const current = (state?.blocks ?? [])
+    .filter((block) => block.kind === "client_current")
+    .sort((a, b) => a.displayOrder - b.displayOrder)
   if (isPartneredClientStatus(status)) {
-    const state = await loadBlockEditorState(input.clientId, input.practiceId)
-    const current = (state?.blocks ?? [])
-      .filter((block) => block.kind === "client_current")
-      .sort((a, b) => a.displayOrder - b.displayOrder)
     if (current.length === 0) {
       const [created] = await db
         .insert(clientRelationshipBlocks)
@@ -547,6 +571,15 @@ export async function saveRelationshipStatusWithCurrentBlock(input: Scope & { re
         .update(clientRelationshipBlocks)
         .set({ status, updatedAt: new Date() })
         .where(eq(clientRelationshipBlocks.relationshipBlockId, current[0].relationshipBlockId))
+    }
+  } else {
+    // Non-partnered: dissolve current blocks. People go to Not placed — never silent-delete.
+    for (const block of current) {
+      await unplaceMembersOfBlock(input, block.relationshipBlockId)
+      await db
+        .delete(clientRelationshipBlocks)
+        .where(eq(clientRelationshipBlocks.relationshipBlockId, block.relationshipBlockId))
+      await writeAudit(input, "client_relationship_block.deleted", "client_relationship_block", block.relationshipBlockId)
     }
   }
   return loadBlockEditorState(input.clientId, input.practiceId)

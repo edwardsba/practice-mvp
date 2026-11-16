@@ -231,8 +231,8 @@ export function RelationshipBlocksSection({
   const [status, setStatus] = useState(relationshipStatus)
   const [error, setError] = useState<string | null>(null)
   const [selection, setSelection] = useState<Selection | null>(null)
-  const [intimateOpenLocal, setIntimateOpenLocal] = useState(true)
-  const [caregiversOpenLocal, setCaregiversOpenLocal] = useState(true)
+  const [intimateOpenLocal, setIntimateOpenLocal] = useState(false)
+  const [caregiversOpenLocal, setCaregiversOpenLocal] = useState(false)
   const intimateOpen = sectionOpen?.intimate ?? intimateOpenLocal
   const caregiversOpen = sectionOpen?.caregivers ?? caregiversOpenLocal
   const portalReady = typeof document !== "undefined"

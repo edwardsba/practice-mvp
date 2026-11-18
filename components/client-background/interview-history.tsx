@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useState, type MouseEvent, type RefObject } from "react"
+import { useEffect, useRef, useState, type MouseEvent } from "react"
 import { useRouter } from "next/navigation"
 
 import {
@@ -45,7 +45,7 @@ import {
   type ScreeningAnswer,
   type ScreeningAnswers,
 } from "@/lib/client-background/interview-history"
-import { emptyEvent, type EventRecord, type ReasonForAttending, type RelationshipRecord, type StressorsRecord } from "@/lib/client-background/types"
+import { emptyEvent, type EventRecord, type RelationshipRecord, type StressorsRecord } from "@/lib/client-background/types"
 
 export function InterviewHistory({
   clientId,
@@ -53,7 +53,6 @@ export function InterviewHistory({
   events,
   relationships,
   screening,
-  reasonRef,
   stressors,
   selfReportId,
   historyClient,
@@ -73,7 +72,6 @@ export function InterviewHistory({
   events: EventRecord[]
   relationships: RelationshipRecord[]
   screening: ScreeningAnswers
-  reasonRef: RefObject<ReasonForAttending>
   stressors: StressorsRecord
   selfReportId: string | null
   historyClient?: ClientBackgroundSuggestions["history"]
@@ -134,8 +132,7 @@ export function InterviewHistory({
           answersRef.current,
           entriesRef.current,
           dateOfBirth,
-          stressorsRef.current,
-          reasonRef.current
+          stressorsRef.current
         )
       )
       setChecks(
@@ -148,7 +145,7 @@ export function InterviewHistory({
       setCompleteError(null)
       setConfirmOpen(true)
     })
-  }, [dateOfBirth, getChecks, reasonRef, registerComplete])
+  }, [dateOfBirth, getChecks, registerComplete])
 
   useEffect(() => {
     return registerFlush(async () => {

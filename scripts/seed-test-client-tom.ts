@@ -59,7 +59,6 @@ async function main() {
 
   const harry = await findHarry(pool, account.practice_id)
   const source = tomExampleSource()
-  if (harry) source.data.reason.referrerProfessionalId = harry
   const clientId = randomUUID()
   const ids = new Map<string, string>()
   for (const person of tomRelationships()) ids.set(person.relationshipRecordId, randomUUID())
@@ -90,7 +89,7 @@ async function main() {
         JSON.stringify(source.data.demographics.education),
         JSON.stringify(source.data.demographics.occupation),
         JSON.stringify(source.data.stressors),
-        JSON.stringify(source.data.reason),
+        JSON.stringify({}),
         source.data.relationshipStatus.relationshipStatus,
         source.data.blockAnswers?.previousRelationships,
         source.data.blockAnswers?.otherChildren,
@@ -174,6 +173,9 @@ async function main() {
        ) VALUES ($1,$2,$3,'completed', now(), $4)`,
       [clientId, account.practice_id, account.practitioner_profile_id, JSON.stringify(tomScreening())]
     )
+    if (harry) {
+      await ensureTomMedicareApproval(db, clientId, account.practice_id, harry)
+    }
     await db.query("COMMIT")
   } catch (error) {
     await db.query("ROLLBACK")
@@ -233,24 +235,153 @@ async function findHarry(pool: Pool, practiceId: string): Promise<string | null>
   return professional.rows[0]?.professional_id ?? null
 }
 
+/** Medicare claim + MHTP Initial approval (Harry referrer). Idempotent. */
+async function ensureTomMedicareApproval(
+  db: PoolClient,
+  clientId: string,
+  practiceId: string,
+  harryProfessionalId: string
+) {
+  const medicare = await db.query<{ claim_type_id: string }>(
+    `SELECT claim_type_id FROM claim_types
+     WHERE practice_id = $1 AND claim_type_name = 'Medicare' AND is_active = true
+     LIMIT 1`,
+    [practiceId]
+  )
+  const mhtp = await db.query<{
+    funding_approval_type_id: string
+    appointments_approved: number | null
+  }>(
+    `SELECT funding_approval_type_id, appointments_approved FROM funding_approval_types
+     WHERE practice_id = $1 AND name = 'MHTP Initial' AND is_active = true
+     LIMIT 1`,
+    [practiceId]
+  )
+  const medicareTypeId = medicare.rows[0]?.claim_type_id
+  const mhtpType = mhtp.rows[0]
+  if (!medicareTypeId || !mhtpType) return
+
+  let claimId: string | null = null
+  const existingClaim = await db.query<{ claim_id: string }>(
+    `SELECT claim_id FROM claims
+     WHERE client_id = $1 AND practice_id = $2 AND claim_type_id = $3 AND is_active = true
+     ORDER BY created_at
+     LIMIT 1`,
+    [clientId, practiceId, medicareTypeId]
+  )
+  if (existingClaim.rows[0]) {
+    claimId = existingClaim.rows[0].claim_id
+  } else {
+    claimId = randomUUID()
+    await db.query(
+      `INSERT INTO claims (claim_id, practice_id, client_id, claim_type_id, is_active)
+       VALUES ($1, $2, $3, $4, true)`,
+      [claimId, practiceId, clientId, medicareTypeId]
+    )
+  }
+
+  const existingApproval = await db.query<{ funding_approval_id: string }>(
+    `SELECT funding_approval_id FROM funding_approvals
+     WHERE client_id = $1 AND practice_id = $2
+       AND funding_approval_type_id = $3 AND is_active = true
+     ORDER BY created_at
+     LIMIT 1`,
+    [clientId, practiceId, mhtpType.funding_approval_type_id]
+  )
+
+  const appointmentsApproved = mhtpType.appointments_approved ?? 6
+  let approvalId: string
+  if (existingApproval.rows[0]) {
+    approvalId = existingApproval.rows[0].funding_approval_id
+    await db.query(
+      `UPDATE funding_approvals
+       SET claim_id = $2,
+           referrer_id = $3,
+           start_date = '2026-10-03',
+           end_date = '2027-10-03',
+           appointments_approved = $4,
+           approval_status = 'active',
+           referral_date = '2026-10-03',
+           referrer_comments = 'low mood and stress',
+           referral_source = NULL,
+           referrer_relationship_id = NULL,
+           referrer_other = NULL,
+           is_active = true,
+           updated_at = now()
+       WHERE funding_approval_id = $1`,
+      [approvalId, claimId, harryProfessionalId, appointmentsApproved]
+    )
+  } else {
+    approvalId = randomUUID()
+    await db.query(
+      `INSERT INTO funding_approvals (
+         funding_approval_id, practice_id, client_id, claim_id, funding_approval_type_id,
+         referrer_id, start_date, end_date, appointments_approved, approval_status,
+         referral_date, referrer_comments, is_active
+       ) VALUES ($1,$2,$3,$4,$5,$6,'2026-10-03','2027-10-03',$7,'active','2026-10-03','low mood and stress', true)`,
+      [
+        approvalId,
+        practiceId,
+        clientId,
+        claimId,
+        mhtpType.funding_approval_type_id,
+        harryProfessionalId,
+        appointmentsApproved,
+      ]
+    )
+  }
+
+  const typeReports = await db.query<{
+    appointment_number: number
+    report_type: string
+    report_type_id: string | null
+  }>(
+    `SELECT appointment_number, report_type, report_type_id
+     FROM funding_approval_type_reports
+     WHERE funding_approval_type_id = $1
+     ORDER BY appointment_number`,
+    [mhtpType.funding_approval_type_id]
+  )
+  for (const row of typeReports.rows) {
+    const linked = await db.query<{ link_id: string }>(
+      `SELECT link_id FROM funding_approval_report_links
+       WHERE funding_approval_id = $1 AND appointment_number = $2
+       LIMIT 1`,
+      [approvalId, row.appointment_number]
+    )
+    if (linked.rows[0]) {
+      await db.query(
+        `UPDATE funding_approval_report_links
+         SET report_type = $2, report_type_id = $3, updated_at = now()
+         WHERE link_id = $1`,
+        [linked.rows[0].link_id, row.report_type, row.report_type_id]
+      )
+    } else {
+      await db.query(
+        `INSERT INTO funding_approval_report_links (
+           funding_approval_id, appointment_number, report_type, report_type_id
+         ) VALUES ($1, $2, $3, $4)`,
+        [approvalId, row.appointment_number, row.report_type, row.report_type_id]
+      )
+    }
+  }
+}
+
 async function repairTom(pool: Pool, clientId: string, practiceId: string) {
   const harry = await findHarry(pool, practiceId)
   if (!harry) throw new Error("Dr Harry TestDoc was not found in this practice.")
   const db = await pool.connect()
   try {
     await db.query("BEGIN")
+    // Referral lives on funding_approvals; leave reason_for_attending_json alone (or empty object).
     await db.query(
       `UPDATE client_backgrounds
-       SET reason_for_attending_json = COALESCE(reason_for_attending_json, '{}'::jsonb) || jsonb_build_object(
-             'referralType', 'medical',
-             'referrerProfessionalId', $2::text,
-             'referralDate', '2026-10-03',
-             'referrerConcerns', 'low mood and stress'
-           ),
+       SET reason_for_attending_json = COALESCE(reason_for_attending_json, '{}'::jsonb),
            updated_at = now()
-       WHERE client_id = $1 AND practice_id = $3`,
-      [clientId, harry, practiceId]
+       WHERE client_id = $1 AND practice_id = $2`,
+      [clientId, practiceId]
     )
+    await ensureTomMedicareApproval(db, clientId, practiceId, harry)
     await db.query(
       `UPDATE client_relationship_records
        SET caregiver_relationship = 'grandparent',

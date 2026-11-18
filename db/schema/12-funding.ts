@@ -66,6 +66,15 @@ export const fundingApprovals = pgTable('funding_approvals', {
   endDate: text('end_date'),
   appointmentsApproved: integer('appointments_approved'),
   approvalStatus: text('approval_status').notNull().default('active'),
+  /** Full date YYYY-MM-DD, same format as start_date / end_date. */
+  referralDate: text('referral_date'),
+  referrerComments: text('referrer_comments'),
+  /** self | family_or_friend | other — used only when referrer_id is null. */
+  referralSource: text('referral_source'),
+  /** Who referred them (a relationship person), when referral_source is family_or_friend. */
+  referrerRelationshipId: uuid('referrer_relationship_id'),
+  /** Who: Other describe, or referral_source other describe. */
+  referrerOther: text('referrer_other'),
   isActive: boolean('is_active').notNull().default(true),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),

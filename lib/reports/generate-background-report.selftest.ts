@@ -6,7 +6,6 @@ import {
   emptyClientRelationshipStatus,
   emptyDemographics,
   emptyEvent,
-  emptyReasonForAttending,
   emptyRisk,
   emptyStressors,
   type ClientBackgroundData,
@@ -18,6 +17,7 @@ import {
   lowerKeepingTypedCase,
   numberedLetterOutline,
   chooseReportInterviews,
+  type BackgroundReportReferralInfo,
   type BackgroundReportSource,
 } from "@/lib/reports/generate-background-report"
 import type { LetterBodyNode } from "@/lib/reports/letter-body-types"
@@ -96,11 +96,6 @@ function benSource(): BackgroundReportSource {
       lossOfLovedOne: "no",
       legalPoliceAccidents: "no",
       mainReason: "I can't switch off",
-    },
-    reason: {
-      ...emptyReasonForAttending(),
-      referralType: "medical",
-      referrerConcerns: "low mood",
     },
     relationships: [
       person({
@@ -259,12 +254,29 @@ function benSource(): BackgroundReportSource {
     selfReportDate: "2026-09-01",
     numberOfChildren: 3,
     referral: {
-      title: "Dr",
-      firstName: "Harry",
-      lastName: "Nguyen",
-      profession: "General practitioner",
-      date: "2026-07-20",
+      referrer: {
+        title: "Dr",
+        firstName: "Harry",
+        lastName: "Nguyen",
+        profession: "General practitioner",
+      },
+      referralDate: "2026-07-20",
+      referrerComments: "low mood",
+      referralSource: "",
+      referrerRelationshipId: null,
+      referrerOther: "",
     },
+  }
+}
+
+function emptyReferral(): BackgroundReportReferralInfo {
+  return {
+    referrer: null,
+    referralDate: null,
+    referrerComments: "",
+    referralSource: "",
+    referrerRelationshipId: null,
+    referrerOther: "",
   }
 }
 
@@ -468,7 +480,6 @@ function emptySource(): BackgroundReportSource {
       relationshipStatus: emptyClientRelationshipStatus(),
       demographics: emptyDemographics(),
       stressors: emptyStressors(),
-      reason: emptyReasonForAttending(),
       relationships: [],
       events: [],
       risk: emptyRisk(),
@@ -1306,14 +1317,19 @@ assert.match(repeatedNames, /Ben01's mother has a history of depression\. His fa
 assert.doesNotMatch(repeatedNames, /Ben01's father has a history of depression/)
 
 const missingReferrer = emptySource()
-missingReferrer.data.reason.referralType = "family_or_friend"
+missingReferrer.referral = {
+  ...emptyReferral(),
+  referralSource: "family_or_friend",
+}
 assert.ok(
   generateBackgroundReport(missingReferrer).omitted.some((item) => item.message === "Referral: who referred the client not recorded")
 )
 const namedReferrer = emptySource()
-namedReferrer.data.reason.referralType = "family_or_friend"
-namedReferrer.data.reason.referrerIsOther = true
-namedReferrer.data.reason.referrerOther = "a neighbour"
+namedReferrer.referral = {
+  ...emptyReferral(),
+  referralSource: "family_or_friend",
+  referrerOther: "a neighbour",
+}
 assert.equal(
   generateBackgroundReport(namedReferrer).omitted.some((item) => item.message === "Referral: who referred the client not recorded"),
   false

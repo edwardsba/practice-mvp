@@ -2,12 +2,10 @@ import assert from "node:assert/strict"
 
 import { backgroundChecks, type BackgroundCheckInput } from "@/lib/client-background/checks"
 import { entryDetailMessage } from "@/lib/client-background/history-links"
-import { sanitizeReasonForAttending } from "@/lib/client-background/sanitize"
 import {
   emptyClientRelationshipStatus,
   emptyDemographics,
   emptyEvent,
-  emptyReasonForAttending,
   emptyRisk,
   emptyStressors,
   type ClientBackgroundData,
@@ -15,8 +13,6 @@ import {
   type RelationshipBlock,
   type RelationshipRecord,
 } from "@/lib/client-background/types"
-
-const REFERRER = "11111111-1111-4111-8111-111111111111"
 
 function person(
   partial: Partial<RelationshipRecord> & Pick<RelationshipRecord, "relationshipRecordId" | "relationshipToClient">
@@ -67,7 +63,6 @@ function data(overrides: Partial<ClientBackgroundData> = {}): ClientBackgroundDa
     backgroundCapturedAt: null,
     relationshipStatus: emptyClientRelationshipStatus(),
     stressors: emptyStressors(),
-    reason: { ...emptyReasonForAttending(), referralType: "self" },
     relationships: [],
     events: [],
     risk: emptyRisk(),
@@ -86,6 +81,7 @@ function input(partial: Partial<BackgroundCheckInput> = {}): BackgroundCheckInpu
     data: partial.data ?? data(),
     numberOfChildren: partial.numberOfChildren ?? null,
     screening: partial.screening ?? null,
+    referralRecorded: partial.referralRecorded ?? true,
   }
 }
 
@@ -93,36 +89,10 @@ function ids(partial: Partial<BackgroundCheckInput>) {
   return backgroundChecks(input(partial)).map((check) => check.id)
 }
 
-const cleared = sanitizeReasonForAttending({
-  referredByMedicalProfessional: "yes",
-  referrerProfessionalId: REFERRER,
-  referralDate: "2026-10-03",
-  referrerConcerns: "Sleep",
-  familyInvolvement: "Drove them",
-  clientMotivation: "Wants to sleep",
-})
-assert.equal(cleared.referralType, "")
-assert.equal(cleared.referrerProfessionalId, null)
-assert.equal(cleared.referralDate, "")
-assert.equal(cleared.referrerConcerns, "")
-assert.equal(cleared.theirConcerns, "")
-
-const kept = sanitizeReasonForAttending({
-  referralType: "medical",
-  referrerProfessionalId: REFERRER,
-  referralDate: "2026-10-03",
-  referrerConcerns: "Sleep",
-})
-assert.equal(kept.referralType, "medical")
-assert.equal(kept.referrerProfessionalId, REFERRER)
-assert.equal(kept.referralDate, "2026-10-03")
-assert.equal(kept.referrerConcerns, "Sleep")
-assert.equal(sanitizeReasonForAttending({ referralType: "medical", referrerProfessionalId: "nope" }).referrerProfessionalId, null)
-
-const missingReferral = backgroundChecks(input({ data: data({ reason: emptyReasonForAttending() }) }))
+const missingReferral = backgroundChecks(input({ referralRecorded: false }))
 assert.deepEqual(
   missingReferral.map((check) => ({ id: check.id, message: check.message, target: check.target })),
-  [{ id: "referral-type", message: "Referral type not recorded", target: "reason" }]
+  [{ id: "referral", message: "Referral not recorded", target: "reason" }]
 )
 
 assert.deepEqual(backgroundChecks(input()), [])

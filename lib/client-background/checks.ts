@@ -36,6 +36,8 @@ export type BackgroundCheckInput = {
   numberOfChildren: number | null
   /** Latest interview's screening answers. Null when there has been no interview. */
   screening: ScreeningAnswers | null
+  /** True when a funding approval records a referrer or referral source. */
+  referralRecorded: boolean
 }
 
 const PARTNER_EXPECTED: readonly ClientRelationshipStatus[] = [
@@ -133,10 +135,10 @@ function markedLivingWith(person: RelationshipRecord): boolean {
 export function backgroundChecks(input: BackgroundCheckInput): BackgroundCheck[] {
   const { data } = input
   const checks: BackgroundCheck[] = []
-  if (!data.reason.referralType) {
+  if (!input.referralRecorded) {
     checks.push({
-      id: "referral-type",
-      message: "Referral type not recorded",
+      id: "referral",
+      message: "Referral not recorded",
       target: "reason",
     })
   }

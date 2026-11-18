@@ -623,31 +623,6 @@ export type StressorsRecord = Record<StressorKey, TriStateAnswer | null> & {
   mainReason: string
 }
 
-export const REFERRAL_TYPES = ["medical", "family_or_friend", "self"] as const
-export type ReferralType = (typeof REFERRAL_TYPES)[number]
-
-export const REFERRAL_TYPE_LABELS: Record<ReferralType, string> = {
-  medical: "Medical professional",
-  family_or_friend: "Family or friend",
-  self: "Self-referral",
-}
-
-/** Why the client came. Referral type decides which fields are kept. */
-export type ReasonForAttending = {
-  referralType: ReferralType | ""
-  /** professionals.professional_id in the same practice, or null. */
-  referrerProfessionalId: string | null
-  /** Partial date: YYYY, YYYY-MM, or YYYY-MM-DD. */
-  referralDate: string
-  referrerConcerns: string
-  /** A person on this client's relationships, when a family member or friend referred them. */
-  referrerRelationshipId: string | null
-  /** True when Who is Other (describe) rather than a recorded person. */
-  referrerIsOther: boolean
-  referrerOther: string
-  theirConcerns: string
-}
-
 export type OccupationFields = {
   workStatus: WorkStatus | ""
   workStatusOther: string
@@ -751,7 +726,6 @@ export type ClientBackgroundData = {
   relationshipStatus: ClientRelationshipStatusValue
   demographics: Demographics
   stressors: StressorsRecord
-  reason: ReasonForAttending
   relationships: RelationshipRecord[]
   relationshipBlocks?: RelationshipBlock[]
   blockAnswers?: RelationshipBlockAnswers
@@ -838,19 +812,6 @@ export function emptyStressors(): StressorsRecord {
     lossOfLovedOne: null,
     legalPoliceAccidents: null,
     mainReason: "",
-  }
-}
-
-export function emptyReasonForAttending(): ReasonForAttending {
-  return {
-    referralType: "",
-    referrerProfessionalId: null,
-    referralDate: "",
-    referrerConcerns: "",
-    referrerRelationshipId: null,
-    referrerIsOther: false,
-    referrerOther: "",
-    theirConcerns: "",
   }
 }
 

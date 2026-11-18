@@ -5,6 +5,11 @@ export type FundingApprovalDraft = {
   approvalTypeId: string
   claimId: string
   referrerId: string
+  referralDate: string
+  referrerComments: string
+  referralSource: string
+  referrerRelationshipId: string
+  referrerOther: string
   startDate: string
   endDate: string
   appointmentsApproved: string

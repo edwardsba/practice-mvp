@@ -2,7 +2,6 @@ import {
   STRESSOR_ITEMS,
   type EventRecord,
   type EventType,
-  type ReasonForAttending,
   type StressorsRecord,
 } from "@/lib/client-background/types"
 
@@ -220,10 +219,10 @@ export function sanitizeScreening(value: unknown): ScreeningAnswers {
 }
 
 /**
- * Referral (1), client and family history (15, including Medication),
- * and the nine stressors. The main reason for attending is optional and is not counted.
+ * Client and family history (15, including Medication), and the nine stressors.
+ * The main reason for attending is optional and is not counted.
  */
-export const INTERVIEW_ANSWER_TOTAL = 1 + HISTORY_QUESTION_KEYS.length + STRESSOR_ITEMS.length
+export const INTERVIEW_ANSWER_TOTAL = HISTORY_QUESTION_KEYS.length + STRESSOR_ITEMS.length
 
 export type BackgroundInterviewAnswerSource = {
   status: "in_progress" | "completed"
@@ -271,20 +270,14 @@ export function unansweredQuestionLabels(
   )
 }
 
-function unansweredReasonLabels(reason: ReasonForAttending): string[] {
-  return reason.referralType ? [] : ["Referral type"]
-}
-
-/** Unanswered items in page order: Referral, then the rest of Background, then History, then Stressors. */
+/** Unanswered items in page order: History, then Stressors. */
 export function unansweredInterviewLabels(
   screening: ScreeningAnswers,
   events: Pick<EventRecord, "eventType" | "startPrecision" | "startValue">[],
   dateOfBirth: string | null,
-  stressors: StressorsRecord,
-  reason: ReasonForAttending
+  stressors: StressorsRecord
 ): string[] {
-  const labels: string[] = unansweredReasonLabels(reason)
-  labels.push(...unansweredQuestionLabels(screening, events, dateOfBirth))
+  const labels: string[] = unansweredQuestionLabels(screening, events, dateOfBirth)
   for (const item of STRESSOR_ITEMS) {
     if (stressors[item.key] == null) labels.push(item.label)
   }
@@ -296,11 +289,7 @@ export function answeredInterviewCount(
   screening: ScreeningAnswers,
   events: Pick<EventRecord, "eventType" | "startPrecision" | "startValue">[],
   dateOfBirth: string | null,
-  stressors: StressorsRecord,
-  reason: ReasonForAttending
+  stressors: StressorsRecord
 ): number {
-  return (
-    INTERVIEW_ANSWER_TOTAL -
-    unansweredInterviewLabels(screening, events, dateOfBirth, stressors, reason).length
-  )
+  return INTERVIEW_ANSWER_TOTAL - unansweredInterviewLabels(screening, events, dateOfBirth, stressors).length
 }

@@ -12,11 +12,9 @@ import {
 } from "@/lib/client-background/interview-history"
 import {
   emptyEvent,
-  emptyReasonForAttending,
   emptyStressors,
   type EventRecord,
   type EventType,
-  type ReasonForAttending,
   type StressorsRecord,
 } from "@/lib/client-background/types"
 
@@ -107,10 +105,10 @@ assert.deepEqual(
   ]
 )
 
-const gaps = unansweredInterviewLabels({}, [], null, emptyStressors(), emptyReasonForAttending())
-assert.deepEqual(gaps.slice(0, 2), ["Referral type", "Illness / injury"])
-assert.equal(gaps[1], "Illness / injury")
-assert.equal(gaps[2], "Traumatic events")
+const gaps = unansweredInterviewLabels({}, [], null, emptyStressors())
+assert.deepEqual(gaps.slice(0, 2), ["Illness / injury", "Traumatic events"])
+assert.equal(gaps[0], "Illness / injury")
+assert.equal(gaps[1], "Traumatic events")
 assert.ok(gaps.includes("Medication"))
 assert.ok(gaps.indexOf("Medication") > gaps.indexOf("Previous therapy"))
 assert.ok(gaps.indexOf("Medication") < gaps.indexOf("Other significant events"))
@@ -124,14 +122,10 @@ assert.ok(gaps.indexOf("Family") > gaps.indexOf("Emotional problems"))
 assert.equal(gaps.at(-1), "Legal matters, police or accidents")
 assert.equal(gaps.includes("Currently taking medication"), false)
 assert.equal(gaps.filter((label) => label === "Family").length, 1)
-assert.equal(gaps.length, HISTORY_QUESTION_KEYS.length + 1 + 9)
+assert.equal(gaps.length, HISTORY_QUESTION_KEYS.length + 9)
 
 const answeredStressors: StressorsRecord = { ...emptyStressors(), family: "yes", financial: "no" }
-const answeredReason: ReasonForAttending = {
-  ...emptyReasonForAttending(),
-  referralType: "self",
-}
-const remaining = unansweredInterviewLabels({}, [], null, answeredStressors, answeredReason)
+const remaining = unansweredInterviewLabels({}, [], null, answeredStressors)
 assert.equal(remaining[0], "Illness / injury")
 assert.equal(remaining.includes("Medication"), true)
 assert.equal(remaining.includes("Referral type"), false)
@@ -141,28 +135,13 @@ assert.equal(remaining.includes("Family"), false)
 assert.equal(remaining.includes("Financial"), false)
 assert.ok(remaining.includes("Social life"))
 assert.equal(remaining.length, HISTORY_QUESTION_KEYS.length + 7)
-assert.equal(INTERVIEW_ANSWER_TOTAL, 25)
+assert.equal(INTERVIEW_ANSWER_TOTAL, 24)
 assert.equal(gaps.length, INTERVIEW_ANSWER_TOTAL)
+assert.equal(answeredInterviewCount({}, [], null, emptyStressors()), 0)
+assert.equal(answeredInterviewCount({}, [], null, emptyStressors()), 0)
+assert.equal(answeredInterviewCount({ medication_history: "yes" }, [], null, emptyStressors()), 1)
 assert.equal(
-  answeredInterviewCount({}, [], null, emptyStressors(), emptyReasonForAttending()),
-  0
-)
-assert.equal(
-  answeredInterviewCount({}, [], null, emptyStressors(), emptyReasonForAttending()),
-  0
-)
-assert.equal(
-  answeredInterviewCount(
-    { medication_history: "yes" },
-    [],
-    null,
-    emptyStressors(),
-    emptyReasonForAttending()
-  ),
-  1
-)
-assert.equal(
-  answeredInterviewCount({}, [], null, answeredStressors, answeredReason),
+  answeredInterviewCount({}, [], null, answeredStressors),
   INTERVIEW_ANSWER_TOTAL - remaining.length
 )
 assert.equal(backgroundInterviewSourceLine(null), "No background interview yet.")

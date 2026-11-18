@@ -51,7 +51,6 @@ import {
   type LivesWith,
   type LivingSituationFields,
   type OccupationFields,
-  type ReasonForAttending,
   type StressorsRecord,
   type TriStateAnswer,
   type RelationshipRating,
@@ -292,36 +291,6 @@ export function sanitizeStressors(value: unknown): StressorsRecord {
   }
   stressors.mainReason = str(raw.mainReason)
   return stressors
-}
-
-function referralTypeOf(raw: Record<string, unknown>): ReasonForAttending["referralType"] {
-  const explicit = str(raw.referralType)
-  if (explicit === "medical" || explicit === "family_or_friend" || explicit === "self") return explicit
-  return ""
-}
-
-export function sanitizeReasonForAttending(value: unknown): ReasonForAttending {
-  const raw = isRecord(value) ? value : {}
-  const referralType = referralTypeOf(raw)
-  const medical = referralType === "medical"
-  const family = referralType === "family_or_friend"
-  const referrerRelationshipId = family ? professionalId(raw.referrerRelationshipId) : null
-  const referrerIsOther = family && !referrerRelationshipId && (raw.referrerIsOther === true || str(raw.referrerOther).length > 0)
-  return {
-    referralType,
-    referrerProfessionalId: medical ? professionalId(raw.referrerProfessionalId) : null,
-    referralDate: medical ? canonicalPartialDate(str(raw.referralDate)) : "",
-    referrerConcerns: medical ? str(raw.referrerConcerns) : "",
-    referrerRelationshipId,
-    referrerIsOther,
-    referrerOther: referrerIsOther ? str(raw.referrerOther) : "",
-    theirConcerns: family ? str(raw.theirConcerns) : "",
-  }
-}
-
-/** Referral type is one choice, so a blank stays blank. The older Yes/No answers are not filled in. */
-export function markUnansweredReason(reason: ReasonForAttending): { reason: ReasonForAttending; changed: boolean } {
-  return { reason, changed: false }
 }
 
 export function markUnansweredStressors(stressors: StressorsRecord): { stressors: StressorsRecord; changed: boolean } {

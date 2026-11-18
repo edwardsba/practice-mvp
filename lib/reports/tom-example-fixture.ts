@@ -4,7 +4,6 @@ import {
   emptyClientRelationshipStatus,
   emptyDemographics,
   emptyEvent,
-  emptyReasonForAttending,
   emptyRisk,
   emptyStressors,
   type EventRecord,
@@ -216,11 +215,6 @@ export function tomExampleSource(): BackgroundReportSource {
   stressors.lossOfLovedOne = "no"
   stressors.legalPoliceAccidents = "no"
   stressors.mainReason = "I can't stop worrying about money"
-  const reason = emptyReasonForAttending()
-  reason.referralType = "medical"
-  reason.referrerProfessionalId = "tom-prescriber"
-  reason.referralDate = "2026-10-03"
-  reason.referrerConcerns = "low mood and stress"
   const answers = emptyBlockAnswers()
   answers.previousRelationships = "yes"
   answers.otherChildren = "none"
@@ -241,7 +235,6 @@ export function tomExampleSource(): BackgroundReportSource {
       relationshipStatus: { ...emptyClientRelationshipStatus(), relationshipStatus: "married" },
       demographics,
       stressors,
-      reason,
       relationships: tomRelationships(),
       relationshipBlocks: tomBlocks(),
       blockAnswers: answers,
@@ -253,11 +246,17 @@ export function tomExampleSource(): BackgroundReportSource {
     selfReportDate: null,
     numberOfChildren: 5,
     referral: {
-      title: "Dr",
-      firstName: "Harry",
-      lastName: "TestDoc",
-      profession: "GP",
-      date: "2026-10-03",
+      referrer: {
+        title: "Dr",
+        firstName: "Harry",
+        lastName: "TestDoc",
+        profession: "GP",
+      },
+      referralDate: "2026-10-03",
+      referrerComments: "low mood and stress",
+      referralSource: "",
+      referrerRelationshipId: null,
+      referrerOther: "",
     },
     professionals: [
       {

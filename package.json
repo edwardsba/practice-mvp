@@ -102,6 +102,7 @@
     "db:relationship-blocks": "tsx db/apply-relationship-blocks-migration.ts",
     "db:sexual-orientation": "tsx db/apply-sexual-orientation-migration.ts",
     "db:referral-type": "tsx db/apply-referral-type-migration.ts",
+    "db:referral-on-funding-approvals": "tsx db/apply-referral-on-funding-approvals-migration.ts",
     "db:condition-groups": "tsx db/apply-condition-groups-migration.ts",
     "db:retire-background-fields": "tsx db/apply-retire-background-fields-migration.ts",
     "db:relationship-children-siblings-answers": "tsx db/apply-relationship-children-siblings-answers-migration.ts",

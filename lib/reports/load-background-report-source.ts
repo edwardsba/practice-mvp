@@ -5,6 +5,7 @@ import { and, asc, eq } from "drizzle-orm"
 import {
   clientBackgroundInterviews,
   clients,
+  fundingApprovals,
   practitionerPracticeMemberships,
   practitionerProfiles,
   professionals,
@@ -13,10 +14,22 @@ import {
 import { sanitizeScreening } from "@/lib/client-background/interview-history"
 import { loadClientBackground, loadLatestBackgroundSelfReport, loadReasonSupport } from "@/lib/client-background/load"
 import { db } from "@/lib/db"
-import { chooseReportInterviews, type BackgroundReportSource } from "@/lib/reports/generate-background-report"
+import { pickApprovalForReportDate } from "@/lib/funding/referral"
+import {
+  chooseReportInterviews,
+  type BackgroundReportReferralInfo,
+  type BackgroundReportSource,
+} from "@/lib/reports/generate-background-report"
 
 function isoDate(value: Date): string {
   return value.toLocaleDateString("en-CA", { timeZone: "Australia/Sydney" })
+}
+
+function referralSourceValue(
+  value: string | null | undefined
+): BackgroundReportReferralInfo["referralSource"] {
+  if (value === "self" || value === "family_or_friend" || value === "other") return value
+  return ""
 }
 
 export async function loadBackgroundReportSource({
@@ -91,40 +104,78 @@ export async function loadBackgroundReportSource({
   const chosenRow = chosen.answerIndex == null ? null : candidates[chosen.answerIndex]
   const screening = chosenRow ? sanitizeScreening(chosenRow.screeningJson) : null
   const interviews = chosen.dates.map((date) => ({ date }))
+  const interviewDate = interviews[0]?.date ?? null
 
   const selfReport = await loadLatestBackgroundSelfReport(clientId, practiceId)
 
-  let referral: BackgroundReportSource["referral"] = null
-  const referrerId = data.reason.referrerProfessionalId
-  if (referrerId) {
-    const [professional] = await db
-      .select({
-        title: professionals.title,
-        firstName: professionals.firstName,
-        lastName: professionals.lastName,
-        professionName: professions.professionName,
-      })
-      .from(professionals)
-      .leftJoin(
-        professions,
-        and(eq(professions.professionId, professionals.professionId), eq(professions.practiceId, practiceId))
+  const approvalRows = await db
+    .select({
+      fundingApprovalId: fundingApprovals.fundingApprovalId,
+      startDate: fundingApprovals.startDate,
+      endDate: fundingApprovals.endDate,
+      createdAt: fundingApprovals.createdAt,
+      referrerId: fundingApprovals.referrerId,
+      referralDate: fundingApprovals.referralDate,
+      referrerComments: fundingApprovals.referrerComments,
+      referralSource: fundingApprovals.referralSource,
+      referrerRelationshipId: fundingApprovals.referrerRelationshipId,
+      referrerOther: fundingApprovals.referrerOther,
+    })
+    .from(fundingApprovals)
+    .where(
+      and(
+        eq(fundingApprovals.clientId, clientId),
+        eq(fundingApprovals.practiceId, practiceId),
+        eq(fundingApprovals.isActive, true)
       )
-      .where(and(eq(professionals.professionalId, referrerId), eq(professionals.practiceId, practiceId)))
-      .limit(1)
-    if (professional) {
-      referral = {
-        title: professional.title,
-        firstName: professional.firstName,
-        lastName: professional.lastName,
-        profession: professional.professionName,
-        date: data.reason.referralDate.trim() || null,
+    )
+
+  const picked = pickApprovalForReportDate(approvalRows, interviewDate)
+  let referral: BackgroundReportReferralInfo | null = null
+  if (picked) {
+    let referrer: BackgroundReportReferralInfo["referrer"] = null
+    if (picked.referrerId) {
+      const [professional] = await db
+        .select({
+          title: professionals.title,
+          firstName: professionals.firstName,
+          lastName: professionals.lastName,
+          professionName: professions.professionName,
+        })
+        .from(professionals)
+        .leftJoin(
+          professions,
+          and(eq(professions.professionId, professionals.professionId), eq(professions.practiceId, practiceId))
+        )
+        .where(and(eq(professionals.professionalId, picked.referrerId), eq(professionals.practiceId, practiceId)))
+        .limit(1)
+      if (professional) {
+        referrer = {
+          title: professional.title,
+          firstName: professional.firstName,
+          lastName: professional.lastName,
+          profession: professional.professionName,
+        }
       }
+    }
+    referral = {
+      referrer,
+      referralDate: picked.referralDate?.trim() || null,
+      referrerComments: picked.referrerComments?.trim() || "",
+      referralSource: referralSourceValue(picked.referralSource),
+      referrerRelationshipId: picked.referrerRelationshipId,
+      referrerOther: picked.referrerOther?.trim() || "",
     }
   }
 
   const practitionerName = practitioner
     ? [practitioner.firstName.trim(), practitioner.lastName.trim()].filter(Boolean).join(" ")
     : ""
+
+  const selectedProfessionalIds = data.events
+    .map((event) => event.prescriberProfessionalId)
+    .filter((id): id is string => Boolean(id))
+  const selectedProfessionalId = selectedProfessionalIds[0] ?? null
 
   return {
     reportDate,
@@ -140,6 +191,6 @@ export async function loadBackgroundReportSource({
     selfReportDate: selfReport ? isoDate(new Date(selfReport.assessmentDate)) : null,
     numberOfChildren: selfReport?.answers.familyHome.numberOfChildren ?? null,
     referral,
-    professionals: (await loadReasonSupport(clientId, practiceId, data.reason.referrerProfessionalId)).professionals,
+    professionals: (await loadReasonSupport(clientId, practiceId, selectedProfessionalId)).professionals,
   }
 }

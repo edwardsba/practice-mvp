@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto"
 
 import { and, eq, inArray, isNull } from "drizzle-orm"
 
-import { auditEvents, assessmentDefinitions, assessmentInstances, assessmentResults, clientBackgroundInterviews, clientBackgrounds, clientEventRecords, clientRelationshipBlocks, clientRelationshipRecords, clients, professionals } from "@/db/schema"
+import { auditEvents, assessmentDefinitions, assessmentInstances, assessmentResults, clientBackgroundInterviews, clientBackgrounds, clientEventRecords, clientRelationshipBlocks, clientRelationshipRecords, clients } from "@/db/schema"
 import { BACKGROUND_ASSESSMENT_CODE } from "@/lib/background-questionnaire/types"
 import { db } from "@/lib/db"
 import { settleEventDates } from "@/lib/client-background/age"
@@ -21,13 +21,11 @@ import {
   demographicsFromStored,
   sanitizeClientRelationshipStatus,
   markUnansweredStressors,
-  markUnansweredReason,
   sanitizeEducation,
   sanitizeEvent,
   sanitizeIdentity,
   sanitizeLivingSituation,
   sanitizeOccupation,
-  sanitizeReasonForAttending,
   sanitizeRisk,
   sanitizeStressors,
 } from "@/lib/client-background/sanitize"
@@ -39,7 +37,6 @@ import {
   type IdentityFields,
   type LivingSituationFields,
   type OccupationFields,
-  type ReasonForAttending,
   type StressorsRecord,
   type RiskRatings,
 } from "@/lib/client-background/types"
@@ -309,7 +306,6 @@ async function upsertBackgroundColumn(
     occupationJson: OccupationFields
     riskJson: RiskRatings
     stressorsJson: StressorsRecord
-    reasonForAttendingJson: ReasonForAttending
     sexualOrientation: string | null
     sexualOrientationOther: string | null
   }>
@@ -451,36 +447,6 @@ export async function saveStressors(
     return { ...result, stressors }
   } catch {
     return { error: "Could not save stressors." }
-  }
-}
-
-async function professionalBelongsToPractice(professionalId: string, practiceId: string) {
-  const [row] = await db
-    .select({ professionalId: professionals.professionalId })
-    .from(professionals)
-    .where(and(eq(professionals.professionalId, professionalId), eq(professionals.practiceId, practiceId)))
-    .limit(1)
-  return row != null
-}
-
-export async function saveReasonForAttending(input: {
-  clientId: string
-  practiceId: string
-  userId: string
-  reason: unknown
-}) {
-  const reason = sanitizeReasonForAttending(input.reason)
-  if (reason.referrerProfessionalId) {
-    const allowed = await professionalBelongsToPractice(reason.referrerProfessionalId, input.practiceId)
-    if (!allowed) return { error: "Choose a professional from this practice." }
-  }
-  try {
-    const result = await upsertBackgroundColumn(input.clientId, input.practiceId, input.userId, {
-      reasonForAttendingJson: reason,
-    })
-    return { ...result, reason }
-  } catch {
-    return { error: "Could not save reason for attending." }
   }
 }
 
@@ -961,14 +927,12 @@ export async function completeBackgroundInterview(input: {
       const completedAt = new Date()
       const demographics = background ? demographicsFromStored(background) : emptyDemographics()
       const filled = markUnansweredStressors(sanitizeStressors(background?.stressorsJson))
-      const reasonFilled = markUnansweredReason(sanitizeReasonForAttending(background?.reasonForAttendingJson))
-      if (filled.changed || reasonFilled.changed) {
+      if (filled.changed) {
         if (background) {
           await tx
             .update(clientBackgrounds)
             .set({
               stressorsJson: filled.stressors,
-              reasonForAttendingJson: reasonFilled.reason,
               updatedAt: completedAt,
             })
             .where(
@@ -982,7 +946,6 @@ export async function completeBackgroundInterview(input: {
             clientId: input.clientId,
             practiceId: input.practiceId,
             stressorsJson: filled.stressors,
-            reasonForAttendingJson: reasonFilled.reason,
             updatedAt: completedAt,
           })
         }
@@ -1000,7 +963,6 @@ export async function completeBackgroundInterview(input: {
         events,
         screening,
         stressors: filled.stressors,
-        reason: reasonFilled.reason,
       }
 
       await tx

@@ -6,10 +6,15 @@ import { AppShell } from "@/components/app-shell"
 import { BackButton } from "@/components/ui/back-button"
 import { EntityPageHeader } from "@/components/ui/entity-page-header"
 import { clients } from "@/db/schema"
+import { getReferralFundingCardData } from "@/lib/actions/funding"
 import { requirePractitionerContext } from "@/lib/auth"
 import { loadBackgroundInterviewCard, loadClientBackground, loadLatestBackgroundSelfReport, loadReasonSupport } from "@/lib/client-background/load"
 import { ensureFamilyOfOrigin } from "@/lib/client-background/mutations"
 import { db } from "@/lib/db"
+import {
+  anyReferralRecorded,
+  buildReferralFundingCardProps,
+} from "@/lib/funding/referral-funding-card-props"
 
 export default async function ClientBackgroundRoute({
   params,
@@ -44,13 +49,19 @@ export default async function ClientBackgroundRoute({
 
   const data = await loadClientBackground(clientId, context.practiceId)
   if (!data) notFound()
-  const [interview, selfReport, reasonSupport] = await Promise.all([
+  const [interview, selfReport, reasonSupport, referralFundingData] = await Promise.all([
     loadBackgroundInterviewCard(clientId, context.practiceId),
     loadLatestBackgroundSelfReport(clientId, context.practiceId),
-    loadReasonSupport(clientId, context.practiceId, data.reason.referrerProfessionalId),
+    loadReasonSupport(clientId, context.practiceId, null),
+    getReferralFundingCardData(clientId),
   ])
   if (!interview) notFound()
 
+  const referralFunding = buildReferralFundingCardProps(
+    context.practiceId,
+    referralFundingData
+  )
+  const referralRecorded = anyReferralRecorded(referralFunding.approvals)
   const clientName = `${client.firstName} ${client.lastName}`
 
   return (
@@ -70,6 +81,8 @@ export default async function ClientBackgroundRoute({
         interview={interview}
         numberOfChildren={selfReport?.answers.familyHome.numberOfChildren ?? null}
         reasonSupport={reasonSupport}
+        referralFunding={referralFunding}
+        referralRecorded={referralRecorded}
       />
     </AppShell>
   )

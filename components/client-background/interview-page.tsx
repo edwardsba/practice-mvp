@@ -8,7 +8,6 @@ import {
   saveIdentityAction,
   saveLivingSituationAction,
   saveOccupationAction,
-  saveReasonForAttendingAction,
 } from "@/app/clients/[client_id]/background/actions"
 import {
   EducationFieldsEditor,
@@ -25,9 +24,10 @@ import {
   writeSectionOpenState,
 } from "@/components/client-background/interview-section-card"
 import { RelationshipBlocksSection } from "@/components/client-background/relationship-blocks-section"
-import { ReasonFields } from "@/components/client-background/reason-section"
 import { scrollToBackgroundCheck } from "@/components/client-background/worth-checking"
+import { ReferralFundingCard } from "@/components/funding/referral-funding-card"
 import { Button } from "@/components/ui/button"
+import type { ReferralFundingCardProps } from "@/lib/funding/referral-funding-card-props"
 import { backgroundAnswersToClientBackground } from "@/lib/background-questionnaire/to-client-background"
 import type { BackgroundSelfReport } from "@/lib/background-questionnaire/types"
 import { assessAge, displayedAge } from "@/lib/client-background/age"
@@ -37,7 +37,6 @@ import {
   type BackgroundCheck,
 } from "@/lib/client-background/checks"
 import type { ReasonSupport } from "@/lib/client-background/load"
-import { applyKeptSuggestion } from "@/lib/client-background/reason"
 import { parsePartialDate } from "@/lib/client-background/partial-date"
 import type { ScreeningAnswers } from "@/lib/client-background/interview-history"
 import type {
@@ -58,13 +57,15 @@ function clientAge(dateOfBirth: string | null) {
 
 export function InterviewPage({
   clientId,
-  practiceId,
+  practiceId: _practiceId,
   clientName,
   initialPage,
   data,
   screening,
   selfReport,
   reasonSupport,
+  referralFunding,
+  referralRecorded = false,
 }: {
   clientId: string
   practiceId: string
@@ -74,15 +75,15 @@ export function InterviewPage({
   screening: ScreeningAnswers
   selfReport: BackgroundSelfReport | null
   reasonSupport: ReasonSupport
+  referralFunding: ReferralFundingCardProps
+  referralRecorded?: boolean
 }) {
   const router = useRouter()
   const identityRef = useRef(data.demographics.identity)
   const occupationRef = useRef(data.demographics.occupation)
   const livingRef = useRef(data.demographics.livingSituation)
-  const reasonRef = useRef(data.reason)
   const relationshipsRef = useRef(data.relationships)
   const statusRef = useRef(data.relationshipStatus)
-  const suggestionDismissed = useRef(false)
   const pendingCheck = useRef<BackgroundCheck | null>(null)
   const [page, setPage] = useState<InterviewPageId>(initialPage)
   const [relationships, setRelationships] = useState(data.relationships)
@@ -216,12 +217,12 @@ export function InterviewPage({
           },
           stressors: current.stressors,
           events: current.events,
-          reason: reasonRef.current,
         },
         numberOfChildren: selfReport?.answers.familyHome.numberOfChildren ?? null,
         screening: current.screening,
+        referralRecorded,
       }),
-    [data, selfReport]
+    [data, referralRecorded, selfReport]
   )
 
   const liveChecks = getChecks({
@@ -370,51 +371,12 @@ export function InterviewPage({
       <div className={cn("space-y-4 py-4", page !== "background" && "hidden")}>
         <InterviewSectionCard
           id="check-reason"
-          title="Referral"
+          title="Referral and funding"
           open={Boolean(sectionOpen.reason)}
           onToggle={() => toggleSection("reason")}
           badge={needsBadge(sectionNeeds("reason"))}
         >
-          <AutosaveFields
-            saved={data.reason}
-            save={async (value) => {
-              const next = applyKeptSuggestion(value, {
-                suggestedProfessionalId: reasonSupport.suggestedProfessionalId,
-                dismissed: suggestionDismissed.current,
-              })
-              reasonRef.current = next
-              const result = await saveReasonForAttendingAction(clientId, next)
-              if (result.error || !("reason" in result) || !result.reason) {
-                return { error: result.error ?? "Could not save reason for attending." }
-              }
-              reasonRef.current = result.reason
-              return { value: result.reason }
-            }}
-            onPhase={(phase, retry) => onPhase("reason", phase, retry)}
-            registerFlush={registerFlush}
-          >
-            {(value, onChange, commit) => {
-              reasonRef.current = value
-              return (
-                <ReasonFields
-                  idPrefix="interview_reason"
-                  practiceId={practiceId}
-                  value={value}
-                  onChange={onChange}
-                  onCommit={commit}
-                  professionals={professionals}
-                  professions={reasonSupport.professions}
-                  organisations={reasonSupport.organisations}
-                  relationships={data.relationships}
-                  suggestedProfessionalId={reasonSupport.suggestedProfessionalId}
-                  onProfessionalsChange={setProfessionals}
-                  onSuggestionDismissedChange={(dismissed) => {
-                    suggestionDismissed.current = dismissed
-                  }}
-                />
-              )
-            }}
-          </AutosaveFields>
+          <ReferralFundingCard {...referralFunding} />
         </InterviewSectionCard>
         <InterviewSectionCard
           id="check-identity"
@@ -579,7 +541,6 @@ export function InterviewPage({
           events={data.events}
           relationships={relationships}
           screening={screening}
-          reasonRef={reasonRef}
           stressors={data.stressors}
           selfReportId={selfReport?.resultId ?? null}
           historyClient={suggestions?.history}

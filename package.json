@@ -104,6 +104,7 @@
     "db:referral-type": "tsx db/apply-referral-type-migration.ts",
     "db:referral-on-funding-approvals": "tsx db/apply-referral-on-funding-approvals-migration.ts",
     "db:condition-groups": "tsx db/apply-condition-groups-migration.ts",
+    "db:history-issues": "tsx db/apply-history-issues-migration.ts",
     "db:retire-background-fields": "tsx db/apply-retire-background-fields-migration.ts",
     "db:relationship-children-siblings-answers": "tsx db/apply-relationship-children-siblings-answers-migration.ts",
     "db:round-m-verify": "tsx db/apply-relationship-children-siblings-answers-migration.ts && tsx scripts/seed-test-client-tom.ts && tsx lib/reports/tom-example-db.selftest.ts",

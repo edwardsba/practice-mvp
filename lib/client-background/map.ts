@@ -1,3 +1,4 @@
+import { sanitizeHistoryIssue } from "@/lib/client-background/history-issues"
 import {
   emptyBlockAnswers,
   isOneOf,
@@ -7,6 +8,7 @@ import {
   type ClientRelationshipStatusValue,
   type EventRecord,
   type EventType,
+  type HistoryIssue,
   type RelationshipBlock,
   type RelationshipBlockAnswers,
   type RelationshipRecord,
@@ -188,6 +190,7 @@ export function toEvent(row: {
   relationshipRecordId: string | null
   conditionEventId: string | null
   conditionGroupId: string | null
+  parentEventId?: string | null
   admissionType: string | null
   facility: string | null
   admissionLength: string | null
@@ -216,6 +219,7 @@ export function toEvent(row: {
     aboutOther: row.aboutOther ?? "",
     conditionEventId: row.conditionEventId,
     conditionGroupId: row.conditionGroupId,
+    parentEventId: row.parentEventId ?? null,
     admissionType: row.admissionType ?? "",
     facility: row.facility ?? "",
     admissionLength: row.admissionLength ?? "",
@@ -226,4 +230,27 @@ export function toEvent(row: {
     abstinentSincePrecision: row.abstinentSincePrecision ?? "",
     abstinentSinceValue: row.abstinentSinceValue ?? "",
   })
+}
+
+export function toHistoryIssue(row: {
+  issueId: string
+  category: string
+  about: string | null
+  relationshipRecordId: string | null
+  title: string | null
+  treatmentAnswer: string | null
+  displayOrder: number
+}): HistoryIssue {
+  return sanitizeHistoryIssue(
+    {
+      issueId: row.issueId,
+      category: row.category,
+      about: row.about,
+      relationshipRecordId: row.relationshipRecordId,
+      title: row.title ?? "",
+      treatmentAnswer: row.treatmentAnswer ?? "",
+      displayOrder: row.displayOrder,
+    },
+    row.issueId
+  )
 }

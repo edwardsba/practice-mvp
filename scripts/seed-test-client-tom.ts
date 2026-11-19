@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto"
 import { config } from "dotenv"
 import { Pool, type PoolClient } from "pg"
 
-import { tomBlocks, tomEvents, tomExampleSource, tomRelationships, tomScreening, TOM_FIRST_NAME, TOM_LAST_NAME } from "../lib/reports/tom-example-fixture"
+import { tomBlocks, tomEvents, tomExampleSource, tomIssues, tomRelationships, tomScreening, TOM_FIRST_NAME, TOM_LAST_NAME } from "../lib/reports/tom-example-fixture"
 
 config({ path: ".env.local" })
 
@@ -63,6 +63,7 @@ async function main() {
   const ids = new Map<string, string>()
   for (const person of tomRelationships()) ids.set(person.relationshipRecordId, randomUUID())
   for (const block of tomBlocks()) ids.set(block.relationshipBlockId, randomUUID())
+  for (const issue of tomIssues()) ids.set(issue.issueId, randomUUID())
   for (const event of tomEvents()) ids.set(event.eventRecordId, randomUUID())
 
   const db = await pool.connect()
@@ -133,14 +134,33 @@ async function main() {
         [ids.get(block.relationshipBlockId), ids.get(block.parentRecordId)]
       )
     }
+    for (const issue of tomIssues()) {
+      await db.query(
+        `INSERT INTO client_history_issues (
+           issue_id, client_id, practice_id, category, about, relationship_record_id, title,
+           treatment_answer, display_order
+         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+        [
+          ids.get(issue.issueId),
+          clientId,
+          account.practice_id,
+          issue.category,
+          issue.about,
+          issue.relationshipRecordId ? ids.get(issue.relationshipRecordId) : null,
+          text(issue.title),
+          text(issue.treatmentAnswer),
+          issue.displayOrder,
+        ]
+      )
+    }
     for (const event of tomEvents()) {
       await db.query(
         `INSERT INTO client_event_records (
            event_record_id, client_id, practice_id, event_type, title, start_precision, start_value,
            end_precision, end_value, end_ongoing, resolved_or_ongoing, about, about_other,
-           relationship_record_id, condition_event_id, admission_type, admission_length, prescriber_name,
-           prescriber_professional_id, self_harm_type, substance_status, display_order
-         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)`,
+           relationship_record_id, condition_group_id, parent_event_id, admission_type, admission_length,
+           prescriber_name, prescriber_professional_id, self_harm_type, substance_status, display_order
+         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)`,
         [
           ids.get(event.eventRecordId),
           clientId,
@@ -156,7 +176,8 @@ async function main() {
           text(event.about),
           text(event.aboutOther),
           event.relationshipRecordId ? ids.get(event.relationshipRecordId) : null,
-          event.conditionEventId ? ids.get(event.conditionEventId) : null,
+          event.conditionGroupId ? ids.get(event.conditionGroupId) : null,
+          event.parentEventId ? ids.get(event.parentEventId) : null,
           text(event.admissionType),
           text(event.admissionLength),
           text(event.prescriberName),

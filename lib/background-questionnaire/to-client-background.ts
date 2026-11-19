@@ -71,6 +71,9 @@ export type ClientBackgroundSuggestions = {
   medication: {
     currentlyTaking?: AppliedAnswer<"yes" | "no">
     previouslyTaken?: AppliedAnswer<"yes" | "no">
+    everAdmitted?: AppliedAnswer<"yes" | "no">
+    previousTherapy?: AppliedAnswer<"yes" | "no">
+    everMedication?: AppliedAnswer<"yes" | "no">
   }
   stressors: Partial<Record<StressorKey, AppliedAnswer<"yes" | "no">>> & {
     mainReason?: AppliedAnswer<string>
@@ -275,22 +278,23 @@ export function backgroundAnswersToClientBackground(
   }
 
   const history: ClientBackgroundSuggestions["history"] = {}
-  const hospital = yesNo(treatment.hospitalForEmotionalProblem)
-  if (hospital) history.psychiatric_admission = hospital
-  const therapy = yesNo(treatment.therapyForEmotionalIssues)
-  if (therapy) history.previous_therapy = therapy
   const familyEmotional = yesNo(treatment.familyEmotionalProblem)
   if (familyEmotional) history.family_emotional_problems = familyEmotional
   const familySubstances = yesNo(treatment.familyAlcoholOrDrugs)
   if (familySubstances) history.family_substance_use = familySubstances
-  const familyHospital = yesNo(treatment.familyHospitalForEmotionalOrSubstance)
-  if (familyHospital) history.family_psychiatric_admission = familyHospital
 
   const medication: ClientBackgroundSuggestions["medication"] = {}
   const currentlyTaking = yesNo(treatment.currentMedication)
   if (currentlyTaking) medication.currentlyTaking = currentlyTaking
   const previouslyTaken = yesNo(treatment.everTakenMedication)
-  if (previouslyTaken) history.medication_history = previouslyTaken
+  if (previouslyTaken) {
+    medication.previouslyTaken = previouslyTaken
+    medication.everMedication = previouslyTaken
+  }
+  const hospital = yesNo(treatment.hospitalForEmotionalProblem)
+  if (hospital) medication.everAdmitted = hospital
+  const therapy = yesNo(treatment.therapyForEmotionalIssues)
+  if (therapy) medication.previousTherapy = therapy
 
   const stressorSuggestions: ClientBackgroundSuggestions["stressors"] = {}
   for (const item of STRESSOR_TARGETS) {

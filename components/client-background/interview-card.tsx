@@ -8,7 +8,6 @@ import { WorthCheckingLinks } from "@/components/client-background/worth-checkin
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import type { BackgroundCheck } from "@/lib/client-background/checks"
-import { INTERVIEW_ANSWER_TOTAL } from "@/lib/client-background/interview-history"
 import type { BackgroundInterviewCardData } from "@/lib/client-background/load"
 
 export function BackgroundInterviewCard({
@@ -47,7 +46,7 @@ export function BackgroundInterviewCard({
       <CardContent className="space-y-3">
         {summary.inProgress ? (
           <p className="text-sm">
-            In progress · started {summary.inProgress.startedAt} · Interview: {summary.inProgress.answered} of {INTERVIEW_ANSWER_TOTAL} answered
+            In progress · started {summary.inProgress.startedAt} · Interview: {summary.inProgress.answered} of {summary.inProgress.total} answered
           </p>
         ) : (
           <p className="text-sm">

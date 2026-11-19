@@ -376,7 +376,7 @@ export function InterviewPage({
           onToggle={() => toggleSection("reason")}
           badge={needsBadge(sectionNeeds("reason"))}
         >
-          <ReferralFundingCard {...referralFunding} />
+          <ReferralFundingCard {...referralFunding} hideTitle />
         </InterviewSectionCard>
         <InterviewSectionCard
           id="check-identity"
@@ -547,6 +547,7 @@ export function InterviewPage({
           medicationClient={suggestions?.medication}
           professionals={professionals}
           stressorsClient={suggestions?.stressors}
+          issues={data.issues}
           onEvents={() => {}}
           onPhase={onPhase}
           registerFlush={registerFlush}

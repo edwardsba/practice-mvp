@@ -224,14 +224,12 @@ function benSource(): BackgroundReportSource {
     emotional_problems: "not_asked",
     substance_use: "no",
     self_harm: "yes",
-    psychiatric_admission: "no",
-    previous_therapy: "no",
     other_significant_events: "no",
+    other_treatment: "no",
     family_illness: "no",
     family_emotional_problems: "yes",
     family_substance_use: "no",
     family_self_harm: "no",
-    family_psychiatric_admission: "no",
     family_significant_events: "no",
   }
 
@@ -394,9 +392,9 @@ assert.doesNotMatch(body, /including \./)
 assert.doesNotMatch(body, /including at\b/)
 
 assert.ok(draft.omitted.some((item) => item.message === "Traumatic events is Yes, with no entries."))
-assert.ok(draft.omitted.some((item) => item.message === "Emotional problems not asked"))
+assert.ok(draft.omitted.some((item) => item.message === "Mental health not asked"))
 assert.equal(
-  draft.omitted.some((item) => item.message === "Medication is Yes, with no entries."),
+  draft.omitted.some((item) => item.message === "Other treatment not linked to an issue is Yes, with no entries."),
   false
 )
 
@@ -1090,7 +1088,7 @@ assert.ok(messages.some((message) => message.includes("Married") && message.incl
 assert.equal(messages.some((message) => message.includes("other parent not recorded")), false)
 assert.equal(messages.some((message) => message.includes("adoption date")), false)
 assert.ok(messages.some((message) => message.includes("Anxiety") && message.includes("needs detail")))
-assert.ok(messages.some((message) => message === "Medication 'Temazepam' is not linked to a condition"))
+assert.ok(messages.some((message) => message === "Treatment 'Temazepam' is not linked to an issue"))
 assert.equal(messages.some((message) => message.includes("no start date")), false)
 
 const disruption = benSource()

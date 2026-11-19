@@ -38,7 +38,9 @@ export function entryDetailGap(event: EventRecord): "title" | "date" | "both" | 
 export function entryDetailMessage(event: EventRecord, dateOfBirth: string | null): string | null {
   const gap = entryDetailGap(event)
   if (!gap) return null
-  const label = HISTORY_QUESTIONS[historyQuestionKeyForEvent(event, dateOfBirth)].label
+  const label = isTreatmentEvent(event.eventType)
+    ? "Treatment"
+    : HISTORY_QUESTIONS[historyQuestionKeyForEvent(event, dateOfBirth)].label
   const title = event.title.trim()
   if (gap === "both") return `${label}: entry needs detail (no title, no date)`
   if (gap === "title") return `${label}: entry needs detail (no title)`
@@ -46,16 +48,30 @@ export function entryDetailMessage(event: EventRecord, dateOfBirth: string | nul
 }
 
 export function treatmentsForCondition(events: EventRecord[], conditionId: string): EventRecord[] {
-  return events.filter((event) => isTreatmentEvent(event.eventType) && event.conditionEventId === conditionId)
+  const episode = events.find((event) => event.eventRecordId === conditionId)
+  const issueId = episode?.conditionGroupId
+  if (issueId) {
+    return events.filter(
+      (event) =>
+        isTreatmentEvent(event.eventType) &&
+        !event.parentEventId &&
+        (event.conditionGroupId === issueId || event.conditionEventId === conditionId)
+    )
+  }
+  return events.filter(
+    (event) => isTreatmentEvent(event.eventType) && !event.parentEventId && event.conditionEventId === conditionId
+  )
 }
 
 export function treatmentNeedsLink(event: EventRecord): boolean {
-  return isTreatmentEvent(event.eventType) && !event.conditionEventId
+  if (!isTreatmentEvent(event.eventType) || event.parentEventId) return false
+  return !event.conditionGroupId && !event.conditionEventId
 }
 
 export function unlinkedTreatmentMessage(event: EventRecord): string | null {
   if (!treatmentNeedsLink(event)) return null
-  const label = HISTORY_QUESTIONS[historyQuestionKeyForEvent(event, null)].label
   const title = event.title.trim()
-  return title ? `${label} '${title}' is not linked to a condition` : `${label} entry is not linked to a condition`
+  return title
+    ? `Treatment '${title}' is not linked to an issue`
+    : "Treatment entry is not linked to an issue"
 }

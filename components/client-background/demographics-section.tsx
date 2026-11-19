@@ -2,7 +2,7 @@
 
 import { useState, type ReactNode } from "react"
 
-import { saveDemographicsAction } from "@/app/clients/[client_id]/background/actions"
+import { saveDemographicsAction, saveLivingSituationAction } from "@/app/clients/[client_id]/background/actions"
 import { AddButton, ClientAnswer, PartialDatePicker, ReadOnlyField, SaveRow, SelectField, TextField, YesNoDetail } from "@/components/client-background/fields"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -53,9 +53,6 @@ export function DemographicsSection({
 
   function updateIdentity(identity: IdentityFields) {
     setDraft({ ...draft, identity })
-  }
-  function updateLiving(livingSituation: LivingSituationFields) {
-    setDraft({ ...draft, livingSituation })
   }
   function updateEducation(education: EducationFields) {
     setDraft({ ...draft, education })
@@ -128,13 +125,95 @@ export function DemographicsSection({
           <Subsection title="Occupation and financial" divided id="check-occupation">
             <OccupationFieldsEditor value={draft.occupation} onChange={updateOccupation} />
           </Subsection>
-          <Subsection title="Living situation" divided id="check-living">
-            <LivingFieldsEditor value={draft.livingSituation} relationships={relationships} onChange={updateLiving} />
-          </Subsection>
           <SaveRow pending={pending} error={error} onSave={() => void save()} />
         </form>
       ) : (
-        <DemographicsReadOnly value={saved} relationships={relationships} />
+        <DemographicsReadOnly value={saved} />
+      )}
+    </div>
+  )
+}
+
+export function LivingSituationSection({
+  clientId,
+  livingSituation,
+  relationships,
+}: {
+  clientId: string
+  livingSituation: LivingSituationFields
+  relationships: RelationshipRecord[]
+}) {
+  const [saved, setSaved] = useState(livingSituation)
+  const [draft, setDraft] = useState(livingSituation)
+  const [editing, setEditing] = useState(false)
+  const [pending, setPending] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function save() {
+    setPending(true)
+    setError(null)
+    const result = await saveLivingSituationAction(clientId, draft)
+    if (result.error || !("livingSituation" in result) || !result.livingSituation) {
+      setPending(false)
+      setError(result.error ?? "Could not save living situation.")
+      return
+    }
+    setSaved(result.livingSituation)
+    setDraft(result.livingSituation)
+    setPending(false)
+    setEditing(false)
+  }
+
+  return (
+    <div className="space-y-4" id="check-living">
+      <div className="flex justify-end">
+        {editing ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            disabled={pending}
+            onClick={() => {
+              setDraft(saved)
+              setError(null)
+              setEditing(false)
+            }}
+          >
+            Cancel
+          </Button>
+        ) : (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setDraft(saved)
+              setError(null)
+              setEditing(true)
+            }}
+          >
+            Edit
+          </Button>
+        )}
+      </div>
+      {editing ? (
+        <form
+          className="max-w-xl min-w-0 space-y-6"
+          onSubmit={(event) => {
+            event.preventDefault()
+            void save()
+          }}
+        >
+          <LivingFieldsEditor value={draft} relationships={relationships} onChange={setDraft} />
+          <SaveRow pending={pending} error={error} onSave={() => void save()} />
+        </form>
+      ) : (
+        <div className="space-y-3">
+          <ReadOnlyField label="Housing type" value={saved.housingType} />
+          <ReadOnlyField label="Who the client lives with" value={livesWithText(saved)} />
+          <PeopleLivingWithClient relationships={relationships} />
+          <ReadOnlyField label="Housing stability" value={saved.housingStability} />
+        </div>
       )}
     </div>
   )
@@ -161,10 +240,8 @@ function Subsection({
 
 function DemographicsReadOnly({
   value,
-  relationships,
 }: {
   value: Demographics
-  relationships: RelationshipRecord[]
 }) {
   const pronouns = value.identity.pronouns
   const limited = NECESSITY_KEYS.filter((key) => value.occupation.necessities[key])
@@ -221,12 +298,6 @@ function DemographicsReadOnly({
           label="Access to necessities"
           value={limited.length ? `Limited: ${limited.map((key) => NECESSITY_LABELS[key]).join(", ")}` : "No limits recorded"}
         />
-      </Subsection>
-      <Subsection title="Living situation" divided id="check-living">
-        <ReadOnlyField label="Housing type" value={value.livingSituation.housingType} />
-        <ReadOnlyField label="Who the client lives with" value={livesWithText(value.livingSituation)} />
-        <PeopleLivingWithClient relationships={relationships} />
-        <ReadOnlyField label="Housing stability" value={value.livingSituation.housingStability} />
       </Subsection>
     </div>
   )

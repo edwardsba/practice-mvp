@@ -506,6 +506,7 @@ export function sanitizeEvent(value: unknown, fallbackId = ""): EventRecord {
     relationshipRecordId,
     conditionEventId: str(raw.conditionEventId) || null,
     conditionGroupId: str(raw.conditionGroupId) || null,
+    parentEventId: str(raw.parentEventId) || null,
     admissionType: oneOf<AdmissionType>(raw.admissionType, ADMISSION_TYPES),
     facility: str(raw.facility),
     admissionLength: str(raw.admissionLength),
@@ -519,7 +520,10 @@ export function sanitizeEvent(value: unknown, fallbackId = ""): EventRecord {
   if (!treatment) event.conditionEventId = null
   const condition =
     eventType === "emotional_problems" || eventType === "substance_use" || eventType === "illness_injury"
-  if (!condition || (event.conditionGroupId ?? "").startsWith("title:")) event.conditionGroupId = null
+  // Treatments and episodes share conditionGroupId (issue). Clear only when neither.
+  if (!condition && !treatment) event.conditionGroupId = null
+  else if ((event.conditionGroupId ?? "").startsWith("title:")) event.conditionGroupId = null
+  if (event.parentEventId && event.parentEventId === event.eventRecordId) event.parentEventId = null
   if (eventType !== "psychiatric_admission") {
     event.admissionType = ""
     event.facility = ""

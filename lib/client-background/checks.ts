@@ -1,4 +1,5 @@
 import { needLabel, needsForBlock, needsForMember, isPartneredClientStatus } from "@/lib/client-background/relationship-blocks"
+import { issueNeedsWho, resolveHistoryIssues } from "@/lib/client-background/history-issues"
 import { entryDetailMessage, unlinkedTreatmentMessage } from "@/lib/client-background/history-links"
 import { eventsForQuestion, historyQuestionAcceptsEntries, historyQuestionCheckLabel, HISTORY_QUESTION_KEYS, type ScreeningAnswers } from "@/lib/client-background/interview-history"
 import {
@@ -66,11 +67,12 @@ const LIVES_WITH_KINDS: Partial<Record<LivesWith, readonly RelationshipToClient[
 /** Client Background accordion that holds this check's interview section. */
 export function backgroundSectionForCheck(
   target: BackgroundCheckTarget
-): "reason" | "demographics" | "relationships" | "history" {
+): "reason" | "demographics" | "relationships" | "living" | "history" {
   if (target === "reason") return "reason"
   if (target === "relationships" || target === "relationships-intimate" || target === "relationships-caregivers") {
     return "relationships"
   }
+  if (target === "living") return "living"
   if (target === "history") return "history"
   return "demographics"
 }
@@ -252,6 +254,15 @@ export function backgroundChecks(input: BackgroundCheckInput): BackgroundCheck[]
     if (unlinked) {
       checks.push({ id: `unlinked-${event.eventRecordId}`, message: unlinked, target: "history" })
     }
+  }
+
+  for (const issue of resolveHistoryIssues(data.events, data.issues)) {
+    if (!issueNeedsWho(issue)) continue
+    checks.push({
+      id: `issue-who-${issue.issueId}`,
+      message: `${issue.title.trim() || "Issue"} needs who`,
+      target: "history",
+    })
   }
 
   if (blocks.length > 0) {

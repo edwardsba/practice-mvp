@@ -879,15 +879,17 @@ export function EventEditor({
         <SelectField
           id={`${draft.eventRecordId}_for`}
           label="For"
-          value={draft.conditionEventId ?? ""}
-          onChange={(conditionEventId) => patch({ conditionEventId: conditionEventId || null })}
+          value={draft.conditionGroupId ?? ""}
+          onChange={(conditionGroupId) => patch({ conditionGroupId: conditionGroupId || null, conditionEventId: null })}
         >
           <option value="">Not linked</option>
-          {conditions.map((condition) => (
-            <option key={condition.eventRecordId} value={condition.eventRecordId}>
-              {condition.title.trim() || EVENT_TYPE_LABELS[condition.eventType]}
-            </option>
-          ))}
+          {conditionGroups(events, dateOfBirth)
+            .filter((group) => group.personKey === personKey(draft) && !group.id.startsWith("title:"))
+            .map((group) => (
+              <option key={group.id} value={group.id}>
+                {group.title}
+              </option>
+            ))}
         </SelectField>
       ) : null}
       {draft.eventType === "psychiatric_admission" ? (

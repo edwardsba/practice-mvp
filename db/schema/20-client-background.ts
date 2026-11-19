@@ -130,6 +130,34 @@ export const clientRelationshipBlocks = pgTable("client_relationship_blocks", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 })
 
+/**
+ * An issue (condition) under Mental health / Substance use / Physical health.
+ * Episodes share condition_group_id = issue_id. Treatments link by the same id.
+ */
+export const clientHistoryIssues = pgTable("client_history_issues", {
+  issueId: uuid("issue_id").primaryKey(),
+  clientId: uuid("client_id")
+    .notNull()
+    .references(() => clients.clientId),
+  practiceId: uuid("practice_id")
+    .notNull()
+    .references(() => practices.practiceId),
+  /** Condition event type: emotional_problems, substance_use, or illness_injury. */
+  category: text("category").notNull(),
+  /** self or significant_other. */
+  about: text("about").notNull(),
+  relationshipRecordId: uuid("relationship_record_id").references(
+    () => clientRelationshipRecords.relationshipRecordId,
+    { onDelete: "set null" }
+  ),
+  title: text("title").notNull().default(""),
+  /** yes | none | not_asked. Null when never answered. */
+  treatmentAnswer: text("treatment_answer"),
+  displayOrder: integer("display_order").notNull().default(0),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+})
+
 export const clientEventRecords = pgTable("client_event_records", {
   eventRecordId: uuid("event_record_id").primaryKey().defaultRandom(),
   clientId: uuid("client_id")
@@ -159,10 +187,12 @@ export const clientEventRecords = pgTable("client_event_records", {
     () => clientRelationshipRecords.relationshipRecordId,
     { onDelete: "set null" }
   ),
-  /** Treatment entries: the condition this treatment is for. */
+  /** Legacy: treatment → episode. Prefer condition_group_id (issue). Kept for reads. */
   conditionEventId: uuid("condition_event_id"),
-  /** Episodes of one condition share this id. Null on events that are not a condition. */
+  /** Episodes and treatments of one issue share this id (= client_history_issues.issue_id). */
   conditionGroupId: uuid("condition_group_id"),
+  /** Sub-event (step) under an episode or treatment. */
+  parentEventId: uuid("parent_event_id"),
   /** Admission entries: psychiatric_inpatient, residential_rehab, medical, or emergency_department. */
   admissionType: text("admission_type"),
   facility: text("facility"),

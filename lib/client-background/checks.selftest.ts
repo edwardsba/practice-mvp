@@ -283,7 +283,7 @@ assert.deepEqual(
 )
 
 const historyYes = backgroundChecks(input({ screening: { emotional_problems: "yes" } }))
-assert.equal(historyYes[0]?.message, "Emotional problems is Yes, with no entries.")
+assert.equal(historyYes[0]?.message, "Mental health is Yes, with no entries.")
 assert.equal(historyYes[0]?.id, "history-emotional_problems")
 assert.equal(historyYes[0]?.target, "history")
 assert.deepEqual(

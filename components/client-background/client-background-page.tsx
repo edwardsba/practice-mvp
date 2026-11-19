@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react"
 import { ChevronDown } from "lucide-react"
 
-import { DemographicsSection } from "@/components/client-background/demographics-section"
+import { DemographicsSection, LivingSituationSection } from "@/components/client-background/demographics-section"
 import { HistoryTreeSection } from "@/components/client-background/history-tree-section"
 import { BackgroundInterviewCard } from "@/components/client-background/interview-card"
 import { BackgroundStressorsSection } from "@/components/client-background/medication-stressors"
@@ -21,6 +21,7 @@ const SECTIONS = [
   { id: "reason", label: "Referral and funding" },
   { id: "demographics", label: "Demographics" },
   { id: "relationships", label: "Relationships" },
+  { id: "living", label: "Living situation" },
   { id: "history", label: "History" },
   { id: "stressors", label: "Stressors" },
   { id: "risk", label: "Risk" },
@@ -56,12 +57,15 @@ export function ClientBackgroundPage({
       target === "reason" ||
       target === "stressors" ||
       target === "relationships" ||
+      target === "living" ||
       target === "history" ||
       target === "risk"
         ? target
         : target.startsWith("history")
           ? "history"
-          : "demographics"
+          : target === "living"
+            ? "living"
+            : "demographics"
     setOpen(section)
     window.setTimeout(() => {
       document.getElementById(hash)?.scrollIntoView({ behavior: "smooth", block: "start" })
@@ -100,7 +104,7 @@ export function ClientBackgroundPage({
           open={open === item.id}
           onToggle={() => toggle(item.id)}
         >
-          {item.id === "reason" ? <ReferralFundingCard {...referralFunding} /> : null}
+          {item.id === "reason" ? <ReferralFundingCard {...referralFunding} hideTitle /> : null}
           {item.id === "demographics" ? (
             <DemographicsSection
               clientId={clientId}
@@ -119,6 +123,13 @@ export function ClientBackgroundPage({
               events={data.events}
             />
           ) : null}
+          {item.id === "living" ? (
+            <LivingSituationSection
+              clientId={clientId}
+              livingSituation={data.demographics.livingSituation}
+              relationships={data.relationships}
+            />
+          ) : null}
           {item.id === "history" ? (
             <HistoryTreeSection
               clientId={clientId}
@@ -127,6 +138,7 @@ export function ClientBackgroundPage({
               relationships={data.relationships}
               screening={interview.latest?.screening ?? {}}
               professionals={reasonSupport.professionals}
+              issues={data.issues}
             />
           ) : null}
           {item.id === "stressors" ? (

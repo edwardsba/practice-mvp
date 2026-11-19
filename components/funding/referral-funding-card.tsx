@@ -141,9 +141,11 @@ function ApprovalView({
             {approval.reportingRequirements.map((req) => (
               <span
                 key={`${req.appointmentNumber}-${req.reportType}`}
-                className="inline-flex items-center gap-2 rounded-md border px-2 py-1 text-xs"
+                className="inline-flex flex-col gap-1 rounded-md border px-2 py-1 text-xs sm:flex-row sm:items-center sm:gap-2"
               >
-                {req.appointmentNumber} · {req.reportType} ·{" "}
+                <span>
+                  {req.appointmentNumber} · {req.reportType}
+                </span>
                 <StatusBadge
                   status={req.status}
                   statusMap={REPORTING_REQUIREMENT_STATUS_CONFIG}
@@ -162,7 +164,8 @@ export function ReferralFundingCard({
   practiceId,
   approvals,
   formOptions,
-}: ReferralFundingCardProps) {
+  hideTitle = false,
+}: ReferralFundingCardProps & { hideTitle?: boolean }) {
   const router = useRouter()
   const [panel, setPanel] = useState<PanelState | null>(null)
   const [mounted, setMounted] = useState(false)
@@ -215,11 +218,12 @@ export function ReferralFundingCard({
     <>
       <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-3 space-y-0">
-          <CardTitle>Referral and funding</CardTitle>
+          {hideTitle ? <span className="sr-only">Referral and funding</span> : <CardTitle>Referral and funding</CardTitle>}
           <Button
             type="button"
             variant="outline"
             size="sm"
+            className={hideTitle ? "ml-auto" : undefined}
             onClick={() => setPanel({ mode: "create" })}
           >
             + Add funding approval
@@ -280,9 +284,11 @@ export function ReferralFundingCard({
                       {approval.reportingRequirements.map((req) => (
                         <span
                           key={`${approval.fundingApprovalId}-${req.appointmentNumber}-${req.reportType}`}
-                          className="inline-flex items-center gap-2 rounded-md border px-2 py-1 text-xs"
+                          className="inline-flex flex-col gap-1 rounded-md border px-2 py-1 text-xs sm:flex-row sm:items-center sm:gap-2"
                         >
-                          {req.appointmentNumber} · {req.reportType} ·
+                          <span>
+                            {req.appointmentNumber} · {req.reportType}
+                          </span>
                           <StatusBadge
                             status={req.status}
                             statusMap={REPORTING_REQUIREMENT_STATUS_CONFIG}

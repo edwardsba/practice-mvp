@@ -268,6 +268,26 @@ export type BlockRole = (typeof BLOCK_ROLES)[number]
 export const BLOCK_ANSWERS = ["yes", "none", "not_asked"] as const
 export type BlockAnswer = (typeof BLOCK_ANSWERS)[number]
 
+/** Treatment question under an issue: Yes / None / Not asked. */
+export const TREATMENT_ANSWERS = ["yes", "none", "not_asked"] as const
+export type TreatmentAnswer = (typeof TREATMENT_ANSWERS)[number]
+
+export const TREATMENT_ANSWER_LABELS: Record<TreatmentAnswer, string> = {
+  yes: "Yes",
+  none: "None",
+  not_asked: "Not asked",
+}
+
+export type HistoryIssue = {
+  issueId: string
+  category: ConditionEventType
+  about: HistoryAbout
+  relationshipRecordId: string | null
+  title: string
+  treatmentAnswer: TreatmentAnswer | ""
+  displayOrder: number
+}
+
 export const CURRENT_BLOCK_STATUSES = [
   "married",
   "defacto",
@@ -703,10 +723,12 @@ export type EventRecord = {
   /** Who, when the significant other is not a recorded person. */
   aboutOther: string
   relationshipRecordId: string | null
-  /** Treatment entries: the condition entry this treatment is for. */
+  /** Legacy: treatment → episode. Prefer conditionGroupId (issue). Kept for reads. */
   conditionEventId: string | null
-  /** Episodes of one condition share this id. The condition's title is its earliest episode's title. */
+  /** Episodes and treatments of one issue share this id (= HistoryIssue.issueId). */
   conditionGroupId: string | null
+  /** Sub-event under an episode or treatment. */
+  parentEventId: string | null
   admissionType: AdmissionType | ""
   facility: string
   admissionLength: string
@@ -730,6 +752,7 @@ export type ClientBackgroundData = {
   relationshipBlocks?: RelationshipBlock[]
   blockAnswers?: RelationshipBlockAnswers
   events: EventRecord[]
+  issues?: HistoryIssue[]
   risk: RiskRatings
 }
 
@@ -864,6 +887,7 @@ export function emptyEvent(eventType: EventType, displayOrder: number): Omit<Eve
     relationshipRecordId: null,
     conditionEventId: null,
     conditionGroupId: null,
+    parentEventId: null,
     admissionType: "",
     facility: "",
     admissionLength: "",
@@ -873,6 +897,21 @@ export function emptyEvent(eventType: EventType, displayOrder: number): Omit<Eve
     substanceStatus: "",
     abstinentSincePrecision: "",
     abstinentSinceValue: "",
+    displayOrder,
+  }
+}
+
+export function emptyHistoryIssue(
+  category: ConditionEventType,
+  about: HistoryAbout,
+  displayOrder: number
+): Omit<HistoryIssue, "issueId"> {
+  return {
+    category,
+    about,
+    relationshipRecordId: null,
+    title: "",
+    treatmentAnswer: "",
     displayOrder,
   }
 }

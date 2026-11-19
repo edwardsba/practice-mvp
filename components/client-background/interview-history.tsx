@@ -32,7 +32,7 @@ import {
 } from "@/components/ui/dialog"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import type { ClientBackgroundSuggestions } from "@/lib/background-questionnaire/to-client-background"
-import { isConditionEvent, isTreatmentEvent, treatmentNeedsLink, treatmentsForCondition } from "@/lib/client-background/history-links"
+import { HistoryTreeSection } from "@/components/client-background/history-tree-section"
 import type { ProfessionalOption } from "@/lib/client-background/professionals"
 import type { BackgroundCheck } from "@/lib/client-background/checks"
 import {
@@ -45,7 +45,13 @@ import {
   type ScreeningAnswer,
   type ScreeningAnswers,
 } from "@/lib/client-background/interview-history"
-import { emptyEvent, type EventRecord, type RelationshipRecord, type StressorsRecord } from "@/lib/client-background/types"
+import {
+  emptyEvent,
+  type EventRecord,
+  type HistoryIssue,
+  type RelationshipRecord,
+  type StressorsRecord,
+} from "@/lib/client-background/types"
 
 export function InterviewHistory({
   clientId,
@@ -59,6 +65,7 @@ export function InterviewHistory({
   medicationClient,
   professionals,
   stressorsClient,
+  issues,
   onEvents,
   onPhase,
   registerFlush,
@@ -78,6 +85,7 @@ export function InterviewHistory({
   medicationClient?: ClientBackgroundSuggestions["medication"]
   professionals: ProfessionalOption[]
   stressorsClient?: ClientBackgroundSuggestions["stressors"]
+  issues?: HistoryIssue[]
   onEvents: (events: EventRecord[]) => void
   onPhase: (id: string, phase: SavePhase, retry: (() => void) | null) => void
   registerFlush: (flush: () => Promise<void>) => () => void
@@ -132,7 +140,8 @@ export function InterviewHistory({
           answersRef.current,
           entriesRef.current,
           dateOfBirth,
-          stressorsRef.current
+          stressorsRef.current,
+          issues ?? []
         )
       )
       setChecks(
@@ -203,31 +212,14 @@ export function InterviewHistory({
     }
   }
 
-  function addTreatment(condition: EventRecord, event: MouseEvent<HTMLButtonElement>) {
-    remember(event)
-    setError(null)
-    setSheet({
-      draft: {
-        ...emptyEvent("psychiatric_admission", 0),
-        eventRecordId: "",
-        about: condition.about,
-        relationshipRecordId: condition.relationshipRecordId,
-        aboutOther: condition.aboutOther,
-        conditionEventId: condition.eventRecordId,
-      },
-      editing: true,
-      isNew: true,
-    })
-  }
-
   function addEntry(key: HistoryQuestionKey, event: MouseEvent<HTMLButtonElement>) {
     remember(event)
     const question = HISTORY_QUESTIONS[key]
-    if (!question.eventType) return
+    if (!question.eventType && question.mode !== "other_treatment") return
     setError(null)
     setSheet({
       draft: {
-        ...emptyEvent(question.eventType, 0),
+        ...emptyEvent(question.eventType ?? "psychiatric_admission", 0),
         eventRecordId: "",
         about: question.about,
       },
@@ -336,17 +328,28 @@ export function InterviewHistory({
           badge={needsBadge(historyGroupNeeds(group))}
         >
           <div className="space-y-4">
+            {group.title === "Client history" && medicationClient ? (
+              <div className="space-y-1 rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-950">
+                {medicationClient.everAdmitted ? (
+                  <ClientAnswer label={`Ever admitted: ${medicationClient.everAdmitted.label}`} matches={false} />
+                ) : null}
+                {medicationClient.previousTherapy ? (
+                  <ClientAnswer label={`Previous therapy: ${medicationClient.previousTherapy.label}`} matches={false} />
+                ) : null}
+                {medicationClient.everMedication ? (
+                  <ClientAnswer label={`Ever taken medication: ${medicationClient.everMedication.label}`} matches={false} />
+                ) : null}
+                {medicationClient.currentlyTaking ? (
+                  <ClientAnswer label={`Currently taking: ${medicationClient.currentlyTaking.label}`} matches={false} />
+                ) : null}
+              </div>
+            ) : null}
             {group.keys.map((key) => {
               const question = HISTORY_QUESTIONS[key]
-              const suggestion = historyClient?.[key]
+              const suggestion = historyClient?.[key as keyof NonNullable<typeof historyClient>]
               const matched = eventsForQuestion(entries, key, dateOfBirth)
-              const listed =
-                question.eventType && isTreatmentEvent(question.eventType)
-                  ? matched.filter((entry) => treatmentNeedsLink(entry))
-                  : matched
               const locked = matched.length > 0
               const shown: ScreeningAnswer | null = locked ? "yes" : answers[key] ?? null
-              const currentMedication = key === "medication_history" ? medicationClient?.currentlyTaking : undefined
               return (
                 <div key={key} id={`check-history-${key}`} className="scroll-mt-28 space-y-2 border-b pb-4 last:border-b-0 last:pb-0">
                   <SelectField
@@ -355,19 +358,12 @@ export function InterviewHistory({
                     value={shown ?? ""}
                     disabled={locked}
                     client={
-                      currentMedication || suggestion ? (
-                        <>
-                          {currentMedication ? (
-                            <ClientAnswer label={`Currently taking: ${currentMedication.label}`} matches={false} />
-                          ) : null}
-                          {suggestion ? (
-                            <ClientAnswer
-                              label={key === "medication_history" ? `Ever taken: ${suggestion.label}` : suggestion.label}
-                              matches={shown === suggestion.apply}
-                              onUse={locked ? undefined : () => void choose(key, suggestion.apply)}
-                            />
-                          ) : null}
-                        </>
+                      suggestion ? (
+                        <ClientAnswer
+                          label={suggestion.label}
+                          matches={shown === suggestion.apply}
+                          onUse={locked ? undefined : () => void choose(key, suggestion.apply)}
+                        />
                       ) : undefined
                     }
                     onChange={(next) => {
@@ -386,57 +382,31 @@ export function InterviewHistory({
                   {locked ? <p className="text-xs text-muted-foreground">Entries recorded</p> : null}
                   {shown === "yes" ? (
                     <div className="space-y-1">
-                      {listed.map((entry) => {
+                      {matched.map((entry) => {
                         const lines = historyEntryLines(entry, dateOfBirth, relationships)
-                        const linked = isConditionEvent(entry.eventType)
-                          ? treatmentsForCondition(entries, entry.eventRecordId)
-                          : []
                         return (
-                          <div key={entry.eventRecordId} className="space-y-1">
-                            <button
-                              type="button"
-                              className="flex min-h-11 w-full cursor-pointer flex-col justify-center rounded-md px-2 text-left hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
-                              onClick={(event) => {
-                                remember(event)
-                                setSheet({ draft: { ...entry }, editing: false, isNew: false })
-                                setError(null)
-                              }}
-                            >
-                              <span className="flex items-center gap-2 text-sm">
-                                {lines.title}
-                                <HistoryTags entry={entry} />
-                              </span>
-                              <span className="text-xs text-muted-foreground">{lines.meta}</span>
-                            </button>
-                            {group.title === "Significant others" && isConditionEvent(entry.eventType) ? (
-                              <AddButton label="+ Add treatment" onClick={(click) => addTreatment(entry, click)} />
-                            ) : null}
-                            {linked.length > 0 ? (
-                              <div className="ml-4 space-y-1 border-l pl-3">
-                                {linked.map((treatment) => {
-                                  const treatmentLines = historyEntryLines(treatment, dateOfBirth, relationships)
-                                  return (
-                                    <button
-                                      key={treatment.eventRecordId}
-                                      type="button"
-                                      className="flex min-h-11 w-full cursor-pointer flex-col justify-center rounded-md px-2 text-left hover:bg-muted"
-                                      onClick={(event) => {
-                                        remember(event)
-                                        setSheet({ draft: { ...treatment }, editing: false, isNew: false })
-                                        setError(null)
-                                      }}
-                                    >
-                                      <span className="text-sm">{treatmentLines.title}</span>
-                                      <span className="text-xs text-muted-foreground">{treatmentLines.meta}</span>
-                                    </button>
-                                  )
-                                })}
-                              </div>
-                            ) : null}
-                          </div>
+                          <button
+                            key={entry.eventRecordId}
+                            type="button"
+                            className="flex min-h-11 w-full cursor-pointer flex-col justify-center rounded-md px-2 text-left hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
+                            onClick={(event) => {
+                              remember(event)
+                              setSheet({ draft: { ...entry }, editing: false, isNew: false })
+                              setError(null)
+                            }}
+                          >
+                            <span className="flex items-center gap-2 text-sm">
+                              {lines.title}
+                              <HistoryTags entry={entry} />
+                            </span>
+                            <span className="text-xs text-muted-foreground">{lines.meta}</span>
+                          </button>
                         )
                       })}
-                      <AddButton label="+ Add entry" onClick={(event) => addEntry(key, event)} />
+                      <AddButton
+                        label={question.mode === "other_treatment" ? "+ Add treatment" : "+ Add entry"}
+                        onClick={(event) => addEntry(key, event)}
+                      />
                     </div>
                   ) : null}
                 </div>
@@ -445,6 +415,16 @@ export function InterviewHistory({
           </div>
         </InterviewSectionCard>
       ))}
+
+      <HistoryTreeSection
+        clientId={clientId}
+        dateOfBirth={dateOfBirth}
+        events={entries}
+        relationships={relationships}
+        screening={answers}
+        professionals={professionals}
+        issues={issues}
+      />
 
       <InterviewSectionCard
         title="Stressors"

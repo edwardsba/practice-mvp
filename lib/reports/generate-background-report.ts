@@ -404,7 +404,7 @@ function historyItems(
       const index = omitted.findIndex((row) => row.id === `history-${key}`)
       if (index >= 0) omitted.splice(index, 1)
     }
-    omitted.push({ id: "family-history", message: "Significant others not assessed", target: "history" })
+    omitted.push({ id: "family-history", message: "Family and significant others not assessed", target: "history" })
   }
   return items
 }

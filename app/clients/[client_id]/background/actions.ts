@@ -29,8 +29,9 @@ import {
   saveInterviewScreening,
   startBackgroundInterview,
   updateEvent,
+  updateHistoryIssueTreatmentAnswer,
 } from "@/lib/client-background/mutations"
-import type { BlockKind, BlockRole, RelationshipBlockAnswers } from "@/lib/client-background/types"
+import type { BlockKind, BlockRole, RelationshipBlockAnswers, TreatmentAnswer } from "@/lib/client-background/types"
 
 function refresh(clientId: string) {
   revalidatePath(`/clients/${clientId}/background`)
@@ -196,6 +197,23 @@ export async function updateEventAction(clientId: string, event: unknown) {
     practiceId: context.practiceId,
     userId: context.userId,
     event,
+  })
+  if (!result.error) refresh(clientId)
+  return result
+}
+
+export async function updateHistoryIssueTreatmentAnswerAction(
+  clientId: string,
+  issueId: string,
+  treatmentAnswer: TreatmentAnswer | ""
+) {
+  const context = await requirePractitionerContext()
+  const result = await updateHistoryIssueTreatmentAnswer({
+    clientId,
+    practiceId: context.practiceId,
+    userId: context.userId,
+    issueId,
+    treatmentAnswer,
   })
   if (!result.error) refresh(clientId)
   return result

@@ -9,6 +9,7 @@ import {
   clientBackgroundInterviews,
   clientBackgrounds,
   clientEventRecords,
+  clientHistoryIssues,
   clientRelationshipBlocks,
   clientRelationshipRecords,
   clients,
@@ -23,10 +24,11 @@ import { db } from "@/lib/db"
 import { settleEventDates } from "@/lib/client-background/age"
 import {
   answeredInterviewCount,
+  interviewAnswerTotal,
   sanitizeScreening,
   type BackgroundInterviewAnswerSource,
 } from "@/lib/client-background/interview-history"
-import { toBlockAnswers, toClientRelationshipStatus, toEvent, toRelationship, toRelationshipBlock } from "@/lib/client-background/map"
+import { toBlockAnswers, toClientRelationshipStatus, toEvent, toHistoryIssue, toRelationship, toRelationshipBlock } from "@/lib/client-background/map"
 import {
   demographicsFromStored,
   sanitizeRisk,
@@ -116,6 +118,12 @@ export async function loadClientBackground(
     )
     .orderBy(asc(clientEventRecords.displayOrder))
 
+  const issueRows = await db
+    .select()
+    .from(clientHistoryIssues)
+    .where(and(eq(clientHistoryIssues.clientId, clientId), eq(clientHistoryIssues.practiceId, practiceId)))
+    .orderBy(asc(clientHistoryIssues.displayOrder))
+
   return {
     dateOfBirth: client.dateOfBirth,
     backgroundCapturedAt: client.backgroundCapturedAt
@@ -132,6 +140,7 @@ export async function loadClientBackground(
     relationshipBlocks: blockRows.map(toRelationshipBlock),
     blockAnswers: toBlockAnswers(background ?? null),
     events: eventRows.map((row) => settleEventDates(toEvent(row), client.dateOfBirth)),
+    issues: issueRows.map(toHistoryIssue),
     risk: background?.riskJson ? sanitizeRisk(background.riskJson) : emptyRisk(),
   }
 }
@@ -175,7 +184,7 @@ export async function loadClientBackgroundSummary(
 }
 
 export type BackgroundInterviewCardData = {
-  inProgress: { startedAt: string; answered: number } | null
+  inProgress: { startedAt: string; answered: number; total: number } | null
   lastCompletedAt: string | null
   completed: { interviewId: string; completedAt: string; practitionerName: string }[]
   latest: BackgroundInterviewAnswerSource | null
@@ -231,6 +240,11 @@ export async function loadBackgroundInterviewCard(
     .from(clientEventRecords)
     .where(and(eq(clientEventRecords.clientId, clientId), eq(clientEventRecords.practiceId, practiceId)))
   const events = eventRows.map((row) => toEvent(row))
+  const issueRows = await db
+    .select()
+    .from(clientHistoryIssues)
+    .where(and(eq(clientHistoryIssues.clientId, clientId), eq(clientHistoryIssues.practiceId, practiceId)))
+  const issues = issueRows.map(toHistoryIssue)
 
   const [background] = await db
     .select({
@@ -255,8 +269,10 @@ export async function loadBackgroundInterviewCard(
             sanitizeScreening(inProgress.screeningJson),
             events,
             client.dateOfBirth,
-            stressors
+            stressors,
+            issues
           ),
+          total: interviewAnswerTotal(issues.length),
         }
       : null,
     latest: latestRow

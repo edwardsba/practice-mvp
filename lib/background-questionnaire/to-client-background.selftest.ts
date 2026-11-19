@@ -136,22 +136,17 @@ history.stressors.legalMatters = true
 history.stressors.mainReason = "Anxiety at work"
 history.familyHome.numberOfChildren = 0
 const historyMapped = backgroundAnswersToClientBackground(history)
-assert.deepEqual(historyMapped.history.psychiatric_admission, { label: "Yes", apply: "yes" })
-assert.deepEqual(historyMapped.history.previous_therapy, { label: "No", apply: "no" })
+assert.deepEqual(historyMapped.medication.everAdmitted, { label: "Yes", apply: "yes" })
+assert.deepEqual(historyMapped.medication.previousTherapy, { label: "No", apply: "no" })
 assert.deepEqual(Object.keys(historyMapped.history).sort(), [
   "family_emotional_problems",
-  "family_psychiatric_admission",
   "family_substance_use",
-  "medication_history",
-  "previous_therapy",
-  "psychiatric_admission",
 ])
 assert.deepEqual(historyMapped.medication.currentlyTaking, { label: "No", apply: "no" })
-assert.equal(historyMapped.medication.previouslyTaken, undefined)
-assert.deepEqual(historyMapped.history.medication_history, { label: "Yes", apply: "yes" })
+assert.deepEqual(historyMapped.medication.previouslyTaken, { label: "Yes", apply: "yes" })
+assert.deepEqual(historyMapped.medication.everMedication, { label: "Yes", apply: "yes" })
 assert.deepEqual(historyMapped.history.family_emotional_problems, { label: "Yes", apply: "yes" })
 assert.deepEqual(historyMapped.history.family_substance_use, { label: "No", apply: "no" })
-assert.deepEqual(historyMapped.history.family_psychiatric_admission, { label: "Yes", apply: "yes" })
 assert.deepEqual(historyMapped.stressors.family, { label: "Yes", apply: "yes" })
 assert.deepEqual(historyMapped.stressors.socialLife, { label: "No", apply: "no" })
 assert.deepEqual(historyMapped.stressors.intimateRelationships, { label: "Yes", apply: "yes" })

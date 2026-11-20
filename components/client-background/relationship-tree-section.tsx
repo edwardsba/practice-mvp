@@ -28,6 +28,23 @@ import {
   typesForRole,
   type PersonDraft,
 } from "@/components/client-background/relationship-panel-shared"
+import {
+  TreeBranch,
+  treeItemStateClassName,
+  treeLayer1ClassName,
+  treeLayer2MetaClassName,
+  treeLayer2ShellClassName,
+  treeLayer2TitleClassName,
+  treeLayer3AvatarClassName,
+  treeLayer3MetaClassName,
+  treeLayer3ShellClassName,
+  treeLayer3TitleClassName,
+  treeLayer4AvatarClassName,
+  treeLayer4MetaClassName,
+  treeLayer4ShellClassName,
+  treeLayer4TitleClassName,
+  treeSelectedTitleClassName,
+} from "@/components/client-background/tree-levels"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { isPartneredClientStatus, rolesForBlock } from "@/lib/client-background/relationship-blocks"
 import {
@@ -165,10 +182,35 @@ export function RelationshipTreeSection({
     ? shownBlocks.filter((item) => item.kind === "client_current").sort((a, b) => a.displayOrder - b.displayOrder)[0]?.relationshipBlockId ?? null
     : null
 
+  const selectedId =
+    selection?.type === "person" || selection?.type === "block" ? selection.id : null
+
   return (
     <div className="space-y-4">
-      <TreeCard title={tree.partners.title} nodes={tree.partners.children} onAdd={() => { setSelection({ type: "add" }); setMode("edit"); setError("") }} onPerson={openPerson} onBlock={openBlock} />
-      <TreeCard title={tree.parents.title} nodes={tree.parents.children} onAdd={() => { setSelection({ type: "add" }); setMode("edit"); setError("") }} onPerson={openPerson} onBlock={openBlock} />
+      <TreeCard
+        title={tree.partners.title}
+        nodes={tree.partners.children}
+        onAdd={() => {
+          setSelection({ type: "add" })
+          setMode("edit")
+          setError("")
+        }}
+        onPerson={openPerson}
+        onBlock={openBlock}
+        selectedId={selectedId}
+      />
+      <TreeCard
+        title={tree.parents.title}
+        nodes={tree.parents.children}
+        onAdd={() => {
+          setSelection({ type: "add" })
+          setMode("edit")
+          setError("")
+        }}
+        onPerson={openPerson}
+        onBlock={openBlock}
+        selectedId={selectedId}
+      />
       {ready && selection
         ? createPortal(
             <RelationshipPanelShell
@@ -268,12 +310,14 @@ function TreeCard({
   onAdd,
   onPerson,
   onBlock,
+  selectedId,
 }: {
   title: string
   nodes: RelationshipTreeNode[]
   onAdd: () => void
   onPerson: (id: string) => void
   onBlock: (id: string) => void
+  selectedId: string | null
 }) {
   return (
     <Card>
@@ -289,16 +333,37 @@ function TreeCard({
             {nodes.map((node, index) =>
               node.kind === "section" ? (
                 <div key={node.title}>
-                  <h3 className="mb-2 text-sm font-semibold">{node.title}</h3>
-                  {node.children.length > 0 ? <ConnectedList nodes={node.children} onPerson={onPerson} onBlock={onBlock} /> : null}
+                  <h3 className={cn("mb-2", treeLayer1ClassName)}>{node.title}</h3>
+                  {node.children.length > 0 ? (
+                    <ConnectedList
+                      nodes={node.children}
+                      personLayer={3}
+                      onPerson={onPerson}
+                      onBlock={onBlock}
+                      selectedId={selectedId}
+                    />
+                  ) : null}
                 </div>
               ) : (
-                <ConnectedList key={nodeKey(node, index)} nodes={[node]} onPerson={onPerson} onBlock={onBlock} />
+                <ConnectedList
+                  key={nodeKey(node, index)}
+                  nodes={[node]}
+                  personLayer={3}
+                  onPerson={onPerson}
+                  onBlock={onBlock}
+                  selectedId={selectedId}
+                />
               )
             )}
           </div>
         ) : (
-          <ConnectedList nodes={nodes} onPerson={onPerson} onBlock={onBlock} />
+          <ConnectedList
+            nodes={nodes}
+            personLayer={3}
+            onPerson={onPerson}
+            onBlock={onBlock}
+            selectedId={selectedId}
+          />
         )}
       </CardContent>
     </Card>
@@ -308,15 +373,29 @@ function TreeCard({
 function BranchList({
   nodes,
   plainNotes = false,
+  personLayer,
   onPerson,
   onBlock,
+  selectedId,
 }: {
   nodes: RelationshipTreeNode[]
   plainNotes?: boolean
+  personLayer: 3 | 4
   onPerson: (id: string) => void
   onBlock: (id: string) => void
+  selectedId: string | null
 }) {
-  if (!plainNotes) return <ConnectedList nodes={nodes} onPerson={onPerson} onBlock={onBlock} />
+  if (!plainNotes) {
+    return (
+      <ConnectedList
+        nodes={nodes}
+        personLayer={personLayer}
+        onPerson={onPerson}
+        onBlock={onBlock}
+        selectedId={selectedId}
+      />
+    )
+  }
   const parts: ({ kind: "list"; nodes: Exclude<RelationshipTreeNode, { kind: "note" }>[] } | { kind: "note"; text: string })[] = []
   for (const node of nodes) {
     if (node.kind === "note") {
@@ -335,7 +414,14 @@ function BranchList({
             {part.text}
           </p>
         ) : (
-          <ConnectedList key={`list-${index}`} nodes={part.nodes} onPerson={onPerson} onBlock={onBlock} />
+          <ConnectedList
+            key={`list-${index}`}
+            nodes={part.nodes}
+            personLayer={personLayer}
+            onPerson={onPerson}
+            onBlock={onBlock}
+            selectedId={selectedId}
+          />
         )
       )}
     </>
@@ -344,88 +430,148 @@ function BranchList({
 
 function ConnectedList({
   nodes,
+  personLayer,
   onPerson,
   onBlock,
+  selectedId,
 }: {
   nodes: RelationshipTreeNode[]
+  personLayer: 3 | 4
   onPerson: (id: string) => void
   onBlock: (id: string) => void
+  selectedId: string | null
 }) {
   return (
     <ul>
-      {nodes.map((node, index) => (
-        <li key={nodeKey(node, index)} className="relative pl-4">
-          <span
-            aria-hidden
-            className="absolute top-0 left-0 w-0.5 bg-[#a1a1aa]"
-            style={{ height: index === nodes.length - 1 ? 20 : "100%" }}
-          />
-          <span aria-hidden className="absolute top-5 left-0 h-0.5 w-4 bg-[#a1a1aa]" />
-          {node.kind === "note" ? (
-            <p className="flex min-h-10 items-center px-1 text-sm text-muted-foreground italic">{node.text}</p>
-          ) : (
-            <TreeNode node={node} onPerson={onPerson} onBlock={onBlock} />
-          )}
-        </li>
-      ))}
+      {nodes.map((node, index) => {
+        const isLast = index === nodes.length - 1
+        const intoLayer = node.kind === "block" ? 2 : personLayer
+        return (
+          <TreeBranch key={nodeKey(node, index)} intoLayer={intoLayer} isLast={isLast}>
+            {node.kind === "note" ? (
+              <p className="flex min-h-10 items-center px-1 text-sm text-muted-foreground italic">{node.text}</p>
+            ) : (
+              <TreeNode
+                node={node}
+                personLayer={personLayer}
+                onPerson={onPerson}
+                onBlock={onBlock}
+                selectedId={selectedId}
+              />
+            )}
+          </TreeBranch>
+        )
+      })}
     </ul>
   )
 }
 
 function TreeNode({
   node,
+  personLayer,
   onPerson,
   onBlock,
+  selectedId,
 }: {
   node: Exclude<RelationshipTreeNode, { kind: "note" }>
+  personLayer: 3 | 4
   onPerson: (id: string) => void
   onBlock: (id: string) => void
+  selectedId: string | null
 }) {
   if (node.kind === "person") {
     const [name, ...rest] = node.line.split(" · ")
+    const selected = selectedId === node.id
+    const layer4 = personLayer === 4
     return (
       <>
-        <button type="button" className="flex min-h-10 w-full items-center gap-2 rounded-md px-1 text-left hover:bg-muted" onClick={() => onPerson(node.id)}>
-          <span
-            className={cn(
-              "flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-medium",
-              node.deceased ? "border-2 border-dashed border-[#a1a1aa]" : "bg-muted"
-            )}
-            aria-hidden
-          >
-            {node.initial}
+        <button
+          type="button"
+          aria-current={selected ? "true" : undefined}
+          className={cn(
+            layer4 ? treeLayer4ShellClassName : treeLayer3ShellClassName,
+            treeItemStateClassName({ selected })
+          )}
+          onClick={() => onPerson(node.id)}
+        >
+          <span className="flex min-w-0 items-center gap-2">
+            <span
+              className={cn(
+                layer4 ? treeLayer4AvatarClassName : treeLayer3AvatarClassName,
+                node.deceased ? "border-2 border-dashed border-[#a1a1aa]" : "bg-muted"
+              )}
+              aria-hidden
+            >
+              {node.initial}
+            </span>
+            <span
+              className={cn(
+                layer4 ? treeLayer4TitleClassName : treeLayer3TitleClassName,
+                treeSelectedTitleClassName(selected),
+                "min-w-0"
+              )}
+            >
+              {name}
+            </span>
           </span>
-          <span className="text-sm">
-            <span className="font-medium">{name}</span>
-            {rest.length > 0 ? <span className="text-muted-foreground"> · {rest.join(" · ")}</span> : null}
-          </span>
+          {rest.length > 0 ? (
+            <span
+              className={cn(
+                layer4 ? treeLayer4MetaClassName : treeLayer3MetaClassName,
+                selected && "text-[#1e3a8a]",
+                "w-full"
+              )}
+            >
+              {rest.join(" · ")}
+            </span>
+          ) : null}
         </button>
-        {node.children.length > 0 ? <ConnectedList nodes={node.children} onPerson={onPerson} onBlock={onBlock} /> : null}
+        {node.children.length > 0 ? (
+          <ConnectedList
+            nodes={node.children}
+            personLayer={4}
+            onPerson={onPerson}
+            onBlock={onBlock}
+            selectedId={selectedId}
+          />
+        ) : null}
       </>
     )
   }
   if (node.kind === "section") return null
   if (node.kind === "block") {
+    const selected = Boolean(node.id) && selectedId === node.id
     const band = (
       <>
-        <span className="text-sm font-medium">{node.heading}</span>
-        {node.meta ? <span className="text-xs text-muted-foreground">{node.meta}</span> : null}
+        <span className={cn(treeLayer2TitleClassName, treeSelectedTitleClassName(selected))}>{node.heading}</span>
+        {node.meta ? (
+          <span className={cn(treeLayer2MetaClassName, selected && "text-[#1e3a8a]")}>{node.meta}</span>
+        ) : null}
       </>
     )
     return (
       <>
         {node.interactive === false || !node.id ? (
-          <div className="flex min-h-10 w-full flex-col justify-center rounded-[8px] bg-[#f4f4f5] px-3 py-2">{band}</div>
+          <div className={treeLayer2ShellClassName}>{band}</div>
         ) : (
           <button
             type="button"
-            className="flex min-h-10 w-full flex-col justify-center rounded-[8px] bg-[#f4f4f5] px-3 py-2 text-left hover:bg-[#e4e4e7]"
+            aria-current={selected ? "true" : undefined}
+            className={cn(treeLayer2ShellClassName, treeItemStateClassName({ selected }))}
             onClick={() => onBlock(node.id)}
           >
             {band}
           </button>
         )}
-        {node.children.length > 0 ? <BranchList nodes={node.children} onPerson={onPerson} onBlock={onBlock} /> : null}
+        {node.children.length > 0 ? (
+          <BranchList
+            nodes={node.children}
+            personLayer={3}
+            onPerson={onPerson}
+            onBlock={onBlock}
+            selectedId={selectedId}
+          />
+        ) : null}
       </>
     )
   }
@@ -435,7 +581,13 @@ function TreeNode({
   return (
     <>
       <p className="flex min-h-10 items-center px-1 text-sm text-muted-foreground">{node.label}</p>
-      <BranchList nodes={node.children} onPerson={onPerson} onBlock={onBlock} />
+      <BranchList
+        nodes={node.children}
+        personLayer={personLayer}
+        onPerson={onPerson}
+        onBlock={onBlock}
+        selectedId={selectedId}
+      />
     </>
   )
 }

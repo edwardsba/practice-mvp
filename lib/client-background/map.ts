@@ -237,6 +237,7 @@ export function toHistoryIssue(row: {
   category: string
   about: string | null
   relationshipRecordId: string | null
+  aboutOther?: string | null
   title: string | null
   treatmentAnswer: string | null
   displayOrder: number
@@ -247,6 +248,7 @@ export function toHistoryIssue(row: {
       category: row.category,
       about: row.about,
       relationshipRecordId: row.relationshipRecordId,
+      aboutOther: row.aboutOther ?? "",
       title: row.title ?? "",
       treatmentAnswer: row.treatmentAnswer ?? "",
       displayOrder: row.displayOrder,

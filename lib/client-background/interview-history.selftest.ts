@@ -95,6 +95,7 @@ const issues: HistoryIssue[] = [
     category: "emotional_problems",
     about: "self",
     relationshipRecordId: null,
+    aboutOther: "",
     title: "Depression",
     treatmentAnswer: "",
     displayOrder: 0,

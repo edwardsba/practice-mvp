@@ -9,6 +9,8 @@ CREATE TABLE IF NOT EXISTS client_history_issues (
   category text NOT NULL,
   about text NOT NULL,
   relationship_record_id uuid REFERENCES client_relationship_records(relationship_record_id) ON DELETE SET NULL,
+  /** Who: Other free text when relationship_record_id is null. */
+  about_other text,
   title text NOT NULL DEFAULT '',
   treatment_answer text,
   display_order integer NOT NULL DEFAULT 0,
@@ -28,6 +30,7 @@ INSERT INTO client_history_issues (
   category,
   about,
   relationship_record_id,
+  about_other,
   title,
   treatment_answer,
   display_order,
@@ -41,6 +44,7 @@ SELECT
   g.event_type,
   COALESCE(NULLIF(g.about, ''), 'self'),
   g.relationship_record_id,
+  NULLIF(trim(COALESCE(g.about_other, '')), ''),
   COALESCE(NULLIF(trim(g.title), ''), CASE g.event_type
     WHEN 'emotional_problems' THEN 'Emotional problems'
     WHEN 'substance_use' THEN 'Substance use'
@@ -59,6 +63,7 @@ FROM (
     e.event_type,
     e.about,
     e.relationship_record_id,
+    e.about_other,
     e.title,
     e.start_value,
     e.display_order

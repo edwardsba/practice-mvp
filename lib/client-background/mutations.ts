@@ -529,6 +529,8 @@ async function ensureHistoryIssue(
     .where(eq(clientHistoryIssues.issueId, conditionGroupId))
     .limit(1)
   const title = event.title.trim() || event.eventType
+  const aboutOther =
+    event.about === "significant_other" && !event.relationshipRecordId ? event.aboutOther.trim() || null : null
   if (existing) {
     await tx
       .update(clientHistoryIssues)
@@ -536,6 +538,7 @@ async function ensureHistoryIssue(
         title,
         about: event.about,
         relationshipRecordId: event.relationshipRecordId,
+        aboutOther,
         category: event.eventType,
         updatedAt: new Date(),
       })
@@ -549,6 +552,7 @@ async function ensureHistoryIssue(
     category: event.eventType,
     about: event.about,
     relationshipRecordId: event.relationshipRecordId,
+    aboutOther,
     title,
     treatmentAnswer: null,
     displayOrder: 0,

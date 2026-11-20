@@ -298,13 +298,16 @@ function familySections(input: Input, issues: HistoryIssue[]): HistoryTreeNode[]
 }
 
 function whoLabel(issue: HistoryIssue, people: RelationshipRecord[]): string {
-  if (!issue.relationshipRecordId) return ""
-  const person = people.find((item) => item.relationshipRecordId === issue.relationshipRecordId)
-  if (!person) return ""
-  const role = roleWord(person)
-  const name = person.givenName.trim()
-  if (name) return `${name} (${role.toLowerCase()})`
-  return role
+  if (issue.relationshipRecordId) {
+    const person = people.find((item) => item.relationshipRecordId === issue.relationshipRecordId)
+    if (!person) return ""
+    const role = roleWord(person)
+    const name = person.givenName.trim()
+    if (name) return `${name} (${role.toLowerCase()})`
+    return role
+  }
+  const other = issue.aboutOther.trim()
+  return other
 }
 
 function roleWord(person: RelationshipRecord): string {

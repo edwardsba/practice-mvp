@@ -3,13 +3,15 @@ import assert from "node:assert/strict"
 import {
   comparePartialStarts,
   episodeForTreatment,
+  issueNeedsWho,
   mixedIssueEvents,
   planHistoryIssueBackfill,
+  sanitizeHistoryIssue,
   subEventsFor,
   treatmentAnswerAfterChange,
   treatmentsForIssue,
 } from "@/lib/client-background/history-issues"
-import { emptyEvent, type EventRecord } from "@/lib/client-background/types"
+import { emptyEvent, emptyHistoryIssue, type EventRecord } from "@/lib/client-background/types"
 
 const DOB = "1970-03-12"
 
@@ -213,5 +215,37 @@ assert.equal(plan.issues.find((issue) => issue.issueId === "g2")?.treatmentAnswe
 assert.equal(plan.issues.find((issue) => issue.issueId === "g3")?.treatmentAnswer, "none")
 assert.deepEqual(plan.treatmentGroupLinks, [{ eventRecordId: "b", conditionGroupId: "g1" }])
 assert.equal(plan.otherTreatmentYes, true)
+
+const friendPlan = planHistoryIssueBackfill({
+  events: [
+    event({
+      eventRecordId: "friend-ep",
+      eventType: "substance_use",
+      title: "Alcohol",
+      conditionGroupId: "g-friend",
+      about: "significant_other",
+      aboutOther: "close friend",
+    }),
+  ],
+  screening: { family_psychiatric_admission: "no" },
+})
+assert.equal(friendPlan.issues[0]?.aboutOther, "close friend")
+assert.equal(friendPlan.issues[0]?.relationshipRecordId, null)
+assert.equal(friendPlan.issues[0]?.treatmentAnswer, "none")
+
+const needsWho = sanitizeHistoryIssue({
+  ...emptyHistoryIssue("substance_use", "significant_other", 0),
+  issueId: "needs-who",
+  title: "Alcohol",
+})
+assert.equal(issueNeedsWho(needsWho), true)
+const friendIssue = sanitizeHistoryIssue({
+  ...emptyHistoryIssue("substance_use", "significant_other", 0),
+  issueId: "tom-issue-friend-alcohol",
+  title: "Alcohol",
+  aboutOther: "close friend",
+})
+assert.equal(issueNeedsWho(friendIssue), false)
+assert.equal(friendIssue.aboutOther, "close friend")
 
 console.log("history issues selftest passed")

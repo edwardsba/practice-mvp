@@ -137,9 +137,9 @@ async function main() {
     for (const issue of tomIssues()) {
       await db.query(
         `INSERT INTO client_history_issues (
-           issue_id, client_id, practice_id, category, about, relationship_record_id, title,
+           issue_id, client_id, practice_id, category, about, relationship_record_id, about_other, title,
            treatment_answer, display_order
-         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
         [
           ids.get(issue.issueId),
           clientId,
@@ -147,6 +147,7 @@ async function main() {
           issue.category,
           issue.about,
           issue.relationshipRecordId ? ids.get(issue.relationshipRecordId) : null,
+          text(issue.aboutOther),
           text(issue.title),
           text(issue.treatmentAnswer),
           issue.displayOrder,

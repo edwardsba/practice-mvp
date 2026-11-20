@@ -129,6 +129,12 @@ assert.deepEqual(tree.family.children.map(shape), [
         treatmentAnswer: "none",
         children: [{ line: "Episode 1", tag: "Episode" }],
       },
+      {
+        heading: "Alcohol · close friend",
+        meta: "",
+        treatmentAnswer: "none",
+        children: [{ line: "Episode 1", tag: "Episode" }],
+      },
     ],
   },
   { title: "Physical health", children: ["None"] },

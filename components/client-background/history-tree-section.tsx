@@ -126,11 +126,14 @@ export function HistoryTreeSection({
   }
 
   function startAdd(about: "self" | "significant_other", eventType: EventRecord["eventType"] = "emotional_problems", issueId?: string) {
+    const issue = issueId ? issues.find((item) => item.issueId === issueId) : undefined
     setSelection({ kind: "add", about, eventType, issueId })
     setDraft({
       ...emptyEvent(eventType, 0),
       eventRecordId: "",
       about,
+      relationshipRecordId: issue?.relationshipRecordId ?? null,
+      aboutOther: issue?.aboutOther ?? "",
       conditionGroupId: issueId ?? null,
     })
     setMode("edit")
@@ -145,6 +148,7 @@ export function HistoryTreeSection({
       eventRecordId: "",
       about: issue.about,
       relationshipRecordId: issue.relationshipRecordId,
+      aboutOther: issue.aboutOther,
       conditionGroupId: issue.issueId,
     })
     setMode("edit")

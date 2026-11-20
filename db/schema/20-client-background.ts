@@ -150,6 +150,8 @@ export const clientHistoryIssues = pgTable("client_history_issues", {
     () => clientRelationshipRecords.relationshipRecordId,
     { onDelete: "set null" }
   ),
+  /** Who: Other free text when relationship_record_id is null. */
+  aboutOther: text("about_other"),
   title: text("title").notNull().default(""),
   /** yes | none | not_asked. Null when never answered. */
   treatmentAnswer: text("treatment_answer"),

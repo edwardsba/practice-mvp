@@ -40,17 +40,19 @@ const refill = planConditionBackfill(
   ungrouoped.map((event) => ({ clientId: "tom", event })),
   () => `group-${n++}`
 )
-assert.equal(refill.groupsMade, 5)
+assert.equal(refill.groupsMade, 6)
 const depressionIds = refill.assignments
   .filter((row) => row.eventRecordId.startsWith("tom-depression"))
   .map((row) => row.conditionGroupId)
 assert.equal(depressionIds.length, 2)
 assert.equal(depressionIds[0], depressionIds[1])
 const alcohol = refill.assignments.find((row) => row.eventRecordId === "tom-alcohol")
+const friendAlcohol = refill.assignments.find((row) => row.eventRecordId === "tom-friend-alcohol")
 const leg = refill.assignments.find((row) => row.eventRecordId === "tom-leg")
-assert.ok(alcohol && leg)
+assert.ok(alcohol && friendAlcohol && leg)
 assert.notEqual(alcohol.conditionGroupId, leg.conditionGroupId)
+assert.notEqual(alcohol.conditionGroupId, friendAlcohol.conditionGroupId)
 assert.notEqual(depressionIds[0], alcohol.conditionGroupId)
-assert.equal(refill.byClient[0]?.groups, 5)
+assert.equal(refill.byClient[0]?.groups, 6)
 
 console.log("condition groups selftest passed")

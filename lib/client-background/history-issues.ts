@@ -25,15 +25,21 @@ export function sanitizeHistoryIssue(value: unknown, fallbackId = ""): HistoryIs
       ? (raw.category as ConditionEventType)
       : "emotional_problems"
   const about: HistoryAbout = raw.about === "significant_other" ? "significant_other" : "self"
+  const relationshipRecordId =
+    about === "significant_other" && typeof raw.relationshipRecordId === "string" && raw.relationshipRecordId.trim()
+      ? raw.relationshipRecordId.trim()
+      : null
+  const aboutOther =
+    about === "significant_other" && !relationshipRecordId && typeof raw.aboutOther === "string"
+      ? raw.aboutOther.trim()
+      : ""
   const treatmentAnswer = isTreatmentAnswer(raw.treatmentAnswer) ? raw.treatmentAnswer : ""
   return {
     issueId: typeof raw.issueId === "string" && raw.issueId.trim() ? raw.issueId.trim() : fallbackId,
     category,
     about,
-    relationshipRecordId:
-      about === "significant_other" && typeof raw.relationshipRecordId === "string" && raw.relationshipRecordId.trim()
-        ? raw.relationshipRecordId.trim()
-        : null,
+    relationshipRecordId,
+    aboutOther,
     title: typeof raw.title === "string" ? raw.title : "",
     treatmentAnswer,
     displayOrder: typeof raw.displayOrder === "number" && Number.isFinite(raw.displayOrder) ? raw.displayOrder : 0,
@@ -51,6 +57,7 @@ export function resolveHistoryIssues(events: EventRecord[], stored: HistoryIssue
       category: group.eventType,
       about: resolvedAbout(first),
       relationshipRecordId: first.relationshipRecordId,
+      aboutOther: first.relationshipRecordId ? "" : first.aboutOther.trim(),
       title: group.title,
       treatmentAnswer: (treatments.length > 0 ? "yes" : "") as TreatmentAnswer | "",
       displayOrder: index,
@@ -224,7 +231,7 @@ export function treatmentAnswerAfterChange(
 }
 
 export function issueNeedsWho(issue: HistoryIssue): boolean {
-  return issue.about === "significant_other" && !issue.relationshipRecordId
+  return issue.about === "significant_other" && !issue.relationshipRecordId && !issue.aboutOther.trim()
 }
 
 export function issueTitle(issue: HistoryIssue): string {
@@ -248,7 +255,7 @@ export function sameIssuePerson(
   return personKey({
     about: issue.about,
     relationshipRecordId: issue.relationshipRecordId,
-    aboutOther: "",
+    aboutOther: issue.aboutOther,
   }) === personKey(event)
 }
 
@@ -259,6 +266,7 @@ export type IssueBackfillPlan = {
     category: ConditionEventType
     about: HistoryAbout
     relationshipRecordId: string | null
+    aboutOther: string
     title: string
     treatmentAnswer: TreatmentAnswer | ""
   }[]
@@ -310,6 +318,7 @@ export function planHistoryIssueBackfill(input: {
       category: group.eventType,
       about: resolvedAbout(first),
       relationshipRecordId: first.relationshipRecordId,
+      aboutOther: first.relationshipRecordId ? "" : first.aboutOther.trim(),
       title: group.title,
       treatmentAnswer,
     }

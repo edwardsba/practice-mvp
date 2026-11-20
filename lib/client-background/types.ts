@@ -283,6 +283,8 @@ export type HistoryIssue = {
   category: ConditionEventType
   about: HistoryAbout
   relationshipRecordId: string | null
+  /** Who: Other, when the significant other is not a recorded person. */
+  aboutOther: string
   title: string
   treatmentAnswer: TreatmentAnswer | ""
   displayOrder: number
@@ -910,6 +912,7 @@ export function emptyHistoryIssue(
     category,
     about,
     relationshipRecordId: null,
+    aboutOther: "",
     title: "",
     treatmentAnswer: "",
     displayOrder,

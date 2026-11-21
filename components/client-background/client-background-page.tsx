@@ -31,6 +31,7 @@ type SectionId = (typeof SECTIONS)[number]["id"]
 
 export function ClientBackgroundPage({
   clientId,
+  clientName = "Client",
   practiceId: _practiceId,
   data,
   interview,
@@ -40,6 +41,7 @@ export function ClientBackgroundPage({
   referralRecorded = false,
 }: {
   clientId: string
+  clientName?: string
   practiceId: string
   data: ClientBackgroundData
   interview: BackgroundInterviewCardData
@@ -133,6 +135,7 @@ export function ClientBackgroundPage({
           {item.id === "history" ? (
             <HistoryTreeSection
               clientId={clientId}
+              clientName={clientName.split(/\s+/)[0] || clientName}
               dateOfBirth={data.dateOfBirth}
               events={data.events}
               relationships={data.relationships}

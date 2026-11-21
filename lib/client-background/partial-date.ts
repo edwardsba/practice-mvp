@@ -74,3 +74,9 @@ export function precisionForPartialDate(date: PartialDate): StartPrecision | "" 
 export function canonicalPartialDate(value: string): string {
   return formatPartialDate(parsePartialDate(value))
 }
+
+/** Parse a partial-date string into precision + stored value for event fields. */
+export function storedPartial(value: string): { precision: StartPrecision | ""; value: string } {
+  const parsed = parsePartialDate(value)
+  return { precision: precisionForPartialDate(parsed), value: formatPartialDate(parsed) }
+}

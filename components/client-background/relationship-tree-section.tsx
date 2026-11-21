@@ -747,7 +747,7 @@ function BlockPanel({
             </section>
           </div>
         ) : (
-          <BlockFields block={draft} locked={locked} onChange={setDraft} />
+          <BlockFields block={draft} locked={locked} showChildrenQuestion onChange={setDraft} />
         )}
         {error ? <p className="mt-3 text-sm text-destructive">{error}</p> : null}
       </div>

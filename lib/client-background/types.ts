@@ -53,8 +53,16 @@ export const EVENT_TYPES = [
   "family_events",
   "significant_history",
   "traumatic_event",
+  /** Other event on an issue or under a single event (board AE). */
+  "other_event",
+  /** Treatment · Other (free-title treatment). */
+  "other_treatment",
 ] as const
 export type EventType = (typeof EVENT_TYPES)[number]
+
+/** Smart-form event choice: Episode · Treatment · Other. */
+export const SMART_EVENT_KINDS = ["episode", "treatment", "other"] as const
+export type SmartEventKind = (typeof SMART_EVENT_KINDS)[number]
 
 export const START_PRECISIONS = ["year", "year_month", "date", "age"] as const
 export type StartPrecision = (typeof START_PRECISIONS)[number]
@@ -147,8 +155,17 @@ export const ADMISSION_TYPE_LABELS: Record<AdmissionType, string> = {
 export const CONDITION_EVENT_TYPES = ["illness_injury", "emotional_problems", "substance_use"] as const
 export type ConditionEventType = (typeof CONDITION_EVENT_TYPES)[number]
 
-export const TREATMENT_EVENT_TYPES = ["psychiatric_admission", "previous_therapy", "medication"] as const
+export const TREATMENT_EVENT_TYPES = [
+  "psychiatric_admission",
+  "previous_therapy",
+  "medication",
+  "other_treatment",
+] as const
 export type TreatmentEventType = (typeof TREATMENT_EVENT_TYPES)[number]
+
+/** Single-event categories that can nest Episode / Treatment / Other under them. */
+export const SINGLE_EVENT_TYPES = ["self_harm", "traumatic_event", "significant_history", "family_events"] as const
+export type SingleEventType = (typeof SINGLE_EVENT_TYPES)[number]
 
 export const HEALTH_STATUSES = ["good", "fair", "poor", "deceased"] as const
 export type HealthStatus = (typeof HEALTH_STATUSES)[number]
@@ -171,6 +188,36 @@ export const EVENT_TYPE_LABELS: Record<EventType, string> = {
   family_events: "Family events",
   significant_history: "Significant history",
   traumatic_event: "Traumatic event",
+  other_event: "Other",
+  other_treatment: "Other treatment",
+}
+
+export const SMART_EVENT_KIND_LABELS: Record<SmartEventKind, string> = {
+  episode: "Episode",
+  treatment: "Treatment",
+  other: "Other",
+}
+
+/** Treatment type choice inside a Treatment event. */
+export const TREATMENT_TYPE_CHOICES = [
+  "hospital_admission",
+  "therapy",
+  "medication",
+  "other",
+] as const
+export type TreatmentTypeChoice = (typeof TREATMENT_TYPE_CHOICES)[number]
+
+export const TREATMENT_TYPE_CHOICE_LABELS: Record<TreatmentTypeChoice, string> = {
+  hospital_admission: "Hospital admission",
+  therapy: "Therapy",
+  medication: "Medication",
+  other: "Other",
+}
+
+export const CONDITION_CATEGORY_LABELS: Record<ConditionEventType, string> = {
+  emotional_problems: "Mental health",
+  substance_use: "Substance use",
+  illness_injury: "Physical health",
 }
 
 export const SELF_HARM_TYPE_LABELS: Record<SelfHarmType, string> = {

@@ -6,7 +6,10 @@ import { requirePractitionerContext } from "@/lib/auth"
 import {
   addBlockMember,
   createRelationshipBlock,
+  createRelationshipWithMember,
+  createUnplacedPerson,
   deleteRelationshipBlock,
+  discardEmptyRelationshipDraft,
   moveBlockMember,
   removeBlockMember,
   saveRelationshipStatusWithCurrentBlock,
@@ -17,6 +20,7 @@ import {
 import {
   completeBackgroundInterview,
   createEvent,
+  createHistoryIssue,
   deleteEvent,
   saveClientRelationshipStatus,
   saveDemographics,
@@ -29,6 +33,7 @@ import {
   saveInterviewScreening,
   startBackgroundInterview,
   updateEvent,
+  updateHistoryIssue,
   updateHistoryIssueTreatmentAnswer,
 } from "@/lib/client-background/mutations"
 import type { BlockKind, BlockRole, RelationshipBlockAnswers, TreatmentAnswer } from "@/lib/client-background/types"
@@ -219,6 +224,35 @@ export async function updateHistoryIssueTreatmentAnswerAction(
   return result
 }
 
+export async function createHistoryIssueAction(
+  clientId: string,
+  issue: unknown,
+  firstEpisode?: Parameters<typeof createHistoryIssue>[0]["firstEpisode"]
+) {
+  const context = await requirePractitionerContext()
+  const result = await createHistoryIssue({
+    clientId,
+    practiceId: context.practiceId,
+    userId: context.userId,
+    issue,
+    firstEpisode,
+  })
+  if (!result.error) refresh(clientId)
+  return result
+}
+
+export async function updateHistoryIssueAction(clientId: string, issue: unknown) {
+  const context = await requirePractitionerContext()
+  const result = await updateHistoryIssue({
+    clientId,
+    practiceId: context.practiceId,
+    userId: context.userId,
+    issue,
+  })
+  if (!result.error) refresh(clientId)
+  return result
+}
+
 function scope(clientId: string, context: { practiceId: string; userId: string }) {
   return { clientId, practiceId: context.practiceId, userId: context.userId }
 }
@@ -237,6 +271,39 @@ export async function createRelationshipBlockAction(
 ) {
   const context = await requirePractitionerContext()
   const result = await createRelationshipBlock({ ...scope(clientId, context), kind, ...options })
+  if (result && !("error" in result && result.error)) refresh(clientId)
+  return result
+}
+
+export async function createRelationshipWithMemberAction(
+  clientId: string,
+  kind: BlockKind,
+  options?: { parentSide?: "mother" | "father" | ""; arrangementType?: string }
+) {
+  const context = await requirePractitionerContext()
+  const result = await createRelationshipWithMember({ ...scope(clientId, context), kind, ...options })
+  if (result && !("error" in result && result.error)) refresh(clientId)
+  return result
+}
+
+export async function discardEmptyRelationshipDraftAction(
+  clientId: string,
+  relationshipBlockId: string,
+  memberId: string
+) {
+  const context = await requirePractitionerContext()
+  const result = await discardEmptyRelationshipDraft({
+    ...scope(clientId, context),
+    relationshipBlockId,
+    memberId,
+  })
+  if (result && !("error" in result && result.error)) refresh(clientId)
+  return result
+}
+
+export async function createUnplacedPersonAction(clientId: string, givenName?: string) {
+  const context = await requirePractitionerContext()
+  const result = await createUnplacedPerson({ ...scope(clientId, context), givenName })
   if (result && !("error" in result && result.error)) refresh(clientId)
   return result
 }

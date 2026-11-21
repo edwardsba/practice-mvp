@@ -193,7 +193,10 @@ export const clientEventRecords = pgTable("client_event_records", {
   conditionEventId: uuid("condition_event_id"),
   /** Episodes and treatments of one issue share this id (= client_history_issues.issue_id). */
   conditionGroupId: uuid("condition_group_id"),
-  /** Sub-event (step) under an episode or treatment. */
+  /**
+   * Sub-event under an episode/treatment (a step), or a nested event under a
+   * single event (self-harm / traumatic / significant) — Episode, Treatment, or Other.
+   */
   parentEventId: uuid("parent_event_id"),
   /** Admission entries: psychiatric_inpatient, residential_rehab, medical, or emergency_department. */
   admissionType: text("admission_type"),

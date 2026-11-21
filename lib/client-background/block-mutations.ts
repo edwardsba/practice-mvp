@@ -21,6 +21,7 @@ import {
 } from "@/lib/client-background/relationship-blocks"
 import { sanitizeRelationship } from "@/lib/client-background/sanitize"
 import { saveClientRelationshipStatus } from "@/lib/client-background/mutations"
+import { isEmptyNewRelationshipDraft } from "@/lib/client-background/new-relationship-draft"
 import {
   CAREGIVER_RELATIONSHIPS,
   CHILD_TYPES,
@@ -171,6 +172,98 @@ async function ownedPerson(scope: Scope, personId: string) {
     )
     .limit(1)
   return person ?? null
+}
+
+/**
+ * Create a relationship block and its first partner/caregiver together (Round Q).
+ * Opens as one "New relationship" / "New arrangement" form.
+ */
+export async function createRelationshipWithMember(input: Scope & {
+  kind: BlockKind
+  parentSide?: "mother" | "father" | ""
+  arrangementType?: string
+}) {
+  const created = await createRelationshipBlock(input)
+  if (!created || !("blocks" in created) || !created.blocks) return created
+  const kind = input.kind
+  const newest = created.blocks
+    .filter((block) => block.kind === kind)
+    .sort((a, b) => b.displayOrder - a.displayOrder)[0]
+  if (!newest) return created
+  const role: BlockRole = kind === "caregiver_arrangement" ? "caregiver" : "partner"
+  const withMember = await addBlockMember({
+    ...input,
+    relationshipBlockId: newest.relationshipBlockId,
+    role,
+    roleType: "",
+  })
+  if (!withMember || !("relationships" in withMember) || !withMember.relationships) return withMember
+  const member = withMember.relationships
+    .filter((person) => person.relationshipBlockId === newest.relationshipBlockId && person.blockRole === role)
+    .sort((a, b) => b.displayOrder - a.displayOrder)[0]
+  return {
+    ...withMember,
+    createdBlockId: newest.relationshipBlockId,
+    createdMemberId: member?.relationshipRecordId ?? null,
+  }
+}
+
+/**
+ * Remove a brand-new empty relationship draft (block + first member) when the
+ * practitioner closes without entering anything.
+ */
+export async function discardEmptyRelationshipDraft(input: Scope & {
+  relationshipBlockId: string
+  memberId: string
+}) {
+  const block = await ownedBlock(input, input.relationshipBlockId)
+  const member = await ownedPerson(input, input.memberId)
+  if (!block || !member) return { error: "Relationship was not found." }
+  if (member.relationshipBlockId !== block.relationshipBlockId) {
+    return { error: "That person is not in this relationship." }
+  }
+  if (!isEmptyNewRelationshipDraft(toRelationshipBlock(block), toRelationship(member))) {
+    return loadBlockEditorState(input.clientId, input.practiceId)
+  }
+  await db
+    .delete(clientRelationshipRecords)
+    .where(
+      and(
+        eq(clientRelationshipRecords.relationshipRecordId, member.relationshipRecordId),
+        eq(clientRelationshipRecords.practiceId, input.practiceId)
+      )
+    )
+  await writeAudit(input, "client_relationship.deleted", "client_relationship", member.relationshipRecordId)
+  await db
+    .delete(clientRelationshipBlocks)
+    .where(eq(clientRelationshipBlocks.relationshipBlockId, block.relationshipBlockId))
+  await writeAudit(input, "client_relationship_block.deleted", "client_relationship_block", block.relationshipBlockId)
+  const key = answerKeyForBlock(toRelationshipBlock(block))
+  if (key) await refreshAnswer(input, key)
+  return loadBlockEditorState(input.clientId, input.practiceId)
+}
+
+/** Create an unplaced person for History "Who → + Add person". */
+export async function createUnplacedPerson(input: Scope & { givenName?: string }) {
+  if (!(await ownedClient(input.clientId, input.practiceId))) return { error: "Client was not found." }
+  const rows = await db
+    .select({ displayOrder: clientRelationshipRecords.displayOrder })
+    .from(clientRelationshipRecords)
+    .where(and(eq(clientRelationshipRecords.clientId, input.clientId), eq(clientRelationshipRecords.practiceId, input.practiceId)))
+  const displayOrder = rows.reduce((max, row) => Math.max(max, row.displayOrder), -1) + 1
+  const [created] = await db
+    .insert(clientRelationshipRecords)
+    .values({
+      clientId: input.clientId,
+      practiceId: input.practiceId,
+      relationshipToClient: "other_caregiver",
+      givenName: input.givenName?.trim() || null,
+      displayOrder,
+      placementReview: "unplaced",
+    })
+    .returning()
+  await writeAudit(input, "client_relationship.created", "client_relationship", created.relationshipRecordId)
+  return loadBlockEditorState(input.clientId, input.practiceId)
 }
 
 export async function createRelationshipBlock(input: Scope & {

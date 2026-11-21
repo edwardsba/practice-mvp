@@ -537,6 +537,7 @@ export function InterviewPage({
       <div id="check-history" className={cn("scroll-mt-28 py-4", page !== "history" && "hidden")}>
         <InterviewHistory
           clientId={clientId}
+          clientName={clientName.split(/\s+/)[0] || clientName}
           dateOfBirth={data.dateOfBirth}
           events={data.events}
           relationships={relationships}

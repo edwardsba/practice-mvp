@@ -76,6 +76,7 @@ export default async function ClientBackgroundRoute({
       />
       <ClientBackgroundPage
         clientId={clientId}
+        clientName={client.firstName || clientName}
         practiceId={context.practiceId}
         data={data}
         interview={interview}

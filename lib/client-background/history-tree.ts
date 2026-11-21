@@ -9,7 +9,12 @@ import {
   subEventsFor,
   unlinkedTreatments,
 } from "@/lib/client-background/history-issues"
-import { isConditionEvent, isTreatmentEvent } from "@/lib/client-background/history-links"
+import {
+  isConditionEvent,
+  isNestedHistoryEvent,
+  isOtherEvent,
+  isTreatmentEvent,
+} from "@/lib/client-background/history-links"
 import { resolvedAbout, type ScreeningAnswers } from "@/lib/client-background/interview-history"
 import { professionalSummary, type ProfessionalOption } from "@/lib/client-background/professionals"
 import {
@@ -38,11 +43,18 @@ export type HistoryTreeNode =
       kind: "row"
       id: string
       line: string
-      tag?: "Episode" | "Treatment" | "Step"
+      tag?: "Episode" | "Treatment" | "Other" | "Step"
       children: HistoryTreeNode[]
     }
   | { kind: "note"; text: string }
-  | { kind: "actions"; issueId?: string; about: "self" | "significant_other"; category?: EventType }
+  | {
+      kind: "actions"
+      issueId?: string
+      /** Parent single-event id when adding under self-harm / traumatic / significant. */
+      parentEventId?: string
+      about: "self" | "significant_other"
+      category?: EventType
+    }
 
 export type HistoryTreeCard = { title: string; children: HistoryTreeNode[] }
 
@@ -55,7 +67,7 @@ type Input = {
   screening: ScreeningAnswers
   professionals?: ProfessionalOption[]
   issues?: HistoryIssue[]
-  /** When true, include "+ Add episode / treatment / step" action nodes (interview). */
+  /** When true, include "+ Add event" action nodes (interview). */
   interactive?: boolean
 }
 
@@ -163,16 +175,25 @@ function issueBand(issue: HistoryIssue, input: Input, _issues: HistoryIssue[], f
         kind: "row",
         id: item.event.eventRecordId,
         line: episodeLine(item.event, item.episodeNumber, input.dateOfBirth),
-        tag: "Episode",
-        children: subEventNodes(input.events, item.event.eventRecordId, input.dateOfBirth),
+        tag: "Episode" as const,
+        children: subEventNodes(input.events, item.event.eventRecordId, input),
+      }
+    }
+    if (item.kind === "other") {
+      return {
+        kind: "row",
+        id: item.event.eventRecordId,
+        line: eventLine(item.event, input.dateOfBirth),
+        tag: "Other" as const,
+        children: subEventNodes(input.events, item.event.eventRecordId, input),
       }
     }
     return {
       kind: "row",
       id: item.event.eventRecordId,
       line: treatmentLine(item.event, input),
-      tag: "Treatment",
-      children: subEventNodes(input.events, item.event.eventRecordId, input.dateOfBirth),
+      tag: "Treatment" as const,
+      children: subEventNodes(input.events, item.event.eventRecordId, input),
     }
   })
   if (input.interactive) {
@@ -199,29 +220,74 @@ function episodeLine(event: EventRecord, number: number, dateOfBirth: string | n
   return [`Episode ${number}`, when].filter(Boolean).join(" · ")
 }
 
-function eventRow(event: EventRecord, input: Input, tag?: "Episode" | "Treatment" | "Step"): HistoryTreeNode {
+function eventRow(event: EventRecord, input: Input, tag?: "Episode" | "Treatment" | "Other" | "Step"): HistoryTreeNode {
   const line = isTreatmentEvent(event.eventType)
     ? treatmentLine(event, input)
     : eventLine(event, input.dateOfBirth)
+  const children = nestedOrStepNodes(input.events, event.eventRecordId, input)
+  const actions: HistoryTreeNode[] = input.interactive
+    ? [
+        {
+          kind: "actions",
+          parentEventId: event.eventRecordId,
+          about: event.about === "significant_other" ? "significant_other" : "self",
+          category: event.eventType,
+        },
+      ]
+    : []
   return {
     kind: "row",
     id: event.eventRecordId,
     line,
-    tag: tag ?? (isTreatmentEvent(event.eventType) ? "Treatment" : undefined),
-    children: subEventNodes(input.events, event.eventRecordId, input.dateOfBirth),
+    tag: tag ?? (isTreatmentEvent(event.eventType) ? "Treatment" : isOtherEvent(event.eventType) ? "Other" : undefined),
+    children: [...children, ...actions],
   }
 }
 
-function subEventNodes(events: EventRecord[], parentId: string, dateOfBirth: string | null): HistoryTreeNode[] {
+/** Nested Episode/Treatment/Other under a parent, plus free-text steps. */
+function nestedOrStepNodes(events: EventRecord[], parentId: string, input: Input): HistoryTreeNode[] {
   return subEventsFor(events, parentId)
-    .sort((a, b) => comparePartialStarts(a, b, dateOfBirth))
-    .map((event) => ({
-      kind: "row" as const,
-      id: event.eventRecordId,
-      line: eventLine(event, dateOfBirth),
-      tag: "Step" as const,
-      children: [] as HistoryTreeNode[],
-    }))
+    .sort((a, b) => comparePartialStarts(a, b, input.dateOfBirth))
+    .map((event) => {
+      if (isNestedHistoryEvent(event.eventType) && event.eventType !== "family_events") {
+        if (isConditionEvent(event.eventType)) {
+          return {
+            kind: "row" as const,
+            id: event.eventRecordId,
+            line: eventLine(event, input.dateOfBirth),
+            tag: "Episode" as const,
+            children: subEventNodes(events, event.eventRecordId, input),
+          }
+        }
+        if (isOtherEvent(event.eventType)) {
+          return {
+            kind: "row" as const,
+            id: event.eventRecordId,
+            line: eventLine(event, input.dateOfBirth),
+            tag: "Other" as const,
+            children: subEventNodes(events, event.eventRecordId, input),
+          }
+        }
+        return {
+          kind: "row" as const,
+          id: event.eventRecordId,
+          line: treatmentLine(event, input),
+          tag: "Treatment" as const,
+          children: subEventNodes(events, event.eventRecordId, input),
+        }
+      }
+      return {
+        kind: "row" as const,
+        id: event.eventRecordId,
+        line: eventLine(event, input.dateOfBirth),
+        tag: "Step" as const,
+        children: [] as HistoryTreeNode[],
+      }
+    })
+}
+
+function subEventNodes(events: EventRecord[], parentId: string, input: Input): HistoryTreeNode[] {
+  return nestedOrStepNodes(events, parentId, input)
 }
 
 function issueSpanMeta(episodes: EventRecord[], dateOfBirth: string | null): string {
@@ -253,6 +319,9 @@ function treatmentLine(event: EventRecord, input: Input): string {
   }
   if (event.eventType === "previous_therapy") {
     return ["Therapy", event.title.trim().toLowerCase(), when.dates].filter(Boolean).join(" · ")
+  }
+  if (event.eventType === "other_treatment") {
+    return [event.title.trim() || "Other treatment", when.dates].filter(Boolean).join(" · ")
   }
   const prescriber = prescriberLabel(event, input.professionals ?? [])
   return ["Medication", event.title.trim().toLowerCase(), when.dates, ongoing(event) ? "ongoing" : "", prescriber]

@@ -5,12 +5,23 @@ import { createPortal } from "react-dom"
 
 import {
   createEventAction,
+  createHistoryIssueAction,
+  createUnplacedPersonAction,
   deleteEventAction,
   updateEventAction,
   updateHistoryIssueTreatmentAnswerAction,
 } from "@/app/clients/[client_id]/background/actions"
-import { ClientAnswer, ReadOnlyField, SaveRow } from "@/components/client-background/fields"
+import { ContextStrip } from "@/components/client-background/context-strip"
+import { ClientAnswer, ReadOnlyField, SaveRow, SelectField } from "@/components/client-background/fields"
 import { EventEditor } from "@/components/client-background/history-section"
+import {
+  NewEventForm,
+  NewIssueForm,
+  blankEpisodeForIssue,
+  blankIssueDraft,
+  eventTypeForSmartKind,
+  treatmentTypeChoiceForEventType,
+} from "@/components/client-background/smart-history-forms"
 import {
   InterviewSectionCard,
   needsBadge,
@@ -34,9 +45,11 @@ import {
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { clientAgeAtStart, formatPartialWhen } from "@/lib/client-background/age"
+import { formatContextStrip, resolveFormContext } from "@/lib/client-background/form-context"
 import { resolveHistoryIssues } from "@/lib/client-background/history-issues"
 import { buildHistoryTree, type HistoryTreeNode } from "@/lib/client-background/history-tree"
-import { isConditionEvent } from "@/lib/client-background/history-links"
+import { isConditionEvent, isSingleEventType } from "@/lib/client-background/history-links"
+import { smartKindForEventType } from "@/lib/client-background/smart-event-fields"
 import type { ScreeningAnswer, ScreeningAnswers } from "@/lib/client-background/interview-history"
 import {
   HISTORY_QUESTIONS,
@@ -44,30 +57,42 @@ import {
 } from "@/lib/client-background/interview-history"
 import type { ProfessionalOption } from "@/lib/client-background/professionals"
 import {
+  CONDITION_CATEGORY_LABELS,
+  CONDITION_EVENT_TYPES,
   emptyEvent,
   EVENT_TYPE_LABELS,
   TREATMENT_ANSWER_LABELS,
   TREATMENT_ANSWERS,
+  type ConditionEventType,
   type EventRecord,
   type EventType,
   type HistoryIssue,
   type RelationshipRecord,
+  type SmartEventKind,
   type StartPrecision,
   type TreatmentAnswer,
+  type TreatmentTypeChoice,
 } from "@/lib/client-background/types"
 import { cn } from "@/lib/utils"
 
 type Selection =
   | { kind: "entry"; id: string }
   | { kind: "issue"; id: string }
-  | { kind: "add"; about: "self" | "significant_other"; eventType?: EventRecord["eventType"]; issueId?: string }
-  | { kind: "treatment"; issueId: string }
+  | { kind: "new_issue"; about: "self" | "significant_other"; category: ConditionEventType }
+  | {
+      kind: "new_event"
+      about: "self" | "significant_other"
+      issueId?: string
+      parentEventId?: string
+      category?: EventType
+    }
   | { kind: "step"; parentId: string }
 
 type Presentation = "cards" | "interview"
 
 export function HistoryTreeSection({
   clientId,
+  clientName = "Client",
   dateOfBirth,
   events,
   relationships,
@@ -86,6 +111,8 @@ export function HistoryTreeSection({
   historyClient,
 }: {
   clientId: string
+  /** First name (or display name) for context strip "About: Tom (client)". */
+  clientName?: string
   dateOfBirth: string | null
   events: EventRecord[]
   relationships: RelationshipRecord[]
@@ -110,6 +137,7 @@ export function HistoryTreeSection({
 }) {
   const [localEvents, setLocalEvents] = useState<EventRecord[] | null>(null)
   const [localIssues, setLocalIssues] = useState<HistoryIssue[] | null>(null)
+  const [localPeople, setLocalPeople] = useState<RelationshipRecord[] | null>(null)
   const incoming = JSON.stringify(
     events.map((event) => [
       event.eventRecordId,
@@ -123,12 +151,14 @@ export function HistoryTreeSection({
   useEffect(() => {
     setLocalEvents(null)
     setLocalIssues(null)
+    setLocalPeople(null)
   }, [incoming])
   const shown = localEvents ?? events
+  const people = localPeople ?? relationships
   const issues = resolveHistoryIssues(shown, localIssues ?? storedIssues)
   const tree = buildHistoryTree({
     events: shown,
-    relationships,
+    relationships: people,
     dateOfBirth,
     screening,
     professionals,
@@ -137,6 +167,9 @@ export function HistoryTreeSection({
   const [selection, setSelection] = useState<Selection | null>(null)
   const [mode, setMode] = useState<"view" | "edit">("view")
   const [draft, setDraft] = useState<EventRecord | null>(null)
+  const [issueDraft, setIssueDraft] = useState<HistoryIssue | null>(null)
+  const [smartKind, setSmartKind] = useState<SmartEventKind>("episode")
+  const [treatmentType, setTreatmentType] = useState<TreatmentTypeChoice | "">("")
   const [isNew, setIsNew] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
@@ -164,9 +197,12 @@ export function HistoryTreeSection({
   function close() {
     setSelection(null)
     setDraft(null)
+    setIssueDraft(null)
     setMode("view")
     setIsNew(false)
     setError(null)
+    setSmartKind("episode")
+    setTreatmentType("")
   }
 
   function openEntry(id: string) {
@@ -175,8 +211,10 @@ export function HistoryTreeSection({
     if (entry) {
       setSelection({ kind: "entry", id })
       setDraft({ ...entry })
+      setIssueDraft(null)
     } else if (issue) {
       setSelection({ kind: "issue", id })
+      setIssueDraft({ ...issue })
       const episode = shown.find((event) => event.conditionGroupId === id && isConditionEvent(event.eventType))
       setDraft(episode ? { ...episode } : null)
     }
@@ -185,36 +223,53 @@ export function HistoryTreeSection({
     setError(null)
   }
 
-  function startAdd(
-    about: "self" | "significant_other",
-    eventType: EventRecord["eventType"] = "emotional_problems",
-    issueId?: string
-  ) {
-    const issue = issueId ? issues.find((item) => item.issueId === issueId) : undefined
-    setSelection({ kind: "add", about, eventType, issueId })
-    setDraft({
-      ...emptyEvent(eventType, 0),
-      eventRecordId: "",
-      about,
-      relationshipRecordId: issue?.relationshipRecordId ?? null,
-      aboutOther: issue?.aboutOther ?? "",
-      conditionGroupId: issueId ?? null,
-    })
+  function startNewIssue(about: "self" | "significant_other", category: ConditionEventType) {
+    setSelection({ kind: "new_issue", about, category })
+    setIssueDraft(blankIssueDraft(category, about))
+    setDraft(blankEpisodeForIssue(category, about))
     setMode("edit")
     setIsNew(true)
     setError(null)
   }
 
-  function startTreatment(issue: HistoryIssue) {
-    setSelection({ kind: "treatment", issueId: issue.issueId })
-    setDraft({
-      ...emptyEvent("psychiatric_admission", 0),
-      eventRecordId: "",
-      about: issue.about,
-      relationshipRecordId: issue.relationshipRecordId,
-      aboutOther: issue.aboutOther,
-      conditionGroupId: issue.issueId,
+  function startNewEvent(options: {
+    about: "self" | "significant_other"
+    issueId?: string
+    parentEventId?: string
+    category?: EventType
+  }) {
+    const issue = options.issueId ? issues.find((item) => item.issueId === options.issueId) : undefined
+    const parent = options.parentEventId
+      ? shown.find((event) => event.eventRecordId === options.parentEventId)
+      : undefined
+    const category =
+      options.category ??
+      issue?.category ??
+      parent?.eventType ??
+      ("emotional_problems" as EventType)
+    const about = issue?.about ?? parent?.about ?? options.about
+    setSelection({
+      kind: "new_event",
+      about,
+      issueId: options.issueId,
+      parentEventId: options.parentEventId,
+      category,
     })
+    setSmartKind("episode")
+    setTreatmentType("")
+    setDraft({
+      ...emptyEvent(
+        eventTypeForSmartKind("episode", { category }),
+        0
+      ),
+      eventRecordId: "",
+      about,
+      relationshipRecordId: issue?.relationshipRecordId ?? parent?.relationshipRecordId ?? null,
+      aboutOther: issue?.aboutOther ?? parent?.aboutOther ?? "",
+      conditionGroupId: options.issueId ?? parent?.conditionGroupId ?? null,
+      parentEventId: options.parentEventId ?? null,
+    })
+    setIssueDraft(null)
     setMode("edit")
     setIsNew(true)
     setError(null)
@@ -237,6 +292,35 @@ export function HistoryTreeSection({
   }
 
   async function save() {
+    if (selection?.kind === "new_issue" && issueDraft) {
+      setPending(true)
+      setError(null)
+      const first =
+        draft && (draft.startValue.trim() || draft.endValue.trim() || draft.resolvedOrOngoing === "ongoing")
+          ? {
+              startPrecision: draft.startPrecision,
+              startValue: draft.startValue,
+              endPrecision: draft.endPrecision,
+              endValue: draft.endValue,
+              endOngoing: draft.endOngoing,
+              resolvedOrOngoing: draft.resolvedOrOngoing,
+            }
+          : null
+      const result = await createHistoryIssueAction(clientId, issueDraft, first)
+      setPending(false)
+      if (result.error || !result.issue) {
+        setError(result.error ?? "Could not save this issue.")
+        return
+      }
+      publishIssues([...issues, result.issue])
+      if (result.event) publishEvents([...shown, result.event])
+      setIssueDraft(result.issue)
+      setDraft(result.event ?? null)
+      setSelection({ kind: "issue", id: result.issue.issueId })
+      setIsNew(false)
+      setMode("view")
+      return
+    }
     if (!draft) return
     setPending(true)
     setError(null)
@@ -249,6 +333,17 @@ export function HistoryTreeSection({
     publishEvents(
       isNew ? [...shown, result.event] : shown.map((event) => (event.eventRecordId === result.event!.eventRecordId ? result.event! : event))
     )
+    if (isNew && isConditionEvent(result.event.eventType) === false) {
+      // Adding a treatment sets the issue Treatment answer to Yes (server syncs).
+      const issueId = result.event.conditionGroupId
+      if (issueId) {
+        publishIssues(
+          issues.map((item) =>
+            item.issueId === issueId ? { ...item, treatmentAnswer: "yes" as TreatmentAnswer } : item
+          )
+        )
+      }
+    }
     setDraft(result.event)
     setSelection({ kind: "entry", id: result.event.eventRecordId })
     setIsNew(false)
@@ -264,6 +359,20 @@ export function HistoryTreeSection({
     if (saved) setDraft({ ...saved })
     setMode("view")
     setError(null)
+  }
+
+  async function addPersonForWho() {
+    const before = people.map((person) => person.relationshipRecordId)
+    const result = await createUnplacedPersonAction(clientId)
+    if (!result || !("relationships" in result) || !result.relationships) {
+      setError(result && "error" in result && result.error ? String(result.error) : "Could not add a person.")
+      return
+    }
+    setLocalPeople(result.relationships)
+    const created = result.relationships.find((person) => !before.includes(person.relationshipRecordId))
+    if (created && issueDraft) {
+      setIssueDraft({ ...issueDraft, relationshipRecordId: created.relationshipRecordId, aboutOther: "" })
+    }
   }
 
   async function remove() {
@@ -282,23 +391,22 @@ export function HistoryTreeSection({
 
   const selectedIssue =
     selection?.kind === "issue"
-      ? issues.find((item) => item.issueId === selection.id)
-      : selection?.kind === "treatment"
+      ? issues.find((item) => item.issueId === selection.id) ?? issueDraft
+      : selection?.kind === "new_event" && selection.issueId
         ? issues.find((item) => item.issueId === selection.issueId)
-        : undefined
+        : selection?.kind === "new_issue"
+          ? issueDraft
+          : undefined
   const entry = selection?.kind === "entry" ? shown.find((event) => event.eventRecordId === selection.id) : undefined
-  const showAddTreatment = !readOnly && mode === "view" && selectedIssue != null
   const showAddStep =
     !readOnly &&
-    entry != null &&
-    !entry.parentEventId &&
-    (mode === "view" || mode === "edit") &&
-    !isNew
+    ((entry != null && (mode === "view" || mode === "edit") && !isNew) ||
+      (selection?.kind === "new_event" && mode === "edit" && draft?.eventRecordId))
   const selectedId =
     selection?.kind === "entry" || selection?.kind === "issue"
       ? selection.id
-      : selection?.kind === "treatment"
-        ? selection.issueId
+      : selection?.kind === "new_event"
+        ? selection.issueId ?? selection.parentEventId ?? null
         : selection?.kind === "step"
           ? selection.parentId
           : null
@@ -312,23 +420,77 @@ export function HistoryTreeSection({
     publishIssues(issues.map((item) => (item.issueId === result.issue!.issueId ? result.issue! : item)))
   }
 
+  const contextForPanel = (() => {
+    if (!selection) return null
+    const about =
+      selection.kind === "new_issue" || selection.kind === "new_event"
+        ? selection.about
+        : draft?.about === "significant_other"
+          ? "significant_other"
+          : selectedIssue?.about === "significant_other"
+            ? "significant_other"
+            : "self"
+    const personId =
+      selectedIssue?.relationshipRecordId ??
+      issueDraft?.relationshipRecordId ??
+      draft?.relationshipRecordId ??
+      null
+    const person = personId ? people.find((item) => item.relationshipRecordId === personId) : null
+    const category =
+      selection.kind === "new_issue"
+        ? selection.category
+        : selection.kind === "new_event"
+          ? selection.category ?? selectedIssue?.category ?? null
+          : selectedIssue?.category ?? draft?.eventType ?? null
+    const issue =
+      selectedIssue ??
+      (selection.kind === "new_event" && selection.issueId
+        ? issues.find((item) => item.issueId === selection.issueId)
+        : null)
+    return resolveFormContext(
+      {
+        clientName,
+        about,
+        person,
+        aboutOther: selectedIssue?.aboutOther ?? draft?.aboutOther ?? "",
+        category,
+        issue: selection.kind === "new_issue" ? null : issue,
+      },
+      people
+    )
+  })()
+
   const treeProps = {
     onOpen: openEntry,
-    onAddEpisode: readOnly
+    onAddEvent: readOnly
       ? undefined
       : (issueId: string, about: "self" | "significant_other") => {
           const found = issues.find((item) => item.issueId === issueId)
-          startAdd(about, found?.category ?? "emotional_problems", issueId)
+          startNewEvent({
+            about,
+            issueId,
+            category: found?.category,
+          })
         },
-    onAddTreatment: readOnly
+    onAddNestedEvent: readOnly
       ? undefined
-      : (issueId: string) => {
-          const found = issues.find((item) => item.issueId === issueId)
-          if (found) startTreatment(found)
+      : (parentEventId: string, about: "self" | "significant_other") => {
+          const parent = shown.find((event) => event.eventRecordId === parentEventId)
+          startNewEvent({
+            about,
+            parentEventId,
+            category: parent?.eventType,
+          })
         },
     onAddCategory: readOnly
       ? undefined
-      : (about: "self" | "significant_other", eventType: EventType) => startAdd(about, eventType),
+      : (about: "self" | "significant_other", eventType: EventType) => {
+          if ((CONDITION_EVENT_TYPES as readonly string[]).includes(eventType)) {
+            startNewIssue(about, eventType as ConditionEventType)
+            return
+          }
+          startNewEvent({ about, category: eventType })
+        },
     onTreatmentAnswer: readOnly ? undefined : (issueId: string, value: TreatmentAnswer | "") => void setTreatmentAnswer(issueId, value),
     onScreeningChange: presentation === "interview" ? onScreeningChange : undefined,
     screening,
@@ -384,78 +546,181 @@ export function HistoryTreeSection({
           </TreeCard>
         </>
       )}
-      {ready && selection && draft
+      {ready && selection && (draft || issueDraft)
         ? createPortal(
             <div className="fixed inset-0 z-50">
               <button type="button" className="absolute inset-0 bg-black/20" aria-label="Dismiss" onClick={close} />
               <aside
                 role="dialog"
                 aria-modal="true"
-                aria-label={draft.title.trim() || "History"}
+                aria-label={
+                  selection.kind === "new_issue"
+                    ? "New issue"
+                    : selection.kind === "new_event"
+                      ? "New event"
+                      : draft?.title.trim() || issueDraft?.title.trim() || "History"
+                }
                 className="absolute inset-y-0 right-0 flex w-full animate-[relationship-panel_200ms_ease-out] flex-col overflow-y-auto bg-background p-4 shadow-xl sm:w-[440px]"
               >
                 <style>{`@keyframes relationship-panel { from { transform: translateX(100%); } to { transform: translateX(0); } }`}</style>
-                <div className="mb-4 flex items-start justify-between gap-3">
+                <div className="mb-2 flex items-start justify-between gap-3">
                   <h2 className="text-base font-semibold">
-                    {draft.parentEventId ? "Step" : draft.title.trim() || EVENT_TYPE_LABELS[draft.eventType]}
+                    {selection.kind === "new_issue"
+                      ? "New issue"
+                      : selection.kind === "new_event"
+                        ? "New event"
+                        : selection.kind === "step" || draft?.parentEventId
+                          ? "Step"
+                          : draft?.title.trim() ||
+                            issueDraft?.title.trim() ||
+                            (draft ? EVENT_TYPE_LABELS[draft.eventType] : "History")}
                   </h2>
                   <Button type="button" variant="ghost" size="sm" onClick={close}>
                     Close
                   </Button>
                 </div>
+                {contextForPanel ? (
+                  <ContextStrip
+                    lines={contextForPanel.lines}
+                    readOnly={mode === "view" || readOnly}
+                    editors={
+                      mode === "edit"
+                        ? {
+                            about: (
+                              <SelectField
+                                id="context_about"
+                                label="About"
+                                value={draft?.about === "significant_other" || issueDraft?.about === "significant_other" ? "significant_other" : "self"}
+                                onChange={(about) => {
+                                  const next = about === "significant_other" ? "significant_other" : "self"
+                                  if (issueDraft) setIssueDraft({ ...issueDraft, about: next })
+                                  if (draft) setDraft({ ...draft, about: next })
+                                }}
+                              >
+                                <option value="self">Self</option>
+                                <option value="significant_other">Family and significant others</option>
+                              </SelectField>
+                            ),
+                            category:
+                              selection.kind === "new_issue" && issueDraft ? (
+                                <SelectField
+                                  id="context_category"
+                                  label="Category"
+                                  value={issueDraft.category}
+                                  onChange={(category) => {
+                                    if ((CONDITION_EVENT_TYPES as readonly string[]).includes(category)) {
+                                      setIssueDraft({ ...issueDraft, category: category as ConditionEventType })
+                                      if (draft) setDraft({ ...draft, eventType: category as ConditionEventType })
+                                    }
+                                  }}
+                                >
+                                  {CONDITION_EVENT_TYPES.map((option) => (
+                                    <option key={option} value={option}>
+                                      {CONDITION_CATEGORY_LABELS[option]}
+                                    </option>
+                                  ))}
+                                </SelectField>
+                              ) : undefined,
+                          }
+                        : undefined
+                    }
+                  />
+                ) : null}
                 {mode === "edit" ? (
                   <>
-                    {draft.parentEventId ? (
+                    {selection.kind === "new_issue" && issueDraft && draft ? (
+                      <NewIssueForm
+                        draft={issueDraft}
+                        firstEpisode={draft}
+                        dateOfBirth={dateOfBirth}
+                        relationships={people}
+                        onIssueChange={setIssueDraft}
+                        onEpisodeChange={setDraft}
+                        onAddPerson={() => void addPersonForWho()}
+                      />
+                    ) : selection.kind === "new_event" && draft ? (
+                      <NewEventForm
+                        draft={draft}
+                        kind={smartKind}
+                        treatmentType={treatmentType}
+                        category={selection.category ?? null}
+                        dateOfBirth={dateOfBirth}
+                        professionals={professionals}
+                        onKindChange={setSmartKind}
+                        onTreatmentTypeChange={setTreatmentType}
+                        onChange={setDraft}
+                      />
+                    ) : selection.kind === "step" && draft ? (
                       <StepEditor draft={draft} dateOfBirth={dateOfBirth} onChange={setDraft} />
-                    ) : (
+                    ) : draft ? (
                       <EventEditor
                         draft={draft}
                         dateOfBirth={dateOfBirth}
-                        relationships={relationships}
+                        relationships={people}
                         events={shown}
                         professionals={professionals}
                         onChange={setDraft}
+                        lockContext
                       />
-                    )}
+                    ) : null}
                     <div className="mt-4 space-y-3">
-                      {showAddStep && entry ? (
+                      {selection.kind === "new_event" && draft ? (
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              void save().then(() => {
+                                /* after save, selection becomes entry — add step from there */
+                              })
+                            }}
+                          >
+                            Add step
+                          </Button>
+                          <Button type="button" size="sm" disabled={pending} onClick={() => void save()}>
+                            Done
+                          </Button>
+                        </div>
+                      ) : null}
+                      {showAddStep && entry && selection.kind !== "new_event" ? (
                         <Button type="button" variant="outline" size="sm" onClick={() => startStep(entry)}>
                           Add step
                         </Button>
                       ) : null}
-                      <SaveRow
-                        pending={pending}
-                        error={error}
-                        onSave={() => void save()}
-                        extra={
-                          <>
-                            <Button type="button" variant="ghost" size="sm" disabled={pending} onClick={cancel}>
-                              Cancel
-                            </Button>
-                            {isNew ? null : (
-                              <Button type="button" variant="ghost" size="sm" disabled={pending} onClick={() => void remove()}>
-                                Remove
+                      {selection.kind === "new_event" ? null : (
+                        <SaveRow
+                          pending={pending}
+                          error={error}
+                          onSave={() => void save()}
+                          extra={
+                            <>
+                              <Button type="button" variant="ghost" size="sm" disabled={pending} onClick={cancel}>
+                                Cancel
                               </Button>
-                            )}
-                          </>
-                        }
-                      />
+                              {isNew ? null : (
+                                <Button type="button" variant="ghost" size="sm" disabled={pending} onClick={() => void remove()}>
+                                  Remove
+                                </Button>
+                              )}
+                            </>
+                          }
+                        />
+                      )}
+                      {selection.kind === "new_event" && error ? (
+                        <p className="text-sm text-destructive">{error}</p>
+                      ) : null}
                     </div>
                   </>
                 ) : (
                   <>
-                    <EntryDetails entry={draft} dateOfBirth={dateOfBirth} />
+                    {draft ? <EntryDetails entry={draft} dateOfBirth={dateOfBirth} /> : null}
                     {selectedIssue ? (
                       <p className="mt-2 text-sm text-muted-foreground">
                         Treatment: {treatmentAnswerText(selectedIssue.treatmentAnswer)}
                       </p>
                     ) : null}
                     <div className="mt-6 flex flex-wrap gap-2">
-                      {showAddTreatment && selectedIssue ? (
-                        <Button type="button" variant="outline" size="sm" onClick={() => startTreatment(selectedIssue)}>
-                          + Add treatment
-                        </Button>
-                      ) : null}
                       {showAddStep && entry ? (
                         <Button type="button" variant="outline" size="sm" onClick={() => startStep(entry)}>
                           Add step
@@ -572,8 +837,8 @@ type SectionBodyProps = {
   nodes: HistoryTreeNode[]
   about: "self" | "significant_other"
   onOpen: (id: string) => void
-  onAddEpisode?: (issueId: string, about: "self" | "significant_other") => void
-  onAddTreatment?: (issueId: string) => void
+  onAddEvent?: (issueId: string, about: "self" | "significant_other") => void
+  onAddNestedEvent?: (parentEventId: string, about: "self" | "significant_other") => void
   onAddCategory?: (about: "self" | "significant_other", eventType: EventType) => void
   onTreatmentAnswer?: (issueId: string, value: TreatmentAnswer | "") => void
   onScreeningChange?: (key: HistoryQuestionKey, answer: ScreeningAnswer | "") => void
@@ -599,8 +864,8 @@ function CategoryBlock({
   node,
   about,
   onOpen,
-  onAddEpisode,
-  onAddTreatment,
+  onAddEvent,
+  onAddNestedEvent,
   onAddCategory,
   onTreatmentAnswer,
   onScreeningChange,
@@ -671,8 +936,8 @@ function CategoryBlock({
           nodes={treeChildren}
           about={about}
           onOpen={onOpen}
-          onAddEpisode={onAddEpisode}
-          onAddTreatment={onAddTreatment}
+          onAddEvent={onAddEvent}
+          onAddNestedEvent={onAddNestedEvent}
           onTreatmentAnswer={onTreatmentAnswer}
           selectedId={selectedId}
           readOnly={readOnly}
@@ -704,8 +969,8 @@ function ConnectedList({
   nodes,
   about,
   onOpen,
-  onAddEpisode,
-  onAddTreatment,
+  onAddEvent,
+  onAddNestedEvent,
   onTreatmentAnswer,
   selectedId,
   readOnly,
@@ -713,8 +978,8 @@ function ConnectedList({
   nodes: HistoryTreeNode[]
   about: "self" | "significant_other"
   onOpen: (id: string) => void
-  onAddEpisode?: (issueId: string, about: "self" | "significant_other") => void
-  onAddTreatment?: (issueId: string) => void
+  onAddEvent?: (issueId: string, about: "self" | "significant_other") => void
+  onAddNestedEvent?: (parentEventId: string, about: "self" | "significant_other") => void
   onTreatmentAnswer?: (issueId: string, value: TreatmentAnswer | "") => void
   selectedId: string | null
   readOnly?: boolean
@@ -788,33 +1053,22 @@ function ConnectedList({
                   nodes={node.children}
                   about={about}
                   onOpen={onOpen}
-                  onAddEpisode={onAddEpisode}
-                  onAddTreatment={onAddTreatment}
+                  onAddEvent={onAddEvent}
+                  onAddNestedEvent={onAddNestedEvent}
                   onTreatmentAnswer={onTreatmentAnswer}
                   selectedId={selectedId}
                   readOnly={readOnly}
                 />
               ) : null}
-              {!readOnly && (onAddEpisode || onAddTreatment) ? (
+              {!readOnly && onAddEvent ? (
                 <div className="flex flex-wrap gap-3 px-1 py-1 text-sm">
-                  {onAddEpisode ? (
-                    <button
-                      type="button"
-                      className="text-primary underline-offset-2 hover:underline"
-                      onClick={() => onAddEpisode(node.id, about)}
-                    >
-                      + Add episode
-                    </button>
-                  ) : null}
-                  {onAddTreatment ? (
-                    <button
-                      type="button"
-                      className="text-primary underline-offset-2 hover:underline"
-                      onClick={() => onAddTreatment(node.id)}
-                    >
-                      + Add treatment
-                    </button>
-                  ) : null}
+                  <button
+                    type="button"
+                    className="text-primary underline-offset-2 hover:underline"
+                    onClick={() => onAddEvent(node.id, about)}
+                  >
+                    + Add event
+                  </button>
                 </div>
               ) : null}
             </TreeBranch>
@@ -825,6 +1079,7 @@ function ConnectedList({
           const layer = isStep ? 4 : 3
           const selected = selectedId === node.id
           const { title, meta } = splitLine(node.line)
+          const rowChildren = node.children.filter((child) => child.kind !== "actions")
           return (
             <TreeBranch
               key={nodeKey(node, index)}
@@ -865,17 +1120,33 @@ function ConnectedList({
                   </span>
                 ) : null}
               </button>
-              {node.children.length > 0 ? (
+              {rowChildren.length > 0 ? (
                 <ConnectedList
-                  nodes={node.children}
+                  nodes={rowChildren}
                   about={about}
                   onOpen={onOpen}
-                  onAddEpisode={onAddEpisode}
-                  onAddTreatment={onAddTreatment}
+                  onAddEvent={onAddEvent}
+                  onAddNestedEvent={onAddNestedEvent}
                   onTreatmentAnswer={onTreatmentAnswer}
                   selectedId={selectedId}
                   readOnly={readOnly}
                 />
+              ) : null}
+              {!readOnly &&
+              !isStep &&
+              onAddNestedEvent &&
+              node.tag !== "Episode" &&
+              node.tag !== "Treatment" &&
+              node.tag !== "Other" ? (
+                <div className="flex flex-wrap gap-3 px-1 py-1 text-sm">
+                  <button
+                    type="button"
+                    className="text-primary underline-offset-2 hover:underline"
+                    onClick={() => onAddNestedEvent(node.id, about)}
+                  >
+                    + Add event
+                  </button>
+                </div>
               ) : null}
             </TreeBranch>
           )
@@ -891,13 +1162,14 @@ function splitLine(line: string): { title: string; meta: string } {
   return { title: title ?? line, meta: rest.join(" · ") }
 }
 
-function Tag({ label }: { label: "Episode" | "Treatment" | "Step" }) {
+function Tag({ label }: { label: "Episode" | "Treatment" | "Other" | "Step" }) {
   return (
     <span
       className={cn(
         "shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
         label === "Episode" && "bg-indigo-100 text-indigo-800",
         label === "Treatment" && "bg-emerald-100 text-emerald-800",
+        label === "Other" && "bg-zinc-200 text-zinc-700",
         label === "Step" && "bg-zinc-100 text-zinc-700"
       )}
     >

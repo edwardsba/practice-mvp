@@ -99,6 +99,16 @@ export function treatmentsForIssue(events: EventRecord[], issueId: string): Even
   })
 }
 
+/** Other events belonging to an issue (conditionGroupId match, not nested under an episode). */
+export function otherEventsForIssue(events: EventRecord[], issueId: string): EventRecord[] {
+  return events.filter(
+    (event) =>
+      event.eventType === "other_event" &&
+      !event.parentEventId &&
+      event.conditionGroupId === issueId
+  )
+}
+
 export function episodesForIssue(events: EventRecord[], issueId: string): EventRecord[] {
   if (issueId.startsWith("title:")) {
     return conditionGroups(events).find((group) => group.id === issueId)?.episodes ?? []
@@ -164,11 +174,12 @@ function truncateKey(key: number, rank: number): number {
 export type MixedHistoryItem =
   | { kind: "episode"; event: EventRecord; episodeNumber: number }
   | { kind: "treatment"; event: EventRecord }
+  | { kind: "other"; event: EventRecord }
 
 /**
- * Episodes and treatments of an issue, sorted by start (partial at precision;
- * episode before treatment on the same start; undated last). Episodes numbered
- * in that date order.
+ * Episodes, treatments and Other events of an issue, sorted by start (partial at
+ * precision; episode before treatment/other on the same start; undated last).
+ * Episodes are numbered in that date order; Treatment and Other are not.
  */
 export function mixedIssueEvents(
   events: EventRecord[],
@@ -180,6 +191,7 @@ export function mixedIssueEvents(
   )
   const episodeNumber = new Map(episodes.map((episode, index) => [episode.eventRecordId, index + 1]))
   const treatments = treatmentsForIssue(events, issueId)
+  const others = otherEventsForIssue(events, issueId)
   const mixed: MixedHistoryItem[] = [
     ...episodes.map((event) => ({
       kind: "episode" as const,
@@ -187,11 +199,15 @@ export function mixedIssueEvents(
       episodeNumber: episodeNumber.get(event.eventRecordId) ?? 1,
     })),
     ...treatments.map((event) => ({ kind: "treatment" as const, event })),
+    ...others.map((event) => ({ kind: "other" as const, event })),
   ]
   mixed.sort((a, b) => {
     const byDate = comparePartialStarts(a.event, b.event, dateOfBirth)
     if (byDate !== 0) return byDate
-    if (a.kind !== b.kind) return a.kind === "episode" ? -1 : 1
+    if (a.kind !== b.kind) {
+      if (a.kind === "episode") return -1
+      if (b.kind === "episode") return 1
+    }
     return a.event.displayOrder - b.event.displayOrder
   })
   return mixed

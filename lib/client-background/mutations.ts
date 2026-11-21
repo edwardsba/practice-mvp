@@ -12,7 +12,14 @@ import { personKey } from "@/lib/client-background/condition-groups"
 import { treatmentAnswerAfterChange, treatmentsForIssue } from "@/lib/client-background/history-issues"
 import { isConditionEvent, isTreatmentEvent } from "@/lib/client-background/history-links"
 import { toClientRelationshipStatus, toEvent, toHistoryIssue, toRelationship } from "@/lib/client-background/map"
-import { CONDITION_EVENT_TYPES, type HistoryIssue, type TreatmentAnswer } from "@/lib/client-background/types"
+import {
+  CONDITION_EVENT_TYPES,
+  type ConditionEventType,
+  type HistoryAbout,
+  type HistoryIssue,
+  type TreatmentAnswer,
+} from "@/lib/client-background/types"
+import { sanitizeHistoryIssue } from "@/lib/client-background/history-issues"
 import {
   finalScreeningAnswers,
   sanitizeScreening,
@@ -560,8 +567,16 @@ async function ensureHistoryIssue(
 }
 
 async function withConditionGroup(tx: Tx, clientId: string, practiceId: string, event: EventRecord): Promise<EventRecord> {
-  if (isTreatmentEvent(event.eventType)) {
+  if (isTreatmentEvent(event.eventType) || event.eventType === "other_event") {
     const incoming = event.conditionGroupId?.trim() ?? ""
+    // Nested under a single event (self-harm / traumatic / significant).
+    if (event.parentEventId) {
+      return {
+        ...event,
+        conditionGroupId: incoming && !incoming.startsWith("title:") ? incoming : null,
+        conditionEventId: null,
+      }
+    }
     if (incoming && !incoming.startsWith("title:")) {
       return { ...event, conditionGroupId: incoming, conditionEventId: null }
     }
@@ -845,6 +860,185 @@ export async function deleteEvent(input: {
     })
   } catch {
     return { error: "Could not remove this entry." }
+  }
+}
+
+export async function createHistoryIssue(input: {
+  clientId: string
+  practiceId: string
+  userId: string
+  issue: unknown
+  /** Optional first episode dates when creating a New issue. */
+  firstEpisode?: {
+    startPrecision: EventRecord["startPrecision"]
+    startValue: string
+    endPrecision: EventRecord["endPrecision"]
+    endValue: string
+    endOngoing: boolean
+    resolvedOrOngoing: EventRecord["resolvedOrOngoing"]
+  } | null
+}): Promise<MutationResult<{ issue?: HistoryIssue; event?: EventRecord }>> {
+  const client = await assertClient(input.clientId, input.practiceId)
+  if (!client) return { error: "Client was not found." }
+  const parsed = sanitizeHistoryIssue(input.issue, randomUUID())
+  if (!(CONDITION_EVENT_TYPES as readonly string[]).includes(parsed.category)) {
+    return { error: "Choose a category." }
+  }
+  if (!parsed.title.trim()) return { error: "Enter an issue name." }
+  if (parsed.about === "significant_other" && !parsed.relationshipRecordId && !parsed.aboutOther.trim()) {
+    return { error: "Choose who this issue is about." }
+  }
+  const treatmentAnswer =
+    parsed.treatmentAnswer === "yes" || parsed.treatmentAnswer === "none" || parsed.treatmentAnswer === "not_asked"
+      ? parsed.treatmentAnswer
+      : null
+  try {
+    return await db.transaction(async (tx) => {
+      const issueId = parsed.issueId || randomUUID()
+      const [created] = await tx
+        .insert(clientHistoryIssues)
+        .values({
+          issueId,
+          clientId: input.clientId,
+          practiceId: input.practiceId,
+          category: parsed.category,
+          about: parsed.about,
+          relationshipRecordId: parsed.relationshipRecordId,
+          aboutOther:
+            parsed.about === "significant_other" && !parsed.relationshipRecordId
+              ? parsed.aboutOther.trim() || null
+              : null,
+          title: parsed.title.trim(),
+          treatmentAnswer,
+          displayOrder: parsed.displayOrder,
+        })
+        .returning()
+      await writeAudit(tx, {
+        practiceId: input.practiceId,
+        userId: input.userId,
+        clientId: input.clientId,
+        eventType: "client_history_issue.created",
+        entityType: "client_history_issue",
+        entityId: created.issueId,
+      })
+      let event: EventRecord | undefined
+      const first = input.firstEpisode
+      if (first && (first.startValue.trim() || first.endValue.trim() || first.endOngoing || first.resolvedOrOngoing)) {
+        const displayOrder = await nextEventOrder(tx, input.clientId, input.practiceId, parsed.category)
+        const [createdEvent] = await tx
+          .insert(clientEventRecords)
+          .values({
+            clientId: input.clientId,
+            practiceId: input.practiceId,
+            ...eventColumns({
+              eventRecordId: "",
+              eventType: parsed.category,
+              title: parsed.title.trim(),
+              description: "",
+              startPrecision: first.startPrecision,
+              startValue: first.startValue,
+              endPrecision: first.endPrecision,
+              endValue: first.endValue,
+              endOngoing: first.endOngoing || first.resolvedOrOngoing === "ongoing",
+              resolvedOrOngoing: first.resolvedOrOngoing,
+              treated: null,
+              treatmentType: "",
+              treatmentDetail: "",
+              outcome: "",
+              about: parsed.about,
+              aboutOther: parsed.aboutOther,
+              relationshipRecordId: parsed.relationshipRecordId,
+              conditionEventId: null,
+              conditionGroupId: created.issueId,
+              parentEventId: null,
+              admissionType: "",
+              facility: "",
+              admissionLength: "",
+              prescriberProfessionalId: null,
+              prescriberName: "",
+              selfHarmType: "",
+              substanceStatus: "",
+              abstinentSincePrecision: "",
+              abstinentSinceValue: "",
+              displayOrder,
+            }),
+          })
+          .returning()
+        event = toEvent(createdEvent)
+        await writeAudit(tx, {
+          practiceId: input.practiceId,
+          userId: input.userId,
+          clientId: input.clientId,
+          eventType: "client_event.created",
+          entityType: "client_event",
+          entityId: createdEvent.eventRecordId,
+        })
+      }
+      return { issue: toHistoryIssue(created), event }
+    })
+  } catch {
+    return { error: "Could not add this issue." }
+  }
+}
+
+export async function updateHistoryIssue(input: {
+  clientId: string
+  practiceId: string
+  userId: string
+  issue: unknown
+}): Promise<MutationResult<{ issue?: HistoryIssue }>> {
+  const client = await assertClient(input.clientId, input.practiceId)
+  if (!client) return { error: "Client was not found." }
+  const parsed = sanitizeHistoryIssue(input.issue)
+  if (!parsed.issueId) return { error: "That issue was not found." }
+  try {
+    return await db.transaction(async (tx) => {
+      const [existing] = await tx
+        .select()
+        .from(clientHistoryIssues)
+        .where(
+          and(
+            eq(clientHistoryIssues.issueId, parsed.issueId),
+            eq(clientHistoryIssues.clientId, input.clientId),
+            eq(clientHistoryIssues.practiceId, input.practiceId)
+          )
+        )
+        .limit(1)
+      if (!existing) return { error: "That issue was not found." }
+      const treatmentAnswer =
+        parsed.treatmentAnswer === "yes" || parsed.treatmentAnswer === "none" || parsed.treatmentAnswer === "not_asked"
+          ? parsed.treatmentAnswer
+          : existing.treatmentAnswer
+      const [updated] = await tx
+        .update(clientHistoryIssues)
+        .set({
+          title: parsed.title.trim() || existing.title,
+          about: parsed.about,
+          relationshipRecordId: parsed.relationshipRecordId,
+          aboutOther:
+            parsed.about === "significant_other" && !parsed.relationshipRecordId
+              ? parsed.aboutOther.trim() || null
+              : null,
+          category: (CONDITION_EVENT_TYPES as readonly string[]).includes(parsed.category)
+            ? parsed.category
+            : (existing.category as ConditionEventType),
+          treatmentAnswer,
+          updatedAt: new Date(),
+        })
+        .where(eq(clientHistoryIssues.issueId, existing.issueId))
+        .returning()
+      await writeAudit(tx, {
+        practiceId: input.practiceId,
+        userId: input.userId,
+        clientId: input.clientId,
+        eventType: "client_history_issue.updated",
+        entityType: "client_history_issue",
+        entityId: updated.issueId,
+      })
+      return { issue: toHistoryIssue(updated) }
+    })
+  } catch {
+    return { error: "Could not save this issue." }
   }
 }
 

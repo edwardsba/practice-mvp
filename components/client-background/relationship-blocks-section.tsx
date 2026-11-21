@@ -6,7 +6,9 @@ import { createPortal } from "react-dom"
 import {
   addBlockMemberAction,
   createRelationshipBlockAction,
+  createRelationshipWithMemberAction,
   deleteRelationshipBlockAction,
+  discardEmptyRelationshipDraftAction,
   moveBlockMemberAction,
   removeBlockMemberAction,
   saveRelationshipStatusBlockAction,
@@ -14,6 +16,9 @@ import {
   updateBlockMemberAction,
   updateRelationshipBlockAction,
 } from "@/app/clients/[client_id]/background/actions"
+import { ContextStrip } from "@/components/client-background/context-strip"
+import { resolveFormContext } from "@/lib/client-background/form-context"
+import { isEmptyNewRelationshipDraft } from "@/lib/client-background/new-relationship-draft"
 import { ClientAnswer, SelectField, TextField } from "@/components/client-background/fields"
 import type { SavePhase } from "@/components/client-background/interview-autosave"
 import { InterviewSectionCard, needsBadge } from "@/components/client-background/interview-section-card"
@@ -86,6 +91,7 @@ type EditorState = {
 type Selection =
   | { type: "person"; id: string; addAnotherRole?: BlockRole }
   | { type: "block"; id: string }
+  | { type: "new_relationship"; blockId: string; memberId: string }
   | { type: "move"; id: string }
 
 const linkClass = "text-sm text-primary underline-offset-2 hover:underline"
@@ -422,10 +428,55 @@ export function RelationshipBlocksSection({
   }
 
   async function addBlock(kind: BlockKind, options?: { parentSide?: "mother" | "father" }) {
-    const before = blockList.map((item) => item.relationshipBlockId)
-    const result = await run(() => createRelationshipBlockAction(clientId, kind, options))
-    const created = result?.blocks?.find((item) => !before.includes(item.relationshipBlockId))
-    if (created) openBlock(created.relationshipBlockId)
+    // Other-children still opens as a block-only form (no partner).
+    if (kind === "client_other_children") {
+      const before = blockList.map((item) => item.relationshipBlockId)
+      const result = await run(() => createRelationshipBlockAction(clientId, kind, options))
+      const created = result?.blocks?.find((item) => !before.includes(item.relationshipBlockId))
+      if (created) openBlock(created.relationshipBlockId)
+      return
+    }
+    const beforeBlocks = blockList.map((item) => item.relationshipBlockId)
+    const beforePeople = people.map((item) => item.relationshipRecordId)
+    const result = await run(() => createRelationshipWithMemberAction(clientId, kind, options))
+    if (!result || !("blocks" in result) || !result.blocks || !result.relationships) return
+    const createdBlock =
+      ("createdBlockId" in result && typeof result.createdBlockId === "string"
+        ? result.blocks.find((item) => item.relationshipBlockId === result.createdBlockId)
+        : null) ??
+      result.blocks.find((item) => !beforeBlocks.includes(item.relationshipBlockId))
+    const createdMember =
+      ("createdMemberId" in result && typeof result.createdMemberId === "string"
+        ? result.relationships.find((item) => item.relationshipRecordId === result.createdMemberId)
+        : null) ??
+      result.relationships.find((item) => !beforePeople.includes(item.relationshipRecordId))
+    if (createdBlock && createdMember) {
+      setSelection({
+        type: "new_relationship",
+        blockId: createdBlock.relationshipBlockId,
+        memberId: createdMember.relationshipRecordId,
+      })
+      setError(null)
+    }
+  }
+
+  async function closeNewRelationship(blockId: string, memberId: string, blockDraft: RelationshipBlock, personDraft: PersonDraft) {
+    const member = people.find((item) => item.relationshipRecordId === memberId)
+    if (!member) {
+      closePanel()
+      return
+    }
+    const person = personFromDraft(member, personDraft)
+    if (isEmptyNewRelationshipDraft(blockDraft, person)) {
+      await run(() => discardEmptyRelationshipDraftAction(clientId, blockId, memberId))
+      closePanel()
+      return
+    }
+    await run(async () => {
+      await updateRelationshipBlockAction(clientId, blockDraft)
+      return updateBlockMemberAction(clientId, person)
+    })
+    closePanel()
   }
 
   function schedulePersonSave(person: RelationshipRecord, draft: PersonDraft) {
@@ -479,7 +530,17 @@ export function RelationshipBlocksSection({
   const selectedId =
     selection?.type === "person" || selection?.type === "block" || selection?.type === "move"
       ? selection.id
-      : null
+      : selection?.type === "new_relationship"
+        ? selection.blockId
+        : null
+  const newRelationshipBlock =
+    selection?.type === "new_relationship"
+      ? blockList.find((item) => item.relationshipBlockId === selection.blockId)
+      : undefined
+  const newRelationshipMember =
+    selection?.type === "new_relationship"
+      ? people.find((item) => item.relationshipRecordId === selection.memberId)
+      : undefined
 
   return (
     <>
@@ -777,13 +838,59 @@ export function RelationshipBlocksSection({
         ? createPortal(
             <RelationshipPanelShell
               ariaLabel={
-                selection.type === "block"
-                  ? selectedBlock?.relationshipBlockId || "Relationship"
-                  : selectedPerson?.givenName || "Person"
+                selection.type === "new_relationship"
+                  ? newRelationshipBlock?.kind === "caregiver_arrangement"
+                    ? "New arrangement"
+                    : "New relationship"
+                  : selection.type === "block"
+                    ? selectedBlock?.relationshipBlockId || "Relationship"
+                    : selectedPerson?.givenName || "Person"
               }
-              onDismiss={closePanel}
+              onDismiss={() => {
+                if (selection.type === "new_relationship" && newRelationshipBlock && newRelationshipMember) {
+                  void closeNewRelationship(
+                    selection.blockId,
+                    selection.memberId,
+                    newRelationshipBlock,
+                    draftFromPerson(newRelationshipMember)
+                  )
+                  return
+                }
+                closePanel()
+              }}
             >
-              {selection.type === "move" && selectedPerson ? (
+              {selection.type === "new_relationship" && newRelationshipBlock && newRelationshipMember ? (
+                <NewRelationshipPanel
+                  key={`${selection.blockId}-${selection.memberId}`}
+                  block={newRelationshipBlock}
+                  member={newRelationshipMember}
+                  people={people}
+                  locked={newRelationshipBlock.relationshipBlockId === lockedId}
+                  error={error}
+                  onBlockChange={(draft) => {
+                    void run(() => updateRelationshipBlockAction(clientId, draft))
+                  }}
+                  onPersonChange={(draft) => {
+                    void run(() =>
+                      updateBlockMemberAction(clientId, personFromDraft(newRelationshipMember, draft))
+                    )
+                  }}
+                  onAddAnother={async (blockDraft, personDraft) => {
+                    await run(async () => {
+                      await updateRelationshipBlockAction(clientId, blockDraft)
+                      return updateBlockMemberAction(clientId, personFromDraft(newRelationshipMember, personDraft))
+                    })
+                    const role = newRelationshipMember.blockRole === "caregiver" ? "caregiver" : "partner"
+                    await addPerson(newRelationshipBlock.relationshipBlockId, role)
+                  }}
+                  onDone={(blockDraft, personDraft) =>
+                    void closeNewRelationship(selection.blockId, selection.memberId, blockDraft, personDraft)
+                  }
+                  onClose={(blockDraft, personDraft) =>
+                    void closeNewRelationship(selection.blockId, selection.memberId, blockDraft, personDraft)
+                  }
+                />
+              ) : selection.type === "move" && selectedPerson ? (
                 <>
                   <PanelHeader
                     initial={(selectedPerson.givenName.trim() || "?").slice(0, 1).toUpperCase()}
@@ -962,6 +1069,158 @@ function InterviewPersonPanel({
   )
 }
 
+function NewRelationshipPanel({
+  block,
+  member,
+  people,
+  locked,
+  error,
+  onBlockChange,
+  onPersonChange,
+  onAddAnother,
+  onDone,
+  onClose,
+}: {
+  block: RelationshipBlock
+  member: RelationshipRecord
+  people: RelationshipRecord[]
+  locked: boolean
+  error: string | null
+  onBlockChange: (draft: RelationshipBlock) => void
+  onPersonChange: (draft: PersonDraft) => void
+  onAddAnother: (blockDraft: RelationshipBlock, personDraft: PersonDraft) => Promise<void>
+  onDone: (blockDraft: RelationshipBlock, personDraft: PersonDraft) => void
+  onClose: (blockDraft: RelationshipBlock, personDraft: PersonDraft) => void
+}) {
+  const [blockDraft, setBlockDraft] = useState(block)
+  const [personDraft, setPersonDraft] = useState(draftFromPerson(member))
+  const isArrangement = block.kind === "caregiver_arrangement"
+  const context = resolveFormContext(
+    {
+      clientName: "",
+      about: "self",
+      block,
+      person:
+        block.kind === "parent_other"
+          ? people.find(
+              (person) =>
+                person.relationshipToClient === block.parentSide ||
+                (person.blockRole === "parent" && person.blockRoleType === block.parentSide)
+            ) ?? null
+          : null,
+    },
+    people
+  )
+  const showChildren = block.kind === "client_current" || block.kind === "client_previous"
+  const showSiblings = block.kind === "parent_other" || block.kind === "caregiver_arrangement"
+  const addLabel = isArrangement ? "Add another caregiver" : "Add another partner"
+
+  return (
+    <>
+      <PanelHeader
+        initial="+"
+        deceased={false}
+        title={isArrangement ? "New arrangement" : "New relationship"}
+        subtitle=""
+        onClose={() => onClose(blockDraft, personDraft)}
+      />
+      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
+        <ContextStrip lines={context.lines} readOnly />
+        <BlockFields
+          block={blockDraft}
+          locked={locked}
+          showChildrenQuestion={false}
+          onChange={(next) => {
+            setBlockDraft(next)
+            onBlockChange(next)
+          }}
+        />
+        <div className="space-y-2">
+          <h3 className="text-sm font-medium">{isArrangement ? "Caregiver" : "Partner"}</h3>
+          <PersonFields
+            idPrefix={`${member.relationshipRecordId}-new`}
+            person={member}
+            block={blockDraft}
+            draft={personDraft}
+            basicsOnly
+            onChange={(next) => {
+              setPersonDraft(next)
+              onPersonChange(next)
+            }}
+          />
+        </div>
+        {showChildren ? (
+          <SelectField
+            id={`${block.relationshipBlockId}-children-new`}
+            label="Children"
+            value={blockDraft.childrenAnswer || (blockDraft.noChildren ? "none" : "")}
+            onChange={(childrenAnswer) => {
+              const answer =
+                childrenAnswer === "yes" || childrenAnswer === "none" || childrenAnswer === "not_asked"
+                  ? childrenAnswer
+                  : ("" as const)
+              const next: RelationshipBlock = {
+                ...blockDraft,
+                childrenAnswer: answer,
+                noChildren: answer === "none",
+              }
+              setBlockDraft(next)
+              onBlockChange(next)
+            }}
+          >
+            <option value="">Select…</option>
+            <option value="yes">Yes</option>
+            <option value="none">None</option>
+            <option value="not_asked">Not asked</option>
+          </SelectField>
+        ) : null}
+        {showSiblings ? (
+          <SelectField
+            id={`${block.relationshipBlockId}-siblings-new`}
+            label="Siblings"
+            value={blockDraft.siblingsAnswer || ""}
+            onChange={(siblingsAnswer) => {
+              const answer =
+                siblingsAnswer === "yes" || siblingsAnswer === "none" || siblingsAnswer === "not_asked"
+                  ? siblingsAnswer
+                  : ("" as const)
+              const next: RelationshipBlock = {
+                ...blockDraft,
+                siblingsAnswer: answer,
+              }
+              setBlockDraft(next)
+              onBlockChange(next)
+            }}
+          >
+            <option value="">Select…</option>
+            <option value="yes">Yes</option>
+            <option value="none">None</option>
+            <option value="not_asked">Not asked</option>
+          </SelectField>
+        ) : null}
+        {error ? <p className="text-sm text-destructive">{error}</p> : null}
+      </div>
+      <footer className="flex flex-wrap items-center gap-2 border-t p-4">
+        <button
+          type="button"
+          className={cn(linkClass, "min-h-10")}
+          onClick={() => void onAddAnother(blockDraft, personDraft)}
+        >
+          {addLabel}
+        </button>
+        <span className="flex-1" />
+        <button
+          type="button"
+          className="inline-flex min-h-10 items-center rounded-md bg-primary px-3 text-sm text-primary-foreground"
+          onClick={() => onDone(blockDraft, personDraft)}
+        >
+          Done
+        </button>
+      </footer>
+    </>
+  )
+}
+
 function InterviewBlockPanel({
   block,
   locked,
@@ -993,7 +1252,6 @@ function InterviewBlockPanel({
         <BlockFields
           block={draft}
           locked={locked}
-          showChildrenCheckbox={false}
           onChange={(next) => {
             setDraft(next)
             onDraftChange(next)

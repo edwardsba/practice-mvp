@@ -1,6 +1,7 @@
 import { HISTORY_QUESTIONS, historyQuestionKeyForEvent, resolvedAbout } from "@/lib/client-background/interview-history"
 import {
   CONDITION_EVENT_TYPES,
+  SINGLE_EVENT_TYPES,
   TREATMENT_EVENT_TYPES,
   type EventRecord,
   type EventType,
@@ -12,6 +13,19 @@ export function isConditionEvent(eventType: EventType): boolean {
 
 export function isTreatmentEvent(eventType: EventType): boolean {
   return (TREATMENT_EVENT_TYPES as readonly string[]).includes(eventType)
+}
+
+export function isOtherEvent(eventType: EventType): boolean {
+  return eventType === "other_event"
+}
+
+export function isSingleEventType(eventType: EventType): boolean {
+  return (SINGLE_EVENT_TYPES as readonly string[]).includes(eventType)
+}
+
+/** Nested event under an issue or single event (not a free-text step). */
+export function isNestedHistoryEvent(eventType: EventType): boolean {
+  return isConditionEvent(eventType) || isTreatmentEvent(eventType) || isOtherEvent(eventType)
 }
 
 export function entryHasTitle(event: Pick<EventRecord, "title">): boolean {

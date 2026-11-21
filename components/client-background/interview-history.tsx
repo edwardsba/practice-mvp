@@ -46,6 +46,7 @@ import type {
 
 export function InterviewHistory({
   clientId,
+  clientName = "Client",
   dateOfBirth,
   events,
   relationships,
@@ -66,6 +67,7 @@ export function InterviewHistory({
   sectionSyncKey = 0,
 }: {
   clientId: string
+  clientName?: string
   dateOfBirth: string | null
   events: EventRecord[]
   relationships: RelationshipRecord[]
@@ -222,6 +224,7 @@ export function InterviewHistory({
     <div className="space-y-4">
       <HistoryTreeSection
         clientId={clientId}
+        clientName={clientName}
         dateOfBirth={dateOfBirth}
         events={entries}
         relationships={relationships}

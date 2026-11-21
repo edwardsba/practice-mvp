@@ -196,12 +196,15 @@ export function PersonFields({
   block,
   draft,
   onChange,
+  /** New relationship form: Name, Sex, DOB/age, Health (+ caregiver Relationship). */
+  basicsOnly = false,
 }: {
   idPrefix: string
   person: RelationshipRecord
   block: RelationshipBlock | null
   draft: PersonDraft
   onChange: (draft: PersonDraft) => void
+  basicsOnly?: boolean
 }) {
   function patch(partial: Partial<PersonDraft>) {
     onChange({ ...draft, ...partial })
@@ -223,12 +226,12 @@ export function PersonFields({
       </SelectField>
       <PartialDatePicker
         id={`${idPrefix}-dob`}
-        dateLabel="Date of birth"
+        dateLabel="Date of birth or age"
         mode="person"
         value={draft.dateOfBirth}
         onChange={(dateOfBirth) => patch({ dateOfBirth })}
       />
-      {role === "child" && childTypes.length > 0 ? (
+      {!basicsOnly && role === "child" && childTypes.length > 0 ? (
         <SelectField
           id={`${idPrefix}-child-type`}
           label="Type"
@@ -243,7 +246,7 @@ export function PersonFields({
           ))}
         </SelectField>
       ) : null}
-      {role === "sibling" && siblingTypes.length > 0 ? (
+      {!basicsOnly && role === "sibling" && siblingTypes.length > 0 ? (
         <SelectField
           id={`${idPrefix}-sibling-type`}
           label="Type"
@@ -257,7 +260,7 @@ export function PersonFields({
           ))}
         </SelectField>
       ) : null}
-      {role === "parent" ? (
+      {!basicsOnly && role === "parent" ? (
         <SelectField
           id={`${idPrefix}-parent`}
           label="Parent"
@@ -283,7 +286,7 @@ export function PersonFields({
           ))}
         </SelectField>
       ) : null}
-      {role === "parent" ? (
+      {!basicsOnly && role === "parent" ? (
         <label className="flex min-h-10 items-center gap-2 text-sm">
           <input type="checkbox" checked={draft.notKnown} onChange={(event) => patch({ notKnown: event.target.checked })} />
           Not known
@@ -316,6 +319,8 @@ export function PersonFields({
           onChange={(dateOfDeath) => patch({ dateOfDeath })}
         />
       ) : null}
+      {basicsOnly ? null : (
+      <>
       <SelectField
         id={`${idPrefix}-support`}
         label="Supportive"
@@ -374,6 +379,8 @@ export function PersonFields({
           </option>
         ))}
       </SelectField>
+      </>
+      )}
     </div>
   )
 }
@@ -382,15 +389,25 @@ export function BlockFields({
   block,
   locked,
   onChange,
-  showChildrenCheckbox = true,
+  showChildrenQuestion = false,
+  hideEndedForCurrent = true,
 }: {
   block: RelationshipBlock
   locked: boolean
   onChange: (block: RelationshipBlock) => void
-  /** Client Background panel keeps the legacy checkbox; interview uses Children SelectField in the tree. */
-  showChildrenCheckbox?: boolean
+  /** Yes / None / Not asked — same as the interview Children dropdown. */
+  showChildrenQuestion?: boolean
+  hideEndedForCurrent?: boolean
 }) {
   const statuses = statusesForBlock(block.kind)
+  const hideEnded =
+    hideEndedForCurrent &&
+    (block.kind === "client_current" ||
+      block.status === "married" ||
+      block.status === "de_facto" ||
+      block.status === "dating" ||
+      block.status === "engaged" ||
+      (block.status in CURRENT_BLOCK_STATUS_LABELS && block.kind !== "client_previous"))
   return (
     <div className="space-y-3">
       {statuses.length > 0 ? (
@@ -464,7 +481,7 @@ export function BlockFields({
           onChange={(startedOn) => onChange({ ...block, startedOn })}
         />
       ) : null}
-      {block.kind !== "client_other_children" && block.kind !== "client_current" ? (
+      {block.kind !== "client_other_children" && !hideEnded ? (
         <PartialDatePicker
           id={`${block.relationshipBlockId}-end`}
           dateLabel="Ended"
@@ -473,21 +490,24 @@ export function BlockFields({
           onChange={(endedOn) => onChange({ ...block, endedOn })}
         />
       ) : null}
-      {showChildrenCheckbox && (block.kind === "client_current" || block.kind === "client_previous") ? (
-        <label className="flex min-h-10 items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            checked={block.noChildren || block.childrenAnswer === "none"}
-            onChange={(event) =>
-              onChange({
-                ...block,
-                noChildren: event.target.checked,
-                childrenAnswer: event.target.checked ? "none" : block.childrenAnswer === "none" ? "" : block.childrenAnswer,
-              })
-            }
-          />
-          No children
-        </label>
+      {showChildrenQuestion && (block.kind === "client_current" || block.kind === "client_previous") ? (
+        <SelectField
+          id={`${block.relationshipBlockId}-children`}
+          label="Children"
+          value={block.childrenAnswer || (block.noChildren ? "none" : "")}
+          onChange={(childrenAnswer) =>
+            onChange({
+              ...block,
+              childrenAnswer: childrenAnswer === "yes" || childrenAnswer === "none" || childrenAnswer === "not_asked" ? childrenAnswer : "",
+              noChildren: childrenAnswer === "none",
+            })
+          }
+        >
+          <option value="">Select…</option>
+          <option value="yes">Yes</option>
+          <option value="none">None</option>
+          <option value="not_asked">Not asked</option>
+        </SelectField>
       ) : null}
     </div>
   )

@@ -42,6 +42,7 @@ function refresh(clientId: string) {
   revalidatePath(`/clients/${clientId}/background`)
   revalidatePath(`/clients/${clientId}/background/interview`)
   revalidatePath(`/clients/${clientId}`)
+  revalidatePath(`/clients/${clientId}/edit`)
 }
 
 export async function saveIdentityAction(clientId: string, identity: unknown) {

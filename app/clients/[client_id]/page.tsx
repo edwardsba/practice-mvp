@@ -40,13 +40,18 @@ import { appendReturnTo } from "@/lib/navigation/back"
 import { buildTemplateVariablesFromLinkResponse } from "@/lib/email/link-response"
 import { getQuestionnaireEmailContext } from "@/lib/email/practitioner-context"
 import { loadActiveTreatmentPlanSummary } from "@/lib/treatment-plans/load"
-import { loadClientBackgroundSummary } from "@/lib/client-background/load"
+import {
+  loadClientBackground,
+  loadClientBackgroundSummary,
+} from "@/lib/client-background/load"
 import { formatCommunicationSummary } from "@/lib/clients/communication-summary"
+import { buildEditDetailsHref } from "@/lib/clients/edit-details-panels"
 import {
   formatCrisisPlanSummary,
   formatEmergencyContactSummary,
 } from "@/lib/clients/emergency-details-summary"
 import { buildReferralFundingPanelSummary } from "@/lib/clients/referral-funding-summary"
+import { formatStressorsSummary } from "@/lib/clients/stressors-summary"
 import {
   ATTENDANCE_RISK_CONFIG,
   CLIENT_STATUS_CONFIG,
@@ -99,6 +104,7 @@ export default async function ClientDetailPage({
     latestAsq,
     latestPsf,
     backgroundSummary,
+    background,
   ] = await Promise.all([
     loadActiveTreatmentPlanSummary(clientId, context.practiceId),
     loadActiveCrisisPlanSummary(clientId, context.practiceId),
@@ -112,7 +118,10 @@ export default async function ClientDetailPage({
     loadLatestAssessmentResultForClient(clientId, context.practiceId, "ASQ"),
     loadLatestAssessmentResultForClient(clientId, context.practiceId, "PSF"),
     loadClientBackgroundSummary(clientId, context.practiceId),
+    loadClientBackground(clientId, context.practiceId),
   ])
+
+  const stressorsLine = formatStressorsSummary(background?.stressors)
 
   const referralFunding = buildReferralFundingCardProps(
     context.practiceId,
@@ -230,21 +239,6 @@ export default async function ClientDetailPage({
                 statusMap={ATTENDANCE_RISK_CONFIG}
               />
             </ClientPanelField>
-            <ClientPanelField label="Risk">
-              {latestAsq ? (
-                <span>
-                  ASQ · {formatDate(latestAsq.assessmentDate)}
-                  {latestAsq.score != null ? ` · ${latestAsq.score}` : ""}
-                  {latestAsq.severity
-                    ? ` · ${latestAsq.severity}`
-                    : ""}
-                </span>
-              ) : (
-                <span className="font-normal text-muted-foreground">
-                  No ASQ on file
-                </span>
-              )}
-            </ClientPanelField>
             <ClientPanelField label="Notes">
               <div className="max-h-24 overflow-y-auto rounded-md border bg-muted/30 p-2 text-sm font-normal whitespace-pre-wrap">
                 {client.notes?.trim() || (
@@ -258,7 +252,7 @@ export default async function ClientDetailPage({
         <ClientPanel
           title="Contact details"
           control="open"
-          openHref={`/clients/${clientId}/edit`}
+          openHref={buildEditDetailsHref(clientId, "details")}
         >
           <ClientPanelFields>
             <ClientPanelField label="Phone">
@@ -283,7 +277,12 @@ export default async function ClientDetailPage({
               )}
             </ClientPanelField>
             <ClientPanelField label="Communication">
-              <span className="font-normal">{communicationLine}</span>
+              <Link
+                href={buildEditDetailsHref(clientId, "communication")}
+                className="font-normal text-primary hover:underline"
+              >
+                {communicationLine}
+              </Link>
             </ClientPanelField>
           </ClientPanelFields>
         </ClientPanel>
@@ -324,6 +323,14 @@ export default async function ClientDetailPage({
                   {formatCrisisPlanSummary(activeCrisisPlan)}
                 </p>
               </div>
+              <div className="border-t pt-4">
+                <Link
+                  href={buildEditDetailsHref(clientId, "emergency")}
+                  className="text-sm text-primary hover:underline"
+                >
+                  Edit emergency contacts ›
+                </Link>
+              </div>
             </div>
           }
         >
@@ -349,6 +356,21 @@ export default async function ClientDetailPage({
               >
                 {formatCrisisPlanSummary(activeCrisisPlan)}
               </span>
+            </ClientPanelField>
+            <ClientPanelField label="Risk">
+              {latestAsq ? (
+                <span>
+                  ASQ · {formatDate(latestAsq.assessmentDate)}
+                  {latestAsq.score != null ? ` · ${latestAsq.score}` : ""}
+                  {latestAsq.severity
+                    ? ` · ${latestAsq.severity}`
+                    : ""}
+                </span>
+              ) : (
+                <span className="font-normal text-muted-foreground">
+                  No ASQ on file
+                </span>
+              )}
             </ClientPanelField>
           </ClientPanelFields>
         </ClientPanel>
@@ -498,6 +520,17 @@ export default async function ClientDetailPage({
                   No PSF on file
                 </span>
               )}
+            </ClientPanelField>
+            <ClientPanelField label="Stressors">
+              <span
+                className={
+                  stressorsLine === "None recorded"
+                    ? "font-normal text-muted-foreground"
+                    : "font-normal"
+                }
+              >
+                {stressorsLine}
+              </span>
             </ClientPanelField>
           </ClientPanelFields>
           <p className="mt-3 text-xs text-muted-foreground">

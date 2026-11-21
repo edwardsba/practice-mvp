@@ -54,6 +54,7 @@ type ClientPanelBase = {
   title: string
   children: ReactNode
   className?: string
+  id?: string
 }
 
 type ClientPanelMenu = ClientPanelBase & {
@@ -62,6 +63,7 @@ type ClientPanelMenu = ClientPanelBase & {
   expandedContent?: never
   openHref?: never
   openLabel?: never
+  defaultExpanded?: never
 }
 
 type ClientPanelOpen = ClientPanelBase & {
@@ -70,11 +72,14 @@ type ClientPanelOpen = ClientPanelBase & {
   openLabel?: string
   menuContent?: never
   expandedContent?: never
+  defaultExpanded?: never
 }
 
 type ClientPanelExpand = ClientPanelBase & {
   control: "expand"
   expandedContent: ReactNode
+  /** When true, the panel starts open (e.g. from `?open=`). Not remembered between visits. */
+  defaultExpanded?: boolean
   menuContent?: never
   openHref?: never
   openLabel?: never
@@ -89,11 +94,16 @@ export type ClientPanelProps =
  * Shared client-details panel: title + one control (menu / open / expand) + body.
  */
 export function ClientPanel(props: ClientPanelProps) {
-  const [expanded, setExpanded] = useState(false)
-  const { title, children, className, control } = props
+  const { title, children, className, control, id } = props
+  const [expanded, setExpanded] = useState(
+    control === "expand" ? Boolean(props.defaultExpanded) : false
+  )
 
   return (
-    <Card className={cn("gap-4 py-4 shadow-sm", className)}>
+    <Card
+      id={id}
+      className={cn("scroll-mt-24 gap-4 py-4 shadow-sm", className)}
+    >
       <CardHeader className="flex flex-row items-center justify-between gap-3 space-y-0 px-4 py-0">
         <CardTitle className="text-base font-semibold">{title}</CardTitle>
         {control === "menu" ? (
@@ -109,10 +119,7 @@ export function ClientPanel(props: ClientPanelProps) {
                 <Menu className="size-5" aria-hidden />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent
-              align="end"
-              className="w-auto min-w-56"
-            >
+            <DropdownMenuContent align="end" className="w-auto min-w-56">
               {props.menuContent}
             </DropdownMenuContent>
           </DropdownMenu>

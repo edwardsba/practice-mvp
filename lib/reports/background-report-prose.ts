@@ -1,6 +1,7 @@
 import { assessAge, clientAgeAtStart, compareEventsChronologically } from "@/lib/client-background/age"
 import { conditionGroups } from "@/lib/client-background/condition-groups"
 import { resolvedAbout } from "@/lib/client-background/interview-history"
+import { treatmentsForIssue } from "@/lib/client-background/history-issues"
 import { treatmentsForCondition } from "@/lib/client-background/history-links"
 import { parsePartialDate, precisionForPartialDate } from "@/lib/client-background/partial-date"
 import { professionalSummary, type ProfessionalOption } from "@/lib/client-background/professionals"
@@ -415,6 +416,38 @@ export function currentMedicationParagraph(
   return `${name} is currently taking ${joinAnd(parts)}.`
 }
 
+function linkedTreatmentsForConditionKind(
+  kind: "illness_injury" | "emotional_problems" | "substance_use",
+  events: EventRecord[],
+  dateOfBirth: string | null
+): EventRecord[] {
+  const rows = events.filter(
+    (event) => event.eventType === kind && resolvedAbout(event) === "self" && !event.parentEventId
+  )
+  const seen = new Set<string>()
+  const linked: EventRecord[] = []
+  const groupIds = new Set(
+    rows.map((event) => event.conditionGroupId).filter((id): id is string => Boolean(id))
+  )
+  for (const groupId of groupIds) {
+    for (const treatment of treatmentsForIssue(events, groupId)) {
+      if (seen.has(treatment.eventRecordId)) continue
+      seen.add(treatment.eventRecordId)
+      linked.push(treatment)
+    }
+  }
+  // Legacy: treatments linked only by conditionEventId (no group id yet).
+  for (const episode of rows) {
+    for (const treatment of treatmentsForCondition(events, episode.eventRecordId)) {
+      if (seen.has(treatment.eventRecordId)) continue
+      seen.add(treatment.eventRecordId)
+      linked.push(treatment)
+    }
+  }
+  void dateOfBirth
+  return linked
+}
+
 export function conditionParagraph(
   kind: "illness_injury" | "emotional_problems" | "substance_use" | "self_harm" | "traumatic_event" | "significant_history",
   events: EventRecord[],
@@ -423,20 +456,22 @@ export function conditionParagraph(
   dateOfBirth: string | null
 ): string | null {
   const rows = sortByStart(
-    events.filter((event) => event.eventType === kind && resolvedAbout(event) === "self"),
+    events.filter((event) => event.eventType === kind && resolvedAbout(event) === "self" && !event.parentEventId),
     dateOfBirth
   )
   if (rows.length === 0) return null
-  const linked = rows.flatMap((event) => treatmentsForCondition(events, event.eventRecordId))
-  if (kind === "illness_injury") {
-    const care = linkedTreatmentsSentence(linked, voice, dateOfBirth)
-    return [illnessInjurySentence(rows, name, dateOfBirth), care].filter(Boolean).join(" ")
+  if (kind === "illness_injury" || kind === "emotional_problems" || kind === "substance_use") {
+    const linked = linkedTreatmentsForConditionKind(kind, events, dateOfBirth)
+    if (kind === "illness_injury") {
+      const care = linkedTreatmentsSentence(linked, voice, dateOfBirth)
+      return [illnessInjurySentence(rows, name, dateOfBirth), care].filter(Boolean).join(" ")
+    }
+    if (kind === "emotional_problems") {
+      const care = linkedTreatmentsSentence(linked, voice, dateOfBirth)
+      return [emotionalProblemsSentence(rows, name, dateOfBirth), care].filter(Boolean).join(" ")
+    }
+    return substanceUseSentence(rows, linked, name, dateOfBirth)
   }
-  if (kind === "emotional_problems") {
-    const care = linkedTreatmentsSentence(linked, voice, dateOfBirth)
-    return [emotionalProblemsSentence(rows, name, dateOfBirth), care].filter(Boolean).join(" ")
-  }
-  if (kind === "substance_use") return substanceUseSentence(rows, linked, name, dateOfBirth)
   if (kind === "self_harm") return selfHarmSentence(rows, name, dateOfBirth)
   if (kind === "traumatic_event") return traumaticEventsSentence(rows, name, dateOfBirth)
   return otherSignificantEventsSentence(rows, name, dateOfBirth)
@@ -447,6 +482,8 @@ export function unlinkedTreatmentsParagraph(events: EventRecord[], name: string,
     (event) =>
       (event.eventType === "psychiatric_admission" || event.eventType === "previous_therapy" || event.eventType === "medication") &&
       resolvedAbout(event) === "self" &&
+      !event.parentEventId &&
+      !event.conditionGroupId &&
       !event.conditionEventId
   )
   if (rows.length === 0) return null

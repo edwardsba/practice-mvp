@@ -3,23 +3,25 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react"
 import { ChevronDown } from "lucide-react"
 
-import { DemographicsSection } from "@/components/client-background/demographics-section"
+import { DemographicsSection, LivingSituationSection } from "@/components/client-background/demographics-section"
 import { HistoryTreeSection } from "@/components/client-background/history-tree-section"
 import { BackgroundInterviewCard } from "@/components/client-background/interview-card"
 import { BackgroundStressorsSection } from "@/components/client-background/medication-stressors"
-import { ReasonSection } from "@/components/client-background/reason-section"
 import { RelationshipTreeSection } from "@/components/client-background/relationship-tree-section"
 import { scrollToBackgroundCheck } from "@/components/client-background/worth-checking"
+import { ReferralFundingCard } from "@/components/funding/referral-funding-card"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { backgroundChecks, backgroundSectionForCheck, type BackgroundCheck } from "@/lib/client-background/checks"
 import type { BackgroundInterviewCardData, ReasonSupport } from "@/lib/client-background/load"
 import { emptyBlockAnswers, type ClientBackgroundData } from "@/lib/client-background/types"
+import type { ReferralFundingCardProps } from "@/lib/funding/referral-funding-card-props"
 import { cn } from "@/lib/utils"
 
 const SECTIONS = [
-  { id: "reason", label: "Referral" },
+  { id: "reason", label: "Referral and funding" },
   { id: "demographics", label: "Demographics" },
   { id: "relationships", label: "Relationships" },
+  { id: "living", label: "Living situation" },
   { id: "history", label: "History" },
   { id: "stressors", label: "Stressors" },
   { id: "risk", label: "Risk" },
@@ -29,18 +31,24 @@ type SectionId = (typeof SECTIONS)[number]["id"]
 
 export function ClientBackgroundPage({
   clientId,
-  practiceId,
+  clientName = "Client",
+  practiceId: _practiceId,
   data,
   interview,
   numberOfChildren,
   reasonSupport,
+  referralFunding,
+  referralRecorded = false,
 }: {
   clientId: string
+  clientName?: string
   practiceId: string
   data: ClientBackgroundData
   interview: BackgroundInterviewCardData
   numberOfChildren: number | null
   reasonSupport: ReasonSupport
+  referralFunding: ReferralFundingCardProps
+  referralRecorded?: boolean
 }) {
   const [open, setOpen] = useState<SectionId | null>(null)
   useEffect(() => {
@@ -51,12 +59,15 @@ export function ClientBackgroundPage({
       target === "reason" ||
       target === "stressors" ||
       target === "relationships" ||
+      target === "living" ||
       target === "history" ||
       target === "risk"
         ? target
         : target.startsWith("history")
           ? "history"
-          : "demographics"
+          : target === "living"
+            ? "living"
+            : "demographics"
     setOpen(section)
     window.setTimeout(() => {
       document.getElementById(hash)?.scrollIntoView({ behavior: "smooth", block: "start" })
@@ -69,8 +80,9 @@ export function ClientBackgroundPage({
         data,
         numberOfChildren,
         screening: interview.latest?.screening ?? null,
+        referralRecorded,
       }),
-    [data, interview.latest, numberOfChildren]
+    [data, interview.latest, numberOfChildren, referralRecorded]
   )
 
   function toggle(id: SectionId) {
@@ -94,18 +106,7 @@ export function ClientBackgroundPage({
           open={open === item.id}
           onToggle={() => toggle(item.id)}
         >
-          {item.id === "reason" ? (
-            <ReasonSection
-              clientId={clientId}
-              practiceId={practiceId}
-              reason={data.reason}
-              professionals={reasonSupport.professionals}
-              professions={reasonSupport.professions}
-              organisations={reasonSupport.organisations}
-              relationships={data.relationships}
-              suggestedProfessionalId={reasonSupport.suggestedProfessionalId}
-            />
-          ) : null}
+          {item.id === "reason" ? <ReferralFundingCard {...referralFunding} hideTitle /> : null}
           {item.id === "demographics" ? (
             <DemographicsSection
               clientId={clientId}
@@ -124,14 +125,23 @@ export function ClientBackgroundPage({
               events={data.events}
             />
           ) : null}
+          {item.id === "living" ? (
+            <LivingSituationSection
+              clientId={clientId}
+              livingSituation={data.demographics.livingSituation}
+              relationships={data.relationships}
+            />
+          ) : null}
           {item.id === "history" ? (
             <HistoryTreeSection
               clientId={clientId}
+              clientName={clientName.split(/\s+/)[0] || clientName}
               dateOfBirth={data.dateOfBirth}
               events={data.events}
               relationships={data.relationships}
               screening={interview.latest?.screening ?? {}}
               professionals={reasonSupport.professionals}
+              issues={data.issues}
             />
           ) : null}
           {item.id === "stressors" ? (

@@ -9,10 +9,10 @@ import {
   clientBackgroundInterviews,
   clientBackgrounds,
   clientEventRecords,
+  clientHistoryIssues,
   clientRelationshipBlocks,
   clientRelationshipRecords,
   clients,
-  fundingApprovals,
   practitionerProfiles,
   professionalOrganisations,
   professionals,
@@ -24,13 +24,13 @@ import { db } from "@/lib/db"
 import { settleEventDates } from "@/lib/client-background/age"
 import {
   answeredInterviewCount,
+  interviewAnswerTotal,
   sanitizeScreening,
   type BackgroundInterviewAnswerSource,
 } from "@/lib/client-background/interview-history"
-import { toBlockAnswers, toClientRelationshipStatus, toEvent, toRelationship, toRelationshipBlock } from "@/lib/client-background/map"
+import { toBlockAnswers, toClientRelationshipStatus, toEvent, toHistoryIssue, toRelationship, toRelationshipBlock } from "@/lib/client-background/map"
 import {
   demographicsFromStored,
-  sanitizeReasonForAttending,
   sanitizeRisk,
   sanitizeStressors,
 } from "@/lib/client-background/sanitize"
@@ -43,7 +43,6 @@ import {
 import {
   emptyDemographics,
   emptyClientRelationshipStatus,
-  emptyReasonForAttending,
   emptyRisk,
   emptyStressors,
   type ClientBackgroundData,
@@ -119,6 +118,12 @@ export async function loadClientBackground(
     )
     .orderBy(asc(clientEventRecords.displayOrder))
 
+  const issueRows = await db
+    .select()
+    .from(clientHistoryIssues)
+    .where(and(eq(clientHistoryIssues.clientId, clientId), eq(clientHistoryIssues.practiceId, practiceId)))
+    .orderBy(asc(clientHistoryIssues.displayOrder))
+
   return {
     dateOfBirth: client.dateOfBirth,
     backgroundCapturedAt: client.backgroundCapturedAt
@@ -131,11 +136,11 @@ export async function loadClientBackground(
       ? demographicsFromStored(background)
       : emptyDemographics(),
     stressors: background ? sanitizeStressors(background.stressorsJson) : emptyStressors(),
-    reason: background ? sanitizeReasonForAttending(background.reasonForAttendingJson) : emptyReasonForAttending(),
     relationships: relationshipRows.map(toRelationship),
     relationshipBlocks: blockRows.map(toRelationshipBlock),
     blockAnswers: toBlockAnswers(background ?? null),
     events: eventRows.map((row) => settleEventDates(toEvent(row), client.dateOfBirth)),
+    issues: issueRows.map(toHistoryIssue),
     risk: background?.riskJson ? sanitizeRisk(background.riskJson) : emptyRisk(),
   }
 }
@@ -179,7 +184,7 @@ export async function loadClientBackgroundSummary(
 }
 
 export type BackgroundInterviewCardData = {
-  inProgress: { startedAt: string; answered: number } | null
+  inProgress: { startedAt: string; answered: number; total: number } | null
   lastCompletedAt: string | null
   completed: { interviewId: string; completedAt: string; practitionerName: string }[]
   latest: BackgroundInterviewAnswerSource | null
@@ -235,17 +240,20 @@ export async function loadBackgroundInterviewCard(
     .from(clientEventRecords)
     .where(and(eq(clientEventRecords.clientId, clientId), eq(clientEventRecords.practiceId, practiceId)))
   const events = eventRows.map((row) => toEvent(row))
+  const issueRows = await db
+    .select()
+    .from(clientHistoryIssues)
+    .where(and(eq(clientHistoryIssues.clientId, clientId), eq(clientHistoryIssues.practiceId, practiceId)))
+  const issues = issueRows.map(toHistoryIssue)
 
   const [background] = await db
     .select({
       stressorsJson: clientBackgrounds.stressorsJson,
-      reasonForAttendingJson: clientBackgrounds.reasonForAttendingJson,
     })
     .from(clientBackgrounds)
     .where(and(eq(clientBackgrounds.clientId, clientId), eq(clientBackgrounds.practiceId, practiceId)))
     .limit(1)
   const stressors = sanitizeStressors(background?.stressorsJson)
-  const reason = sanitizeReasonForAttending(background?.reasonForAttendingJson)
 
   const inProgress = rows.find((row) => row.status === "in_progress") ?? null
   const completed = rows
@@ -262,8 +270,9 @@ export async function loadBackgroundInterviewCard(
             events,
             client.dateOfBirth,
             stressors,
-            reason
+            issues
           ),
+          total: interviewAnswerTotal(issues.length),
         }
       : null,
     latest: latestRow
@@ -355,7 +364,6 @@ export type ReasonSupport = {
   professionals: ProfessionalOption[]
   professions: ProfessionOption[]
   organisations: OrganisationOption[]
-  suggestedProfessionalId: string | null
 }
 
 function toProfessionalOption(row: {
@@ -368,9 +376,9 @@ function toProfessionalOption(row: {
   return row
 }
 
-/** Active professionals in the practice, plus a saved referrer who is no longer active. */
+/** Active professionals in the practice, plus a selected professional who is no longer active. */
 export async function loadReasonSupport(
-  clientId: string,
+  _clientId: string,
   practiceId: string,
   selectedProfessionalId: string | null
 ): Promise<ReasonSupport> {
@@ -406,44 +414,6 @@ export async function loadReasonSupport(
     if (selected) options = sortProfessionals([...options, selected])
   }
 
-  const approvals = await db
-    .select({
-      referrerId: fundingApprovals.referrerId,
-      startDate: fundingApprovals.startDate,
-      createdAt: fundingApprovals.createdAt,
-    })
-    .from(fundingApprovals)
-    .innerJoin(
-      professionals,
-      and(
-        eq(professionals.professionalId, fundingApprovals.referrerId),
-        eq(professionals.practiceId, practiceId),
-        eq(professionals.isActive, true)
-      )
-    )
-    .where(
-      and(
-        eq(fundingApprovals.clientId, clientId),
-        eq(fundingApprovals.practiceId, practiceId),
-        eq(fundingApprovals.isActive, true),
-        eq(fundingApprovals.approvalStatus, "active")
-      )
-    )
-
-  approvals.sort((a, b) => {
-    const aDate = a.startDate?.trim() ?? ""
-    const bDate = b.startDate?.trim() ?? ""
-    if (aDate !== bDate) {
-      if (!aDate) return 1
-      if (!bDate) return -1
-      return bDate.localeCompare(aDate)
-    }
-    return b.createdAt.getTime() - a.createdAt.getTime()
-  })
-  const suggested = approvals[0]?.referrerId ?? null
-  const suggestedProfessionalId =
-    suggested && options.some((item) => item.professionalId === suggested) ? suggested : null
-
   const professionRows = await db
     .select({
       professionId: professions.professionId,
@@ -468,6 +438,5 @@ export async function loadReasonSupport(
     professionals: options,
     professions: professionRows,
     organisations: organisationRows,
-    suggestedProfessionalId,
   }
 }

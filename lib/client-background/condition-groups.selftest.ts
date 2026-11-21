@@ -22,20 +22,37 @@ assert.equal(match?.id, depression.id)
 const separate: EventRecord = { ...emptyEvent("emotional_problems", 0), eventRecordId: "new-anxiety", title: "Anxiety" }
 assert.equal(matchingConditionGroup(events, separate, "1970-03-12"), null)
 
+// Tom fixture already has condition_group_id / issue ids — nothing left to backfill.
 let n = 0
 const plan = planConditionBackfill(
   events.map((event) => ({ clientId: "tom", event })),
   () => `group-${n++}`
 )
-assert.equal(plan.groupsMade, 6)
-const depressionIds = plan.assignments.filter((row) => row.eventRecordId.startsWith("tom-depression")).map((row) => row.conditionGroupId)
+assert.equal(plan.groupsMade, 0)
+assert.equal(plan.assignments.length, 0)
+
+const ungrouoped = events.map((event) => ({
+  ...event,
+  conditionGroupId: null as string | null,
+}))
+n = 0
+const refill = planConditionBackfill(
+  ungrouoped.map((event) => ({ clientId: "tom", event })),
+  () => `group-${n++}`
+)
+assert.equal(refill.groupsMade, 6)
+const depressionIds = refill.assignments
+  .filter((row) => row.eventRecordId.startsWith("tom-depression"))
+  .map((row) => row.conditionGroupId)
 assert.equal(depressionIds.length, 2)
 assert.equal(depressionIds[0], depressionIds[1])
-const alcohol = plan.assignments.find((row) => row.eventRecordId === "tom-alcohol")
-const leg = plan.assignments.find((row) => row.eventRecordId === "tom-leg")
-assert.ok(alcohol && leg)
+const alcohol = refill.assignments.find((row) => row.eventRecordId === "tom-alcohol")
+const friendAlcohol = refill.assignments.find((row) => row.eventRecordId === "tom-friend-alcohol")
+const leg = refill.assignments.find((row) => row.eventRecordId === "tom-leg")
+assert.ok(alcohol && friendAlcohol && leg)
 assert.notEqual(alcohol.conditionGroupId, leg.conditionGroupId)
+assert.notEqual(alcohol.conditionGroupId, friendAlcohol.conditionGroupId)
 assert.notEqual(depressionIds[0], alcohol.conditionGroupId)
-assert.equal(plan.byClient[0]?.groups, 6)
+assert.equal(refill.byClient[0]?.groups, 6)
 
 console.log("condition groups selftest passed")

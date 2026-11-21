@@ -21,6 +21,7 @@ import {
 } from "@/lib/client-background/relationship-blocks"
 import { sanitizeRelationship } from "@/lib/client-background/sanitize"
 import { saveClientRelationshipStatus } from "@/lib/client-background/mutations"
+import { isEmptyNewRelationshipDraft } from "@/lib/client-background/new-relationship-draft"
 import {
   CAREGIVER_RELATIONSHIPS,
   CHILD_TYPES,
@@ -173,6 +174,98 @@ async function ownedPerson(scope: Scope, personId: string) {
   return person ?? null
 }
 
+/**
+ * Create a relationship block and its first partner/caregiver together (Round Q).
+ * Opens as one "New relationship" / "New arrangement" form.
+ */
+export async function createRelationshipWithMember(input: Scope & {
+  kind: BlockKind
+  parentSide?: "mother" | "father" | ""
+  arrangementType?: string
+}) {
+  const created = await createRelationshipBlock(input)
+  if (!created || !("blocks" in created) || !created.blocks) return created
+  const kind = input.kind
+  const newest = created.blocks
+    .filter((block) => block.kind === kind)
+    .sort((a, b) => b.displayOrder - a.displayOrder)[0]
+  if (!newest) return created
+  const role: BlockRole = kind === "caregiver_arrangement" ? "caregiver" : "partner"
+  const withMember = await addBlockMember({
+    ...input,
+    relationshipBlockId: newest.relationshipBlockId,
+    role,
+    roleType: "",
+  })
+  if (!withMember || !("relationships" in withMember) || !withMember.relationships) return withMember
+  const member = withMember.relationships
+    .filter((person) => person.relationshipBlockId === newest.relationshipBlockId && person.blockRole === role)
+    .sort((a, b) => b.displayOrder - a.displayOrder)[0]
+  return {
+    ...withMember,
+    createdBlockId: newest.relationshipBlockId,
+    createdMemberId: member?.relationshipRecordId ?? null,
+  }
+}
+
+/**
+ * Remove a brand-new empty relationship draft (block + first member) when the
+ * practitioner closes without entering anything.
+ */
+export async function discardEmptyRelationshipDraft(input: Scope & {
+  relationshipBlockId: string
+  memberId: string
+}) {
+  const block = await ownedBlock(input, input.relationshipBlockId)
+  const member = await ownedPerson(input, input.memberId)
+  if (!block || !member) return { error: "Relationship was not found." }
+  if (member.relationshipBlockId !== block.relationshipBlockId) {
+    return { error: "That person is not in this relationship." }
+  }
+  if (!isEmptyNewRelationshipDraft(toRelationshipBlock(block), toRelationship(member))) {
+    return loadBlockEditorState(input.clientId, input.practiceId)
+  }
+  await db
+    .delete(clientRelationshipRecords)
+    .where(
+      and(
+        eq(clientRelationshipRecords.relationshipRecordId, member.relationshipRecordId),
+        eq(clientRelationshipRecords.practiceId, input.practiceId)
+      )
+    )
+  await writeAudit(input, "client_relationship.deleted", "client_relationship", member.relationshipRecordId)
+  await db
+    .delete(clientRelationshipBlocks)
+    .where(eq(clientRelationshipBlocks.relationshipBlockId, block.relationshipBlockId))
+  await writeAudit(input, "client_relationship_block.deleted", "client_relationship_block", block.relationshipBlockId)
+  const key = answerKeyForBlock(toRelationshipBlock(block))
+  if (key) await refreshAnswer(input, key)
+  return loadBlockEditorState(input.clientId, input.practiceId)
+}
+
+/** Create an unplaced person for History "Who → + Add person". */
+export async function createUnplacedPerson(input: Scope & { givenName?: string }) {
+  if (!(await ownedClient(input.clientId, input.practiceId))) return { error: "Client was not found." }
+  const rows = await db
+    .select({ displayOrder: clientRelationshipRecords.displayOrder })
+    .from(clientRelationshipRecords)
+    .where(and(eq(clientRelationshipRecords.clientId, input.clientId), eq(clientRelationshipRecords.practiceId, input.practiceId)))
+  const displayOrder = rows.reduce((max, row) => Math.max(max, row.displayOrder), -1) + 1
+  const [created] = await db
+    .insert(clientRelationshipRecords)
+    .values({
+      clientId: input.clientId,
+      practiceId: input.practiceId,
+      relationshipToClient: "other_caregiver",
+      givenName: input.givenName?.trim() || null,
+      displayOrder,
+      placementReview: "unplaced",
+    })
+    .returning()
+  await writeAudit(input, "client_relationship.created", "client_relationship", created.relationshipRecordId)
+  return loadBlockEditorState(input.clientId, input.practiceId)
+}
+
 export async function createRelationshipBlock(input: Scope & {
   kind: BlockKind
   parentSide?: "mother" | "father" | ""
@@ -224,21 +317,68 @@ export async function updateRelationshipBlock(input: Scope & { block: unknown })
   const arrangementDetail = typeof raw?.arrangementDetail === "string" ? raw.arrangementDetail : existing.arrangementDetail
   const startedOn = typeof raw?.startedOn === "string" ? raw.startedOn : existing.startedOn
   const endedOn = typeof raw?.endedOn === "string" ? raw.endedOn : existing.endedOn
-  const noChildren = typeof raw?.noChildren === "boolean" ? raw.noChildren : existing.noChildren
+  const childrenAnswerRaw = typeof raw?.childrenAnswer === "string" ? raw.childrenAnswer : existing.childrenAnswer
+  const siblingsAnswerRaw = typeof raw?.siblingsAnswer === "string" ? raw.siblingsAnswer : existing.siblingsAnswer
+  const childrenAnswer = isBlockAnswer(childrenAnswerRaw ?? "") ? childrenAnswerRaw : null
+  const siblingsAnswer = isBlockAnswer(siblingsAnswerRaw ?? "") ? siblingsAnswerRaw : null
+  // Keep no_children in step with children_answer so main keeps working.
+  const noChildren =
+    childrenAnswer === "none"
+      ? true
+      : childrenAnswer === "yes" || childrenAnswer === "not_asked"
+        ? false
+        : typeof raw?.noChildren === "boolean"
+          ? raw.noChildren
+          : existing.noChildren
+  const keepStatusDetail = existing.kind === "client_other_children" || status === "other"
   await db
     .update(clientRelationshipBlocks)
     .set({
       status: status || null,
-      statusDetail: status === "other" ? statusDetail || null : null,
+      statusDetail: keepStatusDetail ? statusDetail || null : null,
       arrangementType: arrangementType || null,
       arrangementDetail: arrangementType === "other" ? arrangementDetail || null : null,
       startedOn: startedOn || null,
       endedOn: endedOn || null,
       noChildren,
+      childrenAnswer,
+      siblingsAnswer,
       updatedAt: new Date(),
     })
     .where(eq(clientRelationshipBlocks.relationshipBlockId, existing.relationshipBlockId))
   return loadBlockEditorState(input.clientId, input.practiceId)
+}
+
+/** Unlink people from a block into Not placed — never silent-delete them with the block. */
+async function unplaceMembersOfBlock(scope: Scope, relationshipBlockId: string) {
+  const members = await db
+    .select({ relationshipRecordId: clientRelationshipRecords.relationshipRecordId })
+    .from(clientRelationshipRecords)
+    .where(
+      and(
+        eq(clientRelationshipRecords.relationshipBlockId, relationshipBlockId),
+        eq(clientRelationshipRecords.clientId, scope.clientId),
+        eq(clientRelationshipRecords.practiceId, scope.practiceId)
+      )
+    )
+  if (members.length === 0) return
+  await db
+    .update(clientRelationshipRecords)
+    .set({
+      relationshipBlockId: null,
+      placementReview: "unplaced",
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(clientRelationshipRecords.relationshipBlockId, relationshipBlockId),
+        eq(clientRelationshipRecords.clientId, scope.clientId),
+        eq(clientRelationshipRecords.practiceId, scope.practiceId)
+      )
+    )
+  for (const member of members) {
+    await writeAudit(scope, "client_relationship.unplaced", "client_relationship", member.relationshipRecordId)
+  }
 }
 
 export async function deleteRelationshipBlock(input: Scope & { relationshipBlockId: string }) {
@@ -246,15 +386,7 @@ export async function deleteRelationshipBlock(input: Scope & { relationshipBlock
   if (!existing) return { error: "Relationship was not found." }
   if (existing.kind === "biological_parents") return { error: "The biological parents block stays." }
   const block = toRelationshipBlock(existing)
-  await db
-    .delete(clientRelationshipRecords)
-    .where(
-      and(
-        eq(clientRelationshipRecords.relationshipBlockId, existing.relationshipBlockId),
-        eq(clientRelationshipRecords.clientId, input.clientId),
-        eq(clientRelationshipRecords.practiceId, input.practiceId)
-      )
-    )
+  await unplaceMembersOfBlock(input, existing.relationshipBlockId)
   await db
     .delete(clientRelationshipBlocks)
     .where(eq(clientRelationshipBlocks.relationshipBlockId, existing.relationshipBlockId))
@@ -326,7 +458,13 @@ export async function addBlockMember(input: Scope & { relationshipBlockId: strin
   if (input.role === "child") {
     await db
       .update(clientRelationshipBlocks)
-      .set({ noChildren: false, updatedAt: new Date() })
+      .set({ noChildren: false, childrenAnswer: "yes", updatedAt: new Date() })
+      .where(eq(clientRelationshipBlocks.relationshipBlockId, block.relationshipBlockId))
+  }
+  if (input.role === "sibling") {
+    await db
+      .update(clientRelationshipBlocks)
+      .set({ siblingsAnswer: "yes", updatedAt: new Date() })
       .where(eq(clientRelationshipBlocks.relationshipBlockId, block.relationshipBlockId))
   }
   return loadBlockEditorState(input.clientId, input.practiceId)
@@ -380,6 +518,8 @@ export async function removeBlockMember(input: Scope & { relationshipRecordId: s
   if (existing.blockRole === "parent" && (existing.relationshipToClient === "mother" || existing.relationshipToClient === "father")) {
     return { error: "Mark a parent as not known instead of removing them." }
   }
+  const blockId = existing.relationshipBlockId
+  const role = existing.blockRole
   await db
     .delete(clientRelationshipRecords)
     .where(
@@ -389,7 +529,37 @@ export async function removeBlockMember(input: Scope & { relationshipRecordId: s
       )
     )
   await writeAudit(input, "client_relationship.deleted", "client_relationship", existing.relationshipRecordId)
+  if (blockId && (role === "child" || role === "sibling")) {
+    await refreshMemberAnswer(input, blockId, role)
+  }
   return loadBlockEditorState(input.clientId, input.practiceId)
+}
+
+/** Removing the last child/sibling sets Not asked, never None. */
+async function refreshMemberAnswer(scope: Scope, blockId: string, role: "child" | "sibling") {
+  const remaining = await db
+    .select({ relationshipRecordId: clientRelationshipRecords.relationshipRecordId })
+    .from(clientRelationshipRecords)
+    .where(
+      and(
+        eq(clientRelationshipRecords.relationshipBlockId, blockId),
+        eq(clientRelationshipRecords.clientId, scope.clientId),
+        eq(clientRelationshipRecords.practiceId, scope.practiceId),
+        eq(clientRelationshipRecords.blockRole, role)
+      )
+    )
+  if (remaining.length > 0) return
+  if (role === "child") {
+    await db
+      .update(clientRelationshipBlocks)
+      .set({ childrenAnswer: "not_asked", noChildren: false, updatedAt: new Date() })
+      .where(eq(clientRelationshipBlocks.relationshipBlockId, blockId))
+    return
+  }
+  await db
+    .update(clientRelationshipBlocks)
+    .set({ siblingsAnswer: "not_asked", updatedAt: new Date() })
+    .where(eq(clientRelationshipBlocks.relationshipBlockId, blockId))
 }
 
 export async function moveBlockMember(input: Scope & {
@@ -425,6 +595,8 @@ export async function moveBlockMember(input: Scope & {
   ) {
     return { error: "Choose a type for this relationship." }
   }
+  const previousBlockId = person.relationshipBlockId
+  const previousRole = person.blockRole
   await db
     .update(clientRelationshipRecords)
     .set({
@@ -439,6 +611,25 @@ export async function moveBlockMember(input: Scope & {
     })
     .where(eq(clientRelationshipRecords.relationshipRecordId, person.relationshipRecordId))
   await writeAudit(input, "client_relationship.moved", "client_relationship", person.relationshipRecordId)
+  if (input.role === "child") {
+    await db
+      .update(clientRelationshipBlocks)
+      .set({ noChildren: false, childrenAnswer: "yes", updatedAt: new Date() })
+      .where(eq(clientRelationshipBlocks.relationshipBlockId, block.relationshipBlockId))
+  }
+  if (input.role === "sibling") {
+    await db
+      .update(clientRelationshipBlocks)
+      .set({ siblingsAnswer: "yes", updatedAt: new Date() })
+      .where(eq(clientRelationshipBlocks.relationshipBlockId, block.relationshipBlockId))
+  }
+  if (
+    previousBlockId &&
+    previousBlockId !== block.relationshipBlockId &&
+    (previousRole === "child" || previousRole === "sibling")
+  ) {
+    await refreshMemberAnswer(input, previousBlockId, previousRole)
+  }
   return loadBlockEditorState(input.clientId, input.practiceId)
 }
 
@@ -451,11 +642,11 @@ export async function saveRelationshipStatusWithCurrentBlock(input: Scope & { re
   })
   if (saved.error) return { error: saved.error }
   const status = saved.relationshipStatus ?? ""
+  const state = await loadBlockEditorState(input.clientId, input.practiceId)
+  const current = (state?.blocks ?? [])
+    .filter((block) => block.kind === "client_current")
+    .sort((a, b) => a.displayOrder - b.displayOrder)
   if (isPartneredClientStatus(status)) {
-    const state = await loadBlockEditorState(input.clientId, input.practiceId)
-    const current = (state?.blocks ?? [])
-      .filter((block) => block.kind === "client_current")
-      .sort((a, b) => a.displayOrder - b.displayOrder)
     if (current.length === 0) {
       const [created] = await db
         .insert(clientRelationshipBlocks)
@@ -473,6 +664,15 @@ export async function saveRelationshipStatusWithCurrentBlock(input: Scope & { re
         .update(clientRelationshipBlocks)
         .set({ status, updatedAt: new Date() })
         .where(eq(clientRelationshipBlocks.relationshipBlockId, current[0].relationshipBlockId))
+    }
+  } else {
+    // Non-partnered: dissolve current blocks. People go to Not placed — never silent-delete.
+    for (const block of current) {
+      await unplaceMembersOfBlock(input, block.relationshipBlockId)
+      await db
+        .delete(clientRelationshipBlocks)
+        .where(eq(clientRelationshipBlocks.relationshipBlockId, block.relationshipBlockId))
+      await writeAudit(input, "client_relationship_block.deleted", "client_relationship_block", block.relationshipBlockId)
     }
   }
   return loadBlockEditorState(input.clientId, input.practiceId)

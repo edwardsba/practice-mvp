@@ -6,10 +6,17 @@ import { ListPageHeader } from "@/components/ui/list-page-header"
 import {
   getClaimById,
   getClaims,
+  getClaimsForClientDropdown,
   getFundingApprovalTypesForForm,
   getReferrersForDropdown,
+  getReferralFundingCardData,
 } from "@/lib/actions/funding"
+import { getProfessions, getProfessionalOrganisations } from "@/lib/actions/contacts"
 import { requirePractitionerContext } from "@/lib/auth"
+import { PRIVATE_CLAIM_TYPE_NAME } from "@/lib/funding/referral"
+import { and, eq } from "drizzle-orm"
+import { claimTypes } from "@/db/schema"
+import { db } from "@/lib/db"
 
 export default async function NewFundingApprovalPage({
   searchParams,
@@ -33,16 +40,61 @@ export default async function NewFundingApprovalPage({
     ? await getClaimById(claimIdParam)
     : null
 
-  const [clients, approvalTypes, claims, referrers] = await Promise.all([
-    getActiveClients(),
-    getFundingApprovalTypesForForm(context.practiceId),
-    getClaims(context.practiceId),
-    getReferrersForDropdown(context.practiceId),
-  ])
-
   const initialClientId =
     clientIdSnake ?? clientIdCamel ?? claimFromParam?.clientId ?? undefined
   const initialClaimId = claimFromParam?.claimId ?? undefined
+
+  const [
+    clients,
+    approvalTypes,
+    allClaims,
+    clientClaims,
+    referrers,
+    professions,
+    organisations,
+    privateClaimType,
+    clientCardData,
+  ] = await Promise.all([
+    getActiveClients(),
+    getFundingApprovalTypesForForm(context.practiceId),
+    initialClientId ? Promise.resolve([]) : getClaims(context.practiceId),
+    initialClientId
+      ? getClaimsForClientDropdown(initialClientId)
+      : Promise.resolve([]),
+    getReferrersForDropdown(context.practiceId),
+    getProfessions(context.practiceId),
+    getProfessionalOrganisations(context.practiceId),
+    db
+      .select({ claimTypeId: claimTypes.claimTypeId })
+      .from(claimTypes)
+      .where(
+        and(
+          eq(claimTypes.practiceId, context.practiceId),
+          eq(claimTypes.isActive, true),
+          eq(claimTypes.claimTypeName, PRIVATE_CLAIM_TYPE_NAME)
+        )
+      )
+      .limit(1),
+    initialClientId
+      ? getReferralFundingCardData(initialClientId)
+      : Promise.resolve(null),
+  ])
+
+  const claims = initialClientId
+    ? clientClaims.map((claim) => ({
+        claimId: claim.claimId,
+        clientId: initialClientId,
+        claimTypeId: claim.claimTypeId,
+        claimTypeName: claim.claimTypeName,
+        startDate: claim.startDate,
+      }))
+    : allClaims.map((claim) => ({
+        claimId: claim.claimId,
+        clientId: claim.clientId,
+        claimTypeId: claim.claimTypeId,
+        claimTypeName: claim.claimTypeName,
+        startDate: claim.startDate,
+      }))
 
   return (
     <AppShell>
@@ -55,16 +107,19 @@ export default async function NewFundingApprovalPage({
       <ListPageHeader heading="Add funding approval" />
 
       <FundingApprovalForm
+        practiceId={context.practiceId}
         clients={clients}
         approvalTypes={approvalTypes}
-        claims={claims.map((claim) => ({
-          claimId: claim.claimId,
-          clientId: claim.clientId,
-          claimTypeId: claim.claimTypeId,
-          claimTypeName: claim.claimTypeName,
-          startDate: claim.startDate,
-        }))}
+        claims={claims}
         referrers={referrers}
+        relationships={clientCardData?.relationships ?? []}
+        professions={professions}
+        organisations={organisations.map((org) => ({
+          organisationId: org.organisationId,
+          organisationName: org.organisationName,
+        }))}
+        privateClaimTypeId={privateClaimType[0]?.claimTypeId ?? null}
+        lockClient={Boolean(initialClientId)}
         initialValues={
           initialClientId || initialClaimId
             ? {

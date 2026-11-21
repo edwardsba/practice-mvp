@@ -51,7 +51,6 @@ import {
   type LivesWith,
   type LivingSituationFields,
   type OccupationFields,
-  type ReasonForAttending,
   type StressorsRecord,
   type TriStateAnswer,
   type RelationshipRating,
@@ -294,36 +293,6 @@ export function sanitizeStressors(value: unknown): StressorsRecord {
   return stressors
 }
 
-function referralTypeOf(raw: Record<string, unknown>): ReasonForAttending["referralType"] {
-  const explicit = str(raw.referralType)
-  if (explicit === "medical" || explicit === "family_or_friend" || explicit === "self") return explicit
-  return ""
-}
-
-export function sanitizeReasonForAttending(value: unknown): ReasonForAttending {
-  const raw = isRecord(value) ? value : {}
-  const referralType = referralTypeOf(raw)
-  const medical = referralType === "medical"
-  const family = referralType === "family_or_friend"
-  const referrerRelationshipId = family ? professionalId(raw.referrerRelationshipId) : null
-  const referrerIsOther = family && !referrerRelationshipId && (raw.referrerIsOther === true || str(raw.referrerOther).length > 0)
-  return {
-    referralType,
-    referrerProfessionalId: medical ? professionalId(raw.referrerProfessionalId) : null,
-    referralDate: medical ? canonicalPartialDate(str(raw.referralDate)) : "",
-    referrerConcerns: medical ? str(raw.referrerConcerns) : "",
-    referrerRelationshipId,
-    referrerIsOther,
-    referrerOther: referrerIsOther ? str(raw.referrerOther) : "",
-    theirConcerns: family ? str(raw.theirConcerns) : "",
-  }
-}
-
-/** Referral type is one choice, so a blank stays blank. The older Yes/No answers are not filled in. */
-export function markUnansweredReason(reason: ReasonForAttending): { reason: ReasonForAttending; changed: boolean } {
-  return { reason, changed: false }
-}
-
 export function markUnansweredStressors(stressors: StressorsRecord): { stressors: StressorsRecord; changed: boolean } {
   let changed = false
   const nextStressors = { ...stressors }
@@ -537,6 +506,7 @@ export function sanitizeEvent(value: unknown, fallbackId = ""): EventRecord {
     relationshipRecordId,
     conditionEventId: str(raw.conditionEventId) || null,
     conditionGroupId: str(raw.conditionGroupId) || null,
+    parentEventId: str(raw.parentEventId) || null,
     admissionType: oneOf<AdmissionType>(raw.admissionType, ADMISSION_TYPES),
     facility: str(raw.facility),
     admissionLength: str(raw.admissionLength),
@@ -550,7 +520,10 @@ export function sanitizeEvent(value: unknown, fallbackId = ""): EventRecord {
   if (!treatment) event.conditionEventId = null
   const condition =
     eventType === "emotional_problems" || eventType === "substance_use" || eventType === "illness_injury"
-  if (!condition || (event.conditionGroupId ?? "").startsWith("title:")) event.conditionGroupId = null
+  // Treatments and episodes share conditionGroupId (issue). Clear only when neither.
+  if (!condition && !treatment) event.conditionGroupId = null
+  else if ((event.conditionGroupId ?? "").startsWith("title:")) event.conditionGroupId = null
+  if (event.parentEventId && event.parentEventId === event.eventRecordId) event.parentEventId = null
   if (eventType !== "psychiatric_admission") {
     event.admissionType = ""
     event.facility = ""

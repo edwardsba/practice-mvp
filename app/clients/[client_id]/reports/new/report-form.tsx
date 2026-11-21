@@ -685,6 +685,9 @@ export function ReportForm({
               data: storedBackground!.data,
               numberOfChildren: storedBackground!.numberOfChildren,
               screening: storedBackground!.screening,
+              referralRecorded: Boolean(
+                storedBackground!.referral?.referrer || storedBackground!.referral?.referralSource
+              ),
             }
           ),
           omissions: initialSnapshot.backgroundOmissions ?? [],

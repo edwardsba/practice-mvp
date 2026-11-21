@@ -1,5 +1,5 @@
 import { assessAge, compareEventsChronologically } from "@/lib/client-background/age"
-import { backgroundChecks } from "@/lib/client-background/checks"
+import { backgroundChecks, type BackgroundCheckTarget } from "@/lib/client-background/checks"
 import type { ProfessionalOption } from "@/lib/client-background/professionals"
 import {
   HISTORY_QUESTION_GROUPS,
@@ -62,14 +62,29 @@ export type BackgroundReportOmission = {
   target: BackgroundReportOmissionTarget
 }
 
-export type BackgroundReportReferral = {
+function omissionTargetForCheck(target: BackgroundCheckTarget): BackgroundReportOmissionTarget {
+  if (target === "relationships-intimate" || target === "relationships-caregivers") return "relationships"
+  return target
+}
+
+export type BackgroundReportReferralPerson = {
   title: string | null
   firstName: string
   lastName: string
   profession: string | null
-  /** Partial date, or null when none was recorded. */
-  date: string | null
 }
+
+export type BackgroundReportReferralInfo = {
+  referrer: BackgroundReportReferralPerson | null
+  referralDate: string | null
+  referrerComments: string
+  referralSource: "self" | "family_or_friend" | "other" | ""
+  referrerRelationshipId: string | null
+  referrerOther: string
+}
+
+/** @deprecated Prefer BackgroundReportReferralPerson; kept for less churn. */
+export type BackgroundReportReferral = BackgroundReportReferralPerson
 
 export type BackgroundReportInterview = {
   /** YYYY-MM-DD. Completed date, or the interview date when it is not completed. */
@@ -147,7 +162,7 @@ export type BackgroundReportSource = {
   selfReportDate: string | null
   /** Self-report children count, for the existing consistency checks. */
   numberOfChildren: number | null
-  referral: BackgroundReportReferral | null
+  referral: BackgroundReportReferralInfo | null
   /** Professionals named on medication entries. */
   professionals?: ProfessionalOption[]
 }
@@ -389,13 +404,17 @@ function historyItems(
       const index = omitted.findIndex((row) => row.id === `history-${key}`)
       if (index >= 0) omitted.splice(index, 1)
     }
-    omitted.push({ id: "family-history", message: "Significant others not assessed", target: "history" })
+    omitted.push({ id: "family-history", message: "Family and significant others not assessed", target: "history" })
   }
   return items
 }
 
-function referralName(referral: BackgroundReportReferral): string {
+function referralName(referral: BackgroundReportReferralPerson): string {
   return [referral.title?.trim(), referral.firstName.trim(), referral.lastName.trim()].filter(Boolean).join(" ")
+}
+
+function referralRecorded(referral: BackgroundReportReferralInfo | null): boolean {
+  return Boolean(referral?.referrer || referral?.referralSource?.trim())
 }
 
 function introductionLines(source: BackgroundReportSource, omitted: BackgroundReportOmission[]): string[] {
@@ -426,14 +445,12 @@ function sourceLines(source: BackgroundReportSource): string[] {
     })
   }
   const referral = source.referral
-  if (referral && source.data.reason.referralType === "medical") {
-    const name = referralName(referral)
-    if (name) {
-      const profession = reportProfession(referral.profession)
-      const date = referral.date?.trim() ?? ""
-      const parts = [name, profession, date ? displayDate(date) : ""].filter(Boolean)
-      rows.push({ sort: date || "9999-99-99", text: `Referral from ${parts.join(", ")}.` })
-    }
+  if (referral?.referrer && referralName(referral.referrer)) {
+    const name = referralName(referral.referrer)
+    const profession = reportProfession(referral.referrer.profession)
+    const date = referral.referralDate?.trim() ?? ""
+    const parts = [name, profession, date ? displayDate(date) : ""].filter(Boolean)
+    rows.push({ sort: date || "9999-99-99", text: `Referral from ${parts.join(", ")}.` })
   }
   rows.sort((a, b) => a.sort.localeCompare(b.sort))
   return rows.map((row) => row.text)
@@ -445,29 +462,30 @@ function presentingItems(
   first: string,
   omitted: BackgroundReportOmission[]
 ): string[] {
-  const { reason } = source.data
+  const referral = source.referral
   const items: string[] = []
-  if (reason.referralType === "medical") {
-    if (source.referral && referralName(source.referral)) {
-      const profession = reportProfession(source.referral.profession)
-      const name = referralName(source.referral)
-      const by = profession ? `${voice.possessive} ${profession}, ${name}` : name
-      let line = `${first} was referred by ${by}`
-      if (source.referral.date?.trim()) line += `, on ${displayDate(source.referral.date)}`
-      if (reason.referrerConcerns.trim()) line += `, with concerns about ${reason.referrerConcerns.trim()}`
-      else {
-        omitted.push({ id: "referrer-concerns", message: "Referrer's concerns not recorded", target: "reason" })
-      }
-      items.push(`${line}.`)
+  if (referral?.referrer && referralName(referral.referrer)) {
+    const profession = reportProfession(referral.referrer.profession)
+    const name = referralName(referral.referrer)
+    const by = profession ? `${voice.possessive} ${profession}, ${name}` : name
+    let line = `${first} was referred by ${by}`
+    if (referral.referralDate?.trim()) line += `, on ${displayDate(referral.referralDate)}`
+    if (referral.referrerComments.trim()) line += `, with concerns about ${referral.referrerComments.trim()}`
+    else {
+      omitted.push({ id: "referrer-concerns", message: "Referrer's concerns not recorded", target: "reason" })
     }
-  } else if (reason.referralType === "family_or_friend") {
-    const person = reason.referrerRelationshipId
-      ? source.data.relationships.find((row) => row.relationshipRecordId === reason.referrerRelationshipId)
+    items.push(`${line}.`)
+  } else if (referral?.referralSource === "family_or_friend") {
+    const person = referral.referrerRelationshipId
+      ? source.data.relationships.find((row) => row.relationshipRecordId === referral.referrerRelationshipId)
       : undefined
-    const other = reason.referrerIsOther ? lowerLeadingWord(reason.referrerOther) : ""
-    const by = person ? referrerPerson(person, voice, source.data.relationshipStatus.relationshipStatus) : other
+    const otherDescribe = referral.referrerOther.trim()
+    const other = !person && otherDescribe ? lowerLeadingWord(otherDescribe) : ""
+    const by = person
+      ? referrerPerson(person, voice, source.data.relationshipStatus.relationshipStatus)
+      : other
     if (by) {
-      const concerns = reason.theirConcerns.trim().replace(/\.+$/, "")
+      const concerns = referral.referrerComments.trim().replace(/\.+$/, "")
       items.push(
         concerns
           ? `${first} was referred by ${by}, who was concerned about ${concerns}.`
@@ -476,10 +494,22 @@ function presentingItems(
     } else {
       omitted.push({ id: "referrer-who", message: "Referral: who referred the client not recorded", target: "reason" })
     }
-  } else if (reason.referralType === "self") {
+  } else if (referral?.referralSource === "self") {
     items.push(`${first} self-referred.`)
+  } else if (referral?.referralSource === "other") {
+    const who = lowerLeadingWord(referral.referrerOther)
+    if (who) {
+      const concerns = referral.referrerComments.trim().replace(/\.+$/, "")
+      items.push(
+        concerns
+          ? `${first} was referred by ${who}, who was concerned about ${concerns}.`
+          : `${first} was referred by ${who}.`
+      )
+    } else {
+      omitted.push({ id: "referrer-who", message: "Referral: who referred the client not recorded", target: "reason" })
+    }
   } else {
-    omitted.push({ id: "referral-type", message: "Referral type not recorded", target: "reason" })
+    omitted.push({ id: "referral", message: "Referral not recorded", target: "reason" })
   }
 
   const yesStressors: string[] = []
@@ -938,10 +968,15 @@ export function generateBackgroundReport(source: BackgroundReportSource): Backgr
     data: source.data,
     numberOfChildren: source.numberOfChildren,
     screening: source.screening,
+    referralRecorded: referralRecorded(source.referral),
   })) {
     if (seen.has(check.id)) continue
     seen.add(check.id)
-    omitted.push(check)
+    omitted.push({
+      id: check.id,
+      message: check.message,
+      target: omissionTargetForCheck(check.target),
+    })
   }
   const content: LetterBodyNode[] = []
 

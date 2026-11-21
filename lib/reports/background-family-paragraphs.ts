@@ -1,5 +1,6 @@
 import { compareEventsChronologically } from "@/lib/client-background/age"
 import { conditionGroups } from "@/lib/client-background/condition-groups"
+import { treatmentsForIssue } from "@/lib/client-background/history-issues"
 import { isConditionEvent, isTreatmentEvent, treatmentsForCondition } from "@/lib/client-background/history-links"
 import { resolvedAbout } from "@/lib/client-background/interview-history"
 import type { EventRecord, EventType, RelationshipRecord } from "@/lib/client-background/types"
@@ -70,12 +71,40 @@ function conditionText(event: EventRecord, role: string, kind: string, past: boo
 
 function historyUnits(kind: string, matched: EventRecord[]): { event: EventRecord; episodes: EventRecord[] }[] {
   if (isTreatmentEvent(kind as EventType)) {
-    return matched.filter((event) => !event.conditionEventId).map((event) => ({ event, episodes: [event] }))
+    return matched
+      .filter((event) => !event.conditionEventId && !event.conditionGroupId && !event.parentEventId)
+      .map((event) => ({ event, episodes: [event] }))
   }
   if (isConditionEvent(kind as EventType)) {
-    return conditionGroups(matched).map((group) => ({ event: group.episodes[0], episodes: group.episodes }))
+    return conditionGroups(matched.filter((event) => !event.parentEventId)).map((group) => ({
+      event: group.episodes[0],
+      episodes: group.episodes,
+    }))
   }
-  return matched.map((event) => ({ event, episodes: [event] }))
+  return matched.filter((event) => !event.parentEventId).map((event) => ({ event, episodes: [event] }))
+}
+
+function familyTreatmentsForEpisodes(events: EventRecord[], episodes: EventRecord[]): EventRecord[] {
+  const seen = new Set<string>()
+  const care: EventRecord[] = []
+  const groupIds = new Set(
+    episodes.map((episode) => episode.conditionGroupId).filter((id): id is string => Boolean(id))
+  )
+  for (const groupId of groupIds) {
+    for (const treatment of treatmentsForIssue(events, groupId)) {
+      if (seen.has(treatment.eventRecordId)) continue
+      seen.add(treatment.eventRecordId)
+      care.push(treatment)
+    }
+  }
+  for (const episode of episodes) {
+    for (const treatment of treatmentsForCondition(events, episode.eventRecordId)) {
+      if (seen.has(treatment.eventRecordId)) continue
+      seen.add(treatment.eventRecordId)
+      care.push(treatment)
+    }
+  }
+  return care
 }
 
 function sexPronoun(person: RelationshipRecord): string {
@@ -140,9 +169,7 @@ export function significantOtherParagraphs(
     const units = historyUnits(kind, matched)
     const sentences = units.map((unit, index) => {
       const event = unit.event
-      const care = unit.episodes
-        .flatMap((episode) => treatmentsForCondition(events, episode.eventRecordId))
-        .sort((a, b) => {
+      const care = familyTreatmentsForEpisodes(events, unit.episodes).sort((a, b) => {
           const aMissing = !a.startValue.trim()
           const bMissing = !b.startValue.trim()
           if (aMissing !== bMissing) return aMissing ? 1 : -1

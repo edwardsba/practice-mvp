@@ -82,6 +82,8 @@ function current(status: string): RelationshipBlock {
     startedOn: "2014",
     endedOn: "",
     noChildren: true,
+    childrenAnswer: "none",
+    siblingsAnswer: "",
     displayOrder: 0,
   }
 }

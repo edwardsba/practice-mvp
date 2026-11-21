@@ -4,10 +4,15 @@ import { and, eq } from "drizzle-orm"
 import { AppShell } from "@/components/app-shell"
 import { InterviewPage } from "@/components/client-background/interview-page"
 import { clients } from "@/db/schema"
+import { getReferralFundingCardData } from "@/lib/actions/funding"
 import { requirePractitionerContext } from "@/lib/auth"
 import { loadClientBackground, loadInProgressInterview, loadLatestBackgroundSelfReport, loadReasonSupport } from "@/lib/client-background/load"
 import { ensureFamilyOfOrigin } from "@/lib/client-background/mutations"
 import { db } from "@/lib/db"
+import {
+  anyReferralRecorded,
+  buildReferralFundingCardProps,
+} from "@/lib/funding/referral-funding-card-props"
 
 export default async function BackgroundInterviewRoute({
   params,
@@ -45,10 +50,16 @@ export default async function BackgroundInterviewRoute({
   const data = await loadClientBackground(clientId, context.practiceId)
   if (!data) notFound()
 
-  const [selfReport, reasonSupport] = await Promise.all([
+  const [selfReport, reasonSupport, referralFundingData] = await Promise.all([
     loadLatestBackgroundSelfReport(clientId, context.practiceId),
-    loadReasonSupport(clientId, context.practiceId, data.reason.referrerProfessionalId),
+    loadReasonSupport(clientId, context.practiceId, null),
+    getReferralFundingCardData(clientId),
   ])
+
+  const referralFunding = buildReferralFundingCardProps(
+    context.practiceId,
+    referralFundingData
+  )
 
   return (
     <AppShell>
@@ -61,6 +72,8 @@ export default async function BackgroundInterviewRoute({
         screening={interview.screening}
         selfReport={selfReport}
         reasonSupport={reasonSupport}
+        referralFunding={referralFunding}
+        referralRecorded={anyReferralRecorded(referralFunding.approvals)}
       />
     </AppShell>
   )

@@ -646,14 +646,6 @@ function EventReadOnly({
         <ReadOnlyField label="Client age at end" value={ageText(dateOfBirth, draft.endPrecision, draft.endValue)} />
       )}
       {stage ? <ReadOnlyField label="Category" value={stage === "childhood" ? "Childhood" : "Adulthood"} /> : null}
-      <ReadOnlyField label="Treated" value={yesNoLabel(draft.treated)} />
-      {draft.treated === true ? (
-        <>
-          <ReadOnlyField label="Treatment type" value={draft.treatmentType} />
-          <ReadOnlyField label="Treatment detail" value={draft.treatmentDetail} />
-          <ReadOnlyField label="Outcome" value={draft.outcome} />
-        </>
-      ) : null}
       <ReadOnlyField
         label="Resolved / Ongoing"
         value={draft.resolvedOrOngoing === "ongoing" ? "Ongoing" : draft.resolvedOrOngoing === "resolved" ? "Resolved" : ""}
@@ -680,6 +672,10 @@ export function EventEditor({
   events,
   professionals,
   onChange,
+  /** When set, About / Who / Event type are omitted (shown in the context strip instead). */
+  lockContext,
+  /** Who stays editable when opening a new family issue before a person is chosen. */
+  showWho = false,
 }: {
   draft: EventRecord
   dateOfBirth: string | null
@@ -687,24 +683,10 @@ export function EventEditor({
   events: EventRecord[]
   professionals: ProfessionalOption[]
   onChange: (event: EventRecord) => void
+  lockContext?: boolean
+  showWho?: boolean
 }) {
   const treatment = isTreatmentEvent(draft.eventType)
-  const conditionEntry = isConditionEvent(draft.eventType)
-  const [choiceHeld, setChoiceHeld] = useState(false)
-  const [choiceFor, setChoiceFor] = useState(draft.eventRecordId)
-  if (choiceFor !== draft.eventRecordId) {
-    setChoiceFor(draft.eventRecordId)
-    setChoiceHeld(false)
-  }
-  const conditions = events.filter(
-    (event) =>
-      event.eventRecordId !== draft.eventRecordId &&
-      isConditionEvent(event.eventType) &&
-      samePerson(event, draft)
-  )
-  const episodeChoices = conditionGroups(events, dateOfBirth).filter(
-    (group) => group.eventType === draft.eventType && group.personKey === personKey(draft)
-  )
   const startLabel =
     draft.eventType === "psychiatric_admission" ? "Admitted" : draft.eventType === "medication" ? "Started" : "Start"
   const endLabel =
@@ -715,6 +697,7 @@ export function EventEditor({
     : resolvedAbout(draft) === "significant_other"
       ? "other"
       : ""
+  void events
 
   function patch(partial: Partial<EventRecord>) {
     const next = { ...draft, ...partial }
@@ -733,11 +716,11 @@ export function EventEditor({
       next.abstinentSincePrecision = ""
       next.abstinentSinceValue = ""
     }
-    if (next.treated !== true) {
-      next.treatmentType = ""
-      next.treatmentDetail = ""
-      next.outcome = ""
-    }
+    // Stop writing legacy Treated fields from the form (columns remain for main).
+    next.treated = null
+    next.treatmentType = ""
+    next.treatmentDetail = ""
+    next.outcome = ""
     if (next.resolvedOrOngoing === "ongoing") {
       next.endPrecision = ""
       next.endValue = ""
@@ -745,40 +728,77 @@ export function EventEditor({
     } else {
       next.endOngoing = false
     }
-    if (next.conditionEventId) {
-      const linked = events.find((event) => event.eventRecordId === next.conditionEventId)
-      if (linked && !samePerson(linked, next)) next.conditionEventId = null
-    }
     onChange(next)
   }
 
-  const selectedCondition = episodeChoices.find(
-    (group) =>
-      group.id === draft.conditionGroupId ||
-      group.episodes.some((episode) => episode.conditionGroupId && episode.conditionGroupId === draft.conditionGroupId) ||
-      (Boolean(draft.conditionGroupId) &&
-        group.title.trim().toLowerCase() === draft.title.trim().toLowerCase() &&
-        group.episodes.some((episode) => episode.eventRecordId !== draft.eventRecordId))
-  )
-
   return (
     <div className="min-w-0 space-y-4">
-      <SelectField
-        id={`${draft.eventRecordId}_about`}
-        label="About"
-        value={draft.about === "significant_other" ? "significant_other" : "self"}
-        onChange={(about) =>
-          patch({
-            about: about === "significant_other" ? "significant_other" : "self",
-            relationshipRecordId: about === "significant_other" ? draft.relationshipRecordId : null,
-            aboutOther: about === "significant_other" ? draft.aboutOther : "",
-          })
-        }
-      >
-        <option value="self">Self</option>
-        <option value="significant_other">Significant other</option>
-      </SelectField>
-      {draft.about === "significant_other" ? (
+      {!lockContext ? (
+        <>
+          <SelectField
+            id={`${draft.eventRecordId}_about`}
+            label="About"
+            value={draft.about === "significant_other" ? "significant_other" : "self"}
+            onChange={(about) =>
+              patch({
+                about: about === "significant_other" ? "significant_other" : "self",
+                relationshipRecordId: about === "significant_other" ? draft.relationshipRecordId : null,
+                aboutOther: about === "significant_other" ? draft.aboutOther : "",
+              })
+            }
+          >
+            <option value="self">Self</option>
+            <option value="significant_other">Significant other</option>
+          </SelectField>
+          {draft.about === "significant_other" ? (
+            <>
+              <SelectField
+                id={`${draft.eventRecordId}_who`}
+                label="Who"
+                value={whoValue}
+                onChange={(value) => {
+                  if (value === "other") {
+                    patch({ about: "significant_other", relationshipRecordId: null, aboutOther: draft.aboutOther })
+                    return
+                  }
+                  patch({ about: "significant_other", relationshipRecordId: value || null, aboutOther: "" })
+                }}
+              >
+                <option value="">Select…</option>
+                {relationships.map((person) => (
+                  <option key={person.relationshipRecordId} value={person.relationshipRecordId}>
+                    {personName(person)}
+                  </option>
+                ))}
+                <option value="other">Other (describe)</option>
+              </SelectField>
+              {whoValue === "other" ? (
+                <TextField
+                  id={`${draft.eventRecordId}_who_other`}
+                  label="Describe"
+                  value={draft.aboutOther}
+                  onChange={(aboutOther) => patch({ about: "significant_other", relationshipRecordId: null, aboutOther })}
+                />
+              ) : null}
+            </>
+          ) : null}
+          <SelectField
+            id={`${draft.eventRecordId}_type`}
+            label="Event type"
+            value={draft.eventType}
+            onChange={(eventType) => patch({ eventType: eventType as EventType })}
+          >
+            {EVENT_TYPES.filter((eventType) => eventType !== "family_events" || eventType === draft.eventType).map(
+              (eventType) => (
+                <option key={eventType} value={eventType}>
+                  {EVENT_TYPE_LABELS[eventType]}
+                </option>
+              )
+            )}
+          </SelectField>
+        </>
+      ) : null}
+      {lockContext && showWho && draft.about === "significant_other" ? (
         <>
           <SelectField
             id={`${draft.eventRecordId}_who`}
@@ -810,18 +830,6 @@ export function EventEditor({
           ) : null}
         </>
       ) : null}
-      <SelectField
-        id={`${draft.eventRecordId}_type`}
-        label="Event type"
-        value={draft.eventType}
-        onChange={(eventType) => patch({ eventType: eventType as EventType })}
-      >
-        {EVENT_TYPES.filter((eventType) => eventType !== "family_events" || eventType === draft.eventType).map((eventType) => (
-          <option key={eventType} value={eventType}>
-            {EVENT_TYPE_LABELS[eventType]}
-          </option>
-        ))}
-      </SelectField>
       {draft.eventType === "self_harm" ? (
         <SelectField
           id={`${draft.eventRecordId}_self_harm_type`}
@@ -839,57 +847,19 @@ export function EventEditor({
       ) : null}
       <TextField
         id={`${draft.eventRecordId}_title`}
-        label={draft.eventType === "medication" ? "Medication name" : "Title"}
+        label={
+          draft.eventType === "medication"
+            ? "Medication name"
+            : draft.eventType === "previous_therapy"
+              ? "Who provided it"
+              : draft.eventType === "other_treatment" || draft.eventType === "other_event"
+                ? "Title"
+                : "Title"
+        }
         value={draft.title}
-        onChange={(title) => {
-          if (!conditionEntry || choiceHeld) {
-            patch({ title })
-            return
-          }
-          const next = { ...draft, title }
-          const match = matchingConditionGroup(events, next, dateOfBirth)
-          patch({ title, conditionGroupId: match ? keptGroupId(match.episodes, draft.conditionGroupId) : null })
-        }}
+        onChange={(title) => patch({ title })}
         placeholder="Optional"
       />
-      {conditionEntry ? (
-        <SelectField
-          id={`${draft.eventRecordId}_condition`}
-          label="Condition"
-          value={selectedCondition?.id ?? ""}
-          onChange={(value) => {
-            setChoiceHeld(true)
-            if (!value) {
-              patch({ conditionGroupId: null })
-              return
-            }
-            const group = episodeChoices.find((item) => item.id === value)
-            patch({ conditionGroupId: group ? keptGroupId(group.episodes, draft.conditionGroupId) : null })
-          }}
-        >
-          <option value="">New condition</option>
-          {episodeChoices.map((group) => (
-            <option key={group.id} value={group.id}>
-              {`Another episode of: ${group.title}`}
-            </option>
-          ))}
-        </SelectField>
-      ) : null}
-      {treatment ? (
-        <SelectField
-          id={`${draft.eventRecordId}_for`}
-          label="For"
-          value={draft.conditionEventId ?? ""}
-          onChange={(conditionEventId) => patch({ conditionEventId: conditionEventId || null })}
-        >
-          <option value="">Not linked</option>
-          {conditions.map((condition) => (
-            <option key={condition.eventRecordId} value={condition.eventRecordId}>
-              {condition.title.trim() || EVENT_TYPE_LABELS[condition.eventType]}
-            </option>
-          ))}
-        </SelectField>
-      ) : null}
       {draft.eventType === "psychiatric_admission" ? (
         <>
           <SelectField
@@ -977,42 +947,6 @@ export function EventEditor({
           Category: {stage === "childhood" ? "Childhood" : "Adulthood"}
         </p>
       ) : null}
-      {treatment ? null : (
-      <>
-      <SelectField
-        id={`${draft.eventRecordId}_treated`}
-        label="Treated"
-        value={draft.treated === true ? "yes" : draft.treated === false ? "no" : ""}
-        onChange={(next) => patch({ treated: next === "yes" ? true : next === "no" ? false : null })}
-      >
-        <option value="">Not recorded</option>
-        <option value="yes">Yes</option>
-        <option value="no">No</option>
-      </SelectField>
-      {draft.treated === true ? (
-        <>
-          <TextField
-            id={`${draft.eventRecordId}_tx_type`}
-            label="Treatment type"
-            value={draft.treatmentType}
-            onChange={(treatmentType) => patch({ treatmentType })}
-          />
-          <TextAreaField
-            id={`${draft.eventRecordId}_tx_detail`}
-            label="Treatment detail"
-            value={draft.treatmentDetail}
-            onChange={(treatmentDetail) => patch({ treatmentDetail })}
-          />
-          <TextAreaField
-            id={`${draft.eventRecordId}_outcome`}
-            label="Outcome"
-            value={draft.outcome}
-            onChange={(outcome) => patch({ outcome })}
-          />
-        </>
-      ) : null}
-      </>
-      )}
       <SelectField
         id={`${draft.eventRecordId}_resolved`}
         label="Resolved / Ongoing"

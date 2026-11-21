@@ -53,8 +53,16 @@ export const EVENT_TYPES = [
   "family_events",
   "significant_history",
   "traumatic_event",
+  /** Other event on an issue or under a single event (board AE). */
+  "other_event",
+  /** Treatment · Other (free-title treatment). */
+  "other_treatment",
 ] as const
 export type EventType = (typeof EVENT_TYPES)[number]
+
+/** Smart-form event choice: Episode · Treatment · Other. */
+export const SMART_EVENT_KINDS = ["episode", "treatment", "other"] as const
+export type SmartEventKind = (typeof SMART_EVENT_KINDS)[number]
 
 export const START_PRECISIONS = ["year", "year_month", "date", "age"] as const
 export type StartPrecision = (typeof START_PRECISIONS)[number]
@@ -147,8 +155,17 @@ export const ADMISSION_TYPE_LABELS: Record<AdmissionType, string> = {
 export const CONDITION_EVENT_TYPES = ["illness_injury", "emotional_problems", "substance_use"] as const
 export type ConditionEventType = (typeof CONDITION_EVENT_TYPES)[number]
 
-export const TREATMENT_EVENT_TYPES = ["psychiatric_admission", "previous_therapy", "medication"] as const
+export const TREATMENT_EVENT_TYPES = [
+  "psychiatric_admission",
+  "previous_therapy",
+  "medication",
+  "other_treatment",
+] as const
 export type TreatmentEventType = (typeof TREATMENT_EVENT_TYPES)[number]
+
+/** Single-event categories that can nest Episode / Treatment / Other under them. */
+export const SINGLE_EVENT_TYPES = ["self_harm", "traumatic_event", "significant_history", "family_events"] as const
+export type SingleEventType = (typeof SINGLE_EVENT_TYPES)[number]
 
 export const HEALTH_STATUSES = ["good", "fair", "poor", "deceased"] as const
 export type HealthStatus = (typeof HEALTH_STATUSES)[number]
@@ -171,6 +188,36 @@ export const EVENT_TYPE_LABELS: Record<EventType, string> = {
   family_events: "Family events",
   significant_history: "Significant history",
   traumatic_event: "Traumatic event",
+  other_event: "Other",
+  other_treatment: "Other treatment",
+}
+
+export const SMART_EVENT_KIND_LABELS: Record<SmartEventKind, string> = {
+  episode: "Episode",
+  treatment: "Treatment",
+  other: "Other",
+}
+
+/** Treatment type choice inside a Treatment event. */
+export const TREATMENT_TYPE_CHOICES = [
+  "hospital_admission",
+  "therapy",
+  "medication",
+  "other",
+] as const
+export type TreatmentTypeChoice = (typeof TREATMENT_TYPE_CHOICES)[number]
+
+export const TREATMENT_TYPE_CHOICE_LABELS: Record<TreatmentTypeChoice, string> = {
+  hospital_admission: "Hospital admission",
+  therapy: "Therapy",
+  medication: "Medication",
+  other: "Other",
+}
+
+export const CONDITION_CATEGORY_LABELS: Record<ConditionEventType, string> = {
+  emotional_problems: "Mental health",
+  substance_use: "Substance use",
+  illness_injury: "Physical health",
 }
 
 export const SELF_HARM_TYPE_LABELS: Record<SelfHarmType, string> = {
@@ -267,6 +314,28 @@ export type BlockRole = (typeof BLOCK_ROLES)[number]
 
 export const BLOCK_ANSWERS = ["yes", "none", "not_asked"] as const
 export type BlockAnswer = (typeof BLOCK_ANSWERS)[number]
+
+/** Treatment question under an issue: Yes / None / Not asked. */
+export const TREATMENT_ANSWERS = ["yes", "none", "not_asked"] as const
+export type TreatmentAnswer = (typeof TREATMENT_ANSWERS)[number]
+
+export const TREATMENT_ANSWER_LABELS: Record<TreatmentAnswer, string> = {
+  yes: "Yes",
+  none: "None",
+  not_asked: "Not asked",
+}
+
+export type HistoryIssue = {
+  issueId: string
+  category: ConditionEventType
+  about: HistoryAbout
+  relationshipRecordId: string | null
+  /** Who: Other, when the significant other is not a recorded person. */
+  aboutOther: string
+  title: string
+  treatmentAnswer: TreatmentAnswer | ""
+  displayOrder: number
+}
 
 export const CURRENT_BLOCK_STATUSES = [
   "married",
@@ -376,6 +445,10 @@ export type RelationshipBlock = {
   startedOn: string
   endedOn: string
   noChildren: boolean
+  /** Explicit Children question: yes / none / not_asked. Kept in step with noChildren (none ⇔ true). */
+  childrenAnswer: BlockAnswer | ""
+  /** Explicit Siblings question: yes / none / not_asked. */
+  siblingsAnswer: BlockAnswer | ""
   displayOrder: number
 }
 
@@ -619,31 +692,6 @@ export type StressorsRecord = Record<StressorKey, TriStateAnswer | null> & {
   mainReason: string
 }
 
-export const REFERRAL_TYPES = ["medical", "family_or_friend", "self"] as const
-export type ReferralType = (typeof REFERRAL_TYPES)[number]
-
-export const REFERRAL_TYPE_LABELS: Record<ReferralType, string> = {
-  medical: "Medical professional",
-  family_or_friend: "Family or friend",
-  self: "Self-referral",
-}
-
-/** Why the client came. Referral type decides which fields are kept. */
-export type ReasonForAttending = {
-  referralType: ReferralType | ""
-  /** professionals.professional_id in the same practice, or null. */
-  referrerProfessionalId: string | null
-  /** Partial date: YYYY, YYYY-MM, or YYYY-MM-DD. */
-  referralDate: string
-  referrerConcerns: string
-  /** A person on this client's relationships, when a family member or friend referred them. */
-  referrerRelationshipId: string | null
-  /** True when Who is Other (describe) rather than a recorded person. */
-  referrerIsOther: boolean
-  referrerOther: string
-  theirConcerns: string
-}
-
 export type OccupationFields = {
   workStatus: WorkStatus | ""
   workStatusOther: string
@@ -724,10 +772,12 @@ export type EventRecord = {
   /** Who, when the significant other is not a recorded person. */
   aboutOther: string
   relationshipRecordId: string | null
-  /** Treatment entries: the condition entry this treatment is for. */
+  /** Legacy: treatment → episode. Prefer conditionGroupId (issue). Kept for reads. */
   conditionEventId: string | null
-  /** Episodes of one condition share this id. The condition's title is its earliest episode's title. */
+  /** Episodes and treatments of one issue share this id (= HistoryIssue.issueId). */
   conditionGroupId: string | null
+  /** Sub-event under an episode or treatment. */
+  parentEventId: string | null
   admissionType: AdmissionType | ""
   facility: string
   admissionLength: string
@@ -747,11 +797,11 @@ export type ClientBackgroundData = {
   relationshipStatus: ClientRelationshipStatusValue
   demographics: Demographics
   stressors: StressorsRecord
-  reason: ReasonForAttending
   relationships: RelationshipRecord[]
   relationshipBlocks?: RelationshipBlock[]
   blockAnswers?: RelationshipBlockAnswers
   events: EventRecord[]
+  issues?: HistoryIssue[]
   risk: RiskRatings
 }
 
@@ -837,19 +887,6 @@ export function emptyStressors(): StressorsRecord {
   }
 }
 
-export function emptyReasonForAttending(): ReasonForAttending {
-  return {
-    referralType: "",
-    referrerProfessionalId: null,
-    referralDate: "",
-    referrerConcerns: "",
-    referrerRelationshipId: null,
-    referrerIsOther: false,
-    referrerOther: "",
-    theirConcerns: "",
-  }
-}
-
 export function triStateLabel(value: TriStateAnswer | null): string {
   if (value === "yes") return "Yes"
   if (value === "no") return "No"
@@ -899,6 +936,7 @@ export function emptyEvent(eventType: EventType, displayOrder: number): Omit<Eve
     relationshipRecordId: null,
     conditionEventId: null,
     conditionGroupId: null,
+    parentEventId: null,
     admissionType: "",
     facility: "",
     admissionLength: "",
@@ -908,6 +946,22 @@ export function emptyEvent(eventType: EventType, displayOrder: number): Omit<Eve
     substanceStatus: "",
     abstinentSincePrecision: "",
     abstinentSinceValue: "",
+    displayOrder,
+  }
+}
+
+export function emptyHistoryIssue(
+  category: ConditionEventType,
+  about: HistoryAbout,
+  displayOrder: number
+): Omit<HistoryIssue, "issueId"> {
+  return {
+    category,
+    about,
+    relationshipRecordId: null,
+    aboutOther: "",
+    title: "",
+    treatmentAnswer: "",
     displayOrder,
   }
 }

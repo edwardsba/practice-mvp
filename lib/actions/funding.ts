@@ -13,6 +13,7 @@ import {
   claimTypes,
   claims,
   clients,
+  clientRelationshipRecords,
   fundingApprovalReportLinks,
   fundingApprovalTypeReports,
   fundingApprovalTypes,
@@ -20,6 +21,7 @@ import {
   professionalOrganisationLinks,
   professionalOrganisations,
   professionals,
+  professions,
   reportTypes,
   sessionNotes,
   simpleReports,
@@ -27,9 +29,21 @@ import {
 import { requirePractitionerContext } from "@/lib/auth"
 import { db } from "@/lib/db"
 import {
+  ADDABLE_RELATIONSHIP_ROLES,
+  type RelationshipToClient,
+} from "@/lib/client-background/types"
+import {
   formatApprovalDropdownLabel,
-  formatApprovalProgress,
+  isMedicareClaimType,
 } from "@/lib/funding/format"
+import {
+  CREATE_PRIVATE_CLAIM,
+  PRIVATE_CLAIM_TYPE_NAME,
+  REFERRAL_SOURCES,
+  sortApprovalsMostRecent,
+  type ReferralSource,
+} from "@/lib/funding/referral"
+import type { ReferralFundingCardData } from "@/lib/funding/referral-funding-card-props"
 import {
   getReportingOverallStatusForApproval,
   getReportingRequirementsForApproval,
@@ -1008,11 +1022,25 @@ export async function getFundingPanelByClientId(clientId: string) {
   const rows = await db
     .select({
       fundingApprovalId: fundingApprovals.fundingApprovalId,
+      claimId: fundingApprovals.claimId,
       fundingApprovalTypeId: fundingApprovals.fundingApprovalTypeId,
       claimTypeName: claimTypes.claimTypeName,
       approvalTypeName: fundingApprovalTypes.name,
       startDate: fundingApprovals.startDate,
+      endDate: fundingApprovals.endDate,
       appointmentsApproved: fundingApprovals.appointmentsApproved,
+      approvalStatus: fundingApprovals.approvalStatus,
+      referrerId: fundingApprovals.referrerId,
+      referrerTitle: professionals.title,
+      referrerFirstName: professionals.firstName,
+      referrerLastName: professionals.lastName,
+      referrerProfessionName: professions.professionName,
+      referralDate: fundingApprovals.referralDate,
+      referrerComments: fundingApprovals.referrerComments,
+      referralSource: fundingApprovals.referralSource,
+      referrerRelationshipId: fundingApprovals.referrerRelationshipId,
+      referrerOther: fundingApprovals.referrerOther,
+      createdAt: fundingApprovals.createdAt,
     })
     .from(fundingApprovals)
     .leftJoin(
@@ -1024,6 +1052,11 @@ export async function getFundingPanelByClientId(clientId: string) {
     )
     .leftJoin(claims, eq(fundingApprovals.claimId, claims.claimId))
     .leftJoin(claimTypes, eq(claims.claimTypeId, claimTypes.claimTypeId))
+    .leftJoin(
+      professionals,
+      eq(fundingApprovals.referrerId, professionals.professionalId)
+    )
+    .leftJoin(professions, eq(professionals.professionId, professions.professionId))
     .where(
       and(
         eq(fundingApprovals.clientId, clientId),
@@ -1031,9 +1064,9 @@ export async function getFundingPanelByClientId(clientId: string) {
         eq(fundingApprovals.isActive, true)
       )
     )
-    .orderBy(desc(fundingApprovals.startDate))
+    .orderBy(desc(fundingApprovals.startDate), desc(fundingApprovals.createdAt))
 
-  return Promise.all(
+  const enriched = await Promise.all(
     rows.map(async (row) => {
       const appointmentsAttended = await countAppointmentsAttended(
         row.fundingApprovalId
@@ -1059,15 +1092,133 @@ export async function getFundingPanelByClientId(clientId: string) {
         }))
       }
 
-      const { fundingApprovalTypeId: _typeId, ...rest } = row
-
       return {
-        ...rest,
+        ...row,
         appointmentsAttended,
         reportingRequirements,
       }
     })
   )
+
+  return sortApprovalsMostRecent(enriched)
+}
+
+export async function getReferralFundingCardData(
+  clientId: string
+): Promise<ReferralFundingCardData> {
+  const context = await requirePractitionerContext()
+
+  const [client] = await db
+    .select({
+      clientId: clients.clientId,
+      firstName: clients.firstName,
+      lastName: clients.lastName,
+    })
+    .from(clients)
+    .where(
+      and(
+        eq(clients.clientId, clientId),
+        eq(clients.practiceId, context.practiceId),
+        eq(clients.isActive, true)
+      )
+    )
+    .limit(1)
+
+  if (!client) {
+    throw new Error("Client not found.")
+  }
+
+  const [
+    approvals,
+    approvalTypes,
+    claimRows,
+    referrers,
+    relationshipRows,
+    professionRows,
+    organisationRows,
+    privateClaimType,
+  ] = await Promise.all([
+    getFundingPanelByClientId(clientId),
+    getFundingApprovalTypesForForm(context.practiceId),
+    getClaimsForClientDropdown(clientId),
+    getReferrersForDropdown(context.practiceId),
+    db
+      .select({
+        relationshipRecordId: clientRelationshipRecords.relationshipRecordId,
+        givenName: clientRelationshipRecords.givenName,
+        relationshipToClient: clientRelationshipRecords.relationshipToClient,
+        blockRole: clientRelationshipRecords.blockRole,
+        blockRoleType: clientRelationshipRecords.blockRoleType,
+      })
+      .from(clientRelationshipRecords)
+      .where(
+        and(
+          eq(clientRelationshipRecords.clientId, clientId),
+          eq(clientRelationshipRecords.practiceId, context.practiceId)
+        )
+      )
+      .orderBy(asc(clientRelationshipRecords.displayOrder)),
+    db
+      .select({
+        professionId: professions.professionId,
+        professionName: professions.professionName,
+      })
+      .from(professions)
+      .where(
+        and(
+          eq(professions.practiceId, context.practiceId),
+          eq(professions.isActive, true)
+        )
+      )
+      .orderBy(asc(professions.professionName)),
+    db
+      .select({
+        organisationId: professionalOrganisations.organisationId,
+        organisationName: professionalOrganisations.organisationName,
+      })
+      .from(professionalOrganisations)
+      .where(
+        and(
+          eq(professionalOrganisations.practiceId, context.practiceId),
+          eq(professionalOrganisations.isActive, true)
+        )
+      )
+      .orderBy(asc(professionalOrganisations.organisationName)),
+    db
+      .select({ claimTypeId: claimTypes.claimTypeId })
+      .from(claimTypes)
+      .where(
+        and(
+          eq(claimTypes.practiceId, context.practiceId),
+          eq(claimTypes.isActive, true),
+          eq(claimTypes.claimTypeName, PRIVATE_CLAIM_TYPE_NAME)
+        )
+      )
+      .limit(1),
+  ])
+
+  return {
+    approvals,
+    clients: [client],
+    approvalTypes,
+    claims: claimRows.map((claim) => ({
+      claimId: claim.claimId,
+      claimTypeId: claim.claimTypeId,
+      claimTypeName: claim.claimTypeName,
+      startDate: claim.startDate,
+    })),
+    privateClaimTypeId: privateClaimType[0]?.claimTypeId ?? null,
+    referrers,
+    relationships: relationshipRows.map((row) => ({
+      relationshipRecordId: row.relationshipRecordId,
+      givenName: row.givenName ?? "",
+      relationshipToClient: row.relationshipToClient,
+      blockRole: row.blockRole,
+      blockRoleType: row.blockRoleType,
+    })),
+    professions: professionRows,
+    organisations: organisationRows,
+  }
 }
 
 export async function getFundingApprovalById(fundingApprovalId: string) {
@@ -1083,8 +1234,15 @@ export async function getFundingApprovalById(fundingApprovalId: string) {
       fundingApprovalTypeId: fundingApprovals.fundingApprovalTypeId,
       approvalTypeName: fundingApprovalTypes.name,
       referrerId: fundingApprovals.referrerId,
+      referrerTitle: professionals.title,
       referrerFirstName: professionals.firstName,
       referrerLastName: professionals.lastName,
+      referrerProfessionName: professions.professionName,
+      referralDate: fundingApprovals.referralDate,
+      referrerComments: fundingApprovals.referrerComments,
+      referralSource: fundingApprovals.referralSource,
+      referrerRelationshipId: fundingApprovals.referrerRelationshipId,
+      referrerOther: fundingApprovals.referrerOther,
       startDate: fundingApprovals.startDate,
       endDate: fundingApprovals.endDate,
       appointmentsApproved: fundingApprovals.appointmentsApproved,
@@ -1108,6 +1266,7 @@ export async function getFundingApprovalById(fundingApprovalId: string) {
       professionals,
       eq(fundingApprovals.referrerId, professionals.professionalId)
     )
+    .leftJoin(professions, eq(professionals.professionId, professions.professionId))
     .leftJoin(claims, eq(fundingApprovals.claimId, claims.claimId))
     .leftJoin(claimTypes, eq(claims.claimTypeId, claimTypes.claimTypeId))
     .where(
@@ -1250,6 +1409,65 @@ export async function getFundingApprovalById(fundingApprovalId: string) {
   }
 }
 
+async function findOrCreatePrivateClaim(
+  practiceId: string,
+  clientId: string
+): Promise<{ claimId: string } | { error: string }> {
+  const [existing] = await db
+    .select({
+      claimId: claims.claimId,
+    })
+    .from(claims)
+    .innerJoin(claimTypes, eq(claims.claimTypeId, claimTypes.claimTypeId))
+    .where(
+      and(
+        eq(claims.practiceId, practiceId),
+        eq(claims.clientId, clientId),
+        eq(claims.isActive, true),
+        eq(claimTypes.claimTypeName, PRIVATE_CLAIM_TYPE_NAME)
+      )
+    )
+    .orderBy(desc(claims.startDate))
+    .limit(1)
+
+  if (existing) return { claimId: existing.claimId }
+
+  const [privateType] = await db
+    .select({ claimTypeId: claimTypes.claimTypeId })
+    .from(claimTypes)
+    .where(
+      and(
+        eq(claimTypes.practiceId, practiceId),
+        eq(claimTypes.isActive, true),
+        eq(claimTypes.claimTypeName, PRIVATE_CLAIM_TYPE_NAME)
+      )
+    )
+    .limit(1)
+
+  if (!privateType) {
+    return { error: "Private claim type is not configured for this practice." }
+  }
+
+  const [created] = await db
+    .insert(claims)
+    .values({
+      practiceId,
+      clientId,
+      claimTypeId: privateType.claimTypeId,
+      updatedAt: new Date(),
+    })
+    .returning({ claimId: claims.claimId })
+
+  return { claimId: created.claimId }
+}
+
+function parseReferralSource(raw: string): ReferralSource | null {
+  if ((REFERRAL_SOURCES as readonly string[]).includes(raw)) {
+    return raw as ReferralSource
+  }
+  return null
+}
+
 export async function upsertFundingApproval(
   fundingApprovalId: string | undefined,
   _prevState: unknown,
@@ -1260,8 +1478,8 @@ export async function upsertFundingApproval(
   const clientId = String(formData.get("client_id") ?? "").trim()
   const fundingApprovalTypeId =
     String(formData.get("funding_approval_type_id") ?? "").trim() || null
-  const claimId = String(formData.get("claim_id") ?? "").trim() || null
-  const referrerId = String(formData.get("referrer_id") ?? "").trim() || null
+  let claimId = String(formData.get("claim_id") ?? "").trim() || null
+  let referrerId = String(formData.get("referrer_id") ?? "").trim() || null
   const startDate = String(formData.get("start_date") ?? "").trim() || null
   const endDate = String(formData.get("end_date") ?? "").trim() || null
   const appointmentsApprovedRaw = String(
@@ -1272,13 +1490,80 @@ export async function upsertFundingApproval(
     : null
   const approvalStatus =
     String(formData.get("approval_status") ?? "active").trim() || "active"
+  const referralDate =
+    String(formData.get("referral_date") ?? "").trim() || null
+  const referrerComments =
+    String(formData.get("referrer_comments") ?? "").trim() || null
+  let referralSource = parseReferralSource(
+    String(formData.get("referral_source") ?? "").trim()
+  )
+  let referrerRelationshipId =
+    String(formData.get("referrer_relationship_id") ?? "").trim() || null
+  let referrerOther =
+    String(formData.get("referrer_other") ?? "").trim() || null
 
   if (!clientId) {
     return { error: "Client is required." }
   }
 
+  if (claimId === CREATE_PRIVATE_CLAIM) {
+    const privateClaim = await findOrCreatePrivateClaim(
+      context.practiceId,
+      clientId
+    )
+    if ("error" in privateClaim) return privateClaim
+    claimId = privateClaim.claimId
+  }
+
+  if (referrerId) {
+    referralSource = null
+    referrerRelationshipId = null
+    referrerOther = null
+  } else if (referralSource === "self") {
+    referrerRelationshipId = null
+    referrerOther = null
+  } else if (referralSource === "family_or_friend") {
+    if (referrerRelationshipId === "other") {
+      referrerRelationshipId = null
+    } else if (referrerRelationshipId) {
+      referrerOther = null
+    }
+  } else if (referralSource !== "other") {
+    referrerRelationshipId = null
+    referrerOther = null
+  }
+
+  let claimTypeName: string | null = null
+  if (claimId) {
+    const [claimRow] = await db
+      .select({ claimTypeName: claimTypes.claimTypeName })
+      .from(claims)
+      .innerJoin(claimTypes, eq(claims.claimTypeId, claimTypes.claimTypeId))
+      .where(
+        and(
+          eq(claims.claimId, claimId),
+          eq(claims.practiceId, context.practiceId),
+          eq(claims.isActive, true)
+        )
+      )
+      .limit(1)
+    claimTypeName = claimRow?.claimTypeName ?? null
+  }
+
+  if (isMedicareClaimType(claimTypeName) && !referrerId) {
+    return { error: "Referrer is required for Medicare claims." }
+  }
+
   const now = new Date()
   let savedApprovalId = fundingApprovalId
+
+  const referralFields = {
+    referralDate,
+    referrerComments,
+    referralSource,
+    referrerRelationshipId,
+    referrerOther,
+  }
 
   try {
     if (fundingApprovalId) {
@@ -1292,6 +1577,7 @@ export async function upsertFundingApproval(
           endDate,
           appointmentsApproved,
           approvalStatus,
+          ...referralFields,
           updatedAt: now,
         })
         .where(
@@ -1313,6 +1599,7 @@ export async function upsertFundingApproval(
           endDate,
           appointmentsApproved,
           approvalStatus,
+          ...referralFields,
           updatedAt: now,
         })
         .returning({
@@ -1397,7 +1684,79 @@ export async function upsertFundingApproval(
   revalidatePath("/funding/approvals")
   revalidatePath(`/funding/approvals/${savedApprovalId}`)
   revalidatePath(`/clients/${clientId}`)
+  revalidatePath(`/clients/${clientId}/background`)
+  revalidatePath(`/clients/${clientId}/background/interview`)
   return { success: true, fundingApprovalId: savedApprovalId }
+}
+
+export async function createUnplacedReferrerPerson(
+  clientId: string,
+  input: { givenName: string; relationshipToClient: string }
+): Promise<{ relationshipRecordId: string } | { error: string }> {
+  const context = await requirePractitionerContext()
+
+  const givenName = input.givenName.trim()
+  const relationshipToClient = input.relationshipToClient.trim()
+
+  if (!givenName) {
+    return { error: "Given name is required." }
+  }
+  if (
+    !(ADDABLE_RELATIONSHIP_ROLES as readonly string[]).includes(
+      relationshipToClient
+    )
+  ) {
+    return { error: "Choose a relationship." }
+  }
+
+  const [client] = await db
+    .select({ clientId: clients.clientId })
+    .from(clients)
+    .where(
+      and(
+        eq(clients.clientId, clientId),
+        eq(clients.practiceId, context.practiceId),
+        eq(clients.isActive, true)
+      )
+    )
+    .limit(1)
+
+  if (!client) {
+    return { error: "Client not found." }
+  }
+
+  const orderRows = await db
+    .select({ displayOrder: clientRelationshipRecords.displayOrder })
+    .from(clientRelationshipRecords)
+    .where(
+      and(
+        eq(clientRelationshipRecords.clientId, clientId),
+        eq(clientRelationshipRecords.practiceId, context.practiceId)
+      )
+    )
+  const displayOrder =
+    orderRows.reduce((max, row) => Math.max(max, row.displayOrder), -1) + 1
+
+  const [created] = await db
+    .insert(clientRelationshipRecords)
+    .values({
+      clientId,
+      practiceId: context.practiceId,
+      givenName,
+      relationshipToClient: relationshipToClient as RelationshipToClient,
+      displayOrder,
+      placementReview: "unplaced",
+      updatedAt: new Date(),
+    })
+    .returning({
+      relationshipRecordId: clientRelationshipRecords.relationshipRecordId,
+    })
+
+  revalidatePath(`/clients/${clientId}`)
+  revalidatePath(`/clients/${clientId}/background`)
+  revalidatePath(`/clients/${clientId}/background/interview`)
+
+  return { relationshipRecordId: created.relationshipRecordId }
 }
 
 export async function getFundingApprovalsForDropdown(clientId: string) {
@@ -1507,11 +1866,14 @@ export async function getReferrersForDropdown(practiceId: string) {
   const rows = await db
     .select({
       professionalId: professionals.professionalId,
+      title: professionals.title,
       firstName: professionals.firstName,
       lastName: professionals.lastName,
+      professionName: professions.professionName,
       organisationName: professionalOrganisations.organisationName,
     })
     .from(professionals)
+    .leftJoin(professions, eq(professionals.professionId, professions.professionId))
     .leftJoin(
       professionalOrganisationLinks,
       and(
@@ -1541,8 +1903,10 @@ export async function getReferrersForDropdown(practiceId: string) {
     string,
     {
       professionalId: string
+      title: string | null
       firstName: string
       lastName: string
+      professionName: string | null
       organisationName: string | null
     }
   >()
@@ -1551,8 +1915,10 @@ export async function getReferrersForDropdown(practiceId: string) {
     if (!byProfessional.has(row.professionalId)) {
       byProfessional.set(row.professionalId, {
         professionalId: row.professionalId,
+        title: row.title,
         firstName: row.firstName,
         lastName: row.lastName,
+        professionName: row.professionName,
         organisationName: row.organisationName,
       })
     }

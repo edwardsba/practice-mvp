@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 
 import { buildHistoryTree, type HistoryTreeNode } from "@/lib/client-background/history-tree"
-import { tomEvents, tomRelationships, tomScreening } from "@/lib/reports/tom-example-fixture"
+import { tomEvents, tomIssues, tomRelationships, tomScreening } from "@/lib/reports/tom-example-fixture"
 import type { ProfessionalOption } from "@/lib/client-background/professionals"
 
 const professionals: ProfessionalOption[] = [
@@ -20,12 +20,27 @@ const tree = buildHistoryTree({
   dateOfBirth: "1970-03-12",
   screening: tomScreening(),
   professionals,
+  issues: tomIssues(),
 })
 
 function shape(node: HistoryTreeNode): unknown {
   if (node.kind === "note") return node.text
-  if (node.kind === "row") return node.children.length > 0 ? { line: node.line, children: node.children.map(shape) } : node.line
-  if (node.kind === "band") return { heading: node.heading, meta: node.meta, children: node.children.map(shape) }
+  if (node.kind === "actions") return { actions: true, issueId: node.issueId }
+  if (node.kind === "row") {
+    const body =
+      node.children.length > 0
+        ? { line: node.line, tag: node.tag, children: node.children.map(shape) }
+        : { line: node.line, tag: node.tag }
+    return body
+  }
+  if (node.kind === "band") {
+    return {
+      heading: node.heading,
+      meta: node.meta,
+      treatmentAnswer: node.treatmentAnswer,
+      children: node.children.map(shape),
+    }
+  }
   return { title: node.title, children: node.children.map(shape) }
 }
 
@@ -34,19 +49,17 @@ assert.deepEqual(tree.client.children.map(shape), [
     title: "Mental health",
     children: [
       {
-        heading: "Depression · current",
-        meta: "2 episodes · 2000–2002, and since 2025",
+        heading: "Depression",
+        meta: "2000 – ongoing · 2 episodes",
+        treatmentAnswer: "yes",
         children: [
+          { line: "Episode 1 · 2000–2002 · age 30 to 32", tag: "Episode" },
+          { line: "Hospital admission · psychiatric inpatient · 2001 · 2 weeks", tag: "Treatment" },
+          { line: "Therapy · psychologist · 2001–2002", tag: "Treatment" },
+          { line: "Episode 2 · since 2025 · from age 55", tag: "Episode" },
           {
-            line: "Current episode · since 2025 · from age 55",
-            children: ["Medication · sertraline · since 2025 · ongoing · Dr Harry TestDoc, GP"],
-          },
-          {
-            line: "Episode · 2000–2002 · age 30 to 32",
-            children: [
-              "Hospital admission · psychiatric inpatient · 2001 · age 31 · 2 weeks",
-              "Therapy · psychologist · 2001–2002 · age 31 to 32",
-            ],
+            line: "Medication · sertraline · since 2025 · ongoing · Dr Harry TestDoc, GP",
+            tag: "Treatment",
           },
         ],
       },
@@ -57,8 +70,12 @@ assert.deepEqual(tree.client.children.map(shape), [
     children: [
       {
         heading: "Alcohol",
-        meta: "1988–2000 · age 18 to 30",
-        children: ["Residential rehab · 2000 · age 30"],
+        meta: "1988 – 2000",
+        treatmentAnswer: "yes",
+        children: [
+          { line: "Episode 1 · 1988–2000 · age 18 to 30", tag: "Episode" },
+          { line: "Residential rehab · 2000", tag: "Treatment" },
+        ],
       },
     ],
   },
@@ -67,47 +84,62 @@ assert.deepEqual(tree.client.children.map(shape), [
     children: [
       {
         heading: "Broken leg",
-        meta: "1982 · age 12",
-        children: ["No treatment recorded"],
+        meta: "1982",
+        treatmentAnswer: "not_asked",
+        children: [{ line: "Episode 1 · 1982 · age 12", tag: "Episode" }],
       },
     ],
   },
-  { title: "Self-harm", children: ["Cutting · 1984–1986 · age 14 to 16"] },
-  { title: "Traumatic events", children: ["Serious car accident · 1989 · age 19"] },
-  { title: "Other significant events", children: ["Moved interstate · 1985 · age 15"] },
+  {
+    title: "Self-harm",
+    children: [{ line: "Cutting · 1984–1986 · age 14 to 16", tag: undefined }],
+  },
+  {
+    title: "Traumatic events",
+    children: [{ line: "Serious car accident · 1989 · age 19", tag: undefined }],
+  },
+  {
+    title: "Other significant events",
+    children: [{ line: "Moved interstate · 1985 · age 15", tag: undefined }],
+  },
+  {
+    title: "Other treatment not linked to an issue",
+    children: ["None"],
+  },
 ])
 
 assert.deepEqual(tree.family.children.map(shape), [
   {
-    title: "Mother (Sally)",
+    title: "Mental health",
     children: [
       {
-        heading: "Depression · emotional problems",
+        heading: "Depression · Sally (mother)",
         meta: "",
-        children: ["No treatment recorded"],
+        treatmentAnswer: "not_asked",
+        children: [{ line: "Episode 1", tag: "Episode" }],
       },
     ],
   },
   {
-    title: "Father (John, deceased)",
+    title: "Substance use",
     children: [
       {
-        heading: "Alcohol · substance use",
+        heading: "Alcohol · John (father)",
         meta: "",
-        children: ["No treatment recorded"],
+        treatmentAnswer: "none",
+        children: [{ line: "Episode 1", tag: "Episode" }],
+      },
+      {
+        heading: "Alcohol · close friend",
+        meta: "",
+        treatmentAnswer: "none",
+        children: [{ line: "Episode 1", tag: "Episode" }],
       },
     ],
   },
-  {
-    title: "Close friend",
-    children: [
-      {
-        heading: "Alcohol · substance use",
-        meta: "",
-        children: ["No treatment recorded"],
-      },
-    ],
-  },
+  { title: "Physical health", children: ["None"] },
+  { title: "Self-harm", children: ["None"] },
+  { title: "Significant events", children: ["None"] },
 ])
 
 console.log("history tree selftest passed")

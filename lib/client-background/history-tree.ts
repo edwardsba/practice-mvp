@@ -1,6 +1,20 @@
 import { clientAgeAtStart, compareEventsChronologically } from "@/lib/client-background/age"
-import { conditionGroups, personKey, type ConditionGroup } from "@/lib/client-background/condition-groups"
-import { isConditionEvent, isTreatmentEvent, treatmentsForCondition } from "@/lib/client-background/history-links"
+import {
+  comparePartialStarts,
+  issueNeedsWho,
+  issueTitle,
+  issuesForCategory,
+  mixedIssueEvents,
+  resolveHistoryIssues,
+  subEventsFor,
+  unlinkedTreatments,
+} from "@/lib/client-background/history-issues"
+import {
+  isConditionEvent,
+  isNestedHistoryEvent,
+  isOtherEvent,
+  isTreatmentEvent,
+} from "@/lib/client-background/history-links"
 import { resolvedAbout, type ScreeningAnswers } from "@/lib/client-background/interview-history"
 import { professionalSummary, type ProfessionalOption } from "@/lib/client-background/professionals"
 import {
@@ -8,15 +22,39 @@ import {
   EVENT_TYPE_LABELS,
   type EventRecord,
   type EventType,
+  type HistoryIssue,
   type RelationshipRecord,
   type StartPrecision,
+  type TreatmentAnswer,
 } from "@/lib/client-background/types"
 
 export type HistoryTreeNode =
-  | { kind: "section"; title: string; children: HistoryTreeNode[] }
-  | { kind: "band"; id: string; heading: string; meta: string; children: HistoryTreeNode[] }
-  | { kind: "row"; id: string; line: string; children: HistoryTreeNode[] }
+  | { kind: "section"; title: string; screeningKey?: string; children: HistoryTreeNode[] }
+  | {
+      kind: "band"
+      id: string
+      heading: string
+      meta: string
+      treatmentAnswer?: TreatmentAnswer | ""
+      needsWho?: boolean
+      children: HistoryTreeNode[]
+    }
+  | {
+      kind: "row"
+      id: string
+      line: string
+      tag?: "Episode" | "Treatment" | "Other" | "Step"
+      children: HistoryTreeNode[]
+    }
   | { kind: "note"; text: string }
+  | {
+      kind: "actions"
+      issueId?: string
+      /** Parent single-event id when adding under self-harm / traumatic / significant. */
+      parentEventId?: string
+      about: "self" | "significant_other"
+      category?: EventType
+    }
 
 export type HistoryTreeCard = { title: string; children: HistoryTreeNode[] }
 
@@ -28,9 +66,17 @@ type Input = {
   dateOfBirth: string | null
   screening: ScreeningAnswers
   professionals?: ProfessionalOption[]
+  issues?: HistoryIssue[]
+  /** When true, include "+ Add event" action nodes (interview). */
+  interactive?: boolean
 }
 
-const CLIENT_SECTIONS: { title: string; screening: keyof ScreeningAnswers; eventType: EventType; mode: "condition" | "event" }[] = [
+const CLIENT_SECTIONS: {
+  title: string
+  screening: keyof ScreeningAnswers
+  eventType: EventType
+  mode: "condition" | "event"
+}[] = [
   { title: "Mental health", screening: "emotional_problems", eventType: "emotional_problems", mode: "condition" },
   { title: "Substance use", screening: "substance_use", eventType: "substance_use", mode: "condition" },
   { title: "Physical health", screening: "illness_injury", eventType: "illness_injury", mode: "condition" },
@@ -39,91 +85,257 @@ const CLIENT_SECTIONS: { title: string; screening: keyof ScreeningAnswers; event
   { title: "Other significant events", screening: "other_significant_events", eventType: "significant_history", mode: "event" },
 ]
 
+const FAMILY_SECTIONS: {
+  title: string
+  screening: keyof ScreeningAnswers
+  eventType: EventType
+  mode: "condition" | "event"
+}[] = [
+  { title: "Mental health", screening: "family_emotional_problems", eventType: "emotional_problems", mode: "condition" },
+  { title: "Substance use", screening: "family_substance_use", eventType: "substance_use", mode: "condition" },
+  { title: "Physical health", screening: "family_illness", eventType: "illness_injury", mode: "condition" },
+  { title: "Self-harm", screening: "family_self_harm", eventType: "self_harm", mode: "event" },
+  { title: "Significant events", screening: "family_significant_events", eventType: "significant_history", mode: "event" },
+]
+
+/**
+ * Singular "+ Add …" labels for each history category title (board AC / Round R).
+ * Kept next to the section definitions — do not string-build from the plural title.
+ */
+export const HISTORY_CATEGORY_ADD_LABELS: Record<string, string> = {
+  "Mental health": "+ Add mental health issue",
+  "Substance use": "+ Add substance use issue",
+  "Physical health": "+ Add physical health issue",
+  "Self-harm": "+ Add self-harm",
+  "Traumatic events": "+ Add traumatic event",
+  "Other significant events": "+ Add significant event",
+  "Significant events": "+ Add significant event",
+  "Other treatment not linked to an issue": "+ Add treatment",
+}
+
+export function historyCategoryAddLabel(title: string): string {
+  return HISTORY_CATEGORY_ADD_LABELS[title] ?? `+ Add ${title.toLowerCase()}`
+}
+
+/**
+ * Visual tree layer for a History node: anything directly under a category is
+ * layer 2 (issue or single event); its children are layer 3; steps are layer 4.
+ */
+export function historyVisualLayer(
+  kind: "band" | "row" | "note" | "actions",
+  options?: { parentLayer?: 1 | 2 | 3 | 4; tag?: "Episode" | "Treatment" | "Other" | "Step" }
+): 2 | 3 | 4 {
+  if (kind === "note" || kind === "actions") return 2
+  if (kind === "band") return 2
+  if (options?.tag === "Step") return 4
+  const parent = options?.parentLayer ?? 1
+  if (parent <= 1) return 2
+  if (parent === 2) return 3
+  return 4
+}
+
 export function buildHistoryTree(input: Input): HistoryTree {
-  const self = input.events.filter((event) => resolvedAbout(event) === "self")
+  const issues = resolveHistoryIssues(input.events, input.issues)
+  const self = input.events.filter((event) => resolvedAbout(event) === "self" && !event.parentEventId)
   const sections: HistoryTreeNode[] = CLIENT_SECTIONS.map((section) => {
-    const matched = self.filter((event) => event.eventType === section.eventType)
-    const children =
-      section.mode === "condition"
-        ? conditionNodes(matched, input, false)
-        : matched
-            .sort((a, b) => compareEventsChronologically(a, b, input.dateOfBirth))
-            .map((event) => row(event.eventRecordId, eventLine(event, input.dateOfBirth)))
-    if (children.length === 0) {
-      const answer = input.screening[section.screening]
-      const note = answer === "yes" ? [] : [{ kind: "note" as const, text: answer === "no" ? "None" : "Not asked" }]
-      return { kind: "section", title: section.title, children: note }
+    if (section.mode === "condition") {
+      const matched = issuesForCategory(issues, section.eventType as "emotional_problems" | "substance_use" | "illness_injury", "self")
+      const children = matched.map((issue) => issueBand(issue, input, issues, false))
+      if (children.length === 0) {
+        return emptySection(section.title, section.screening, input.screening)
+      }
+      return { kind: "section", title: section.title, screeningKey: section.screening, children }
     }
-    return { kind: "section", title: section.title, children }
+    const matched = self
+      .filter((event) => event.eventType === section.eventType)
+      .sort((a, b) => comparePartialStarts(a, b, input.dateOfBirth))
+    if (matched.length === 0) {
+      return emptySection(section.title, section.screening, input.screening)
+    }
+    return {
+      kind: "section",
+      title: section.title,
+      screeningKey: section.screening,
+      children: matched.map((event) => eventRow(event, input)),
+    }
   })
-  const unlinked = self.filter((event) => isTreatmentEvent(event.eventType) && !event.conditionEventId)
-  if (unlinked.length > 0) {
+
+  const unlinked = unlinkedTreatments(self, "self").sort((a, b) => comparePartialStarts(a, b, input.dateOfBirth))
+  const otherAnswer = input.screening.other_treatment
+  const otherChildren: HistoryTreeNode[] =
+    unlinked.length > 0
+      ? unlinked.map((event) => eventRow(event, input, "Treatment"))
+      : otherAnswer === "no"
+        ? [{ kind: "note", text: "None" }]
+        : otherAnswer === "not_asked" || otherAnswer == null
+          ? [{ kind: "note", text: "Not asked" }]
+          : []
+  if (unlinked.length > 0 || otherAnswer != null) {
     sections.push({
       kind: "section",
-      title: "Not linked to a condition",
-      children: unlinked
-        .sort((a, b) => compareEventsChronologically(a, b, input.dateOfBirth))
-        .map((event) => row(event.eventRecordId, treatmentLine(event, input))),
+      title: "Other treatment not linked to an issue",
+      screeningKey: "other_treatment",
+      children: otherChildren,
+    })
+  }
+
+  return {
+    client: { title: "Client history", children: sections },
+    family: { title: "Family and significant others", children: familySections(input, issues) },
+  }
+}
+
+function emptySection(
+  title: string,
+  screening: keyof ScreeningAnswers,
+  answers: ScreeningAnswers
+): HistoryTreeNode {
+  const answer = answers[screening]
+  const note = answer === "yes" ? [] : [{ kind: "note" as const, text: answer === "no" ? "None" : "Not asked" }]
+  return { kind: "section", title, screeningKey: screening, children: note }
+}
+
+function issueBand(issue: HistoryIssue, input: Input, _issues: HistoryIssue[], family: boolean): HistoryTreeNode {
+  const mixed = mixedIssueEvents(input.events, issue.issueId, input.dateOfBirth)
+  const episodes = mixed.filter((item) => item.kind === "episode").map((item) => item.event)
+  const who = family ? whoLabel(issue, input.relationships) : ""
+  const heading = family
+    ? who
+      ? `${issueTitle(issue)} · ${who}`
+      : `${issueTitle(issue)} · Needs who`
+    : issueTitle(issue)
+  const meta = issueSpanMeta(episodes, input.dateOfBirth)
+  const children: HistoryTreeNode[] = mixed.map((item) => {
+    if (item.kind === "episode") {
+      return {
+        kind: "row",
+        id: item.event.eventRecordId,
+        line: episodeLine(item.event, item.episodeNumber, input.dateOfBirth),
+        tag: "Episode" as const,
+        children: subEventNodes(input.events, item.event.eventRecordId, input),
+      }
+    }
+    if (item.kind === "other") {
+      return {
+        kind: "row",
+        id: item.event.eventRecordId,
+        line: eventLine(item.event, input.dateOfBirth),
+        tag: "Other" as const,
+        children: subEventNodes(input.events, item.event.eventRecordId, input),
+      }
+    }
+    return {
+      kind: "row",
+      id: item.event.eventRecordId,
+      line: treatmentLine(item.event, input),
+      tag: "Treatment" as const,
+      children: subEventNodes(input.events, item.event.eventRecordId, input),
+    }
+  })
+  if (input.interactive) {
+    children.push({
+      kind: "actions",
+      issueId: issue.issueId,
+      about: issue.about,
+      category: issue.category,
     })
   }
   return {
-    client: { title: "Client history", children: sections },
-    family: { title: "Family and significant others", children: familySections(input) },
+    kind: "band",
+    id: issue.issueId,
+    heading,
+    meta,
+    treatmentAnswer: issue.treatmentAnswer,
+    needsWho: issueNeedsWho(issue),
+    children,
   }
 }
 
-function conditionNodes(events: EventRecord[], input: Input, family: boolean): HistoryTreeNode[] {
-  return conditionGroups(events, input.dateOfBirth)
-    .sort((a, b) => compareGroups(a, b, input.dateOfBirth))
-    .map((group) => conditionBand(group, input, family))
+function episodeLine(event: EventRecord, number: number, dateOfBirth: string | null): string {
+  const when = spanLine(event, dateOfBirth)
+  return [`Episode ${number}`, when].filter(Boolean).join(" · ")
 }
 
-function conditionBand(group: ConditionGroup, input: Input, family: boolean): HistoryTreeNode {
-  const current = group.episodes.some(ongoing)
-  const heading = family
-    ? [group.title, EVENT_TYPE_LABELS[group.eventType].toLowerCase()].join(" · ")
-    : current
-      ? `${group.title} · current`
-      : group.title
-  const meta =
-    group.episodes.length > 1
-      ? episodeSummary(group, input.dateOfBirth)
-      : family
-        ? datePhrase(group.episodes[0]).dates
-        : spanLine(group.episodes[0], input.dateOfBirth)
-  const nested =
-    group.episodes.length > 1
-      ? [...group.episodes].sort((a, b) => compareCurrentThenRecent(a, b, input.dateOfBirth)).map((episode) => episodeRow(episode, input))
-      : treatmentNodes(group.episodes[0], input)
-  return { kind: "band", id: group.id, heading, meta, children: nested }
-}
-
-function episodeRow(episode: EventRecord, input: Input): HistoryTreeNode {
-  const when = spanLine(episode, input.dateOfBirth)
-  const label = ongoing(episode) ? "Current episode" : "Episode"
+function eventRow(event: EventRecord, input: Input, tag?: "Episode" | "Treatment" | "Other" | "Step"): HistoryTreeNode {
+  const line = isTreatmentEvent(event.eventType)
+    ? treatmentLine(event, input)
+    : eventLine(event, input.dateOfBirth)
+  const children = nestedOrStepNodes(input.events, event.eventRecordId, input)
+  const actions: HistoryTreeNode[] = input.interactive
+    ? [
+        {
+          kind: "actions",
+          parentEventId: event.eventRecordId,
+          about: event.about === "significant_other" ? "significant_other" : "self",
+          category: event.eventType,
+        },
+      ]
+    : []
   return {
     kind: "row",
-    id: episode.eventRecordId,
-    line: [label, when].filter(Boolean).join(" · "),
-    children: treatmentNodes(episode, input),
+    id: event.eventRecordId,
+    line,
+    tag: tag ?? (isTreatmentEvent(event.eventType) ? "Treatment" : isOtherEvent(event.eventType) ? "Other" : undefined),
+    children: [...children, ...actions],
   }
 }
 
-function treatmentNodes(episode: EventRecord, input: Input): HistoryTreeNode[] {
-  const treatments = treatmentsForCondition(input.events, episode.eventRecordId).sort((a, b) =>
-    compareEventsChronologically(a, b, input.dateOfBirth)
-  )
-  if (treatments.length === 0) return [{ kind: "note", text: "No treatment recorded" }]
-  return treatments.map((treatment) => row(treatment.eventRecordId, treatmentLine(treatment, input)))
+/** Nested Episode/Treatment/Other under a parent, plus free-text steps. */
+function nestedOrStepNodes(events: EventRecord[], parentId: string, input: Input): HistoryTreeNode[] {
+  return subEventsFor(events, parentId)
+    .sort((a, b) => comparePartialStarts(a, b, input.dateOfBirth))
+    .map((event) => {
+      if (isNestedHistoryEvent(event.eventType) && event.eventType !== "family_events") {
+        if (isConditionEvent(event.eventType)) {
+          return {
+            kind: "row" as const,
+            id: event.eventRecordId,
+            line: eventLine(event, input.dateOfBirth),
+            tag: "Episode" as const,
+            children: subEventNodes(events, event.eventRecordId, input),
+          }
+        }
+        if (isOtherEvent(event.eventType)) {
+          return {
+            kind: "row" as const,
+            id: event.eventRecordId,
+            line: eventLine(event, input.dateOfBirth),
+            tag: "Other" as const,
+            children: subEventNodes(events, event.eventRecordId, input),
+          }
+        }
+        return {
+          kind: "row" as const,
+          id: event.eventRecordId,
+          line: treatmentLine(event, input),
+          tag: "Treatment" as const,
+          children: subEventNodes(events, event.eventRecordId, input),
+        }
+      }
+      return {
+        kind: "row" as const,
+        id: event.eventRecordId,
+        line: eventLine(event, input.dateOfBirth),
+        tag: "Step" as const,
+        children: [] as HistoryTreeNode[],
+      }
+    })
 }
 
-function episodeSummary(group: ConditionGroup, dateOfBirth: string | null): string {
-  const phrases = [...group.episodes]
-    .sort((a, b) => compareEventsChronologically(a, b, dateOfBirth))
-    .map((episode) => datePhrase(episode).dates)
-    .filter(Boolean)
-  const count = `${group.episodes.length} episodes`
-  return phrases.length > 0 ? `${count} · ${joinAnd(phrases)}` : count
+function subEventNodes(events: EventRecord[], parentId: string, input: Input): HistoryTreeNode[] {
+  return nestedOrStepNodes(events, parentId, input)
+}
+
+function issueSpanMeta(episodes: EventRecord[], dateOfBirth: string | null): string {
+  if (episodes.length === 0) return ""
+  const sorted = [...episodes].sort((a, b) => comparePartialStarts(a, b, dateOfBirth))
+  const first = sorted[0]
+  const last = sorted[sorted.length - 1]
+  const start = yearOf(first.startValue)
+  const end = last.endOngoing || last.resolvedOrOngoing === "ongoing" ? "ongoing" : yearOf(last.endValue) || yearOf(last.startValue)
+  const span = start && end && start !== end ? `${start} – ${end}` : start || end
+  if (episodes.length === 1) return span
+  return [span, `${episodes.length} episodes`].filter(Boolean).join(" · ")
 }
 
 function eventLine(event: EventRecord, dateOfBirth: string | null): string {
@@ -134,71 +346,73 @@ function eventLine(event: EventRecord, dateOfBirth: string | null): string {
 
 function treatmentLine(event: EventRecord, input: Input): string {
   const when = datePhrase(event)
-  const ages = agePhrase(event, input.dateOfBirth)
   if (event.eventType === "psychiatric_admission" && event.admissionType === "residential_rehab") {
-    return ["Residential rehab", when.dates, ages].filter(Boolean).join(" · ")
+    return ["Residential rehab", when.dates].filter(Boolean).join(" · ")
   }
   if (event.eventType === "psychiatric_admission") {
     const type = event.admissionType ? ADMISSION_TYPE_LABELS[event.admissionType].toLowerCase() : ""
-    const length = event.admissionLength.trim()
-    return ["Hospital admission", type, when.dates, ages, length].filter(Boolean).join(" · ")
+    return ["Hospital admission", type, when.dates, event.admissionLength.trim()].filter(Boolean).join(" · ")
   }
   if (event.eventType === "previous_therapy") {
-    return ["Therapy", event.title.trim().toLowerCase(), when.dates, ages].filter(Boolean).join(" · ")
+    return ["Therapy", event.title.trim().toLowerCase(), when.dates].filter(Boolean).join(" · ")
+  }
+  if (event.eventType === "other_treatment") {
+    return [event.title.trim() || "Other treatment", when.dates].filter(Boolean).join(" · ")
   }
   const prescriber = prescriberLabel(event, input.professionals ?? [])
-  return ["Medication", event.title.trim().toLowerCase(), when.dates, ongoing(event) ? "ongoing" : "ended", prescriber]
+  return ["Medication", event.title.trim().toLowerCase(), when.dates, ongoing(event) ? "ongoing" : "", prescriber]
     .filter(Boolean)
     .join(" · ")
 }
 
-function familySections(input: Input): HistoryTreeNode[] {
-  const rows = input.events.filter((event) => resolvedAbout(event) === "significant_other")
-  const keys = [...new Set(rows.map(personKey))]
-  return keys
-    .map((key) => ({ key, sample: rows.find((event) => personKey(event) === key)! }))
-    .sort((a, b) => comparePeople(a.sample, b.sample, input.relationships))
-    .map(({ key, sample }) => {
-      const mine = rows.filter((event) => personKey(event) === key)
-      const conditions = mine.filter((event) => isConditionEvent(event.eventType))
-      const plain = mine.filter((event) => !isConditionEvent(event.eventType) && (!isTreatmentEvent(event.eventType) || !event.conditionEventId))
-      const children = [
-        ...conditionNodes(conditions, input, true),
-        ...plain
-          .sort((a, b) => compareEventsChronologically(a, b, input.dateOfBirth))
-          .map((event) =>
-            isTreatmentEvent(event.eventType)
-              ? row(event.eventRecordId, treatmentLine(event, input))
-              : row(event.eventRecordId, familyEventLine(event))
-          ),
-      ]
-      return { kind: "section" as const, title: personHeading(sample, input.relationships), children }
-    })
+function familySections(input: Input, issues: HistoryIssue[]): HistoryTreeNode[] {
+  return FAMILY_SECTIONS.map((section) => {
+    if (section.mode === "condition") {
+      const matched = issuesForCategory(
+        issues,
+        section.eventType as "emotional_problems" | "substance_use" | "illness_injury",
+        "significant_other"
+      )
+      const children = matched.map((issue) => issueBand(issue, input, issues, true))
+      if (children.length === 0) {
+        return emptySection(section.title, section.screening, input.screening)
+      }
+      return { kind: "section", title: section.title, screeningKey: section.screening, children }
+    }
+    const matched = input.events
+      .filter(
+        (event) =>
+          resolvedAbout(event) === "significant_other" &&
+          !event.parentEventId &&
+          !isConditionEvent(event.eventType) &&
+          !isTreatmentEvent(event.eventType) &&
+          (event.eventType === section.eventType ||
+            (section.eventType === "significant_history" && event.eventType === "family_events"))
+      )
+      .sort((a, b) => comparePartialStarts(a, b, input.dateOfBirth))
+    if (matched.length === 0) {
+      return emptySection(section.title, section.screening, input.screening)
+    }
+    return {
+      kind: "section",
+      title: section.title,
+      screeningKey: section.screening,
+      children: matched.map((event) => eventRow(event, input)),
+    }
+  })
 }
 
-function familyEventLine(event: EventRecord): string {
-  const title = event.title.trim() || EVENT_TYPE_LABELS[event.eventType]
-  const type = EVENT_TYPE_LABELS[event.eventType].toLowerCase()
-  const dates = datePhrase(event).dates
-  return [title, type, dates].filter(Boolean).join(" · ")
-}
-
-function personHeading(event: EventRecord, people: RelationshipRecord[]): string {
-  const person = event.relationshipRecordId
-    ? people.find((item) => item.relationshipRecordId === event.relationshipRecordId)
-    : undefined
-  if (!person) {
-    const other = event.aboutOther.trim()
-    if (!other) return "Significant other"
-    return other.slice(0, 1).toUpperCase() + other.slice(1)
+function whoLabel(issue: HistoryIssue, people: RelationshipRecord[]): string {
+  if (issue.relationshipRecordId) {
+    const person = people.find((item) => item.relationshipRecordId === issue.relationshipRecordId)
+    if (!person) return ""
+    const role = roleWord(person)
+    const name = person.givenName.trim()
+    if (name) return `${name} (${role.toLowerCase()})`
+    return role
   }
-  const role = roleWord(person)
-  const name = person.givenName.trim()
-  const dead = person.deceased || person.healthStatus === "deceased"
-  if (name && dead) return `${role} (${name}, deceased)`
-  if (name) return `${role} (${name})`
-  if (dead) return `${role} (deceased)`
-  return role
+  const other = issue.aboutOther.trim()
+  return other
 }
 
 function roleWord(person: RelationshipRecord): string {
@@ -219,47 +433,6 @@ function roleWord(person: RelationshipRecord): string {
   }
   if (rel === "other_caregiver" || person.blockRole === "caregiver") return "Caregiver"
   return "Relative"
-}
-
-function personRank(person: RelationshipRecord | undefined): number {
-  if (!person) return 5
-  const role = roleWord(person)
-  if (role === "Mother") return 0
-  if (role === "Father") return 1
-  if (role === "Step-parent") return 2
-  if (role === "Partner") return 3
-  if (role === "Daughter" || role === "Son" || role === "Child") return 4
-  if (role === "Sister" || role === "Brother" || role === "Sibling") return 5
-  if (role === "Caregiver" || role === "Relative") return 6
-  return 7
-}
-
-function comparePeople(a: EventRecord, b: EventRecord, people: RelationshipRecord[]): number {
-  const personA = a.relationshipRecordId ? people.find((item) => item.relationshipRecordId === a.relationshipRecordId) : undefined
-  const personB = b.relationshipRecordId ? people.find((item) => item.relationshipRecordId === b.relationshipRecordId) : undefined
-  const rank = personRank(personA) - personRank(personB)
-  if (rank !== 0) return rank
-  return (personA?.displayOrder ?? 0) - (personB?.displayOrder ?? 0)
-}
-
-function compareGroups(a: ConditionGroup, b: ConditionGroup, dateOfBirth: string | null): number {
-  const aCurrent = a.episodes.some(ongoing)
-  const bCurrent = b.episodes.some(ongoing)
-  if (aCurrent !== bCurrent) return aCurrent ? -1 : 1
-  const aLatest = [...a.episodes].sort((left, right) => compareEventsChronologically(right, left, dateOfBirth))[0]
-  const bLatest = [...b.episodes].sort((left, right) => compareEventsChronologically(right, left, dateOfBirth))[0]
-  return compareEventsChronologically(bLatest, aLatest, dateOfBirth)
-}
-
-function compareCurrentThenRecent(a: EventRecord, b: EventRecord, dateOfBirth: string | null): number {
-  const aOngoing = ongoing(a)
-  const bOngoing = ongoing(b)
-  if (aOngoing !== bOngoing) return aOngoing ? -1 : 1
-  return compareEventsChronologically(b, a, dateOfBirth)
-}
-
-function row(id: string, line: string): HistoryTreeNode {
-  return { kind: "row", id, line, children: [] }
 }
 
 function ongoing(event: EventRecord): boolean {
@@ -292,12 +465,6 @@ function spanLine(event: EventRecord, dateOfBirth: string | null): string {
   return [datePhrase(event).dates, agePhrase(event, dateOfBirth)].filter(Boolean).join(" · ")
 }
 
-function joinAnd(parts: string[]): string {
-  if (parts.length <= 1) return parts[0] ?? ""
-  if (parts.length === 2) return `${parts[0]}, and ${parts[1]}`
-  return `${parts.slice(0, -1).join(", ")}, and ${parts[parts.length - 1]}`
-}
-
 function professionShort(value: string | null | undefined): string {
   const text = (value ?? "").trim()
   if (/^general practitioners?$/i.test(text) || /^g\.?p\.?$/i.test(text)) return "GP"
@@ -311,4 +478,13 @@ function prescriberLabel(event: EventRecord, professionals: ProfessionalOption[]
   const profession = professionShort(professional.professionName)
   if (name && profession) return `${name}, ${profession}`
   return name || professionalSummary(professional)
+}
+
+/** Keep for callers that still sort family people by relationship order. */
+export function compareEventsChronologicallyForTree(
+  a: EventRecord,
+  b: EventRecord,
+  dateOfBirth: string | null
+): number {
+  return compareEventsChronologically(a, b, dateOfBirth)
 }

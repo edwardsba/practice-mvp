@@ -1,3 +1,4 @@
+import { sanitizeHistoryIssue } from "@/lib/client-background/history-issues"
 import {
   emptyBlockAnswers,
   isOneOf,
@@ -7,6 +8,7 @@ import {
   type ClientRelationshipStatusValue,
   type EventRecord,
   type EventType,
+  type HistoryIssue,
   type RelationshipBlock,
   type RelationshipBlockAnswers,
   type RelationshipRecord,
@@ -101,6 +103,8 @@ export function toRelationshipBlock(row: {
   startedOn: string | null
   endedOn: string | null
   noChildren: boolean
+  childrenAnswer?: string | null
+  siblingsAnswer?: string | null
   displayOrder: number
 }): RelationshipBlock {
   const kind: BlockKind = isOneOf(row.kind, [
@@ -137,8 +141,14 @@ export function toRelationshipBlock(row: {
     startedOn: row.startedOn ?? "",
     endedOn: row.endedOn ?? "",
     noChildren: row.noChildren,
+    childrenAnswer: isBlockAnswer(row.childrenAnswer) ? row.childrenAnswer : "",
+    siblingsAnswer: isBlockAnswer(row.siblingsAnswer) ? row.siblingsAnswer : "",
     displayOrder: row.displayOrder,
   }
+}
+
+function isBlockAnswer(value: string | null | undefined): value is "yes" | "none" | "not_asked" {
+  return value === "yes" || value === "none" || value === "not_asked"
 }
 
 export function toBlockAnswers(row: {
@@ -180,6 +190,7 @@ export function toEvent(row: {
   relationshipRecordId: string | null
   conditionEventId: string | null
   conditionGroupId: string | null
+  parentEventId?: string | null
   admissionType: string | null
   facility: string | null
   admissionLength: string | null
@@ -208,6 +219,7 @@ export function toEvent(row: {
     aboutOther: row.aboutOther ?? "",
     conditionEventId: row.conditionEventId,
     conditionGroupId: row.conditionGroupId,
+    parentEventId: row.parentEventId ?? null,
     admissionType: row.admissionType ?? "",
     facility: row.facility ?? "",
     admissionLength: row.admissionLength ?? "",
@@ -218,4 +230,29 @@ export function toEvent(row: {
     abstinentSincePrecision: row.abstinentSincePrecision ?? "",
     abstinentSinceValue: row.abstinentSinceValue ?? "",
   })
+}
+
+export function toHistoryIssue(row: {
+  issueId: string
+  category: string
+  about: string | null
+  relationshipRecordId: string | null
+  aboutOther?: string | null
+  title: string | null
+  treatmentAnswer: string | null
+  displayOrder: number
+}): HistoryIssue {
+  return sanitizeHistoryIssue(
+    {
+      issueId: row.issueId,
+      category: row.category,
+      about: row.about,
+      relationshipRecordId: row.relationshipRecordId,
+      aboutOther: row.aboutOther ?? "",
+      title: row.title ?? "",
+      treatmentAnswer: row.treatmentAnswer ?? "",
+      displayOrder: row.displayOrder,
+    },
+    row.issueId
+  )
 }

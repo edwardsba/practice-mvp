@@ -1,23 +1,24 @@
 "use client"
 
-import { useEffect, useRef, useState, type MouseEvent, type RefObject } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 
 import {
   completeBackgroundInterviewAction,
-  createEventAction,
-  deleteEventAction,
   saveInterviewScreeningAction,
   saveStressorsAction,
-  updateEventAction,
 } from "@/app/clients/[client_id]/background/actions"
-import { AddButton, ClientAnswer, SelectField } from "@/components/client-background/fields"
-import { HistoryPanel, HistoryTags, historyEntryLines } from "@/components/client-background/history-section"
 import { AutosaveFields, type SavePhase } from "@/components/client-background/interview-autosave"
+import {
+  InterviewSectionCard,
+  needsBadge,
+  readSectionOpenState,
+  writeSectionOpenState,
+} from "@/components/client-background/interview-section-card"
+import { HistoryTreeSection } from "@/components/client-background/history-tree-section"
 import { StressorsFields } from "@/components/client-background/medication-stressors"
 import { WorthCheckingLinks } from "@/components/client-background/worth-checking"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   Dialog,
   DialogContent,
@@ -25,55 +26,59 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import type { ClientBackgroundSuggestions } from "@/lib/background-questionnaire/to-client-background"
-import { isConditionEvent, isTreatmentEvent, treatmentNeedsLink, treatmentsForCondition } from "@/lib/client-background/history-links"
 import type { ProfessionalOption } from "@/lib/client-background/professionals"
 import type { BackgroundCheck } from "@/lib/client-background/checks"
 import {
   HISTORY_QUESTION_GROUPS,
   HISTORY_QUESTIONS,
-  eventsForQuestion,
-  historyQuestionAcceptsEntries,
   unansweredInterviewLabels,
   type HistoryQuestionKey,
   type ScreeningAnswer,
   type ScreeningAnswers,
 } from "@/lib/client-background/interview-history"
-import { emptyEvent, type EventRecord, type ReasonForAttending, type RelationshipRecord, type StressorsRecord } from "@/lib/client-background/types"
+import type {
+  EventRecord,
+  HistoryIssue,
+  RelationshipRecord,
+  StressorsRecord,
+} from "@/lib/client-background/types"
 
 export function InterviewHistory({
   clientId,
+  clientName = "Client",
   dateOfBirth,
   events,
   relationships,
   screening,
-  reasonRef,
   stressors,
   selfReportId,
   historyClient,
   medicationClient,
   professionals,
   stressorsClient,
+  issues,
   onEvents,
   onPhase,
   registerFlush,
   registerComplete,
   getChecks,
   onJumpToCheck,
+  sectionSyncKey = 0,
 }: {
   clientId: string
+  clientName?: string
   dateOfBirth: string | null
   events: EventRecord[]
   relationships: RelationshipRecord[]
   screening: ScreeningAnswers
-  reasonRef: RefObject<ReasonForAttending>
   stressors: StressorsRecord
   selfReportId: string | null
   historyClient?: ClientBackgroundSuggestions["history"]
   medicationClient?: ClientBackgroundSuggestions["medication"]
   professionals: ProfessionalOption[]
   stressorsClient?: ClientBackgroundSuggestions["stressors"]
+  issues?: HistoryIssue[]
   onEvents: (events: EventRecord[]) => void
   onPhase: (id: string, phase: SavePhase, retry: (() => void) | null) => void
   registerFlush: (flush: () => Promise<void>) => () => void
@@ -84,20 +89,29 @@ export function InterviewHistory({
     stressors: StressorsRecord
   }) => BackgroundCheck[]
   onJumpToCheck: (check: BackgroundCheck) => void
+  /** Bumped when Worth checking opens a history section via sessionStorage. */
+  sectionSyncKey?: number
 }) {
   const [answers, setAnswers] = useState(screening)
   const [entries, setEntries] = useState(events)
-  const [sheet, setSheet] = useState<{ draft: EventRecord; editing: boolean; isNew: boolean } | null>(null)
-  const [pending, setPending] = useState(false)
-  const [error, setError] = useState<string | null>(null)
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [unanswered, setUnanswered] = useState<string[]>([])
   const [checks, setChecks] = useState<BackgroundCheck[]>([])
   const [completing, setCompleting] = useState(false)
   const [completeError, setCompleteError] = useState<string | null>(null)
+  const [sectionOpen, setSectionOpen] = useState<Record<string, boolean>>({})
   const router = useRouter()
-  const opener = useRef<HTMLElement | null>(null)
-  const scrollY = useRef(0)
+  useEffect(() => {
+    setSectionOpen(readSectionOpenState(clientId, "history"))
+  }, [clientId, sectionSyncKey])
+
+  function toggleHistorySection(id: string) {
+    setSectionOpen((current) => {
+      const next = { ...current, [id]: !current[id] }
+      writeSectionOpenState(clientId, "history", next)
+      return next
+    })
+  }
   const answersRef = useRef(answers)
   const entriesRef = useRef(entries)
   const stressorsRef = useRef(stressors)
@@ -115,7 +129,7 @@ export function InterviewHistory({
           entriesRef.current,
           dateOfBirth,
           stressorsRef.current,
-          reasonRef.current
+          issues ?? []
         )
       )
       setChecks(
@@ -128,29 +142,13 @@ export function InterviewHistory({
       setCompleteError(null)
       setConfirmOpen(true)
     })
-  }, [dateOfBirth, getChecks, reasonRef, registerComplete])
+  }, [dateOfBirth, getChecks, issues, registerComplete])
 
   useEffect(() => {
     return registerFlush(async () => {
       if (inflight.current) await inflight.current
     })
   }, [registerFlush])
-
-  function remember(event: MouseEvent<HTMLButtonElement>) {
-    opener.current = event.currentTarget
-    scrollY.current = window.scrollY
-  }
-
-  function closeSheet(force = false) {
-    if (pending && !force) return
-    setSheet(null)
-    setError(null)
-    const node = opener.current
-    requestAnimationFrame(() => {
-      window.scrollTo(0, scrollY.current)
-      node?.focus()
-    })
-  }
 
   function replaceEntries(next: EventRecord[]) {
     entriesRef.current = next
@@ -159,7 +157,6 @@ export function InterviewHistory({
   }
 
   async function choose(key: HistoryQuestionKey, answer: ScreeningAnswer | "") {
-    if (!historyQuestionAcceptsEntries(key)) return
     const next = { ...answersRef.current }
     if (answer === "") delete next[key]
     else next[key] = answer
@@ -186,96 +183,6 @@ export function InterviewHistory({
     }
   }
 
-  function addTreatment(condition: EventRecord, event: MouseEvent<HTMLButtonElement>) {
-    remember(event)
-    setError(null)
-    setSheet({
-      draft: {
-        ...emptyEvent("psychiatric_admission", 0),
-        eventRecordId: "",
-        about: condition.about,
-        relationshipRecordId: condition.relationshipRecordId,
-        aboutOther: condition.aboutOther,
-        conditionEventId: condition.eventRecordId,
-      },
-      editing: true,
-      isNew: true,
-    })
-  }
-
-  function addEntry(key: HistoryQuestionKey, event: MouseEvent<HTMLButtonElement>) {
-    remember(event)
-    const question = HISTORY_QUESTIONS[key]
-    if (!question.eventType) return
-    setError(null)
-    setSheet({
-      draft: {
-        ...emptyEvent(question.eventType, 0),
-        eventRecordId: "",
-        about: question.about,
-      },
-      editing: true,
-      isNew: true,
-    })
-  }
-
-  async function saveEntry() {
-    if (!sheet) return
-    setPending(true)
-    setError(null)
-    onPhase("history", "saving", null)
-    const result = sheet.isNew
-      ? await createEventAction(clientId, sheet.draft)
-      : await updateEventAction(clientId, sheet.draft)
-    setPending(false)
-    if (result.error || !result.event) {
-      setError(result.error ?? "Could not save this entry.")
-      onPhase("history", "error", () => void saveEntry())
-      return
-    }
-    replaceEntries(
-      sheet.isNew
-        ? [...entriesRef.current, result.event]
-        : entriesRef.current.map((entry) =>
-            entry.eventRecordId === result.event!.eventRecordId ? result.event! : entry
-          )
-    )
-    onPhase("history", "saved", null)
-    closeSheet(true)
-  }
-
-  function cancelEntry() {
-    if (!sheet) return
-    if (sheet.isNew) {
-      closeSheet(true)
-      return
-    }
-    const saved = entriesRef.current.find((entry) => entry.eventRecordId === sheet.draft.eventRecordId)
-    if (!saved) {
-      closeSheet(true)
-      return
-    }
-    setSheet({ draft: { ...saved }, editing: false, isNew: false })
-    setError(null)
-  }
-
-  async function removeEntry() {
-    if (!sheet) return
-    if (!window.confirm("Remove this history entry?")) return
-    setPending(true)
-    setError(null)
-    const result = await deleteEventAction(clientId, sheet.draft.eventRecordId)
-    setPending(false)
-    if (result.error) {
-      setError(result.error)
-      onPhase("history", "error", () => void removeEntry())
-      return
-    }
-    replaceEntries(entriesRef.current.filter((entry) => entry.eventRecordId !== sheet.draft.eventRecordId))
-    onPhase("history", "saved", null)
-    closeSheet(true)
-  }
-
   async function complete() {
     setCompleting(true)
     setCompleteError(null)
@@ -288,187 +195,86 @@ export function InterviewHistory({
     router.push(`/clients/${clientId}/background`)
   }
 
+  const liveChecks = getChecks({
+    screening: answers,
+    events: entries,
+    stressors: stressorsRef.current,
+  })
+
+  function historyGroupNeeds(group: (typeof HISTORY_QUESTION_GROUPS)[number]): number {
+    const keys = new Set<string>(group.keys)
+    return liveChecks.filter((check) => {
+      if (check.target !== "history") return false
+      if (check.id.startsWith("history-")) return keys.has(check.id.slice("history-".length))
+      const match = /^(?:detail|unlinked)-(.+)$/.exec(check.id)
+      if (!match) return false
+      const event = entries.find((item) => item.eventRecordId === match[1])
+      if (!event) return false
+      const about = event.about === "significant_other" ? "significant_other" : "self"
+      return group.keys.some((key) => HISTORY_QUESTIONS[key].about === about)
+    }).length
+  }
+
+  const sectionNeeds: Record<string, number> = {}
+  for (const group of HISTORY_QUESTION_GROUPS) {
+    sectionNeeds[group.title] = historyGroupNeeds(group)
+  }
+
   return (
     <div className="space-y-4">
-      {HISTORY_QUESTION_GROUPS.map((group) => (
-        <Card key={group.title}>
-          <CardHeader>
-            <CardTitle>{group.title}</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {group.keys.map((key) => {
-              const question = HISTORY_QUESTIONS[key]
-              const suggestion = historyClient?.[key]
-              const matched = eventsForQuestion(entries, key, dateOfBirth)
-              const listed =
-                question.eventType && isTreatmentEvent(question.eventType)
-                  ? matched.filter((entry) => treatmentNeedsLink(entry))
-                  : matched
-              const locked = matched.length > 0
-              const shown: ScreeningAnswer | null = locked ? "yes" : answers[key] ?? null
-              const currentMedication = key === "medication_history" ? medicationClient?.currentlyTaking : undefined
-              return (
-                <div key={key} id={`check-history-${key}`} className="scroll-mt-28 space-y-2 border-b pb-4 last:border-b-0 last:pb-0">
-                  <SelectField
-                    id={`history_${key}`}
-                    label={question.label}
-                    value={shown ?? ""}
-                    disabled={locked}
-                    client={
-                      currentMedication || suggestion ? (
-                        <>
-                          {currentMedication ? (
-                            <ClientAnswer label={`Currently taking: ${currentMedication.label}`} matches={false} />
-                          ) : null}
-                          {suggestion ? (
-                            <ClientAnswer
-                              label={key === "medication_history" ? `Ever taken: ${suggestion.label}` : suggestion.label}
-                              matches={shown === suggestion.apply}
-                              onUse={locked ? undefined : () => void choose(key, suggestion.apply)}
-                            />
-                          ) : null}
-                        </>
-                      ) : undefined
-                    }
-                    onChange={(next) => {
-                      if (locked) return
-                      void choose(
-                        key,
-                        next === "yes" || next === "no" || next === "not_asked" ? next : ""
-                      )
-                    }}
-                  >
-                    <option value="">Select…</option>
-                    <option value="yes">Yes</option>
-                    <option value="no">No</option>
-                    <option value="not_asked">Not asked</option>
-                  </SelectField>
-                  {locked ? <p className="text-xs text-muted-foreground">Entries recorded</p> : null}
-                  {shown === "yes" ? (
-                    <div className="space-y-1">
-                      {listed.map((entry) => {
-                        const lines = historyEntryLines(entry, dateOfBirth, relationships)
-                        const linked = isConditionEvent(entry.eventType)
-                          ? treatmentsForCondition(entries, entry.eventRecordId)
-                          : []
-                        return (
-                          <div key={entry.eventRecordId} className="space-y-1">
-                            <button
-                              type="button"
-                              className="flex min-h-11 w-full cursor-pointer flex-col justify-center rounded-md px-2 text-left hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
-                              onClick={(event) => {
-                                remember(event)
-                                setSheet({ draft: { ...entry }, editing: false, isNew: false })
-                                setError(null)
-                              }}
-                            >
-                              <span className="flex items-center gap-2 text-sm">
-                                {lines.title}
-                                <HistoryTags entry={entry} />
-                              </span>
-                              <span className="text-xs text-muted-foreground">{lines.meta}</span>
-                            </button>
-                            {group.title === "Significant others" && isConditionEvent(entry.eventType) ? (
-                              <AddButton label="+ Add treatment" onClick={(click) => addTreatment(entry, click)} />
-                            ) : null}
-                            {linked.length > 0 ? (
-                              <div className="ml-4 space-y-1 border-l pl-3">
-                                {linked.map((treatment) => {
-                                  const treatmentLines = historyEntryLines(treatment, dateOfBirth, relationships)
-                                  return (
-                                    <button
-                                      key={treatment.eventRecordId}
-                                      type="button"
-                                      className="flex min-h-11 w-full cursor-pointer flex-col justify-center rounded-md px-2 text-left hover:bg-muted"
-                                      onClick={(event) => {
-                                        remember(event)
-                                        setSheet({ draft: { ...treatment }, editing: false, isNew: false })
-                                        setError(null)
-                                      }}
-                                    >
-                                      <span className="text-sm">{treatmentLines.title}</span>
-                                      <span className="text-xs text-muted-foreground">{treatmentLines.meta}</span>
-                                    </button>
-                                  )
-                                })}
-                              </div>
-                            ) : null}
-                          </div>
-                        )
-                      })}
-                      <AddButton label="+ Add entry" onClick={(event) => addEntry(key, event)} />
-                    </div>
-                  ) : null}
-                </div>
-              )
-            })}
-          </CardContent>
-        </Card>
-      ))}
+      <HistoryTreeSection
+        clientId={clientId}
+        clientName={clientName}
+        dateOfBirth={dateOfBirth}
+        events={entries}
+        relationships={relationships}
+        screening={answers}
+        professionals={professionals}
+        issues={issues}
+        presentation="interview"
+        sectionOpen={sectionOpen}
+        onToggleSection={toggleHistorySection}
+        sectionNeeds={sectionNeeds}
+        onScreeningChange={(key, answer) => void choose(key, answer)}
+        onEventsChange={replaceEntries}
+        medicationClient={medicationClient}
+        historyClient={historyClient}
+      />
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Stressors</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <AutosaveFields
-            saved={stressors}
-            save={async (value) => {
-              stressorsRef.current = value
-              const result = await saveStressorsAction(clientId, value)
-              if (result.error || !("stressors" in result) || !result.stressors) {
-                return { error: result.error ?? "Could not save stressors." }
-              }
-              stressorsRef.current = result.stressors
-              return { value: result.stressors }
-            }}
-            onPhase={(phase, retry) => onPhase("stressors", phase, retry)}
-            registerFlush={registerFlush}
-          >
-            {(value, onChange, commit) => {
-              stressorsRef.current = value
-              return (
-                <StressorsFields
-                  idPrefix="interview_stressors"
-                  value={value}
-                  onChange={onChange}
-                  onCommit={commit}
-                  client={stressorsClient}
-                />
-              )
-            }}
-          </AutosaveFields>
-        </CardContent>
-      </Card>
-
-      <Sheet open={sheet != null} onOpenChange={(next) => !next && closeSheet()}>
-        <SheetContent className="h-full w-full overflow-y-auto sm:max-w-xl">
-          <SheetHeader>
-            <SheetTitle>{sheet ? historyEntryLines(sheet.draft, dateOfBirth, relationships).title : "History"}</SheetTitle>
-          </SheetHeader>
-          <div className="px-4 pb-4">
-            <HistoryPanel
-              draft={sheet?.draft ?? null}
-              editing={sheet?.editing ?? false}
-              pending={pending}
-              error={error}
-              dateOfBirth={dateOfBirth}
-              relationships={relationships}
-              events={entries}
-              professionals={professionals}
-              hideBack
-              isNew={sheet?.isNew ?? false}
-              onEdit={() => sheet && setSheet({ ...sheet, editing: true })}
-              onCancel={cancelEntry}
-              onBack={() => closeSheet()}
-              backLabel="← Back"
-              onChange={(draft) => sheet && setSheet({ ...sheet, draft })}
-              onSave={() => void saveEntry()}
-              onRemove={() => void removeEntry()}
-            />
-          </div>
-        </SheetContent>
-      </Sheet>
+      <InterviewSectionCard
+        title="Stressors"
+        open={Boolean(sectionOpen.Stressors)}
+        onToggle={() => toggleHistorySection("Stressors")}
+        badge={needsBadge(0)}
+      >
+        <AutosaveFields
+          saved={stressors}
+          save={async (value) => {
+            stressorsRef.current = value
+            const result = await saveStressorsAction(clientId, value)
+            if (result.error || !("stressors" in result) || !result.stressors) {
+              return { error: result.error ?? "Could not save stressors." }
+            }
+            stressorsRef.current = result.stressors
+            return { value: result.stressors }
+          }}
+          onPhase={(phase, retry) => onPhase("stressors", phase, retry)}
+          registerFlush={registerFlush}
+        >
+          {(value, onChange, commit) => {
+            stressorsRef.current = value
+            return (
+              <StressorsFields
+                idPrefix="interview_stressors"
+                value={value}
+                onChange={onChange}
+                onCommit={commit}
+                client={stressorsClient}
+              />
+            )
+          }}
+        </AutosaveFields>
+      </InterviewSectionCard>
 
       <Dialog open={confirmOpen} onOpenChange={(next) => !completing && setConfirmOpen(next)}>
         <DialogContent className="max-h-[85vh] overflow-y-auto">

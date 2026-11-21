@@ -4,14 +4,22 @@ import { randomUUID } from "node:crypto"
 
 import { and, eq, inArray, isNull } from "drizzle-orm"
 
-import { auditEvents, assessmentDefinitions, assessmentInstances, assessmentResults, clientBackgroundInterviews, clientBackgrounds, clientEventRecords, clientRelationshipBlocks, clientRelationshipRecords, clients, professionals } from "@/db/schema"
+import { auditEvents, assessmentDefinitions, assessmentInstances, assessmentResults, clientBackgroundInterviews, clientBackgrounds, clientEventRecords, clientHistoryIssues, clientRelationshipBlocks, clientRelationshipRecords, clients } from "@/db/schema"
 import { BACKGROUND_ASSESSMENT_CODE } from "@/lib/background-questionnaire/types"
 import { db } from "@/lib/db"
 import { settleEventDates } from "@/lib/client-background/age"
 import { personKey } from "@/lib/client-background/condition-groups"
-import { isConditionEvent } from "@/lib/client-background/history-links"
-import { toClientRelationshipStatus, toEvent, toRelationship } from "@/lib/client-background/map"
-import { CONDITION_EVENT_TYPES } from "@/lib/client-background/types"
+import { treatmentAnswerAfterChange, treatmentsForIssue } from "@/lib/client-background/history-issues"
+import { isConditionEvent, isTreatmentEvent } from "@/lib/client-background/history-links"
+import { toClientRelationshipStatus, toEvent, toHistoryIssue, toRelationship } from "@/lib/client-background/map"
+import {
+  CONDITION_EVENT_TYPES,
+  type ConditionEventType,
+  type HistoryAbout,
+  type HistoryIssue,
+  type TreatmentAnswer,
+} from "@/lib/client-background/types"
+import { sanitizeHistoryIssue } from "@/lib/client-background/history-issues"
 import {
   finalScreeningAnswers,
   sanitizeScreening,
@@ -21,13 +29,11 @@ import {
   demographicsFromStored,
   sanitizeClientRelationshipStatus,
   markUnansweredStressors,
-  markUnansweredReason,
   sanitizeEducation,
   sanitizeEvent,
   sanitizeIdentity,
   sanitizeLivingSituation,
   sanitizeOccupation,
-  sanitizeReasonForAttending,
   sanitizeRisk,
   sanitizeStressors,
 } from "@/lib/client-background/sanitize"
@@ -39,7 +45,6 @@ import {
   type IdentityFields,
   type LivingSituationFields,
   type OccupationFields,
-  type ReasonForAttending,
   type StressorsRecord,
   type RiskRatings,
 } from "@/lib/client-background/types"
@@ -309,7 +314,6 @@ async function upsertBackgroundColumn(
     occupationJson: OccupationFields
     riskJson: RiskRatings
     stressorsJson: StressorsRecord
-    reasonForAttendingJson: ReasonForAttending
     sexualOrientation: string | null
     sexualOrientationOther: string | null
   }>
@@ -454,36 +458,6 @@ export async function saveStressors(
   }
 }
 
-async function professionalBelongsToPractice(professionalId: string, practiceId: string) {
-  const [row] = await db
-    .select({ professionalId: professionals.professionalId })
-    .from(professionals)
-    .where(and(eq(professionals.professionalId, professionalId), eq(professionals.practiceId, practiceId)))
-    .limit(1)
-  return row != null
-}
-
-export async function saveReasonForAttending(input: {
-  clientId: string
-  practiceId: string
-  userId: string
-  reason: unknown
-}) {
-  const reason = sanitizeReasonForAttending(input.reason)
-  if (reason.referrerProfessionalId) {
-    const allowed = await professionalBelongsToPractice(reason.referrerProfessionalId, input.practiceId)
-    if (!allowed) return { error: "Choose a professional from this practice." }
-  }
-  try {
-    const result = await upsertBackgroundColumn(input.clientId, input.practiceId, input.userId, {
-      reasonForAttendingJson: reason,
-    })
-    return { ...result, reason }
-  } catch {
-    return { error: "Could not save reason for attending." }
-  }
-}
-
 export async function saveOccupation(
   input: { clientId: string; practiceId: string; userId: string; occupation: unknown }
 ) {
@@ -548,8 +522,67 @@ async function loadFamily(tx: Tx, clientId: string, practiceId: string) {
   }
 }
 
+async function ensureHistoryIssue(
+  tx: Tx,
+  clientId: string,
+  practiceId: string,
+  event: EventRecord,
+  conditionGroupId: string
+): Promise<void> {
+  if (!isConditionEvent(event.eventType)) return
+  const [existing] = await tx
+    .select({ issueId: clientHistoryIssues.issueId })
+    .from(clientHistoryIssues)
+    .where(eq(clientHistoryIssues.issueId, conditionGroupId))
+    .limit(1)
+  const title = event.title.trim() || event.eventType
+  const aboutOther =
+    event.about === "significant_other" && !event.relationshipRecordId ? event.aboutOther.trim() || null : null
+  if (existing) {
+    await tx
+      .update(clientHistoryIssues)
+      .set({
+        title,
+        about: event.about,
+        relationshipRecordId: event.relationshipRecordId,
+        aboutOther,
+        category: event.eventType,
+        updatedAt: new Date(),
+      })
+      .where(eq(clientHistoryIssues.issueId, conditionGroupId))
+    return
+  }
+  await tx.insert(clientHistoryIssues).values({
+    issueId: conditionGroupId,
+    clientId,
+    practiceId,
+    category: event.eventType,
+    about: event.about,
+    relationshipRecordId: event.relationshipRecordId,
+    aboutOther,
+    title,
+    treatmentAnswer: null,
+    displayOrder: 0,
+  })
+}
+
 async function withConditionGroup(tx: Tx, clientId: string, practiceId: string, event: EventRecord): Promise<EventRecord> {
-  if (!isConditionEvent(event.eventType)) return { ...event, conditionGroupId: null }
+  if (isTreatmentEvent(event.eventType) || event.eventType === "other_event") {
+    const incoming = event.conditionGroupId?.trim() ?? ""
+    // Nested under a single event (self-harm / traumatic / significant).
+    if (event.parentEventId) {
+      return {
+        ...event,
+        conditionGroupId: incoming && !incoming.startsWith("title:") ? incoming : null,
+        conditionEventId: null,
+      }
+    }
+    if (incoming && !incoming.startsWith("title:")) {
+      return { ...event, conditionGroupId: incoming, conditionEventId: null }
+    }
+    return { ...event, conditionEventId: null }
+  }
+  if (!isConditionEvent(event.eventType)) return { ...event, conditionGroupId: null, conditionEventId: null }
   const incoming = event.conditionGroupId?.trim() ?? ""
   const joining = incoming.length > 0 && !incoming.startsWith("title:")
   const conditionGroupId = joining ? incoming : randomUUID()
@@ -577,7 +610,8 @@ async function withConditionGroup(tx: Tx, clientId: string, practiceId: string, 
         .where(eq(clientEventRecords.eventRecordId, mapped.eventRecordId))
     }
   }
-  return { ...event, conditionGroupId }
+  await ensureHistoryIssue(tx, clientId, practiceId, event, conditionGroupId)
+  return { ...event, conditionGroupId, conditionEventId: null }
 }
 
 async function conditionLinkError(
@@ -586,25 +620,60 @@ async function conditionLinkError(
   practiceId: string,
   event: EventRecord
 ): Promise<string | null> {
-  if (!event.conditionEventId) return null
-  if (event.eventRecordId && event.conditionEventId === event.eventRecordId) {
-    return "A treatment cannot be linked to itself."
-  }
+  if (!isTreatmentEvent(event.eventType)) return null
+  const issueId = event.conditionGroupId?.trim() ?? ""
+  if (!issueId || issueId.startsWith("title:")) return null
   const [row] = await tx
-    .select({ eventType: clientEventRecords.eventType })
-    .from(clientEventRecords)
+    .select({ issueId: clientHistoryIssues.issueId, category: clientHistoryIssues.category })
+    .from(clientHistoryIssues)
     .where(
       and(
-        eq(clientEventRecords.eventRecordId, event.conditionEventId),
-        eq(clientEventRecords.clientId, clientId),
-        eq(clientEventRecords.practiceId, practiceId)
+        eq(clientHistoryIssues.issueId, issueId),
+        eq(clientHistoryIssues.clientId, clientId),
+        eq(clientHistoryIssues.practiceId, practiceId)
       )
     )
     .limit(1)
-  if (!row || !(CONDITION_EVENT_TYPES as readonly string[]).includes(row.eventType)) {
-    return "Choose a condition on this client."
+  if (!row || !(CONDITION_EVENT_TYPES as readonly string[]).includes(row.category)) {
+    return "Choose an issue on this client."
   }
   return null
+}
+
+async function syncIssueTreatmentAnswer(
+  tx: Tx,
+  clientId: string,
+  practiceId: string,
+  issueId: string | null | undefined
+) {
+  if (!issueId || issueId.startsWith("title:")) return
+  const [issue] = await tx
+    .select()
+    .from(clientHistoryIssues)
+    .where(
+      and(
+        eq(clientHistoryIssues.issueId, issueId),
+        eq(clientHistoryIssues.clientId, clientId),
+        eq(clientHistoryIssues.practiceId, practiceId)
+      )
+    )
+    .limit(1)
+  if (!issue) return
+  const eventRows = await tx
+    .select()
+    .from(clientEventRecords)
+    .where(and(eq(clientEventRecords.clientId, clientId), eq(clientEventRecords.practiceId, practiceId)))
+  const events = eventRows.map((row) => toEvent(row))
+  const count = treatmentsForIssue(events, issueId).length
+  const current = (issue.treatmentAnswer === "yes" || issue.treatmentAnswer === "none" || issue.treatmentAnswer === "not_asked"
+    ? issue.treatmentAnswer
+    : "") as TreatmentAnswer | ""
+  const next = treatmentAnswerAfterChange(current, count)
+  if (next === current) return
+  await tx
+    .update(clientHistoryIssues)
+    .set({ treatmentAnswer: next, updatedAt: new Date() })
+    .where(eq(clientHistoryIssues.issueId, issueId))
 }
 
 function eventColumns(event: EventRecord) {
@@ -625,8 +694,10 @@ function eventColumns(event: EventRecord) {
     about: event.about,
     aboutOther: event.aboutOther || null,
     relationshipRecordId: event.relationshipRecordId,
-    conditionEventId: event.conditionEventId,
+    // Stop writing condition_event_id; keep column for main reads.
+    conditionEventId: null,
     conditionGroupId: event.conditionGroupId,
+    parentEventId: event.parentEventId,
     admissionType: event.admissionType || null,
     facility: event.facility || null,
     admissionLength: event.admissionLength || null,
@@ -666,6 +737,9 @@ export async function createEvent(input: {
           ...eventColumns({ ...draft, eventRecordId: "" }),
         })
         .returning()
+      if (isTreatmentEvent(draft.eventType)) {
+        await syncIssueTreatmentAnswer(tx, input.clientId, input.practiceId, draft.conditionGroupId)
+      }
       await writeAudit(tx, {
         practiceId: input.practiceId,
         userId: input.userId,
@@ -715,11 +789,17 @@ export async function updateEvent(input: {
         if (!linked) return { error: "That family member was not found on this client." }
       }
 
+      const previousGroupId = existing.conditionGroupId
       const [updated] = await tx
         .update(clientEventRecords)
         .set(eventColumns({ ...grouped, displayOrder: existing.displayOrder }))
         .where(eq(clientEventRecords.eventRecordId, existing.eventRecordId))
         .returning()
+
+      if (isTreatmentEvent(grouped.eventType) || isTreatmentEvent(existing.eventType as EventRecord["eventType"])) {
+        await syncIssueTreatmentAnswer(tx, input.clientId, input.practiceId, previousGroupId)
+        await syncIssueTreatmentAnswer(tx, input.clientId, input.practiceId, grouped.conditionGroupId)
+      }
 
       await writeAudit(tx, {
         practiceId: input.practiceId,
@@ -768,11 +848,252 @@ export async function deleteEvent(input: {
         entityType: "client_event",
         entityId: existing.eventRecordId,
       })
+      await tx
+        .update(clientEventRecords)
+        .set({ parentEventId: null, updatedAt: new Date() })
+        .where(eq(clientEventRecords.parentEventId, existing.eventRecordId))
       await tx.delete(clientEventRecords).where(eq(clientEventRecords.eventRecordId, existing.eventRecordId))
+      if (isTreatmentEvent(existing.eventType as EventRecord["eventType"])) {
+        await syncIssueTreatmentAnswer(tx, input.clientId, input.practiceId, existing.conditionGroupId)
+      }
       return {}
     })
   } catch {
     return { error: "Could not remove this entry." }
+  }
+}
+
+export async function createHistoryIssue(input: {
+  clientId: string
+  practiceId: string
+  userId: string
+  issue: unknown
+  /** Optional first episode dates when creating a New issue. */
+  firstEpisode?: {
+    startPrecision: EventRecord["startPrecision"]
+    startValue: string
+    endPrecision: EventRecord["endPrecision"]
+    endValue: string
+    endOngoing: boolean
+    resolvedOrOngoing: EventRecord["resolvedOrOngoing"]
+  } | null
+}): Promise<MutationResult<{ issue?: HistoryIssue; event?: EventRecord }>> {
+  const client = await assertClient(input.clientId, input.practiceId)
+  if (!client) return { error: "Client was not found." }
+  const parsed = sanitizeHistoryIssue(input.issue, randomUUID())
+  if (!(CONDITION_EVENT_TYPES as readonly string[]).includes(parsed.category)) {
+    return { error: "Choose a category." }
+  }
+  if (!parsed.title.trim()) return { error: "Enter an issue name." }
+  if (parsed.about === "significant_other" && !parsed.relationshipRecordId && !parsed.aboutOther.trim()) {
+    return { error: "Choose who this issue is about." }
+  }
+  const treatmentAnswer =
+    parsed.treatmentAnswer === "yes" || parsed.treatmentAnswer === "none" || parsed.treatmentAnswer === "not_asked"
+      ? parsed.treatmentAnswer
+      : null
+  try {
+    return await db.transaction(async (tx) => {
+      const issueId = parsed.issueId || randomUUID()
+      const [created] = await tx
+        .insert(clientHistoryIssues)
+        .values({
+          issueId,
+          clientId: input.clientId,
+          practiceId: input.practiceId,
+          category: parsed.category,
+          about: parsed.about,
+          relationshipRecordId: parsed.relationshipRecordId,
+          aboutOther:
+            parsed.about === "significant_other" && !parsed.relationshipRecordId
+              ? parsed.aboutOther.trim() || null
+              : null,
+          title: parsed.title.trim(),
+          treatmentAnswer,
+          displayOrder: parsed.displayOrder,
+        })
+        .returning()
+      await writeAudit(tx, {
+        practiceId: input.practiceId,
+        userId: input.userId,
+        clientId: input.clientId,
+        eventType: "client_history_issue.created",
+        entityType: "client_history_issue",
+        entityId: created.issueId,
+      })
+      let event: EventRecord | undefined
+      const first = input.firstEpisode
+      if (first && (first.startValue.trim() || first.endValue.trim() || first.endOngoing || first.resolvedOrOngoing)) {
+        const displayOrder = await nextEventOrder(tx, input.clientId, input.practiceId, parsed.category)
+        const [createdEvent] = await tx
+          .insert(clientEventRecords)
+          .values({
+            clientId: input.clientId,
+            practiceId: input.practiceId,
+            ...eventColumns({
+              eventRecordId: "",
+              eventType: parsed.category,
+              title: parsed.title.trim(),
+              description: "",
+              startPrecision: first.startPrecision,
+              startValue: first.startValue,
+              endPrecision: first.endPrecision,
+              endValue: first.endValue,
+              endOngoing: first.endOngoing || first.resolvedOrOngoing === "ongoing",
+              resolvedOrOngoing: first.resolvedOrOngoing,
+              treated: null,
+              treatmentType: "",
+              treatmentDetail: "",
+              outcome: "",
+              about: parsed.about,
+              aboutOther: parsed.aboutOther,
+              relationshipRecordId: parsed.relationshipRecordId,
+              conditionEventId: null,
+              conditionGroupId: created.issueId,
+              parentEventId: null,
+              admissionType: "",
+              facility: "",
+              admissionLength: "",
+              prescriberProfessionalId: null,
+              prescriberName: "",
+              selfHarmType: "",
+              substanceStatus: "",
+              abstinentSincePrecision: "",
+              abstinentSinceValue: "",
+              displayOrder,
+            }),
+          })
+          .returning()
+        event = toEvent(createdEvent)
+        await writeAudit(tx, {
+          practiceId: input.practiceId,
+          userId: input.userId,
+          clientId: input.clientId,
+          eventType: "client_event.created",
+          entityType: "client_event",
+          entityId: createdEvent.eventRecordId,
+        })
+      }
+      return { issue: toHistoryIssue(created), event }
+    })
+  } catch {
+    return { error: "Could not add this issue." }
+  }
+}
+
+export async function updateHistoryIssue(input: {
+  clientId: string
+  practiceId: string
+  userId: string
+  issue: unknown
+}): Promise<MutationResult<{ issue?: HistoryIssue }>> {
+  const client = await assertClient(input.clientId, input.practiceId)
+  if (!client) return { error: "Client was not found." }
+  const parsed = sanitizeHistoryIssue(input.issue)
+  if (!parsed.issueId) return { error: "That issue was not found." }
+  try {
+    return await db.transaction(async (tx) => {
+      const [existing] = await tx
+        .select()
+        .from(clientHistoryIssues)
+        .where(
+          and(
+            eq(clientHistoryIssues.issueId, parsed.issueId),
+            eq(clientHistoryIssues.clientId, input.clientId),
+            eq(clientHistoryIssues.practiceId, input.practiceId)
+          )
+        )
+        .limit(1)
+      if (!existing) return { error: "That issue was not found." }
+      const treatmentAnswer =
+        parsed.treatmentAnswer === "yes" || parsed.treatmentAnswer === "none" || parsed.treatmentAnswer === "not_asked"
+          ? parsed.treatmentAnswer
+          : existing.treatmentAnswer
+      const [updated] = await tx
+        .update(clientHistoryIssues)
+        .set({
+          title: parsed.title.trim() || existing.title,
+          about: parsed.about,
+          relationshipRecordId: parsed.relationshipRecordId,
+          aboutOther:
+            parsed.about === "significant_other" && !parsed.relationshipRecordId
+              ? parsed.aboutOther.trim() || null
+              : null,
+          category: (CONDITION_EVENT_TYPES as readonly string[]).includes(parsed.category)
+            ? parsed.category
+            : (existing.category as ConditionEventType),
+          treatmentAnswer,
+          updatedAt: new Date(),
+        })
+        .where(eq(clientHistoryIssues.issueId, existing.issueId))
+        .returning()
+      await writeAudit(tx, {
+        practiceId: input.practiceId,
+        userId: input.userId,
+        clientId: input.clientId,
+        eventType: "client_history_issue.updated",
+        entityType: "client_history_issue",
+        entityId: updated.issueId,
+      })
+      return { issue: toHistoryIssue(updated) }
+    })
+  } catch {
+    return { error: "Could not save this issue." }
+  }
+}
+
+export async function updateHistoryIssueTreatmentAnswer(input: {
+  clientId: string
+  practiceId: string
+  userId: string
+  issueId: string
+  treatmentAnswer: TreatmentAnswer | ""
+}): Promise<MutationResult<{ issue?: HistoryIssue }>> {
+  const client = await assertClient(input.clientId, input.practiceId)
+  if (!client) return { error: "Client was not found." }
+  const answer =
+    input.treatmentAnswer === "yes" || input.treatmentAnswer === "none" || input.treatmentAnswer === "not_asked"
+      ? input.treatmentAnswer
+      : null
+  try {
+    return await db.transaction(async (tx) => {
+      const [existing] = await tx
+        .select()
+        .from(clientHistoryIssues)
+        .where(
+          and(
+            eq(clientHistoryIssues.issueId, input.issueId),
+            eq(clientHistoryIssues.clientId, input.clientId),
+            eq(clientHistoryIssues.practiceId, input.practiceId)
+          )
+        )
+        .limit(1)
+      if (!existing) return { error: "That issue was not found." }
+      const eventRows = await tx
+        .select()
+        .from(clientEventRecords)
+        .where(and(eq(clientEventRecords.clientId, input.clientId), eq(clientEventRecords.practiceId, input.practiceId)))
+      const events = eventRows.map((row) => toEvent(row))
+      if (treatmentsForIssue(events, input.issueId).length > 0 && answer !== "yes") {
+        return { error: "Remove treatments before changing this answer." }
+      }
+      const [updated] = await tx
+        .update(clientHistoryIssues)
+        .set({ treatmentAnswer: answer, updatedAt: new Date() })
+        .where(eq(clientHistoryIssues.issueId, existing.issueId))
+        .returning()
+      await writeAudit(tx, {
+        practiceId: input.practiceId,
+        userId: input.userId,
+        clientId: input.clientId,
+        eventType: "client_history_issue.updated",
+        entityType: "client_history_issue",
+        entityId: updated.issueId,
+      })
+      return { issue: toHistoryIssue(updated) }
+    })
+  } catch {
+    return { error: "Could not save the treatment answer." }
   }
 }
 
@@ -961,14 +1282,12 @@ export async function completeBackgroundInterview(input: {
       const completedAt = new Date()
       const demographics = background ? demographicsFromStored(background) : emptyDemographics()
       const filled = markUnansweredStressors(sanitizeStressors(background?.stressorsJson))
-      const reasonFilled = markUnansweredReason(sanitizeReasonForAttending(background?.reasonForAttendingJson))
-      if (filled.changed || reasonFilled.changed) {
+      if (filled.changed) {
         if (background) {
           await tx
             .update(clientBackgrounds)
             .set({
               stressorsJson: filled.stressors,
-              reasonForAttendingJson: reasonFilled.reason,
               updatedAt: completedAt,
             })
             .where(
@@ -982,7 +1301,6 @@ export async function completeBackgroundInterview(input: {
             clientId: input.clientId,
             practiceId: input.practiceId,
             stressorsJson: filled.stressors,
-            reasonForAttendingJson: reasonFilled.reason,
             updatedAt: completedAt,
           })
         }
@@ -1000,7 +1318,6 @@ export async function completeBackgroundInterview(input: {
         events,
         screening,
         stressors: filled.stressors,
-        reason: reasonFilled.reason,
       }
 
       await tx

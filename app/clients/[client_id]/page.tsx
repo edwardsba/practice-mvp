@@ -17,14 +17,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
+import { ReferralFundingCard } from "@/components/funding/referral-funding-card"
 import { clients } from "@/db/schema"
 import { getDefaultBatteryAssessments } from "@/lib/assessments/battery-defaults"
 import { loadLatestAssessmentResultForClient } from "@/lib/assessments/load"
@@ -39,10 +32,9 @@ import {
 } from "@/lib/crisis-plans/load"
 import { requirePractitionerContext } from "@/lib/auth"
 import { db } from "@/lib/db"
-import { getFundingPanelByClientId } from "@/lib/actions/funding"
-import { formatApprovalProgress, formatDisplayDate } from "@/lib/funding/format"
+import { getReferralFundingCardData } from "@/lib/actions/funding"
+import { buildReferralFundingCardProps } from "@/lib/funding/referral-funding-card-props"
 import { appendReturnTo } from "@/lib/navigation/back"
-import { REPORTING_REQUIREMENT_STATUS_CONFIG } from "@/lib/funding/reporting-status"
 import { buildTemplateVariablesFromLinkResponse } from "@/lib/email/link-response"
 import { getQuestionnaireEmailContext } from "@/lib/email/practitioner-context"
 import { loadActiveTreatmentPlanSummary } from "@/lib/treatment-plans/load"
@@ -89,7 +81,7 @@ export default async function ClientDetailPage({
     activeCrisisPlan,
     emailContext,
     nextAppointment,
-    fundingPanelRows,
+    referralFundingData,
     attendanceRisk,
     latestAsq,
     latestPsf,
@@ -102,17 +94,17 @@ export default async function ClientDetailPage({
       context.practitionerProfileId
     ),
     loadNextAppointmentForClient(clientId, context.practiceId),
-    getFundingPanelByClientId(clientId),
+    getReferralFundingCardData(clientId),
     loadAttendanceRiskForClient(clientId, context.practiceId),
     loadLatestAssessmentResultForClient(clientId, context.practiceId, "ASQ"),
     loadLatestAssessmentResultForClient(clientId, context.practiceId, "PSF"),
     loadClientBackgroundSummary(clientId, context.practiceId),
   ])
 
-  const maxReportCount =
-    fundingPanelRows.length > 0
-      ? Math.max(...fundingPanelRows.map((r) => r.reportingRequirements.length))
-      : 0
+  const referralFunding = buildReferralFundingCardProps(
+    context.practiceId,
+    referralFundingData
+  )
 
   const clientEmail = client.email?.trim() || null
   const estimatedExpiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
@@ -294,115 +286,9 @@ export default async function ClientDetailPage({
             />
           </Card>
 
-          <Card className="mb-6">
-            <CardHeader className="flex flex-row items-center justify-between gap-4">
-              <CardTitle>Funding</CardTitle>
-              <Button variant="outline" size="sm" asChild>
-                <Link
-                  href={`/funding/approvals/new?clientId=${clientId}&returnTo=${encodeURIComponent(`/clients/${clientId}`)}`}
-                >
-                  Add Approval
-                </Link>
-              </Button>
-            </CardHeader>
-            <CardContent>
-              <div className="rounded-lg border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Claim</TableHead>
-                      <TableHead>Approval</TableHead>
-                      <TableHead>Start</TableHead>
-                      <TableHead>Progress</TableHead>
-                      {Array.from({ length: maxReportCount }, (_, i) => (
-                        <TableHead key={i}>Report {i + 1}</TableHead>
-                      ))}
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {fundingPanelRows.length === 0 ? (
-                      <TableRow>
-                        <TableCell
-                          colSpan={4 + maxReportCount}
-                          className="h-16 text-center text-muted-foreground"
-                        >
-                          No funding approvals yet.
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      fundingPanelRows.map((row) => {
-                        const approvalHref = appendReturnTo(
-                          `/funding/approvals/${row.fundingApprovalId}`,
-                          `/clients/${clientId}`
-                        )
-                        return (
-                          <TableRow
-                            key={row.fundingApprovalId}
-                            className="hover:bg-muted/50"
-                          >
-                            <TableCell>
-                              <Link
-                                href={approvalHref}
-                                className="block text-primary hover:underline"
-                              >
-                                {row.claimTypeName ?? "—"}
-                              </Link>
-                            </TableCell>
-                            <TableCell>
-                              <Link
-                                href={approvalHref}
-                                className="block hover:underline"
-                              >
-                                {row.approvalTypeName ?? "—"}
-                              </Link>
-                            </TableCell>
-                            <TableCell>
-                              <Link
-                                href={approvalHref}
-                                className="block hover:underline"
-                              >
-                                {formatDisplayDate(row.startDate)}
-                              </Link>
-                            </TableCell>
-                            <TableCell>
-                              <Link
-                                href={approvalHref}
-                                className="block hover:underline"
-                              >
-                                {formatApprovalProgress(
-                                  row.appointmentsAttended,
-                                  row.appointmentsApproved
-                                )}
-                              </Link>
-                            </TableCell>
-                            {Array.from({ length: maxReportCount }, (_, i) => {
-                              const req = row.reportingRequirements[i]
-                              return (
-                                <TableCell key={i}>
-                                  <Link href={approvalHref} className="block">
-                                    {req ? (
-                                      <StatusBadge
-                                        status={req.status}
-                                        statusMap={
-                                          REPORTING_REQUIREMENT_STATUS_CONFIG
-                                        }
-                                      />
-                                    ) : (
-                                      "—"
-                                    )}
-                                  </Link>
-                                </TableCell>
-                              )
-                            })}
-                          </TableRow>
-                        )
-                      })
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-            </CardContent>
-          </Card>
+          <div className="mb-6">
+            <ReferralFundingCard {...referralFunding} />
+          </div>
 
           <Card className="mb-6">
             <CardHeader className="flex flex-row items-center justify-between">

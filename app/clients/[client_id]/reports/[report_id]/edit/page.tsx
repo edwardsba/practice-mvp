@@ -195,6 +195,8 @@ export default async function EditReportPage({
         data: background,
         numberOfChildren: selfReport?.answers.familyHome.numberOfChildren ?? null,
         screening: interview?.latest?.screening ?? null,
+        // Card agent will load from funding; keep quiet until then when snapshot already has referral.
+        referralRecorded: Boolean(snapshot.background?.referral?.referrer || snapshot.background?.referral?.referralSource),
       }
     }
   }

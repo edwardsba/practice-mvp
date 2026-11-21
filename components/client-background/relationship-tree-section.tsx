@@ -2,56 +2,71 @@
 
 import { useEffect, useState } from "react"
 import { createPortal } from "react-dom"
-import { X } from "lucide-react"
 
 import {
   addBlockMemberAction,
-  createRelationshipBlockAction,
+  createRelationshipWithMemberAction,
   deleteRelationshipBlockAction,
+  discardEmptyRelationshipDraftAction,
   moveBlockMemberAction,
   removeBlockMemberAction,
   updateBlockMemberAction,
   updateRelationshipBlockAction,
 } from "@/app/clients/[client_id]/background/actions"
-import { PartialDatePicker, SelectField, TextAreaField, TextField } from "@/components/client-background/fields"
+import {
+  NewRelationshipPanel,
+  NEW_RELATIONSHIP_ENTRY_POINTS,
+} from "@/components/client-background/new-relationship-panel"
+import {
+  BlockFields,
+  MoveStep,
+  PanelHeader,
+  PersonFields,
+  RelationshipPanelShell,
+  draftFromPerson,
+  personFromDraft,
+  statusLabel,
+  typeOptionLabel,
+  type PersonDraft,
+} from "@/components/client-background/relationship-panel-shared"
+import {
+  TreeBranch,
+  treeItemStateClassName,
+  treeLayer1ClassName,
+  treeLayer2MetaClassName,
+  treeLayer2ShellClassName,
+  treeLayer2TitleClassName,
+  treeLayer3AvatarClassName,
+  treeLayer3MetaClassName,
+  treeLayer3ShellClassName,
+  treeLayer3TitleClassName,
+  treeLayer4AvatarClassName,
+  treeLayer4MetaClassName,
+  treeLayer4ShellClassName,
+  treeLayer4TitleClassName,
+  treeSelectedTitleClassName,
+} from "@/components/client-background/tree-levels"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { isEmptyNewRelationshipDraft } from "@/lib/client-background/new-relationship-draft"
+import { isPartneredClientStatus } from "@/lib/client-background/relationship-blocks"
 import {
-  childTypesForBlock,
-  isPartneredClientStatus,
-  rolesForBlock,
-  siblingTypesForBlock,
-} from "@/lib/client-background/relationship-blocks"
-import {
-  addTargetKind,
   buildRelationshipTree,
   headingFor,
   linesAboutPerson,
-  moveTargets,
+  relationshipSectionAddSpec,
+  relationshipSectionAllowsAdd,
+  type RelationshipSectionAddSpec,
   type RelationshipTreeNode,
 } from "@/lib/client-background/relationship-tree"
 import { todayDateString } from "@/lib/dates/practice-time"
 import {
   ARRANGEMENT_TYPE_LABELS,
-  ARRANGEMENT_TYPES,
-  CAREGIVER_RELATIONSHIP_LABELS,
-  CAREGIVER_RELATIONSHIPS,
-  CHILD_TYPE_LABELS,
-  CURRENT_BLOCK_STATUS_LABELS,
   DEPENDENCY_LABELS,
-  DEPENDENCY_VALUES,
   EVENT_TYPE_LABELS,
   HEALTH_STATUS_LABELS,
-  HEALTH_STATUSES,
-  NEVER_IN_A_RELATIONSHIP,
-  PREVIOUS_BLOCK_STATUS_LABELS,
   RELATIONSHIP_LIVING_SITUATION_LABELS,
-  RELATIONSHIP_LIVING_SITUATIONS,
   RELATIONSHIP_RATING_LABELS,
-  RELATIONSHIP_RATING_VALUES,
-  SEX_OPTIONS,
-  SIBLING_BLOCK_TYPE_LABELS,
   type ArrangementType,
-  type BlockKind,
   type BlockRole,
   type ClientRelationshipStatusValue,
   type EventRecord,
@@ -68,36 +83,14 @@ type EditorState = {
   blocks?: RelationshipBlock[]
   blockAnswers?: RelationshipBlockAnswers
   error?: string
+  createdBlockId?: string
+  createdMemberId?: string
 }
 
 type Selection =
   | { type: "person"; id: string }
   | { type: "block"; id: string }
-  | { type: "add" }
-
-type PersonDraft = {
-  givenName: string
-  sex: string
-  dateOfBirth: string
-  blockRoleType: string
-  healthStatus: RelationshipRecord["healthStatus"] | ""
-  dateOfDeath: string
-  supportive: RelationshipRecord["supportive"] | ""
-  conflict: RelationshipRecord["conflict"] | ""
-  qualityOfRelationship: string
-  dependency: RelationshipRecord["dependency"] | ""
-  livingSituation: RelationshipRecord["livingSituation"] | ""
-  notKnown: boolean
-  deceased: boolean
-}
-
-const ROLE_LABELS: Record<BlockRole, string> = {
-  partner: "Partner",
-  child: "Child",
-  parent: "Parent",
-  sibling: "Sibling",
-  caregiver: "Caregiver",
-}
+  | { type: "new_relationship"; blockId: string; memberId: string }
 
 export function RelationshipTreeSection({
   clientId,
@@ -130,6 +123,7 @@ export function RelationshipTreeSection({
     blockAnswers: answers,
     dateOfBirth,
     asOf: todayDateString(),
+    relationshipStatus,
   })
   const [selection, setSelection] = useState<Selection | null>(null)
   const [mode, setMode] = useState<"view" | "edit" | "move">("view")
@@ -189,106 +183,209 @@ export function RelationshipTreeSection({
 
   const person = selection?.type === "person" ? people.find((item) => item.relationshipRecordId === selection.id) : undefined
   const block = selection?.type === "block" ? shownBlocks.find((item) => item.relationshipBlockId === selection.id) : undefined
+  const newRelationshipBlock =
+    selection?.type === "new_relationship"
+      ? shownBlocks.find((item) => item.relationshipBlockId === selection.blockId)
+      : undefined
+  const newRelationshipMember =
+    selection?.type === "new_relationship"
+      ? people.find((item) => item.relationshipRecordId === selection.memberId)
+      : undefined
   const lockedId = isPartneredClientStatus(relationshipStatus.relationshipStatus)
     ? shownBlocks.filter((item) => item.kind === "client_current").sort((a, b) => a.displayOrder - b.displayOrder)[0]?.relationshipBlockId ?? null
     : null
 
+  const selectedId =
+    selection?.type === "person" || selection?.type === "block" ? selection.id : null
+
+  async function startNewRelationship(spec: RelationshipSectionAddSpec) {
+    const beforeBlocks = shownBlocks.map((item) => item.relationshipBlockId)
+    const beforePeople = people.map((item) => item.relationshipRecordId)
+    const result = await apply(() =>
+      createRelationshipWithMemberAction(clientId, spec.kind, { parentSide: spec.parentSide })
+    )
+    if (!result?.blocks || !result.relationships) return
+    const createdBlock =
+      (result.createdBlockId
+        ? result.blocks.find((item) => item.relationshipBlockId === result.createdBlockId)
+        : null) ?? result.blocks.find((item) => !beforeBlocks.includes(item.relationshipBlockId))
+    const createdMember =
+      (result.createdMemberId
+        ? result.relationships.find((item) => item.relationshipRecordId === result.createdMemberId)
+        : null) ?? result.relationships.find((item) => !beforePeople.includes(item.relationshipRecordId))
+    if (!createdBlock || !createdMember) return
+    setSelection({
+      type: "new_relationship",
+      blockId: createdBlock.relationshipBlockId,
+      memberId: createdMember.relationshipRecordId,
+    })
+    setMode("edit")
+    setError("")
+  }
+
+  async function closeNewRelationship(
+    blockId: string,
+    memberId: string,
+    blockDraft: RelationshipBlock,
+    personDraft: PersonDraft
+  ) {
+    const member = people.find((item) => item.relationshipRecordId === memberId)
+    if (!member) {
+      close()
+      return
+    }
+    const nextPerson = personFromDraft(member, personDraft)
+    if (isEmptyNewRelationshipDraft(blockDraft, nextPerson)) {
+      await apply(() => discardEmptyRelationshipDraftAction(clientId, blockId, memberId))
+      close()
+      return
+    }
+    await apply(async () => {
+      await updateRelationshipBlockAction(clientId, blockDraft)
+      return updateBlockMemberAction(clientId, nextPerson)
+    })
+    close()
+  }
+
   return (
-    <div className="space-y-4">
-      <TreeCard title={tree.partners.title} nodes={tree.partners.children} onAdd={() => { setSelection({ type: "add" }); setMode("edit"); setError("") }} onPerson={openPerson} onBlock={openBlock} />
-      <TreeCard title={tree.parents.title} nodes={tree.parents.children} onAdd={() => { setSelection({ type: "add" }); setMode("edit"); setError("") }} onPerson={openPerson} onBlock={openBlock} />
+    <div className="space-y-4" data-entry-point={NEW_RELATIONSHIP_ENTRY_POINTS.clientBackground}>
+      <TreeCard
+        title={tree.partners.title}
+        nodes={tree.partners.children}
+        onAddSection={(spec) => void startNewRelationship(spec)}
+        onPerson={openPerson}
+        onBlock={openBlock}
+        selectedId={selectedId}
+      />
+      <TreeCard
+        title={tree.parents.title}
+        nodes={tree.parents.children}
+        onAddSection={(spec) => void startNewRelationship(spec)}
+        onPerson={openPerson}
+        onBlock={openBlock}
+        selectedId={selectedId}
+      />
       {ready && selection
         ? createPortal(
-            <div className="fixed inset-0 z-50">
-              <button type="button" className="absolute inset-0 bg-black/20" aria-label="Dismiss" onClick={close} />
-              <aside
-                role="dialog"
-                aria-modal="true"
-                aria-label={selection.type === "add" ? "Add a person" : person?.givenName || block?.relationshipBlockId || "Relationship"}
-                className="absolute inset-y-0 right-0 flex w-full animate-[relationship-panel_200ms_ease-out] flex-col bg-background shadow-xl sm:w-[440px]"
-              >
-                <style>{`@keyframes relationship-panel { from { transform: translateX(100%); } to { transform: translateX(0); } }`}</style>
-                {selection.type === "add" ? (
-                  <AddForm
-                    clientId={clientId}
-                    blocks={shownBlocks}
-                    saving={saving}
-                    error={error}
-                    onClose={close}
-                    onSave={async (targetId, role, roleType, draft) => {
-                      const beforeBlocks = shownBlocks.map((item) => item.relationshipBlockId)
-                      const beforePeople = people.map((item) => item.relationshipRecordId)
-                      const created = addTargetKind(targetId)
-                      let blockId = targetId
-                      if (created) {
-                        const result = await apply(() =>
-                          createRelationshipBlockAction(clientId, created.kind, { parentSide: created.parentSide })
-                        )
-                        const nextId = result?.blocks?.find((item) => !beforeBlocks.includes(item.relationshipBlockId))?.relationshipBlockId
-                        if (!result || !nextId) return
-                        blockId = nextId
-                      }
-                      const added = await apply(() => addBlockMemberAction(clientId, blockId, role, roleType))
-                      const createdPerson = added?.relationships?.find((item) => !beforePeople.includes(item.relationshipRecordId))
-                      if (!added || !createdPerson) return
-                      const saved = await apply(() => updateBlockMemberAction(clientId, personFromDraft(createdPerson, draft)))
-                      if (!saved) return
-                      setSelection({ type: "person", id: createdPerson.relationshipRecordId })
-                      setMode("view")
-                    }}
-                  />
-                ) : selection.type === "person" && person ? (
-                  <PersonPanel
-                    person={person}
-                    block={shownBlocks.find((item) => item.relationshipBlockId === person.relationshipBlockId) ?? null}
-                    blocks={shownBlocks}
-                    people={people}
-                    events={events}
-                    dateOfBirth={dateOfBirth}
-                    mode={mode}
-                    saving={saving}
-                    error={error}
-                    onClose={close}
-                    onEdit={() => { setMode("edit"); setError("") }}
-                    onStartMove={() => { setMode("move"); setError("") }}
-                    onCancel={() => { setMode("view"); setError("") }}
-                    onSave={async (draft) => {
-                      const saved = await apply(() => updateBlockMemberAction(clientId, personFromDraft(person, draft)))
-                      if (saved) setMode("view")
-                    }}
-                    onRemove={async () => {
-                      const removed = await apply(() => removeBlockMemberAction(clientId, person.relationshipRecordId))
-                      if (removed) close()
-                    }}
-                    onMove={async (destinationId, role, roleType) => {
-                      const moved = await apply(() => moveBlockMemberAction(clientId, person.relationshipRecordId, destinationId, role, roleType))
-                      if (moved) setMode("view")
-                    }}
-                  />
-                ) : selection.type === "block" && block ? (
-                  <BlockPanel
-                    block={block}
-                    people={people.filter((item) => item.relationshipBlockId === block.relationshipBlockId)}
-                    locked={block.relationshipBlockId === lockedId}
-                    mode={mode === "move" ? "view" : mode}
-                    saving={saving}
-                    error={error}
-                    onClose={close}
-                    onEdit={() => { setMode("edit"); setError("") }}
-                    onCancel={() => { setMode("view"); setError("") }}
-                    onOpenPerson={openPerson}
-                    onSave={async (draft) => {
-                      const saved = await apply(() => updateRelationshipBlockAction(clientId, draft))
-                      if (saved) setMode("view")
-                    }}
-                    onRemove={async () => {
-                      const removed = await apply(() => deleteRelationshipBlockAction(clientId, block.relationshipBlockId))
-                      if (removed) close()
-                    }}
-                  />
-                ) : null}
-              </aside>
-            </div>,
+            <RelationshipPanelShell
+              ariaLabel={
+                selection.type === "new_relationship"
+                  ? newRelationshipBlock?.kind === "caregiver_arrangement"
+                    ? "New arrangement"
+                    : "New relationship"
+                  : person?.givenName || block?.relationshipBlockId || "Relationship"
+              }
+              onDismiss={() => {
+                if (selection.type === "new_relationship" && newRelationshipBlock && newRelationshipMember) {
+                  void closeNewRelationship(
+                    selection.blockId,
+                    selection.memberId,
+                    newRelationshipBlock,
+                    draftFromPerson(newRelationshipMember)
+                  )
+                  return
+                }
+                close()
+              }}
+            >
+              {selection.type === "new_relationship" && newRelationshipBlock && newRelationshipMember ? (
+                <NewRelationshipPanel
+                  key={`${selection.blockId}-${selection.memberId}`}
+                  block={newRelationshipBlock}
+                  member={newRelationshipMember}
+                  people={people}
+                  locked={newRelationshipBlock.relationshipBlockId === lockedId}
+                  error={error || null}
+                  onBlockChange={(draft) => {
+                    void apply(() => updateRelationshipBlockAction(clientId, draft))
+                  }}
+                  onPersonChange={(draft) => {
+                    void apply(() =>
+                      updateBlockMemberAction(clientId, personFromDraft(newRelationshipMember, draft))
+                    )
+                  }}
+                  onAddAnother={async (blockDraft, personDraft) => {
+                    await apply(async () => {
+                      await updateRelationshipBlockAction(clientId, blockDraft)
+                      return updateBlockMemberAction(
+                        clientId,
+                        personFromDraft(newRelationshipMember, personDraft)
+                      )
+                    })
+                    const role = newRelationshipMember.blockRole === "caregiver" ? "caregiver" : "partner"
+                    const beforePeople = people.map((item) => item.relationshipRecordId)
+                    const added = await apply(() =>
+                      addBlockMemberAction(clientId, newRelationshipBlock.relationshipBlockId, role)
+                    )
+                    const created = added?.relationships?.find(
+                      (item) => !beforePeople.includes(item.relationshipRecordId)
+                    )
+                    if (created) {
+                      setSelection({
+                        type: "new_relationship",
+                        blockId: newRelationshipBlock.relationshipBlockId,
+                        memberId: created.relationshipRecordId,
+                      })
+                    }
+                  }}
+                  onDone={(blockDraft, personDraft) =>
+                    void closeNewRelationship(selection.blockId, selection.memberId, blockDraft, personDraft)
+                  }
+                  onClose={(blockDraft, personDraft) =>
+                    void closeNewRelationship(selection.blockId, selection.memberId, blockDraft, personDraft)
+                  }
+                />
+              ) : selection.type === "person" && person ? (
+                <PersonPanel
+                  person={person}
+                  block={shownBlocks.find((item) => item.relationshipBlockId === person.relationshipBlockId) ?? null}
+                  blocks={shownBlocks}
+                  people={people}
+                  events={events}
+                  dateOfBirth={dateOfBirth}
+                  mode={mode}
+                  saving={saving}
+                  error={error}
+                  onClose={close}
+                  onEdit={() => { setMode("edit"); setError("") }}
+                  onStartMove={() => { setMode("move"); setError("") }}
+                  onCancel={() => { setMode("view"); setError("") }}
+                  onSave={async (draft) => {
+                    const saved = await apply(() => updateBlockMemberAction(clientId, personFromDraft(person, draft)))
+                    if (saved) setMode("view")
+                  }}
+                  onRemove={async () => {
+                    const removed = await apply(() => removeBlockMemberAction(clientId, person.relationshipRecordId))
+                    if (removed) close()
+                  }}
+                  onMove={async (destinationId, role, roleType) => {
+                    const moved = await apply(() => moveBlockMemberAction(clientId, person.relationshipRecordId, destinationId, role, roleType))
+                    if (moved) setMode("view")
+                  }}
+                />
+              ) : selection.type === "block" && block ? (
+                <BlockPanel
+                  block={block}
+                  people={people.filter((item) => item.relationshipBlockId === block.relationshipBlockId)}
+                  locked={block.relationshipBlockId === lockedId}
+                  mode={mode === "move" ? "view" : mode}
+                  saving={saving}
+                  error={error}
+                  onClose={close}
+                  onEdit={() => { setMode("edit"); setError("") }}
+                  onCancel={() => { setMode("view"); setError("") }}
+                  onOpenPerson={openPerson}
+                  onSave={async (draft) => {
+                    const saved = await apply(() => updateRelationshipBlockAction(clientId, draft))
+                    if (saved) setMode("view")
+                  }}
+                  onRemove={async () => {
+                    const removed = await apply(() => deleteRelationshipBlockAction(clientId, block.relationshipBlockId))
+                    if (removed) close()
+                  }}
+                />
+              ) : null}
+            </RelationshipPanelShell>,
             document.body
           )
         : null}
@@ -299,40 +396,73 @@ export function RelationshipTreeSection({
 function TreeCard({
   title,
   nodes,
-  onAdd,
+  onAddSection,
   onPerson,
   onBlock,
+  selectedId,
 }: {
   title: string
   nodes: RelationshipTreeNode[]
-  onAdd: () => void
+  onAddSection: (spec: RelationshipSectionAddSpec) => void
   onPerson: (id: string) => void
   onBlock: (id: string) => void
+  selectedId: string | null
 }) {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0">
         <CardTitle className="text-base">{title}</CardTitle>
-        <button type="button" className="text-sm text-primary underline-offset-2 hover:underline" onClick={onAdd}>
-          + Add
-        </button>
       </CardHeader>
       <CardContent>
         {nodes.some((node) => node.kind === "section") ? (
           <div className="space-y-6">
             {nodes.map((node, index) =>
               node.kind === "section" ? (
-                <div key={node.title}>
-                  <h3 className="mb-2 text-sm font-semibold">{node.title}</h3>
-                  {node.children.length > 0 ? <ConnectedList nodes={node.children} onPerson={onPerson} onBlock={onBlock} /> : null}
+                <div key={node.title} className="space-y-2">
+                  <h3 className={treeLayer1ClassName}>{node.title}</h3>
+                  {node.children.length > 0 ? (
+                    <ConnectedList
+                      nodes={node.children}
+                      personLayer={3}
+                      onPerson={onPerson}
+                      onBlock={onBlock}
+                      selectedId={selectedId}
+                    />
+                  ) : null}
+                  {(() => {
+                    const spec = relationshipSectionAddSpec(node.title)
+                    if (!spec || !relationshipSectionAllowsAdd(node.children)) return null
+                    return (
+                      <button
+                        type="button"
+                        className="text-sm text-primary underline-offset-2 hover:underline"
+                        onClick={() => onAddSection(spec)}
+                      >
+                        {spec.label}
+                      </button>
+                    )
+                  })()}
                 </div>
               ) : (
-                <ConnectedList key={nodeKey(node, index)} nodes={[node]} onPerson={onPerson} onBlock={onBlock} />
+                <ConnectedList
+                  key={nodeKey(node, index)}
+                  nodes={[node]}
+                  personLayer={3}
+                  onPerson={onPerson}
+                  onBlock={onBlock}
+                  selectedId={selectedId}
+                />
               )
             )}
           </div>
         ) : (
-          <ConnectedList nodes={nodes} onPerson={onPerson} onBlock={onBlock} />
+          <ConnectedList
+            nodes={nodes}
+            personLayer={3}
+            onPerson={onPerson}
+            onBlock={onBlock}
+            selectedId={selectedId}
+          />
         )}
       </CardContent>
     </Card>
@@ -342,15 +472,29 @@ function TreeCard({
 function BranchList({
   nodes,
   plainNotes = false,
+  personLayer,
   onPerson,
   onBlock,
+  selectedId,
 }: {
   nodes: RelationshipTreeNode[]
   plainNotes?: boolean
+  personLayer: 3 | 4
   onPerson: (id: string) => void
   onBlock: (id: string) => void
+  selectedId: string | null
 }) {
-  if (!plainNotes) return <ConnectedList nodes={nodes} onPerson={onPerson} onBlock={onBlock} />
+  if (!plainNotes) {
+    return (
+      <ConnectedList
+        nodes={nodes}
+        personLayer={personLayer}
+        onPerson={onPerson}
+        onBlock={onBlock}
+        selectedId={selectedId}
+      />
+    )
+  }
   const parts: ({ kind: "list"; nodes: Exclude<RelationshipTreeNode, { kind: "note" }>[] } | { kind: "note"; text: string })[] = []
   for (const node of nodes) {
     if (node.kind === "note") {
@@ -369,7 +513,14 @@ function BranchList({
             {part.text}
           </p>
         ) : (
-          <ConnectedList key={`list-${index}`} nodes={part.nodes} onPerson={onPerson} onBlock={onBlock} />
+          <ConnectedList
+            key={`list-${index}`}
+            nodes={part.nodes}
+            personLayer={personLayer}
+            onPerson={onPerson}
+            onBlock={onBlock}
+            selectedId={selectedId}
+          />
         )
       )}
     </>
@@ -378,75 +529,150 @@ function BranchList({
 
 function ConnectedList({
   nodes,
+  personLayer,
   onPerson,
   onBlock,
+  selectedId,
 }: {
   nodes: RelationshipTreeNode[]
+  personLayer: 3 | 4
   onPerson: (id: string) => void
   onBlock: (id: string) => void
+  selectedId: string | null
 }) {
   return (
     <ul>
-      {nodes.map((node, index) => (
-        <li key={nodeKey(node, index)} className="relative pl-4">
-          <span
-            aria-hidden
-            className="absolute top-0 left-0 w-0.5 bg-[#a1a1aa]"
-            style={{ height: index === nodes.length - 1 ? 20 : "100%" }}
-          />
-          <span aria-hidden className="absolute top-5 left-0 h-0.5 w-4 bg-[#a1a1aa]" />
-          {node.kind === "note" ? (
-            <p className="flex min-h-10 items-center px-1 text-sm text-muted-foreground italic">{node.text}</p>
-          ) : (
-            <TreeNode node={node} onPerson={onPerson} onBlock={onBlock} />
-          )}
-        </li>
-      ))}
+      {nodes.map((node, index) => {
+        const isLast = index === nodes.length - 1
+        const intoLayer = node.kind === "block" ? 2 : personLayer
+        return (
+          <TreeBranch key={nodeKey(node, index)} intoLayer={intoLayer} isLast={isLast}>
+            {node.kind === "note" ? (
+              <p className="flex min-h-10 items-center px-1 text-sm text-muted-foreground italic">{node.text}</p>
+            ) : (
+              <TreeNode
+                node={node}
+                personLayer={personLayer}
+                onPerson={onPerson}
+                onBlock={onBlock}
+                selectedId={selectedId}
+              />
+            )}
+          </TreeBranch>
+        )
+      })}
     </ul>
   )
 }
 
 function TreeNode({
   node,
+  personLayer,
   onPerson,
   onBlock,
+  selectedId,
 }: {
   node: Exclude<RelationshipTreeNode, { kind: "note" }>
+  personLayer: 3 | 4
   onPerson: (id: string) => void
   onBlock: (id: string) => void
+  selectedId: string | null
 }) {
   if (node.kind === "person") {
     const [name, ...rest] = node.line.split(" · ")
+    const selected = selectedId === node.id
+    const layer4 = personLayer === 4
     return (
       <>
-        <button type="button" className="flex min-h-10 w-full items-center gap-2 rounded-md px-1 text-left hover:bg-muted" onClick={() => onPerson(node.id)}>
-          <span
-            className={cn(
-              "flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-medium",
-              node.deceased ? "border-2 border-dashed border-[#a1a1aa]" : "bg-muted"
-            )}
-            aria-hidden
-          >
-            {node.initial}
+        <button
+          type="button"
+          aria-current={selected ? "true" : undefined}
+          className={cn(
+            layer4 ? treeLayer4ShellClassName : treeLayer3ShellClassName,
+            treeItemStateClassName({ selected })
+          )}
+          onClick={() => onPerson(node.id)}
+        >
+          <span className="flex min-w-0 items-center gap-2">
+            <span
+              className={cn(
+                layer4 ? treeLayer4AvatarClassName : treeLayer3AvatarClassName,
+                node.deceased ? "border-2 border-dashed border-[#a1a1aa]" : "bg-muted"
+              )}
+              aria-hidden
+            >
+              {node.initial}
+            </span>
+            <span
+              className={cn(
+                layer4 ? treeLayer4TitleClassName : treeLayer3TitleClassName,
+                treeSelectedTitleClassName(selected),
+                "min-w-0"
+              )}
+            >
+              {name}
+            </span>
           </span>
-          <span className="text-sm">
-            <span className="font-medium">{name}</span>
-            {rest.length > 0 ? <span className="text-muted-foreground"> · {rest.join(" · ")}</span> : null}
-          </span>
+          {rest.length > 0 ? (
+            <span
+              className={cn(
+                layer4 ? treeLayer4MetaClassName : treeLayer3MetaClassName,
+                selected && "text-[#1e3a8a]",
+                "w-full"
+              )}
+            >
+              {rest.join(" · ")}
+            </span>
+          ) : null}
         </button>
-        {node.children.length > 0 ? <ConnectedList nodes={node.children} onPerson={onPerson} onBlock={onBlock} /> : null}
+        {node.children.length > 0 ? (
+          <ConnectedList
+            nodes={node.children}
+            personLayer={4}
+            onPerson={onPerson}
+            onBlock={onBlock}
+            selectedId={selectedId}
+          />
+        ) : null}
       </>
     )
   }
   if (node.kind === "section") return null
   if (node.kind === "block") {
+    const selected = Boolean(node.id) && selectedId === node.id
+    const band = (
+      <>
+        <span className={cn(treeLayer2TitleClassName, treeSelectedTitleClassName(selected))}>{node.heading}</span>
+        {node.meta ? (
+          <span className={cn(treeLayer2MetaClassName, selected && "text-[#1e3a8a]")}>{node.meta}</span>
+        ) : null}
+      </>
+    )
     return (
       <>
-        <button type="button" className="flex min-h-10 w-full flex-col justify-center rounded-[8px] bg-[#f4f4f5] px-3 py-2 text-left hover:bg-[#e4e4e7]" onClick={() => onBlock(node.id)}>
-          <span className="text-sm font-medium">{node.heading}</span>
-          {node.meta ? <span className="text-xs text-muted-foreground">{node.meta}</span> : null}
-        </button>
-        {node.children.length > 0 ? <BranchList nodes={node.children} onPerson={onPerson} onBlock={onBlock} /> : null}
+        {node.interactive === false || !node.id ? (
+          <div className={cn(treeLayer2ShellClassName, treeItemStateClassName({ interactive: false, square: true }))}>
+            {band}
+          </div>
+        ) : (
+          <button
+            type="button"
+            aria-current={selected ? "true" : undefined}
+            className={cn(treeLayer2ShellClassName, treeItemStateClassName({ selected, square: true }))}
+            onClick={() => onBlock(node.id)}
+          >
+            {band}
+          </button>
+        )}
+        {node.children.length > 0 ? (
+          <BranchList
+            nodes={node.children}
+            personLayer={3}
+            onPerson={onPerson}
+            onBlock={onBlock}
+            selectedId={selectedId}
+          />
+        ) : null}
       </>
     )
   }
@@ -456,7 +682,13 @@ function TreeNode({
   return (
     <>
       <p className="flex min-h-10 items-center px-1 text-sm text-muted-foreground">{node.label}</p>
-      <BranchList nodes={node.children} onPerson={onPerson} onBlock={onBlock} />
+      <BranchList
+        nodes={node.children}
+        personLayer={personLayer}
+        onPerson={onPerson}
+        onBlock={onBlock}
+        selectedId={selectedId}
+      />
     </>
   )
 }
@@ -512,7 +744,7 @@ function PersonPanel({
         onClose={onClose}
       />
       {mode === "move" ? (
-        <MoveStep name={nodeName} person={person} blocks={blocks} saving={saving} error={error} onCancel={onCancel} onMove={onMove} />
+        <MoveStep name={nodeName} person={person} blocks={blocks} people={people} saving={saving} error={error} onCancel={onCancel} onMove={onMove} />
       ) : (
       <>
       <div className="min-h-0 flex-1 overflow-y-auto p-4">
@@ -616,7 +848,7 @@ function BlockPanel({
             </section>
           </div>
         ) : (
-          <BlockFields block={draft} locked={locked} onChange={setDraft} />
+          <BlockFields block={draft} locked={locked} showChildrenQuestion onChange={setDraft} />
         )}
         {error ? <p className="mt-3 text-sm text-destructive">{error}</p> : null}
       </div>
@@ -630,85 +862,6 @@ function BlockPanel({
         <EditFooter saving={saving} onRemove={removable ? () => void onRemove() : undefined} onCancel={onCancel} onSave={() => void onSave(draft)} />
       )}
     </>
-  )
-}
-
-function AddForm({
-  clientId,
-  blocks,
-  saving,
-  error,
-  onClose,
-  onSave,
-}: {
-  clientId: string
-  blocks: RelationshipBlock[]
-  saving: boolean
-  error: string
-  onClose: () => void
-  onSave: (targetId: string, role: BlockRole, roleType: string, draft: PersonDraft) => Promise<void>
-}) {
-  const targets = addTargets(blocks)
-  const [targetId, setTargetId] = useState(targets[0]?.id ?? "")
-  const target = targets.find((item) => item.id === targetId) ?? targets[0]
-  const kind = target?.kind ?? null
-  const roles = kind ? rolesForBlock(kind) : []
-  const [role, setRole] = useState<BlockRole>(roles[0] ?? "partner")
-  const safeRole = roles.includes(role) ? role : roles[0] ?? "partner"
-  const arrangement = blocks.find((item) => item.relationshipBlockId === targetId)?.arrangementType ?? ""
-  const types = typesFor(kind, safeRole, arrangement)
-  const [draft, setDraft] = useState<PersonDraft>(emptyDraft)
-  const roleType = types.includes(draft.blockRoleType) ? draft.blockRoleType : types[0] ?? ""
-  const placeholder = { ...blankPerson(clientId), blockRole: safeRole, blockRoleType: roleType }
-  const chosen = blocks.find((item) => item.relationshipBlockId === targetId) ?? (kind ? blankBlock(kind) : null)
-  return (
-    <>
-      <PanelHeader initial="+" deceased={false} title="Add a person" subtitle="Choose where they belong" onClose={onClose} />
-      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
-        <SelectField id="add-where" label="Where" value={targetId} onChange={(value) => setTargetId(value)}>
-          {targets.map((item) => (
-            <option key={item.id} value={item.id}>{item.label}</option>
-          ))}
-        </SelectField>
-        <SelectField id="add-role" label="Role" value={safeRole} onChange={(value) => setRole(value as BlockRole)}>
-          {roles.map((item) => (
-            <option key={item} value={item}>{ROLE_LABELS[item]}</option>
-          ))}
-        </SelectField>
-        <PersonFields idPrefix="add-person" person={placeholder} block={chosen} draft={{ ...draft, blockRoleType: roleType }} onChange={setDraft} />
-        {error ? <p className="text-sm text-destructive">{error}</p> : null}
-      </div>
-      <EditFooter saving={saving || !target} onCancel={onClose} onSave={() => void onSave(targetId, safeRole, roleType, { ...draft, blockRoleType: roleType })} />
-    </>
-  )
-}
-
-function PanelHeader({
-  initial,
-  deceased,
-  title,
-  subtitle,
-  onClose,
-}: {
-  initial: string
-  deceased: boolean
-  title: string
-  subtitle: string
-  onClose: () => void
-}) {
-  return (
-    <header className="flex items-start gap-3 border-b p-4">
-      <span className={cn("flex size-10 shrink-0 items-center justify-center rounded-full text-sm font-medium", deceased ? "border-2 border-dashed border-[#a1a1aa]" : "bg-muted")} aria-hidden>
-        {initial}
-      </span>
-      <div className="min-w-0 flex-1">
-        <h2 className="truncate text-base font-medium">{title}</h2>
-        <p className="truncate text-sm text-muted-foreground">{subtitle}</p>
-      </div>
-      <button type="button" className="inline-flex size-10 items-center justify-center rounded-md hover:bg-muted" aria-label="Close" onClick={onClose}>
-        <X className="size-4" />
-      </button>
-    </header>
   )
 }
 
@@ -751,285 +904,6 @@ function Facts({ rows }: { rows: { label: string; value: string }[] }) {
         </div>
       ))}
     </dl>
-  )
-}
-
-function PersonFields({
-  idPrefix,
-  person,
-  block,
-  draft,
-  onChange,
-}: {
-  idPrefix: string
-  person: RelationshipRecord
-  block: RelationshipBlock | null
-  draft: PersonDraft
-  onChange: (draft: PersonDraft) => void
-}) {
-  function patch(partial: Partial<PersonDraft>) {
-    onChange({ ...draft, ...partial })
-  }
-  const role = person.blockRole
-  const kind = block?.kind
-  const childTypes = kind ? childTypesForBlock(kind) : []
-  const siblingTypes = kind ? siblingTypesForBlock(kind) : []
-  return (
-    <div className="space-y-3">
-      <TextField id={`${idPrefix}-name`} label="Name" value={draft.givenName} onChange={(givenName) => patch({ givenName })} />
-      <SelectField id={`${idPrefix}-sex`} label="Sex" value={draft.sex} onChange={(sex) => patch({ sex })}>
-        <option value="">Not recorded</option>
-        {SEX_OPTIONS.map((option) => (
-          <option key={option} value={option}>{option}</option>
-        ))}
-      </SelectField>
-      <PartialDatePicker id={`${idPrefix}-dob`} dateLabel="Date of birth" mode="person" value={draft.dateOfBirth} onChange={(dateOfBirth) => patch({ dateOfBirth })} />
-      {role === "child" && childTypes.length > 0 ? (
-        <SelectField id={`${idPrefix}-child-type`} label="Type" value={draft.blockRoleType} onChange={(blockRoleType) => patch({ blockRoleType })}>
-          <option value="">Not recorded</option>
-          {childTypes.map((type) => (
-            <option key={type} value={type}>{CHILD_TYPE_LABELS[type]}</option>
-          ))}
-        </SelectField>
-      ) : null}
-      {role === "sibling" && siblingTypes.length > 0 ? (
-        <SelectField id={`${idPrefix}-sibling-type`} label="Type" value={draft.blockRoleType} onChange={(blockRoleType) => patch({ blockRoleType })}>
-          {siblingTypes.map((type) => (
-            <option key={type} value={type}>{SIBLING_BLOCK_TYPE_LABELS[type]}</option>
-          ))}
-        </SelectField>
-      ) : null}
-      {role === "parent" ? (
-        <SelectField id={`${idPrefix}-parent`} label="Parent" value={draft.blockRoleType || "mother"} onChange={(blockRoleType) => patch({ blockRoleType })}>
-          <option value="mother">Mother</option>
-          <option value="father">Father</option>
-        </SelectField>
-      ) : null}
-      {role === "caregiver" && block?.arrangementType !== "adoption" ? (
-        <SelectField id={`${idPrefix}-caregiver`} label="Relationship" value={draft.blockRoleType} onChange={(blockRoleType) => patch({ blockRoleType })}>
-          <option value="">Not recorded</option>
-          {CAREGIVER_RELATIONSHIPS.map((type) => (
-            <option key={type} value={type}>{CAREGIVER_RELATIONSHIP_LABELS[type]}</option>
-          ))}
-        </SelectField>
-      ) : null}
-      {role === "parent" ? (
-        <label className="flex min-h-10 items-center gap-2 text-sm">
-          <input type="checkbox" checked={draft.notKnown} onChange={(event) => patch({ notKnown: event.target.checked })} />
-          Not known
-        </label>
-      ) : null}
-      <SelectField
-        id={`${idPrefix}-health`}
-        label="Health"
-        value={draft.healthStatus}
-        onChange={(healthStatus) =>
-          patch({
-            healthStatus: healthStatus as PersonDraft["healthStatus"],
-            deceased: healthStatus === "deceased",
-          })
-        }
-      >
-        <option value="">Not recorded</option>
-        {HEALTH_STATUSES.map((option) => (
-          <option key={option} value={option}>{HEALTH_STATUS_LABELS[option]}</option>
-        ))}
-      </SelectField>
-      {draft.healthStatus === "deceased" || draft.deceased ? (
-        <PartialDatePicker id={`${idPrefix}-died`} dateLabel="Year of death" mode="date-only" value={draft.dateOfDeath} onChange={(dateOfDeath) => patch({ dateOfDeath })} />
-      ) : null}
-      <SelectField id={`${idPrefix}-support`} label="Supportive" value={draft.supportive} onChange={(supportive) => patch({ supportive: supportive as PersonDraft["supportive"] })}>
-        <option value="">Not recorded</option>
-        {RELATIONSHIP_RATING_VALUES.map((option) => (
-          <option key={option} value={option}>{RELATIONSHIP_RATING_LABELS[option]}</option>
-        ))}
-      </SelectField>
-      <SelectField id={`${idPrefix}-conflict`} label="Conflict or strain" value={draft.conflict} onChange={(conflict) => patch({ conflict: conflict as PersonDraft["conflict"] })}>
-        <option value="">Not recorded</option>
-        {RELATIONSHIP_RATING_VALUES.map((option) => (
-          <option key={option} value={option}>{RELATIONSHIP_RATING_LABELS[option]}</option>
-        ))}
-      </SelectField>
-      <TextAreaField id={`${idPrefix}-comment`} label="Comment" value={draft.qualityOfRelationship} onChange={(qualityOfRelationship) => patch({ qualityOfRelationship })} />
-      <SelectField id={`${idPrefix}-dependency`} label="Dependency" value={draft.dependency} onChange={(dependency) => patch({ dependency: dependency as PersonDraft["dependency"] })}>
-        <option value="">Not recorded</option>
-        {DEPENDENCY_VALUES.map((option) => (
-          <option key={option} value={option}>{DEPENDENCY_LABELS[option]}</option>
-        ))}
-      </SelectField>
-      <SelectField id={`${idPrefix}-living`} label="Living situation" value={draft.livingSituation} onChange={(livingSituation) => patch({ livingSituation: livingSituation as PersonDraft["livingSituation"] })}>
-        <option value="">Not recorded</option>
-        {RELATIONSHIP_LIVING_SITUATIONS.map((option) => (
-          <option key={option} value={option}>{RELATIONSHIP_LIVING_SITUATION_LABELS[option]}</option>
-        ))}
-      </SelectField>
-    </div>
-  )
-}
-
-function BlockFields({
-  block,
-  locked,
-  onChange,
-}: {
-  block: RelationshipBlock
-  locked: boolean
-  onChange: (block: RelationshipBlock) => void
-}) {
-  const statuses = statusesFor(block.kind)
-  return (
-    <div className="space-y-3">
-      {statuses.length > 0 ? (
-        locked ? (
-          <p className="text-sm">
-            {statusLabel(block.status) || "Not recorded"}
-            <span className="mt-1 block text-xs text-muted-foreground">Set by the client&apos;s relationship status.</span>
-          </p>
-        ) : (
-          <SelectField id={`${block.relationshipBlockId}-status`} label={block.kind === "client_previous" ? "How it ended" : "Status"} value={block.status} onChange={(status) => onChange({ ...block, status })}>
-            <option value="">Not recorded</option>
-            {statuses.map((status) => (
-              <option key={status} value={status}>{statusLabel(status)}</option>
-            ))}
-          </SelectField>
-        )
-      ) : null}
-      {block.status === "other" ? (
-        <TextField id={`${block.relationshipBlockId}-other`} label="Other status" value={block.statusDetail} onChange={(statusDetail) => onChange({ ...block, statusDetail })} />
-      ) : null}
-      {block.kind === "caregiver_arrangement" ? (
-        <SelectField id={`${block.relationshipBlockId}-arrangement`} label="Arrangement" value={block.arrangementType} onChange={(arrangementType) => onChange({ ...block, arrangementType: arrangementType as ArrangementType | "" })}>
-          <option value="">Not recorded</option>
-          {ARRANGEMENT_TYPES.map((type) => (
-            <option key={type} value={type}>{ARRANGEMENT_TYPE_LABELS[type]}</option>
-          ))}
-        </SelectField>
-      ) : null}
-      {block.arrangementType === "other" ? (
-        <TextField id={`${block.relationshipBlockId}-arrangement-detail`} label="Other arrangement" value={block.arrangementDetail} onChange={(arrangementDetail) => onChange({ ...block, arrangementDetail })} />
-      ) : null}
-      {block.kind !== "client_other_children" ? (
-        <PartialDatePicker id={`${block.relationshipBlockId}-start`} dateLabel="Started" mode="date-only" value={block.startedOn} onChange={(startedOn) => onChange({ ...block, startedOn })} />
-      ) : null}
-      {block.kind !== "client_other_children" && block.kind !== "client_current" ? (
-        <PartialDatePicker id={`${block.relationshipBlockId}-end`} dateLabel="Ended" mode="date-only" value={block.endedOn} onChange={(endedOn) => onChange({ ...block, endedOn })} />
-      ) : null}
-      {block.kind === "client_current" || block.kind === "client_previous" ? (
-        <label className="flex min-h-10 items-center gap-2 text-sm">
-          <input type="checkbox" checked={block.noChildren} onChange={(event) => onChange({ ...block, noChildren: event.target.checked })} />
-          No children
-        </label>
-      ) : null}
-    </div>
-  )
-}
-
-function MoveStep({
-  name,
-  person,
-  blocks,
-  saving,
-  error,
-  onCancel,
-  onMove,
-}: {
-  name: string
-  person: RelationshipRecord
-  blocks: RelationshipBlock[]
-  saving: boolean
-  error: string
-  onCancel: () => void
-  onMove: (destinationId: string, role: BlockRole, roleType: string) => Promise<void>
-}) {
-  const targets = moveTargets(blocks, person.relationshipBlockId ?? null)
-  const [blockId, setBlockId] = useState("")
-  const [role, setRole] = useState<BlockRole | "">("")
-  const [roleType, setRoleType] = useState("")
-  const target = targets.find((item) => item.id === blockId)
-  const roles = target ? rolesForBlock(target.kind) : []
-  const chosenRole = role && roles.includes(role) ? role : ""
-  const arrangement = blocks.find((item) => item.relationshipBlockId === blockId)?.arrangementType ?? ""
-  const types = chosenRole ? typesFor(target?.kind ?? null, chosenRole, arrangement) : []
-  const chosenType = types.includes(roleType) ? roleType : ""
-  const ready = Boolean(blockId && chosenRole && (types.length === 0 || chosenType))
-  return (
-    <>
-      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
-        <h3 className="text-sm font-medium">Move {name} to…</h3>
-        <fieldset className="space-y-1">
-          <legend className="text-sm text-muted-foreground">Relationship</legend>
-          {targets.map((item) => (
-            <label key={item.id} className="flex min-h-10 items-center gap-2 text-sm">
-              <input
-                type="radio"
-                name={`move-block-${person.relationshipRecordId}`}
-                checked={blockId === item.id}
-                onChange={() => {
-                  setBlockId(item.id)
-                  setRole("")
-                  setRoleType("")
-                }}
-              />
-              {item.label}
-            </label>
-          ))}
-        </fieldset>
-        <fieldset className={cn("space-y-1", !blockId && "opacity-60")} disabled={!blockId}>
-          <legend className="text-sm text-muted-foreground">Role</legend>
-          {blockId ? (
-            roles.map((item) => (
-              <label key={item} className="flex min-h-10 items-center gap-2 text-sm">
-                <input
-                  type="radio"
-                  name={`move-role-${person.relationshipRecordId}`}
-                  checked={chosenRole === item}
-                  onChange={() => {
-                    setRole(item)
-                    setRoleType("")
-                  }}
-                />
-                {ROLE_LABELS[item]}
-              </label>
-            ))
-          ) : (
-            <p className="flex min-h-10 items-center text-sm text-muted-foreground">Choose a relationship first.</p>
-          )}
-        </fieldset>
-        {chosenRole && types.length > 0 ? (
-          <fieldset className="space-y-1">
-            <legend className="text-sm text-muted-foreground">Type</legend>
-            {types.map((item) => (
-              <label key={item} className="flex min-h-10 items-center gap-2 text-sm">
-                <input
-                  type="radio"
-                  name={`move-type-${person.relationshipRecordId}`}
-                  checked={chosenType === item}
-                  onChange={() => setRoleType(item)}
-                />
-                {typeOptionLabel(chosenRole, item)}
-              </label>
-            ))}
-          </fieldset>
-        ) : null}
-        {error ? <p className="text-sm text-destructive">{error}</p> : null}
-      </div>
-      <footer className="flex items-center justify-end gap-2 border-t p-4">
-        <button type="button" className="inline-flex min-h-10 items-center rounded-md border px-3 text-sm" disabled={saving} onClick={onCancel}>
-          Cancel
-        </button>
-        <button
-          type="button"
-          className="inline-flex min-h-10 items-center rounded-md bg-primary px-3 text-sm text-primary-foreground disabled:opacity-60"
-          disabled={saving || !ready || chosenRole === ""}
-          onClick={() => {
-            if (chosenRole === "") return
-            void onMove(blockId, chosenRole, chosenType)
-          }}
-        >
-          Move
-        </button>
-      </footer>
-    </>
   )
 }
 
@@ -1079,168 +953,6 @@ function blockFacts(block: RelationshipBlock): { label: string; value: string }[
 
 function blockMetaLine(block: RelationshipBlock): string {
   return [block.startedOn.trim(), block.endedOn.trim()].filter(Boolean).join("–") || "Relationship"
-}
-
-function statusesFor(kind: BlockKind): string[] {
-  if (kind === "client_current") return Object.keys(CURRENT_BLOCK_STATUS_LABELS)
-  if (kind === "client_previous") return Object.keys(PREVIOUS_BLOCK_STATUS_LABELS)
-  if (kind === "biological_parents") return [...Object.keys(CURRENT_BLOCK_STATUS_LABELS), ...Object.keys(PREVIOUS_BLOCK_STATUS_LABELS), NEVER_IN_A_RELATIONSHIP]
-  if (kind === "parent_other") return [...Object.keys(CURRENT_BLOCK_STATUS_LABELS), ...Object.keys(PREVIOUS_BLOCK_STATUS_LABELS)]
-  return []
-}
-
-function statusLabel(status: string): string {
-  if (status === NEVER_IN_A_RELATIONSHIP) return "Never in a relationship"
-  if (status in CURRENT_BLOCK_STATUS_LABELS) return CURRENT_BLOCK_STATUS_LABELS[status as keyof typeof CURRENT_BLOCK_STATUS_LABELS]
-  if (status in PREVIOUS_BLOCK_STATUS_LABELS) return PREVIOUS_BLOCK_STATUS_LABELS[status as keyof typeof PREVIOUS_BLOCK_STATUS_LABELS]
-  return ""
-}
-
-function typesFor(kind: BlockKind | null, role: BlockRole, arrangement: string): string[] {
-  if (!kind) return []
-  if (role === "child") return [...childTypesForBlock(kind)]
-  if (role === "sibling") return [...siblingTypesForBlock(kind)]
-  if (role === "parent") return ["mother", "father"]
-  if (role === "caregiver" && arrangement !== "adoption") return [...CAREGIVER_RELATIONSHIPS]
-  return []
-}
-
-function typeOptionLabel(role: BlockRole | "" | undefined, value: string): string {
-  if (!value) return ""
-  if (role === "child" && value in CHILD_TYPE_LABELS) return CHILD_TYPE_LABELS[value as keyof typeof CHILD_TYPE_LABELS]
-  if (role === "sibling" && value in SIBLING_BLOCK_TYPE_LABELS) return SIBLING_BLOCK_TYPE_LABELS[value as keyof typeof SIBLING_BLOCK_TYPE_LABELS]
-  if (role === "parent") return value === "father" ? "Father" : "Mother"
-  if (role === "caregiver" && value in CAREGIVER_RELATIONSHIP_LABELS) return CAREGIVER_RELATIONSHIP_LABELS[value as keyof typeof CAREGIVER_RELATIONSHIP_LABELS]
-  return value
-}
-
-function addTargets(blocks: RelationshipBlock[]): { id: string; label: string; kind: BlockKind }[] {
-  const rows: { id: string; label: string; kind: BlockKind }[] = []
-  for (const block of blocks.filter((item) => item.kind === "client_current")) rows.push({ id: block.relationshipBlockId, label: headingFor(block), kind: block.kind })
-  rows.push({ id: "new-current", label: "+ New current relationship", kind: "client_current" })
-  for (const block of blocks.filter((item) => item.kind === "client_previous")) rows.push({ id: block.relationshipBlockId, label: headingFor(block), kind: block.kind })
-  rows.push({ id: "new-previous", label: "+ New previous relationship", kind: "client_previous" })
-  const biological = blocks.find((item) => item.kind === "biological_parents")
-  if (biological) rows.push({ id: biological.relationshipBlockId, label: headingFor(biological), kind: biological.kind })
-  else rows.push({ id: "new-biological", label: "+ New biological parents", kind: "biological_parents" })
-  for (const block of blocks.filter((item) => item.kind === "parent_other" && item.parentSide === "mother")) {
-    rows.push({ id: block.relationshipBlockId, label: headingFor(block), kind: block.kind })
-  }
-  rows.push({ id: "new-mother", label: "+ New mother's relationship", kind: "parent_other" })
-  for (const block of blocks.filter((item) => item.kind === "parent_other" && item.parentSide === "father")) {
-    rows.push({ id: block.relationshipBlockId, label: headingFor(block), kind: block.kind })
-  }
-  rows.push({ id: "new-father", label: "+ New father's relationship", kind: "parent_other" })
-  for (const block of blocks.filter((item) => item.kind === "caregiver_arrangement")) rows.push({ id: block.relationshipBlockId, label: headingFor(block), kind: block.kind })
-  rows.push({ id: "new-caregiver", label: "+ New caregiver arrangement", kind: "caregiver_arrangement" })
-  const other = blocks.find((item) => item.kind === "client_other_children")
-  if (other) rows.push({ id: other.relationshipBlockId, label: headingFor(other), kind: other.kind })
-  else rows.push({ id: "new-other-children", label: "+ New other children", kind: "client_other_children" })
-  return rows
-}
-
-const emptyDraft: PersonDraft = {
-  givenName: "",
-  sex: "",
-  dateOfBirth: "",
-  blockRoleType: "",
-  healthStatus: "",
-  dateOfDeath: "",
-  supportive: "",
-  conflict: "",
-  qualityOfRelationship: "",
-  dependency: "",
-  livingSituation: "",
-  notKnown: false,
-  deceased: false,
-}
-
-function draftFromPerson(person: RelationshipRecord): PersonDraft {
-  return {
-    givenName: person.givenName,
-    sex: person.sex,
-    dateOfBirth: person.dateOfBirth,
-    blockRoleType: person.blockRoleType ?? person.childType ?? "",
-    healthStatus: person.healthStatus,
-    dateOfDeath: person.dateOfDeath,
-    supportive: person.supportive,
-    conflict: person.conflict,
-    qualityOfRelationship: person.qualityOfRelationship,
-    dependency: person.dependency,
-    livingSituation: person.livingSituation,
-    notKnown: person.notKnown,
-    deceased: person.deceased,
-  }
-}
-
-function personFromDraft(person: RelationshipRecord, draft: PersonDraft): RelationshipRecord {
-  const deceased = draft.healthStatus === "deceased" || (draft.deceased && draft.healthStatus === "")
-  return {
-    ...person,
-    givenName: draft.givenName,
-    sex: draft.sex as RelationshipRecord["sex"],
-    dateOfBirth: draft.dateOfBirth,
-    blockRoleType: draft.blockRoleType,
-    childType: person.blockRole === "child" ? (draft.blockRoleType as RelationshipRecord["childType"]) : person.childType,
-    healthStatus: draft.healthStatus,
-    dateOfDeath: deceased ? draft.dateOfDeath : "",
-    supportive: draft.supportive,
-    conflict: draft.conflict,
-    qualityOfRelationship: draft.qualityOfRelationship,
-    dependency: draft.dependency,
-    livingSituation: draft.livingSituation,
-    notKnown: draft.notKnown,
-    deceased,
-  }
-}
-
-function blankBlock(kind: BlockKind): RelationshipBlock {
-  return {
-    relationshipBlockId: "",
-    kind,
-    parentRecordId: null,
-    parentSide: "",
-    status: "",
-    statusDetail: "",
-    arrangementType: "",
-    arrangementDetail: "",
-    startedOn: "",
-    endedOn: "",
-    noChildren: false,
-    displayOrder: 0,
-  }
-}
-
-function blankPerson(clientId: string): RelationshipRecord {
-  return {
-    relationshipRecordId: `new-${clientId}`,
-    relationshipToClient: "current_partner",
-    sex: "",
-    givenName: "",
-    displayOrder: 0,
-    dateOfBirth: "",
-    approximateAge: null,
-    approximateAgeRecordedOn: "",
-    healthStatus: "",
-    deceased: false,
-    ageAtDeath: null,
-    dateOfDeath: "",
-    healthOrCauseOfDeath: "",
-    childType: "",
-    childTypeDetail: "",
-    supportive: "",
-    conflict: "",
-    qualityOfRelationship: "",
-    dependency: "",
-    livingSituation: "",
-    caregiverRelationship: "",
-    caregiverRelationshipDetail: "",
-    notKnown: false,
-    relationshipBlockId: null,
-    blockRole: "",
-    blockRoleType: "",
-    placementReview: "",
-  }
 }
 
 function roleTitle(person: RelationshipRecord, block: RelationshipBlock | null): string {

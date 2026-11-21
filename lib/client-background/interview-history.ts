@@ -2,33 +2,31 @@ import {
   STRESSOR_ITEMS,
   type EventRecord,
   type EventType,
-  type ReasonForAttending,
+  type HistoryIssue,
   type StressorsRecord,
+  type TreatmentAnswer,
 } from "@/lib/client-background/types"
 
 export const HISTORY_QUESTION_GROUPS = [
   {
     title: "Client history",
     keys: [
-      "illness_injury",
-      "traumatic_events",
       "emotional_problems",
       "substance_use",
+      "illness_injury",
       "self_harm",
-      "psychiatric_admission",
-      "previous_therapy",
-      "medication_history",
+      "traumatic_events",
       "other_significant_events",
+      "other_treatment",
     ],
   },
   {
-    title: "Significant others",
+    title: "Family and significant others",
     keys: [
-      "family_illness",
       "family_emotional_problems",
       "family_substance_use",
+      "family_illness",
       "family_self_harm",
-      "family_psychiatric_admission",
       "family_significant_events",
     ],
   },
@@ -38,7 +36,7 @@ export const HISTORY_QUESTION_KEYS = HISTORY_QUESTION_GROUPS.flatMap((group) => 
 
 export type HistoryQuestionKey = (typeof HISTORY_QUESTION_KEYS)[number]
 
-/** Screening answers, including Medication. */
+/** Screening answers. Retired keys (hospital admission, therapy, medication) are ignored on read. */
 export type ScreeningQuestionKey = HistoryQuestionKey
 
 export const SCREENING_ANSWERS = ["yes", "no", "not_asked"] as const
@@ -52,6 +50,8 @@ type QuestionDefinition = {
   label: string
   eventType: EventType | null
   about: "self" | "significant_other"
+  /** Condition categories have an issue level; event categories are Category → event. */
+  mode: "condition" | "event" | "other_treatment"
 }
 
 const SCREENING_QUESTION_KEYS = HISTORY_QUESTION_KEYS
@@ -59,93 +59,87 @@ const SCREENING_QUESTION_KEYS = HISTORY_QUESTION_KEYS
 export const HISTORY_QUESTIONS: Record<HistoryQuestionKey, QuestionDefinition> = {
   emotional_problems: {
     key: "emotional_problems",
-    label: "Emotional problems",
+    label: "Mental health",
     eventType: "emotional_problems",
     about: "self",
-  },
-  self_harm: {
-    key: "self_harm",
-    label: "Self-harm",
-    eventType: "self_harm",
-    about: "self",
+    mode: "condition",
   },
   substance_use: {
     key: "substance_use",
     label: "Substance use",
     eventType: "substance_use",
     about: "self",
-  },
-  psychiatric_admission: {
-    key: "psychiatric_admission",
-    label: "Hospital admission",
-    eventType: "psychiatric_admission",
-    about: "self",
-  },
-  previous_therapy: {
-    key: "previous_therapy",
-    label: "Previous therapy",
-    eventType: "previous_therapy",
-    about: "self",
+    mode: "condition",
   },
   illness_injury: {
     key: "illness_injury",
-    label: "Illness / injury",
+    label: "Physical health",
     eventType: "illness_injury",
     about: "self",
+    mode: "condition",
+  },
+  self_harm: {
+    key: "self_harm",
+    label: "Self-harm",
+    eventType: "self_harm",
+    about: "self",
+    mode: "event",
   },
   traumatic_events: {
     key: "traumatic_events",
     label: "Traumatic events",
     eventType: "traumatic_event",
     about: "self",
-  },
-  medication_history: {
-    key: "medication_history",
-    label: "Medication",
-    eventType: "medication",
-    about: "self",
+    mode: "event",
   },
   other_significant_events: {
     key: "other_significant_events",
     label: "Other significant events",
     eventType: "significant_history",
     about: "self",
+    mode: "event",
+  },
+  other_treatment: {
+    key: "other_treatment",
+    label: "Other treatment not linked to an issue",
+    eventType: null,
+    about: "self",
+    mode: "other_treatment",
   },
   family_emotional_problems: {
     key: "family_emotional_problems",
-    label: "Emotional problems",
+    label: "Mental health",
     eventType: "emotional_problems",
     about: "significant_other",
-  },
-  family_self_harm: {
-    key: "family_self_harm",
-    label: "Self-harm",
-    eventType: "self_harm",
-    about: "significant_other",
+    mode: "condition",
   },
   family_substance_use: {
     key: "family_substance_use",
     label: "Substance use",
     eventType: "substance_use",
     about: "significant_other",
-  },
-  family_psychiatric_admission: {
-    key: "family_psychiatric_admission",
-    label: "Hospital admission",
-    eventType: "psychiatric_admission",
-    about: "significant_other",
+    mode: "condition",
   },
   family_illness: {
     key: "family_illness",
-    label: "Illness / injury",
+    label: "Physical health",
     eventType: "illness_injury",
     about: "significant_other",
+    mode: "condition",
+  },
+  family_self_harm: {
+    key: "family_self_harm",
+    label: "Self-harm",
+    eventType: "self_harm",
+    about: "significant_other",
+    mode: "event",
   },
   family_significant_events: {
     key: "family_significant_events",
     label: "Significant events",
     eventType: "significant_history",
     about: "significant_other",
+    mode: "event",
   },
 }
 
@@ -153,9 +147,6 @@ const SELF_QUESTION: Partial<Record<EventType, HistoryQuestionKey>> = {
   emotional_problems: "emotional_problems",
   self_harm: "self_harm",
   substance_use: "substance_use",
-  psychiatric_admission: "psychiatric_admission",
-  previous_therapy: "previous_therapy",
-  medication: "medication_history",
   illness_injury: "illness_injury",
   traumatic_event: "traumatic_events",
 }
@@ -164,7 +155,6 @@ const FAMILY_QUESTION: Partial<Record<EventType, HistoryQuestionKey>> = {
   emotional_problems: "family_emotional_problems",
   self_harm: "family_self_harm",
   substance_use: "family_substance_use",
-  psychiatric_admission: "family_psychiatric_admission",
   illness_injury: "family_illness",
 }
 
@@ -173,32 +163,40 @@ export function resolvedAbout(event: { about?: string }): "self" | "significant_
   return event.about === "significant_other" ? "significant_other" : "self"
 }
 
-/** Worth-checking text. Significant others keeps its group name so the two Hospital admission rows stay distinct. */
+/** Worth-checking text. Family group keeps its prefix so Mental health rows stay distinct. */
 export function historyQuestionCheckLabel(key: HistoryQuestionKey): string {
   const label = HISTORY_QUESTIONS[key].label
-  return key.startsWith("family_") ? `Significant others: ${label}` : label
+  return key.startsWith("family_") ? `Family and significant others: ${label}` : label
 }
 
 /**
  * Every history entry belongs to exactly one screening question.
- * About = Self uses the client headings. About = Significant other uses the
- * significant-others headings. The old family_events rows are emotional problems.
- * A significant-other type with no heading of its own lands on Significant events.
+ * Treatments without an issue land on Other treatment. Linked treatments are
+ * not counted as their own screening question.
  */
 export function historyQuestionKeyForEvent(
-  event: Pick<EventRecord, "eventType" | "startPrecision" | "startValue"> & {
+  event: Pick<EventRecord, "eventType" | "startPrecision" | "startValue" | "conditionGroupId" | "conditionEventId" | "parentEventId"> & {
     about?: string
   },
   _dateOfBirth: string | null
 ): HistoryQuestionKey {
   const about = resolvedAbout(event)
+  if (event.parentEventId) {
+    return about === "self" ? "other_significant_events" : "family_significant_events"
+  }
   const type = event.eventType === "family_events" ? "emotional_problems" : event.eventType
+  if (type === "psychiatric_admission" || type === "previous_therapy" || type === "medication") {
+    if (about === "self" && !event.conditionGroupId && !event.conditionEventId) return "other_treatment"
+    // Linked treatments are covered by the issue's Treatment question, not a category.
+    return about === "self" ? "other_treatment" : "family_significant_events"
+  }
   const table = about === "self" ? SELF_QUESTION : FAMILY_QUESTION
   return table[type] ?? (about === "self" ? "other_significant_events" : "family_significant_events")
 }
 
-export function historyQuestionAcceptsEntries(key: HistoryQuestionKey): key is ScreeningQuestionKey {
-  return HISTORY_QUESTIONS[key].eventType != null
+export function historyQuestionAcceptsEntries(key: HistoryQuestionKey): boolean {
+  const question = HISTORY_QUESTIONS[key]
+  return question.eventType != null || question.mode === "other_treatment"
 }
 
 export function eventsForQuestion(
@@ -206,7 +204,26 @@ export function eventsForQuestion(
   key: HistoryQuestionKey,
   dateOfBirth: string | null
 ): EventRecord[] {
-  return events.filter((event) => historyQuestionKeyForEvent(event, dateOfBirth) === key)
+  const question = HISTORY_QUESTIONS[key]
+  if (question.mode === "other_treatment") {
+    return events.filter(
+      (event) =>
+        (event.eventType === "psychiatric_admission" ||
+          event.eventType === "previous_therapy" ||
+          event.eventType === "medication") &&
+        resolvedAbout(event) === "self" &&
+        !event.parentEventId &&
+        !event.conditionGroupId &&
+        !event.conditionEventId
+    )
+  }
+  return events.filter((event) => {
+    if (event.parentEventId) return false
+    if (event.eventType === "psychiatric_admission" || event.eventType === "previous_therapy" || event.eventType === "medication") {
+      return false
+    }
+    return historyQuestionKeyForEvent(event, dateOfBirth) === key
+  })
 }
 
 export function sanitizeScreening(value: unknown): ScreeningAnswers {
@@ -220,10 +237,15 @@ export function sanitizeScreening(value: unknown): ScreeningAnswers {
 }
 
 /**
- * Referral (1), client and family history (15, including Medication),
- * and the nine stressors. The main reason for attending is optional and is not counted.
+ * Category questions + Other treatment + each issue's Treatment question + stressors.
+ * Treatment questions are dynamic (one per issue).
  */
-export const INTERVIEW_ANSWER_TOTAL = 1 + HISTORY_QUESTION_KEYS.length + STRESSOR_ITEMS.length
+export function interviewAnswerTotal(issueCount: number): number {
+  return HISTORY_QUESTION_KEYS.length + issueCount + STRESSOR_ITEMS.length
+}
+
+/** @deprecated Prefer interviewAnswerTotal(issueCount). Base total with no issues. */
+export const INTERVIEW_ANSWER_TOTAL = interviewAnswerTotal(0)
 
 export type BackgroundInterviewAnswerSource = {
   status: "in_progress" | "completed"
@@ -237,21 +259,44 @@ export function backgroundInterviewSourceLine(source: BackgroundInterviewAnswerS
   return `Yes / No / Not asked answers are from the background interview of ${source.dateLabel} (${state}). Change them in the interview.`
 }
 
+function answeredCategoryKeys(
+  screening: ScreeningAnswers,
+  events: Pick<EventRecord, "eventType" | "startPrecision" | "startValue" | "conditionGroupId" | "conditionEventId" | "parentEventId" | "about">[],
+  dateOfBirth: string | null
+): Set<HistoryQuestionKey> {
+  const withEntries = new Set<HistoryQuestionKey>()
+  for (const event of events) {
+    if (event.parentEventId) continue
+    if (
+      event.eventType === "psychiatric_admission" ||
+      event.eventType === "previous_therapy" ||
+      event.eventType === "medication"
+    ) {
+      if (resolvedAbout(event) === "self" && !event.conditionGroupId && !event.conditionEventId) {
+        withEntries.add("other_treatment")
+      }
+      continue
+    }
+    withEntries.add(historyQuestionKeyForEvent(event, dateOfBirth))
+  }
+  return withEntries
+}
+
 export function screeningAnsweredCount(
   screening: ScreeningAnswers,
-  events: Pick<EventRecord, "eventType" | "startPrecision" | "startValue">[],
+  events: Pick<EventRecord, "eventType" | "startPrecision" | "startValue" | "conditionGroupId" | "conditionEventId" | "parentEventId" | "about">[],
   dateOfBirth: string | null
 ): number {
-  const withEntries = new Set(events.map((event) => historyQuestionKeyForEvent(event, dateOfBirth)))
+  const withEntries = answeredCategoryKeys(screening, events, dateOfBirth)
   return SCREENING_QUESTION_KEYS.filter((key) => screening[key] != null || withEntries.has(key)).length
 }
 
 export function finalScreeningAnswers(
   screening: ScreeningAnswers,
-  events: Pick<EventRecord, "eventType" | "startPrecision" | "startValue">[],
+  events: Pick<EventRecord, "eventType" | "startPrecision" | "startValue" | "conditionGroupId" | "conditionEventId" | "parentEventId" | "about">[],
   dateOfBirth: string | null
 ): Record<ScreeningQuestionKey, ScreeningAnswer> {
-  const withEntries = new Set(events.map((event) => historyQuestionKeyForEvent(event, dateOfBirth)))
+  const withEntries = answeredCategoryKeys(screening, events, dateOfBirth)
   const final = {} as Record<ScreeningQuestionKey, ScreeningAnswer>
   for (const key of SCREENING_QUESTION_KEYS) {
     if (withEntries.has(key)) final[key] = "yes"
@@ -262,29 +307,32 @@ export function finalScreeningAnswers(
 
 export function unansweredQuestionLabels(
   screening: ScreeningAnswers,
-  events: Pick<EventRecord, "eventType" | "startPrecision" | "startValue">[],
-  dateOfBirth: string | null
+  events: Pick<EventRecord, "eventType" | "startPrecision" | "startValue" | "conditionGroupId" | "conditionEventId" | "parentEventId" | "about">[],
+  dateOfBirth: string | null,
+  issues: HistoryIssue[] = []
 ): string[] {
-  const withEntries = new Set(events.map((event) => historyQuestionKeyForEvent(event, dateOfBirth)))
-  return HISTORY_QUESTION_KEYS.filter((key) => !withEntries.has(key) && screening[key] == null).map(
+  const withEntries = answeredCategoryKeys(screening, events, dateOfBirth)
+  const labels = HISTORY_QUESTION_KEYS.filter((key) => !withEntries.has(key) && screening[key] == null).map(
     (key) => HISTORY_QUESTIONS[key].label
   )
+  for (const issue of issues) {
+    if (!issue.treatmentAnswer) {
+      const title = issue.title.trim() || "Issue"
+      labels.push(`Treatment (${title})`)
+    }
+  }
+  return labels
 }
 
-function unansweredReasonLabels(reason: ReasonForAttending): string[] {
-  return reason.referralType ? [] : ["Referral type"]
-}
-
-/** Unanswered items in page order: Referral, then the rest of Background, then History, then Stressors. */
+/** Unanswered items in page order: History categories, treatment answers, then Stressors. */
 export function unansweredInterviewLabels(
   screening: ScreeningAnswers,
-  events: Pick<EventRecord, "eventType" | "startPrecision" | "startValue">[],
+  events: Pick<EventRecord, "eventType" | "startPrecision" | "startValue" | "conditionGroupId" | "conditionEventId" | "parentEventId" | "about">[],
   dateOfBirth: string | null,
   stressors: StressorsRecord,
-  reason: ReasonForAttending
+  issues: HistoryIssue[] = []
 ): string[] {
-  const labels: string[] = unansweredReasonLabels(reason)
-  labels.push(...unansweredQuestionLabels(screening, events, dateOfBirth))
+  const labels: string[] = unansweredQuestionLabels(screening, events, dateOfBirth, issues)
   for (const item of STRESSOR_ITEMS) {
     if (stressors[item.key] == null) labels.push(item.label)
   }
@@ -294,13 +342,17 @@ export function unansweredInterviewLabels(
 /** Answered items, counted the same way {@link unansweredInterviewLabels} leaves gaps. */
 export function answeredInterviewCount(
   screening: ScreeningAnswers,
-  events: Pick<EventRecord, "eventType" | "startPrecision" | "startValue">[],
+  events: Pick<EventRecord, "eventType" | "startPrecision" | "startValue" | "conditionGroupId" | "conditionEventId" | "parentEventId" | "about">[],
   dateOfBirth: string | null,
   stressors: StressorsRecord,
-  reason: ReasonForAttending
+  issues: HistoryIssue[] = []
 ): number {
-  return (
-    INTERVIEW_ANSWER_TOTAL -
-    unansweredInterviewLabels(screening, events, dateOfBirth, stressors, reason).length
-  )
+  return interviewAnswerTotal(issues.length) - unansweredInterviewLabels(screening, events, dateOfBirth, stressors, issues).length
+}
+
+export function treatmentAnswerLabel(answer: TreatmentAnswer | ""): string {
+  if (answer === "yes") return "Yes"
+  if (answer === "none") return "None"
+  if (answer === "not_asked") return "Not asked"
+  return ""
 }

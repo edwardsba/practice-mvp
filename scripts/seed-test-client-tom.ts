@@ -78,10 +78,10 @@ async function main() {
     await db.query(
       `INSERT INTO client_backgrounds (
          client_id, practice_id, identity_json, living_situation_json, education_json, occupation_json,
-         stressors_json, reason_for_attending_json, relationship_status,
+         stressors_json, relationship_status,
          previous_relationships, other_children, mother_other_relationships, father_other_relationships, caregiver_arrangements,
          sexual_orientation, sexual_orientation_other
-       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`,
+       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
       [
         clientId,
         account.practice_id,
@@ -90,7 +90,6 @@ async function main() {
         JSON.stringify(source.data.demographics.education),
         JSON.stringify(source.data.demographics.occupation),
         JSON.stringify(source.data.stressors),
-        JSON.stringify({}),
         source.data.relationshipStatus.relationshipStatus,
         source.data.blockAnswers?.previousRelationships,
         source.data.blockAnswers?.otherChildren,
@@ -105,8 +104,8 @@ async function main() {
       await db.query(
         `INSERT INTO client_relationship_blocks (
            relationship_block_id, client_id, practice_id, kind, parent_side, status, arrangement_type,
-           started_on, ended_on, no_children, children_answer, siblings_answer, display_order
-         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
+           started_on, ended_on, children_answer, siblings_answer, display_order
+         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
         [
           ids.get(block.relationshipBlockId),
           clientId,
@@ -117,7 +116,6 @@ async function main() {
           text(block.arrangementType),
           text(block.startedOn),
           text(block.endedOn),
-          block.noChildren,
           text(block.childrenAnswer),
           text(block.siblingsAnswer),
           block.displayOrder,
@@ -220,7 +218,7 @@ async function insertPerson(
   await db.query(
     `INSERT INTO client_relationship_records (
        relationship_record_id, client_id, practice_id, relationship_to_client, sex, given_name, display_order,
-       date_of_birth, health_status, deceased, date_of_death, child_type, caregiver_relationship,
+       date_of_birth, health_status, deceased, date_of_death, child_type_detail, caregiver_relationship,
        caregiver_relationship_detail, living_situation, relationship_block_id, block_role, block_role_type
      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)`,
     [
@@ -235,7 +233,7 @@ async function insertPerson(
       text(person.healthStatus),
       person.deceased,
       text(person.dateOfDeath),
-      text(person.childType),
+      text(person.childTypeDetail),
       text(person.caregiverRelationship),
       text(person.caregiverRelationshipDetail),
       text(person.livingSituation),
@@ -395,14 +393,6 @@ async function repairTom(pool: Pool, clientId: string, practiceId: string) {
   const db = await pool.connect()
   try {
     await db.query("BEGIN")
-    // Referral lives on funding_approvals; leave reason_for_attending_json alone (or empty object).
-    await db.query(
-      `UPDATE client_backgrounds
-       SET reason_for_attending_json = COALESCE(reason_for_attending_json, '{}'::jsonb),
-           updated_at = now()
-       WHERE client_id = $1 AND practice_id = $2`,
-      [clientId, practiceId]
-    )
     await ensureTomMedicareApproval(db, clientId, practiceId, harry)
     await db.query(
       `UPDATE client_relationship_records
@@ -434,19 +424,19 @@ async function repairTom(pool: Pool, clientId: string, practiceId: string) {
     // Round M: Jordan Yes, Pam None, Kim Yes; bio/Phil siblings Yes; Larry/Joan None.
     await db.query(
       `UPDATE client_relationship_blocks
-       SET children_answer = 'yes', no_children = false, updated_at = now()
+       SET children_answer = 'yes', updated_at = now()
        WHERE client_id = $1 AND practice_id = $2 AND kind = 'client_current'`,
       [clientId, practiceId]
     )
     await db.query(
       `UPDATE client_relationship_blocks
-       SET children_answer = 'none', no_children = true, updated_at = now()
+       SET children_answer = 'none', updated_at = now()
        WHERE client_id = $1 AND practice_id = $2 AND kind = 'client_previous' AND status = 'defacto_separated'`,
       [clientId, practiceId]
     )
     await db.query(
       `UPDATE client_relationship_blocks
-       SET children_answer = 'yes', no_children = false, updated_at = now()
+       SET children_answer = 'yes', updated_at = now()
        WHERE client_id = $1 AND practice_id = $2 AND kind = 'client_previous' AND status = 'divorced'`,
       [clientId, practiceId]
     )

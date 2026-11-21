@@ -11,7 +11,6 @@ const emptyBlock = {
   endedOn: "",
   childrenAnswer: "" as const,
   siblingsAnswer: "" as const,
-  noChildren: false,
 }
 
 const emptyPartner = {

@@ -926,7 +926,7 @@ function personFacts(person: RelationshipRecord, dateOfBirth: string | null): { 
     { label: "Living situation", value: person.livingSituation ? RELATIONSHIP_LIVING_SITUATION_LABELS[person.livingSituation] : "Not recorded" }
   )
   if (person.blockRole === "child" || person.blockRole === "sibling") {
-    rows.push({ label: "Type", value: typeOptionLabel(person.blockRole, person.blockRoleType || person.childType) || "Not recorded" })
+    rows.push({ label: "Type", value: typeOptionLabel(person.blockRole, person.blockRoleType ?? "") || "Not recorded" })
   }
   void dateOfBirth
   return rows
@@ -1000,6 +1000,6 @@ function nodeKey(node: RelationshipTreeNode, index: number): string {
 function snapshot(relationships: RelationshipRecord[], blocks: RelationshipBlock[]): string {
   return JSON.stringify({
     relationships: relationships.map((person) => [person.relationshipRecordId, person.givenName, person.relationshipBlockId, person.blockRole, person.blockRoleType, person.dateOfBirth, person.dateOfDeath, person.sex, person.healthStatus, person.deceased, person.notKnown, person.supportive, person.conflict, person.qualityOfRelationship, person.dependency, person.livingSituation]),
-    blocks: blocks.map((block) => [block.relationshipBlockId, block.kind, block.status, block.startedOn, block.endedOn, block.arrangementType, block.noChildren, block.parentSide]),
+    blocks: blocks.map((block) => [block.relationshipBlockId, block.kind, block.status, block.startedOn, block.endedOn, block.arrangementType, block.childrenAnswer, block.parentSide]),
   })
 }

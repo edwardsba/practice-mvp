@@ -15,7 +15,6 @@ export function isEmptyNewRelationshipDraft(
     | "endedOn"
     | "childrenAnswer"
     | "siblingsAnswer"
-    | "noChildren"
   >,
   member: Pick<
     RelationshipRecord,
@@ -38,8 +37,7 @@ export function isEmptyNewRelationshipDraft(
     !block.startedOn.trim() &&
     !block.endedOn.trim() &&
     !block.childrenAnswer &&
-    !block.siblingsAnswer &&
-    !block.noChildren
+    !block.siblingsAnswer
   const memberEmpty =
     !member.givenName.trim() &&
     !member.sex.trim() &&

@@ -64,22 +64,16 @@ export function entryDetailMessage(event: EventRecord, dateOfBirth: string | nul
 export function treatmentsForCondition(events: EventRecord[], conditionId: string): EventRecord[] {
   const episode = events.find((event) => event.eventRecordId === conditionId)
   const issueId = episode?.conditionGroupId
-  if (issueId) {
-    return events.filter(
-      (event) =>
-        isTreatmentEvent(event.eventType) &&
-        !event.parentEventId &&
-        (event.conditionGroupId === issueId || event.conditionEventId === conditionId)
-    )
-  }
+  if (!issueId) return []
   return events.filter(
-    (event) => isTreatmentEvent(event.eventType) && !event.parentEventId && event.conditionEventId === conditionId
+    (event) =>
+      isTreatmentEvent(event.eventType) && !event.parentEventId && event.conditionGroupId === issueId
   )
 }
 
 export function treatmentNeedsLink(event: EventRecord): boolean {
   if (!isTreatmentEvent(event.eventType) || event.parentEventId) return false
-  return !event.conditionGroupId && !event.conditionEventId
+  return !event.conditionGroupId
 }
 
 export function unlinkedTreatmentMessage(event: EventRecord): string | null {

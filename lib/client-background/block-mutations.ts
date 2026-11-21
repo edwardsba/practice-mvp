@@ -321,15 +321,6 @@ export async function updateRelationshipBlock(input: Scope & { block: unknown })
   const siblingsAnswerRaw = typeof raw?.siblingsAnswer === "string" ? raw.siblingsAnswer : existing.siblingsAnswer
   const childrenAnswer = isBlockAnswer(childrenAnswerRaw ?? "") ? childrenAnswerRaw : null
   const siblingsAnswer = isBlockAnswer(siblingsAnswerRaw ?? "") ? siblingsAnswerRaw : null
-  // Keep no_children in step with children_answer so main keeps working.
-  const noChildren =
-    childrenAnswer === "none"
-      ? true
-      : childrenAnswer === "yes" || childrenAnswer === "not_asked"
-        ? false
-        : typeof raw?.noChildren === "boolean"
-          ? raw.noChildren
-          : existing.noChildren
   const keepStatusDetail = existing.kind === "client_other_children" || status === "other"
   await db
     .update(clientRelationshipBlocks)
@@ -340,7 +331,6 @@ export async function updateRelationshipBlock(input: Scope & { block: unknown })
       arrangementDetail: arrangementType === "other" ? arrangementDetail || null : null,
       startedOn: startedOn || null,
       endedOn: endedOn || null,
-      noChildren,
       childrenAnswer,
       siblingsAnswer,
       updatedAt: new Date(),
@@ -450,7 +440,6 @@ export async function addBlockMember(input: Scope & { relationshipBlockId: strin
       relationshipBlockId: block.relationshipBlockId,
       blockRole: input.role,
       blockRoleType: siblingType || null,
-      childType: input.role === "child" ? siblingType || null : null,
       caregiverRelationship: input.role === "caregiver" ? siblingType || null : null,
     })
     .returning()
@@ -458,7 +447,7 @@ export async function addBlockMember(input: Scope & { relationshipBlockId: strin
   if (input.role === "child") {
     await db
       .update(clientRelationshipBlocks)
-      .set({ noChildren: false, childrenAnswer: "yes", updatedAt: new Date() })
+      .set({ childrenAnswer: "yes", updatedAt: new Date() })
       .where(eq(clientRelationshipBlocks.relationshipBlockId, block.relationshipBlockId))
   }
   if (input.role === "sibling") {
@@ -502,7 +491,6 @@ export async function updateBlockMember(input: Scope & { relationship: unknown }
       notKnown: draft.notKnown,
       blockRole: role || null,
       blockRoleType: roleType || null,
-      childType: role === "child" ? roleType || null : existing.childType,
       childTypeDetail: role === "child" ? draft.childTypeDetail || null : existing.childTypeDetail,
       caregiverRelationship: role === "caregiver" ? roleType || null : existing.caregiverRelationship,
       caregiverRelationshipDetail: role === "caregiver" ? draft.caregiverRelationshipDetail || null : existing.caregiverRelationshipDetail,
@@ -552,7 +540,7 @@ async function refreshMemberAnswer(scope: Scope, blockId: string, role: "child" 
   if (role === "child") {
     await db
       .update(clientRelationshipBlocks)
-      .set({ childrenAnswer: "not_asked", noChildren: false, updatedAt: new Date() })
+      .set({ childrenAnswer: "not_asked", updatedAt: new Date() })
       .where(eq(clientRelationshipBlocks.relationshipBlockId, blockId))
     return
   }
@@ -605,7 +593,6 @@ export async function moveBlockMember(input: Scope & {
       blockRoleType: roleType || null,
       relationshipToClient: legacyRoleForMember(block.kind, input.role, roleType),
       placementReview: null,
-      childType: input.role === "child" ? roleType || null : person.childType,
       caregiverRelationship: input.role === "caregiver" ? roleType || null : person.caregiverRelationship,
       updatedAt: new Date(),
     })
@@ -614,7 +601,7 @@ export async function moveBlockMember(input: Scope & {
   if (input.role === "child") {
     await db
       .update(clientRelationshipBlocks)
-      .set({ noChildren: false, childrenAnswer: "yes", updatedAt: new Date() })
+      .set({ childrenAnswer: "yes", updatedAt: new Date() })
       .where(eq(clientRelationshipBlocks.relationshipBlockId, block.relationshipBlockId))
   }
   if (input.role === "sibling") {

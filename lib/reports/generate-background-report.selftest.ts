@@ -30,14 +30,11 @@ function person(
     givenName: "",
     displayOrder: 0,
     dateOfBirth: "",
-    approximateAge: null,
-    approximateAgeRecordedOn: "",
     healthStatus: "",
     deceased: false,
     ageAtDeath: null,
     dateOfDeath: "",
     healthOrCauseOfDeath: "",
-    childType: "",
     childTypeDetail: "",
     supportive: "",
     conflict: "",
@@ -988,6 +985,7 @@ const history = roundText((source) => {
       startValue: "2005",
       endPrecision: "year",
       endValue: "2007",
+      conditionGroupId: "depression",
     }),
     event({
       eventRecordId: "admission",
@@ -995,7 +993,7 @@ const history = roundText((source) => {
       title: "Admission",
       admissionType: "psychiatric_inpatient",
       admissionLength: "two weeks",
-      conditionEventId: "depression",
+      conditionGroupId: "depression",
       startPrecision: "year",
       startValue: "2006",
       displayOrder: 2,
@@ -1004,7 +1002,7 @@ const history = roundText((source) => {
       eventRecordId: "therapy",
       eventType: "previous_therapy",
       title: "Psychologist",
-      conditionEventId: "depression",
+      conditionGroupId: "depression",
       startPrecision: "year",
       startValue: "2006",
       endPrecision: "year",
@@ -1015,7 +1013,7 @@ const history = roundText((source) => {
       eventRecordId: "sertraline",
       eventType: "medication",
       title: "Sertraline",
-      conditionEventId: "depression",
+      conditionGroupId: "depression",
       endOngoing: true,
       resolvedOrOngoing: "ongoing",
       startPrecision: "year",
@@ -1152,6 +1150,7 @@ const treatedMother = significantOtherParagraphs(
       title: "Depression",
       about: "significant_other",
       relationshipRecordId: "sally",
+      conditionGroupId: "sally-depression",
     }),
     event({
       eventRecordId: "sally-admission",
@@ -1162,7 +1161,7 @@ const treatedMother = significantOtherParagraphs(
       startValue: "1992",
       about: "significant_other",
       relationshipRecordId: "sally",
-      conditionEventId: "sally-depression",
+      conditionGroupId: "sally-depression",
     }),
     event({
       eventRecordId: "sally-medication",
@@ -1172,7 +1171,7 @@ const treatedMother = significantOtherParagraphs(
       resolvedOrOngoing: "ongoing",
       about: "significant_other",
       relationshipRecordId: "sally",
-      conditionEventId: "sally-depression",
+      conditionGroupId: "sally-depression",
     }),
   ]
 ).join(" ")
@@ -1191,6 +1190,7 @@ const treatedFather = significantOtherParagraphs(
       title: "Depression",
       about: "significant_other",
       relationshipRecordId: "john",
+      conditionGroupId: "john-depression",
     }),
     event({
       eventRecordId: "john-medication",
@@ -1200,7 +1200,7 @@ const treatedFather = significantOtherParagraphs(
       resolvedOrOngoing: "ongoing",
       about: "significant_other",
       relationshipRecordId: "john",
-      conditionEventId: "john-depression",
+      conditionGroupId: "john-depression",
     }),
   ]
 ).join(" ")
@@ -1227,7 +1227,8 @@ const oneChild = roundText((source) => {
     person({
       relationshipRecordId: "only",
       relationshipToClient: "child_biological",
-      childType: "biological",
+      blockRole: "child",
+      blockRoleType: "biological",
       dateOfBirth: "2001-01-01",
     }),
   ]

@@ -1,12 +1,10 @@
 import assert from "node:assert/strict"
 
 import {
-  chooseLegacyApprovalKind,
   claimOptionsWithPrivateFirst,
   CREATE_PRIVATE_CLAIM,
   formatAttendedBand,
   hasReferralRecorded,
-  moveLegacyReferralOntoApproval,
   pickApprovalForReportDate,
   privateApprovalTypeId,
   PRIVATE_APPROVAL_TYPE_NAME,
@@ -91,71 +89,6 @@ assert.equal(
   pickApprovalForReportDate(approvals, null)?.fundingApprovalId,
   "newer-open"
 )
-
-const empty = {
-  referrerId: null,
-  referralDate: null,
-  referrerComments: null,
-  referralSource: null,
-  referrerRelationshipId: null,
-  referrerOther: null,
-}
-
-const medical = moveLegacyReferralOntoApproval(
-  {
-    referralType: "medical",
-    referrerProfessionalId: "pro-1",
-    referralDate: "2024-05-01",
-    referrerConcerns: "Anxiety",
-  },
-  empty
-)
-assert.equal(medical.referrerId, "pro-1")
-assert.equal(medical.referralDate, "2024-05-01")
-assert.equal(medical.referrerComments, "Anxiety")
-
-const family = moveLegacyReferralOntoApproval(
-  {
-    referralType: "family_or_friend",
-    referrerRelationshipId: "rel-1",
-    theirConcerns: "Worried",
-    referralDate: "2024-04",
-  },
-  empty
-)
-assert.equal(family.referralSource, "family_or_friend")
-assert.equal(family.referrerRelationshipId, "rel-1")
-assert.equal(family.referrerComments, "Worried")
-assert.equal(family.referralDate, null)
-
-const self = moveLegacyReferralOntoApproval({ referralType: "self" }, empty)
-assert.equal(self.referralSource, "self")
-
-assert.equal(
-  chooseLegacyApprovalKind({
-    referralType: "medical",
-    referrerProfessionalId: "pro-1",
-  }),
-  "mhtp_initial"
-)
-assert.equal(
-  chooseLegacyApprovalKind({ referralType: "medical", referrerProfessionalId: null }),
-  "private"
-)
-assert.equal(chooseLegacyApprovalKind({ referralType: "self" }), "private")
-
-const medicalPartialDate = moveLegacyReferralOntoApproval(
-  {
-    referralType: "medical",
-    referrerProfessionalId: "pro-2",
-    referralDate: "2024",
-    referrerConcerns: "Mood",
-  },
-  empty
-)
-assert.equal(medicalPartialDate.referrerId, "pro-2")
-assert.equal(medicalPartialDate.referralDate, null)
-assert.equal(medicalPartialDate.referrerComments, "Mood")
 
 const withReferrer = referralCardBodyLines({
   referrer: {

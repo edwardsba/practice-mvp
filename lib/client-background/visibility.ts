@@ -5,7 +5,7 @@ import { todayDateString } from "@/lib/dates/practice-time"
 
 export type RelationshipFieldVisibility = {
   dateOfBirth: boolean
-  childType: boolean
+  childTypeDetail: boolean
   health: boolean
   supportive: boolean
   comment: boolean
@@ -42,13 +42,14 @@ export function isMinorChild(
 }
 
 export function relationshipFieldVisibility(
-  record: Pick<RelationshipRecord, "relationshipToClient"> & AgeSource,
+  record: Pick<RelationshipRecord, "relationshipToClient" | "blockRole"> & AgeSource,
   asOf = todayDateString()
 ): RelationshipFieldVisibility {
   const role = record.relationshipToClient
   const priorPartner = role === "prior_partner"
   const deceased = record.healthStatus === "deceased"
   const parent = PARENT_ROLES.has(role)
+  const childRole = record.blockRole === "child" || role === "child_biological" || role === "child_step"
 
   return {
     dateOfBirth: true,
@@ -58,7 +59,7 @@ export function relationshipFieldVisibility(
     dependency: !priorPartner && !deceased && !isMinorChild(record, asOf),
     livingSituation: !priorPartner && !deceased,
     notKnown: parent,
-    childType: role === "child_biological" || role === "child_step",
+    childTypeDetail: childRole,
   }
 }
 
@@ -69,8 +70,6 @@ export function applyRelationshipVisibilityDefaults(record: RelationshipRecord):
 
   if (!visibility.dateOfBirth) {
     next.dateOfBirth = ""
-    next.approximateAge = null
-    next.approximateAgeRecordedOn = ""
   }
   if (!visibility.health) {
     next.healthStatus = ""
@@ -84,10 +83,9 @@ export function applyRelationshipVisibilityDefaults(record: RelationshipRecord):
     next.dateOfDeath = ""
     next.healthOrCauseOfDeath = ""
   }
-  if (!visibility.childType) {
-    next.childType = ""
+  if (!visibility.childTypeDetail) {
     next.childTypeDetail = ""
-  } else if (next.childType !== "other") {
+  } else if ((next.blockRoleType ?? "") !== "other") {
     next.childTypeDetail = ""
   }
   if (!visibility.notKnown) next.notKnown = false

@@ -106,7 +106,6 @@ function resolvedChildrenAnswer(block: RelationshipBlock): BlockAnswer | "" {
   if (block.childrenAnswer === "yes" || block.childrenAnswer === "none" || block.childrenAnswer === "not_asked") {
     return block.childrenAnswer
   }
-  if (block.noChildren) return "none"
   return ""
 }
 
@@ -602,7 +601,6 @@ export function RelationshipBlocksSection({
                       updateRelationshipBlockAction(clientId, {
                         ...block,
                         childrenAnswer,
-                        noChildren: childrenAnswer === "none",
                       })
                     )
                   }
@@ -643,7 +641,6 @@ export function RelationshipBlocksSection({
                       updateRelationshipBlockAction(clientId, {
                         ...block,
                         childrenAnswer,
-                        noChildren: childrenAnswer === "none",
                       })
                     )
                   }

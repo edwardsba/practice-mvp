@@ -78,7 +78,6 @@ type DatedEvent = Pick<
   | "selfHarmType"
   | "admissionType"
   | "admissionLength"
-  | "conditionEventId"
   | "about"
   | "prescriberName"
   | "prescriberProfessionalId"
@@ -436,14 +435,6 @@ function linkedTreatmentsForConditionKind(
       linked.push(treatment)
     }
   }
-  // Legacy: treatments linked only by conditionEventId (no group id yet).
-  for (const episode of rows) {
-    for (const treatment of treatmentsForCondition(events, episode.eventRecordId)) {
-      if (seen.has(treatment.eventRecordId)) continue
-      seen.add(treatment.eventRecordId)
-      linked.push(treatment)
-    }
-  }
   void dateOfBirth
   return linked
 }
@@ -483,8 +474,7 @@ export function unlinkedTreatmentsParagraph(events: EventRecord[], name: string,
       (event.eventType === "psychiatric_admission" || event.eventType === "previous_therapy" || event.eventType === "medication") &&
       resolvedAbout(event) === "self" &&
       !event.parentEventId &&
-      !event.conditionGroupId &&
-      !event.conditionEventId
+      !event.conditionGroupId
   )
   if (rows.length === 0) return null
   return unlinkedTreatmentSentence(rows, name, dateOfBirth)

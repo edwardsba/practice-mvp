@@ -70,33 +70,17 @@ export function issueForEvent(issues: HistoryIssue[], event: EventRecord): Histo
   if (id && !id.startsWith("title:")) {
     return issues.find((issue) => issue.issueId === id) ?? null
   }
-  if (event.conditionEventId) {
-    return null
-  }
   return null
 }
 
-/**
- * Treatments belonging to an issue: conditionGroupId match, or legacy conditionEventId
- * pointing at an episode of that issue.
- */
+/** Treatments belonging to an issue: conditionGroupId match. */
 export function treatmentsForIssue(events: EventRecord[], issueId: string): EventRecord[] {
-  const episodeIds = new Set(
-    events
-      .filter((event) => isConditionEvent(event.eventType) && event.conditionGroupId === issueId && !event.parentEventId)
-      .map((event) => event.eventRecordId)
+  return events.filter(
+    (event) =>
+      isTreatmentEvent(event.eventType) &&
+      !event.parentEventId &&
+      event.conditionGroupId === issueId
   )
-  // Title-fallback groups: match episodes that share the synthetic key.
-  if (issueId.startsWith("title:")) {
-    const groupEpisodes = conditionGroups(events).find((group) => group.id === issueId)?.episodes ?? []
-    for (const episode of groupEpisodes) episodeIds.add(episode.eventRecordId)
-  }
-  return events.filter((event) => {
-    if (!isTreatmentEvent(event.eventType) || event.parentEventId) return false
-    if (event.conditionGroupId === issueId) return true
-    if (event.conditionEventId && episodeIds.has(event.conditionEventId)) return true
-    return false
-  })
 }
 
 /** Other events belonging to an issue (conditionGroupId match, not nested under an episode). */
@@ -126,10 +110,6 @@ export function unlinkedTreatments(events: EventRecord[], about: HistoryAbout = 
     if (!isTreatmentEvent(event.eventType) || event.parentEventId) return false
     if (resolvedAbout(event) !== about) return false
     if (event.conditionGroupId) return false
-    if (event.conditionEventId) {
-      const linked = events.find((item) => item.eventRecordId === event.conditionEventId)
-      if (linked && isConditionEvent(linked.eventType)) return false
-    }
     return true
   })
 }
@@ -296,26 +276,11 @@ export function planHistoryIssueBackfill(input: {
 }): IssueBackfillPlan {
   const groups = conditionGroups(input.events).filter((group) => !group.id.startsWith("title:"))
   const treatmentGroupLinks: { eventRecordId: string; conditionGroupId: string }[] = []
-  for (const event of input.events) {
-    if (!isTreatmentEvent(event.eventType)) continue
-    if (event.conditionGroupId) continue
-    if (!event.conditionEventId) continue
-    const episode = input.events.find((item) => item.eventRecordId === event.conditionEventId)
-    if (episode?.conditionGroupId) {
-      treatmentGroupLinks.push({ eventRecordId: event.eventRecordId, conditionGroupId: episode.conditionGroupId })
-    }
-  }
-  const linkedByEvent = new Map(treatmentGroupLinks.map((link) => [link.eventRecordId, link.conditionGroupId]))
   const issues = groups.map((group) => {
     const first = group.episodes[0]
-    const hasTreatments =
-      input.events.some(
-        (event) =>
-          isTreatmentEvent(event.eventType) &&
-          (event.conditionGroupId === group.id ||
-            linkedByEvent.get(event.eventRecordId) === group.id ||
-            group.episodes.some((episode) => event.conditionEventId === episode.eventRecordId))
-      )
+    const hasTreatments = input.events.some(
+      (event) => isTreatmentEvent(event.eventType) && event.conditionGroupId === group.id
+    )
     let treatmentAnswer: TreatmentAnswer | "" = ""
     if (hasTreatments) treatmentAnswer = "yes"
     else if (resolvedAbout(first) === "self") {

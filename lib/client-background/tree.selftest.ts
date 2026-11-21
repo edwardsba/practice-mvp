@@ -13,14 +13,11 @@ function person(
     givenName: "",
     displayOrder: 0,
     dateOfBirth: "",
-    approximateAge: null,
-    approximateAgeRecordedOn: "",
     healthStatus: "",
     deceased: false,
     ageAtDeath: null,
     dateOfDeath: "",
     healthOrCauseOfDeath: "",
-    childType: "",
     childTypeDetail: "",
     supportive: "",
     conflict: "",
@@ -81,7 +78,7 @@ assert.equal(motherVisibility.comment, true)
 assert.equal(motherVisibility.dependency, true)
 assert.equal(motherVisibility.livingSituation, true)
 assert.equal(motherVisibility.notKnown, true)
-assert.equal(motherVisibility.childType, false)
+assert.equal(motherVisibility.childTypeDetail, false)
 
 const priorPartnerVisibility = relationshipFieldVisibility(
   person({ relationshipRecordId: "ex", relationshipToClient: "prior_partner", dateOfBirth: "1980-01-01", healthStatus: "good" }),
@@ -94,7 +91,7 @@ assert.equal(priorPartnerVisibility.comment, true)
 assert.equal(priorPartnerVisibility.dependency, false)
 assert.equal(priorPartnerVisibility.livingSituation, false)
 assert.equal(priorPartnerVisibility.notKnown, false)
-assert.equal(priorPartnerVisibility.childType, false)
+assert.equal(priorPartnerVisibility.childTypeDetail, false)
 
 const minorVisibility = relationshipFieldVisibility(
   person({ relationshipRecordId: "kid", relationshipToClient: "child_biological", dateOfBirth: "2015-01-01" }),
@@ -102,7 +99,7 @@ const minorVisibility = relationshipFieldVisibility(
 )
 assert.equal(minorVisibility.dependency, false)
 assert.equal(minorVisibility.livingSituation, true)
-assert.equal(minorVisibility.childType, true)
+assert.equal(minorVisibility.childTypeDetail, true)
 
 const deceasedVisibility = relationshipFieldVisibility(
   person({ relationshipRecordId: "late", relationshipToClient: "father", healthStatus: "deceased", dateOfBirth: "1950-01-01" }),

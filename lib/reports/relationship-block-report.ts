@@ -42,7 +42,7 @@ function members(block: RelationshipBlock, people: RelationshipRecord[], role: s
 }
 
 function childTypeOf(person: RelationshipRecord): ChildType | "" {
-  const value = person.blockRoleType || person.childType
+  const value = person.blockRoleType ?? ""
   return (CHILD_TYPES as readonly string[]).includes(value) ? (value as ChildType) : ""
 }
 

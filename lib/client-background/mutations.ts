@@ -574,15 +574,14 @@ async function withConditionGroup(tx: Tx, clientId: string, practiceId: string, 
       return {
         ...event,
         conditionGroupId: incoming && !incoming.startsWith("title:") ? incoming : null,
-        conditionEventId: null,
       }
     }
     if (incoming && !incoming.startsWith("title:")) {
-      return { ...event, conditionGroupId: incoming, conditionEventId: null }
+      return { ...event, conditionGroupId: incoming }
     }
-    return { ...event, conditionEventId: null }
+    return { ...event, conditionGroupId: null }
   }
-  if (!isConditionEvent(event.eventType)) return { ...event, conditionGroupId: null, conditionEventId: null }
+  if (!isConditionEvent(event.eventType)) return { ...event, conditionGroupId: null }
   const incoming = event.conditionGroupId?.trim() ?? ""
   const joining = incoming.length > 0 && !incoming.startsWith("title:")
   const conditionGroupId = joining ? incoming : randomUUID()
@@ -611,7 +610,7 @@ async function withConditionGroup(tx: Tx, clientId: string, practiceId: string, 
     }
   }
   await ensureHistoryIssue(tx, clientId, practiceId, event, conditionGroupId)
-  return { ...event, conditionGroupId, conditionEventId: null }
+  return { ...event, conditionGroupId }
 }
 
 async function conditionLinkError(
@@ -687,15 +686,9 @@ function eventColumns(event: EventRecord) {
     endValue: event.endValue || null,
     endOngoing: event.endOngoing,
     resolvedOrOngoing: event.resolvedOrOngoing || null,
-    treated: event.treated,
-    treatmentType: event.treatmentType || null,
-    treatmentDetail: event.treatmentDetail || null,
-    outcome: event.outcome || null,
     about: event.about,
     aboutOther: event.aboutOther || null,
     relationshipRecordId: event.relationshipRecordId,
-    // Stop writing condition_event_id; keep column for main reads.
-    conditionEventId: null,
     conditionGroupId: event.conditionGroupId,
     parentEventId: event.parentEventId,
     admissionType: event.admissionType || null,
@@ -941,14 +934,9 @@ export async function createHistoryIssue(input: {
               endValue: first.endValue,
               endOngoing: first.endOngoing || first.resolvedOrOngoing === "ongoing",
               resolvedOrOngoing: first.resolvedOrOngoing,
-              treated: null,
-              treatmentType: "",
-              treatmentDetail: "",
-              outcome: "",
               about: parsed.about,
               aboutOther: parsed.aboutOther,
               relationshipRecordId: parsed.relationshipRecordId,
-              conditionEventId: null,
               conditionGroupId: created.issueId,
               parentEventId: null,
               admissionType: "",

@@ -1,7 +1,6 @@
 import {
   ADMISSION_TYPES,
   BLOCK_ROLES,
-  CHILD_TYPES,
   HISTORY_ABOUT,
   CAREGIVER_RELATIONSHIPS,
   DEPENDENCY_VALUES,
@@ -55,7 +54,6 @@ import {
   type TriStateAnswer,
   type RelationshipRating,
   type WorkStatus,
-  type ChildType,
   type HistoryAbout,
   type PreviousJob,
   type RatedValue,
@@ -74,7 +72,6 @@ import {
   precisionForPartialDate,
 } from "@/lib/client-background/partial-date"
 import { applyRelationshipVisibilityDefaults } from "@/lib/client-background/visibility"
-import { todayDateString } from "@/lib/dates/practice-time"
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value)
@@ -103,16 +100,6 @@ function intOrNull(value: unknown): number | null {
 function oneOf<T extends string>(value: unknown, options: readonly T[]): T | "" {
   const text = str(value)
   return isOneOf(text, options) ? text : ""
-}
-
-function isoDate(value: unknown): string {
-  const text = str(value)
-  return /^\d{4}-\d{2}-\d{2}$/.test(text) ? text : ""
-}
-
-function ageOrNull(value: unknown): number | null {
-  const age = intOrNull(value)
-  return age != null && age >= 0 && age <= 130 ? age : null
 }
 
 function normalizeSex(value: unknown): string {
@@ -388,25 +375,7 @@ export function sanitizeRelationship(value: unknown, fallbackId = ""): Relations
   const raw = isRecord(value) ? value : {}
   const role = oneOf<RelationshipToClient>(raw.relationshipToClient, RELATIONSHIP_TO_CLIENT)
   const dependency = oneOf<DependencyValue>(raw.dependency, DEPENDENCY_VALUES)
-  let dateOfBirth = canonicalPartialDate(str(raw.dateOfBirth))
-  if (!dateOfBirth) {
-    let approximateAge = ageOrNull(raw.approximateAge)
-    let recordedOn = isoDate(raw.approximateAgeRecordedOn)
-    if (approximateAge == null) {
-      const legacyAge = ageOrNull(raw.age)
-      if (legacyAge != null) {
-        approximateAge = legacyAge
-        recordedOn = recordedOn || todayDateString()
-      }
-    }
-    if (approximateAge != null) {
-      const recordedYear = parsePartialDate(recordedOn || todayDateString()).year
-      if (recordedYear != null) {
-        const year = recordedYear - approximateAge
-        if (year >= 1 && year <= 9999) dateOfBirth = String(year)
-      }
-    }
-  }
+  const dateOfBirth = canonicalPartialDate(str(raw.dateOfBirth))
   const explicitHealth = oneOf<HealthStatus>(raw.healthStatus, HEALTH_STATUSES)
   const healthStatus = explicitHealth || (bool(raw.deceased) ? "deceased" : "")
   const deceased = healthStatus === "deceased"
@@ -417,14 +386,11 @@ export function sanitizeRelationship(value: unknown, fallbackId = ""): Relations
     givenName: str(raw.givenName),
     displayOrder: intOrNull(raw.displayOrder) ?? 0,
     dateOfBirth,
-    approximateAge: null,
-    approximateAgeRecordedOn: "",
     healthStatus,
     deceased,
     ageAtDeath: deceased ? intOrNull(raw.ageAtDeath) : null,
     dateOfDeath: deceased ? canonicalPartialDate(str(raw.dateOfDeath)) : "",
     healthOrCauseOfDeath: deceased ? str(raw.healthOrCauseOfDeath) : "",
-    childType: oneOf<ChildType>(raw.childType, CHILD_TYPES),
     childTypeDetail: str(raw.childTypeDetail),
     supportive: oneOf<RelationshipRating>(raw.supportive, RELATIONSHIP_RATING_VALUES),
     conflict: oneOf<RelationshipRating>(raw.conflict, RELATIONSHIP_RATING_VALUES),
@@ -475,7 +441,6 @@ export function sanitizeEvent(value: unknown, fallbackId = ""): EventRecord {
   const raw = isRecord(value) ? value : {}
   const eventType = oneOf<EventType>(raw.eventType, EVENT_TYPES) || "significant_history"
   const base = emptyEvent(eventType, intOrNull(raw.displayOrder) ?? 0)
-  const treated = boolOrNull(raw.treated)
   let resolvedOrOngoing = oneOf<ResolvedOrOngoing>(raw.resolvedOrOngoing, RESOLVED_OR_ONGOING)
   if (!resolvedOrOngoing && bool(raw.endOngoing)) resolvedOrOngoing = "ongoing"
   const ongoing = resolvedOrOngoing === "ongoing"
@@ -497,14 +462,9 @@ export function sanitizeEvent(value: unknown, fallbackId = ""): EventRecord {
     endValue: ongoing ? "" : str(raw.endValue),
     endOngoing: ongoing,
     resolvedOrOngoing,
-    treated,
-    treatmentType: treated === true ? str(raw.treatmentType) : "",
-    treatmentDetail: treated === true ? str(raw.treatmentDetail) : "",
-    outcome: treated === true ? str(raw.outcome) : "",
     about,
     aboutOther,
     relationshipRecordId,
-    conditionEventId: str(raw.conditionEventId) || null,
     conditionGroupId: str(raw.conditionGroupId) || null,
     parentEventId: str(raw.parentEventId) || null,
     admissionType: oneOf<AdmissionType>(raw.admissionType, ADMISSION_TYPES),
@@ -517,7 +477,6 @@ export function sanitizeEvent(value: unknown, fallbackId = ""): EventRecord {
 
   const treatment =
     eventType === "psychiatric_admission" || eventType === "previous_therapy" || eventType === "medication"
-  if (!treatment) event.conditionEventId = null
   const condition =
     eventType === "emotional_problems" || eventType === "substance_use" || eventType === "illness_injury"
   // Treatments and episodes share conditionGroupId (issue). Clear only when neither.

@@ -47,8 +47,8 @@ Treat all client and clinical data as sensitive health information.
 | `components/` | Shared UI by domain; `components/ui` = shadcn primitives |
 | `lib/` | Domain logic, loaders, PDF/email helpers, shared actions |
 | `db/schema/` | Numbered Drizzle schema modules (`01-…`–`17-…`), re-exported from `index.ts` |
-| `db/migrations/` | Numbered SQL migrations |
-| `db/apply-*.ts`, `db/seed-*.ts` | Migration applicators and seed scripts |
+| `db/migrations/` | Numbered SQL migrations (written by the agent; applied by Claude after review) |
+| `db/seed-*.ts` | Seed scripts (never run by the agent) |
 | `scripts/` | Install/build helpers (e.g. PDF.js worker copy) |
 | `public/` | Static assets; `public/pdfjs/` is **generated** — do not edit or commit |
 | `proxy.ts` | Session refresh + auth gate for non-public routes |
@@ -78,14 +78,13 @@ Current limitation: first active membership only; effectively single-practice / 
 - Set `updatedAt` on updates; use transactions when mutating clinical data + audit/links/versions together.
 - Write `auditEvents` for significant mutations (especially deletes and clinical state changes).
 
-**Migration workflow is partly manual** (Drizzle journal is incomplete vs numbered SQL through `0047+`):
+**Migrations are numbered SQL files in `db/migrations/`, written by the agent and applied by Claude after review. Agents never run migrations, seeds or any script that touches the database.**
 
 1. Update the relevant numbered file under `db/schema/`.
 2. Add numbered SQL under `db/migrations/` (prefer idempotent where practical).
-3. Add `db/apply-<name>-migration.ts` that loads env and runs that SQL.
-4. Add a matching `package.json` script if other migrations have one.
+3. Stop — Claude reviews and applies the SQL. Do not add apply scripts or run `db:*` against a live database.
 
-Do **not** assume `drizzle-kit migrate` / `db:push` reflects production history. Confirm intended workflow before applying migrations.
+Do **not** assume `drizzle-kit migrate` / `db:push` reflects production history.
 
 ## Server Actions vs API routes
 
@@ -183,7 +182,7 @@ npm run lint
 npm run copy:pdf-worker   # also runs on postinstall
 ```
 
-Domain seeds and migrations are many one-off `seed:*` / `db:*` scripts in `package.json` — look up the exact name before running. Prefer reading the matching `db/apply-*.ts` or `db/seed-*.ts` first.
+Domain seeds are one-off `seed:*` / `db:seed-*` / `db:fix-*` scripts in `package.json`. Agents never run them. Prefer reading the matching `db/seed-*.ts` when you need to understand seed data.
 
 ## Do / don't
 
@@ -193,7 +192,7 @@ Domain seeds and migrations are many one-off `seed:*` / `db:*` scripts in `packa
 - Preserve soft-delete guards, finalisation, versioning, and audit logging.
 - Keep pages server-rendered; colocate route-specific actions next to the route.
 - Match existing form (`useActionState`) and header/shell patterns.
-- Follow the schema + SQL + applicator migration pair convention.
+- Follow the schema + numbered SQL migration convention (Claude applies SQL after review).
 
 **Don't**
 

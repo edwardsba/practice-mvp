@@ -83,7 +83,7 @@ export function draftFromPerson(person: RelationshipRecord): PersonDraft {
     givenName: person.givenName,
     sex: person.sex,
     dateOfBirth: person.dateOfBirth,
-    blockRoleType: person.blockRoleType ?? person.childType ?? "",
+    blockRoleType: person.blockRoleType ?? "",
     healthStatus: person.healthStatus,
     dateOfDeath: person.dateOfDeath,
     supportive: person.supportive,
@@ -104,7 +104,6 @@ export function personFromDraft(person: RelationshipRecord, draft: PersonDraft):
     sex: draft.sex as RelationshipRecord["sex"],
     dateOfBirth: draft.dateOfBirth,
     blockRoleType: draft.blockRoleType,
-    childType: person.blockRole === "child" ? (draft.blockRoleType as RelationshipRecord["childType"]) : person.childType,
     healthStatus: draft.healthStatus,
     dateOfDeath: deceased ? draft.dateOfDeath : "",
     supportive: draft.supportive,
@@ -494,12 +493,11 @@ export function BlockFields({
         <SelectField
           id={`${block.relationshipBlockId}-children`}
           label="Children"
-          value={block.childrenAnswer || (block.noChildren ? "none" : "")}
+          value={block.childrenAnswer || ""}
           onChange={(childrenAnswer) =>
             onChange({
               ...block,
               childrenAnswer: childrenAnswer === "yes" || childrenAnswer === "none" || childrenAnswer === "not_asked" ? childrenAnswer : "",
-              noChildren: childrenAnswer === "none",
             })
           }
         >

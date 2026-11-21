@@ -314,7 +314,6 @@ function resolvedChildrenAnswer(block: RelationshipBlock): BlockAnswer | "" {
   if (block.childrenAnswer === "yes" || block.childrenAnswer === "none" || block.childrenAnswer === "not_asked") {
     return block.childrenAnswer
   }
-  if (block.noChildren) return "none"
   return ""
 }
 
@@ -451,7 +450,7 @@ function roleWord(person: RelationshipRecord, block: RelationshipBlock | null): 
 
 function typeWord(person: RelationshipRecord, block: RelationshipBlock | null, people: RelationshipRecord[]): string {
   if (person.blockRole === "child") {
-    const type = person.blockRoleType || person.childType
+    const type = person.blockRoleType ?? ""
     if (type === "step_child") {
       const partner = block ? members(block, people, "partner").find((item) => item.givenName.trim()) : undefined
       return partner ? `step-child (${partner.givenName.trim()}'s)` : "step-child"

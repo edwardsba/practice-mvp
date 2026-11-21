@@ -175,7 +175,7 @@ const plan = planHistoryIssueBackfill({
       eventRecordId: "b",
       eventType: "psychiatric_admission",
       title: "Admission",
-      conditionEventId: "a",
+      conditionGroupId: "g1",
       startPrecision: "year",
       startValue: "2001",
     }),
@@ -213,7 +213,7 @@ const plan = planHistoryIssueBackfill({
 assert.equal(plan.issues.find((issue) => issue.issueId === "g1")?.treatmentAnswer, "yes")
 assert.equal(plan.issues.find((issue) => issue.issueId === "g2")?.treatmentAnswer, "none")
 assert.equal(plan.issues.find((issue) => issue.issueId === "g3")?.treatmentAnswer, "none")
-assert.deepEqual(plan.treatmentGroupLinks, [{ eventRecordId: "b", conditionGroupId: "g1" }])
+assert.deepEqual(plan.treatmentGroupLinks, [])
 assert.equal(plan.otherTreatmentYes, true)
 
 const friendPlan = planHistoryIssueBackfill({

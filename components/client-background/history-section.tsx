@@ -232,9 +232,7 @@ export function HistorySection({
                 <p className="text-sm text-muted-foreground">Nothing recorded</p>
               ) : (
                 <ul className="space-y-1">
-                  {chronological
-                    .filter((entry) => !(entry.conditionEventId && isTreatmentEvent(entry.eventType) && resolvedAbout(entry) === "self"))
-                    .map((entry) => (
+                  {chronological.map((entry) => (
                     <li key={entry.eventRecordId} className="space-y-1">
                       <HistoryRow
                         entry={entry}
@@ -716,11 +714,6 @@ export function EventEditor({
       next.abstinentSincePrecision = ""
       next.abstinentSinceValue = ""
     }
-    // Stop writing legacy Treated fields from the form (columns remain for main).
-    next.treated = null
-    next.treatmentType = ""
-    next.treatmentDetail = ""
-    next.outcome = ""
     if (next.resolvedOrOngoing === "ongoing") {
       next.endPrecision = ""
       next.endValue = ""

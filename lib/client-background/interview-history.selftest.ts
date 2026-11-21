@@ -24,7 +24,7 @@ const BIRTH = "2000-06-15"
 function entry(
   eventType: EventType,
   partial: Partial<EventRecord> = {}
-): Pick<EventRecord, "eventType" | "about" | "startPrecision" | "startValue" | "conditionGroupId" | "conditionEventId" | "parentEventId"> {
+): Pick<EventRecord, "eventType" | "about" | "startPrecision" | "startValue" | "conditionGroupId" | "parentEventId"> {
   return { ...emptyEvent(eventType, 0), ...partial }
 }
 

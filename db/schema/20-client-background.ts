@@ -33,8 +33,6 @@ export const clientBackgrounds = pgTable("client_backgrounds", {
   occupationJson: jsonb("occupation_json"),
   /** One answer per stressor, plus the main reason for attending. */
   stressorsJson: jsonb("stressors_json"),
-  /** Referral type, referrer, and their concerns. */
-  reasonForAttendingJson: jsonb("reason_for_attending_json"),
   riskJson: jsonb("risk_json"),
   /** Client's current relationship status. Not a field of any relative. */
   relationshipStatus: text("relationship_status"),
@@ -67,18 +65,13 @@ export const clientRelationshipRecords = pgTable("client_relationship_records", 
   displayOrder: integer("display_order").notNull().default(0),
   /** Partial date: YYYY, YYYY-MM, or YYYY-MM-DD. */
   dateOfBirth: text("date_of_birth"),
-  /** Legacy. New writes leave this null and store a year in date_of_birth instead. */
-  approximateAge: integer("approximate_age"),
-  approximateAgeRecordedOn: text("approximate_age_recorded_on"),
   deceased: boolean("deceased").notNull().default(false),
   healthStatus: text("health_status"),
   ageAtDeath: integer("age_at_death"),
   /** Partial date: YYYY, YYYY-MM, or YYYY-MM-DD. A year is enough. */
   dateOfDeath: text("date_of_death"),
   healthOrCauseOfDeath: text("health_or_cause_of_death"),
-  /** Child records: biological, adopted, step_child, foster, or other. */
-  childType: text("child_type"),
-  /** Description when child_type is other. */
+  /** Description when block_role_type (child) is other. */
   childTypeDetail: text("child_type_detail"),
   supportive: text("supportive"),
   conflict: text("conflict"),
@@ -120,8 +113,7 @@ export const clientRelationshipBlocks = pgTable("client_relationship_blocks", {
   arrangementDetail: text("arrangement_detail"),
   startedOn: text("started_on"),
   endedOn: text("ended_on"),
-  noChildren: boolean("no_children").notNull().default(false),
-  /** Explicit Children question (yes / none / not_asked). Kept in step with no_children. */
+  /** Explicit Children question (yes / none / not_asked). */
   childrenAnswer: text("children_answer"),
   /** Explicit Siblings question (yes / none / not_asked). */
   siblingsAnswer: text("siblings_answer"),
@@ -177,10 +169,6 @@ export const clientEventRecords = pgTable("client_event_records", {
   endValue: text("end_value"),
   endOngoing: boolean("end_ongoing").notNull().default(false),
   resolvedOrOngoing: text("resolved_or_ongoing"),
-  treated: boolean("treated"),
-  treatmentType: text("treatment_type"),
-  treatmentDetail: text("treatment_detail"),
-  outcome: text("outcome"),
   /** self or significant_other. Significant-other entries use relationship_record_id or about_other. */
   about: text("about"),
   /** Who, when the significant other is not a recorded person. */
@@ -189,8 +177,6 @@ export const clientEventRecords = pgTable("client_event_records", {
     () => clientRelationshipRecords.relationshipRecordId,
     { onDelete: "set null" }
   ),
-  /** Legacy: treatment → episode. Prefer condition_group_id (issue). Kept for reads. */
-  conditionEventId: uuid("condition_event_id"),
   /** Episodes and treatments of one issue share this id (= client_history_issues.issue_id). */
   conditionGroupId: uuid("condition_group_id"),
   /**

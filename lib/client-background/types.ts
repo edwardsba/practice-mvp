@@ -444,8 +444,7 @@ export type RelationshipBlock = {
   arrangementDetail: string
   startedOn: string
   endedOn: string
-  noChildren: boolean
-  /** Explicit Children question: yes / none / not_asked. Kept in step with noChildren (none ⇔ true). */
+  /** Explicit Children question: yes / none / not_asked. */
   childrenAnswer: BlockAnswer | ""
   /** Explicit Siblings question: yes / none / not_asked. */
   siblingsAnswer: BlockAnswer | ""
@@ -718,18 +717,13 @@ export type RelationshipRecord = {
   displayOrder: number
   /** Partial date: YYYY, YYYY-MM, or YYYY-MM-DD. Age is derived from this and is never stored. */
   dateOfBirth: string
-  /** Retired. Cleared on read after conversion into a year-only dateOfBirth. */
-  approximateAge: number | null
-  approximateAgeRecordedOn: string
   healthStatus: HealthStatus | ""
   deceased: boolean
   ageAtDeath: number | null
   /** Partial date: YYYY, YYYY-MM, or YYYY-MM-DD. Cleared unless the person is deceased. */
   dateOfDeath: string
   healthOrCauseOfDeath: string
-  /** Child records. Blank is worth checking. */
-  childType: ChildType | ""
-  /** Description when child type is Other. */
+  /** Description when blockRoleType (child) is Other. */
   childTypeDetail: string
   supportive: RelationshipRating | ""
   conflict: RelationshipRating | ""
@@ -763,17 +757,11 @@ export type EventRecord = {
   endValue: string
   endOngoing: boolean
   resolvedOrOngoing: ResolvedOrOngoing | ""
-  treated: boolean | null
-  treatmentType: string
-  treatmentDetail: string
-  outcome: string
   /** Self, or a significant other. */
   about: HistoryAbout
   /** Who, when the significant other is not a recorded person. */
   aboutOther: string
   relationshipRecordId: string | null
-  /** Legacy: treatment → episode. Prefer conditionGroupId (issue). Kept for reads. */
-  conditionEventId: string | null
   /** Episodes and treatments of one issue share this id (= HistoryIssue.issueId). */
   conditionGroupId: string | null
   /** Sub-event under an episode or treatment. */
@@ -927,14 +915,9 @@ export function emptyEvent(eventType: EventType, displayOrder: number): Omit<Eve
     endValue: "",
     endOngoing: false,
     resolvedOrOngoing: "",
-    treated: null,
-    treatmentType: "",
-    treatmentDetail: "",
-    outcome: "",
     about: eventType === "family_events" ? "significant_other" : "self",
     aboutOther: "",
     relationshipRecordId: null,
-    conditionEventId: null,
     conditionGroupId: null,
     parentEventId: null,
     admissionType: "",

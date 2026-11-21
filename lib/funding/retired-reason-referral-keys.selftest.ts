@@ -14,7 +14,6 @@ const ROOT = join(__dirname, "../..")
 
 const ALLOWED_PATH_PREFIXES = [
   "db/migrations/",
-  "db/apply-",
   "lib/funding/referral.ts",
   "lib/funding/referral.selftest.ts",
   "lib/funding/retired-reason-referral-keys.selftest.ts",

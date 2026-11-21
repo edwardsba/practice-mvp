@@ -10,7 +10,7 @@ import {
   yearFromTypedAge,
 } from "@/lib/client-background/age"
 import { daysInMonth, formatPartialDate, parsePartialDate } from "@/lib/client-background/partial-date"
-import { sanitizeOccupation, sanitizeRelationship } from "@/lib/client-background/sanitize"
+import { sanitizeOccupation } from "@/lib/client-background/sanitize"
 import { estimatedCurrentAge } from "@/lib/client-background/visibility"
 
 assert.equal(formatPartialDate(parsePartialDate("1964")), "1964")
@@ -70,26 +70,6 @@ assert.deepEqual(resolveAgeOnlyBoundary("date", "2010-01-01", birth), {
   precision: "date",
   value: "2010-01-01",
 })
-
-const converted = sanitizeRelationship({
-  relationshipRecordId: "mother",
-  relationshipToClient: "mother",
-  approximateAge: 70,
-  approximateAgeRecordedOn: "2020-06-01",
-})
-assert.equal(converted.dateOfBirth, "1950")
-assert.equal(converted.approximateAge, null)
-assert.equal(converted.approximateAgeRecordedOn, "")
-
-const kept = sanitizeRelationship({
-  relationshipRecordId: "father",
-  relationshipToClient: "father",
-  dateOfBirth: "1964-06",
-  approximateAge: 70,
-  approximateAgeRecordedOn: "2020-06-01",
-})
-assert.equal(kept.dateOfBirth, "1964-06")
-assert.equal(kept.approximateAge, null)
 
 const movedJob = sanitizeOccupation({
   previousJobs: [{ id: "job-1", role: "Nurse", dates: "2015" }],

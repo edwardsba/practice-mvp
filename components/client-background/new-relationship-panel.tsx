@@ -117,7 +117,7 @@ export function NewRelationshipPanel({
           <SelectField
             id={`${block.relationshipBlockId}-children-new`}
             label="Children"
-            value={blockDraft.childrenAnswer || (blockDraft.noChildren ? "none" : "")}
+            value={blockDraft.childrenAnswer || ""}
             onChange={(childrenAnswer) => {
               const answer =
                 childrenAnswer === "yes" || childrenAnswer === "none" || childrenAnswer === "not_asked"
@@ -126,7 +126,6 @@ export function NewRelationshipPanel({
               const next: RelationshipBlock = {
                 ...blockDraft,
                 childrenAnswer: answer,
-                noChildren: answer === "none",
               }
               setBlockDraft(next)
               onBlockChange(next)

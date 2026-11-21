@@ -175,7 +175,7 @@ export function historyQuestionCheckLabel(key: HistoryQuestionKey): string {
  * not counted as their own screening question.
  */
 export function historyQuestionKeyForEvent(
-  event: Pick<EventRecord, "eventType" | "startPrecision" | "startValue" | "conditionGroupId" | "conditionEventId" | "parentEventId"> & {
+  event: Pick<EventRecord, "eventType" | "startPrecision" | "startValue" | "conditionGroupId" | "parentEventId"> & {
     about?: string
   },
   _dateOfBirth: string | null
@@ -186,7 +186,7 @@ export function historyQuestionKeyForEvent(
   }
   const type = event.eventType === "family_events" ? "emotional_problems" : event.eventType
   if (type === "psychiatric_admission" || type === "previous_therapy" || type === "medication") {
-    if (about === "self" && !event.conditionGroupId && !event.conditionEventId) return "other_treatment"
+    if (about === "self" && !event.conditionGroupId) return "other_treatment"
     // Linked treatments are covered by the issue's Treatment question, not a category.
     return about === "self" ? "other_treatment" : "family_significant_events"
   }
@@ -213,8 +213,7 @@ export function eventsForQuestion(
           event.eventType === "medication") &&
         resolvedAbout(event) === "self" &&
         !event.parentEventId &&
-        !event.conditionGroupId &&
-        !event.conditionEventId
+        !event.conditionGroupId
     )
   }
   return events.filter((event) => {
@@ -261,7 +260,7 @@ export function backgroundInterviewSourceLine(source: BackgroundInterviewAnswerS
 
 function answeredCategoryKeys(
   screening: ScreeningAnswers,
-  events: Pick<EventRecord, "eventType" | "startPrecision" | "startValue" | "conditionGroupId" | "conditionEventId" | "parentEventId" | "about">[],
+  events: Pick<EventRecord, "eventType" | "startPrecision" | "startValue" | "conditionGroupId" | "parentEventId" | "about">[],
   dateOfBirth: string | null
 ): Set<HistoryQuestionKey> {
   const withEntries = new Set<HistoryQuestionKey>()
@@ -272,7 +271,7 @@ function answeredCategoryKeys(
       event.eventType === "previous_therapy" ||
       event.eventType === "medication"
     ) {
-      if (resolvedAbout(event) === "self" && !event.conditionGroupId && !event.conditionEventId) {
+      if (resolvedAbout(event) === "self" && !event.conditionGroupId) {
         withEntries.add("other_treatment")
       }
       continue
@@ -284,7 +283,7 @@ function answeredCategoryKeys(
 
 export function screeningAnsweredCount(
   screening: ScreeningAnswers,
-  events: Pick<EventRecord, "eventType" | "startPrecision" | "startValue" | "conditionGroupId" | "conditionEventId" | "parentEventId" | "about">[],
+  events: Pick<EventRecord, "eventType" | "startPrecision" | "startValue" | "conditionGroupId" | "parentEventId" | "about">[],
   dateOfBirth: string | null
 ): number {
   const withEntries = answeredCategoryKeys(screening, events, dateOfBirth)
@@ -293,7 +292,7 @@ export function screeningAnsweredCount(
 
 export function finalScreeningAnswers(
   screening: ScreeningAnswers,
-  events: Pick<EventRecord, "eventType" | "startPrecision" | "startValue" | "conditionGroupId" | "conditionEventId" | "parentEventId" | "about">[],
+  events: Pick<EventRecord, "eventType" | "startPrecision" | "startValue" | "conditionGroupId" | "parentEventId" | "about">[],
   dateOfBirth: string | null
 ): Record<ScreeningQuestionKey, ScreeningAnswer> {
   const withEntries = answeredCategoryKeys(screening, events, dateOfBirth)
@@ -307,7 +306,7 @@ export function finalScreeningAnswers(
 
 export function unansweredQuestionLabels(
   screening: ScreeningAnswers,
-  events: Pick<EventRecord, "eventType" | "startPrecision" | "startValue" | "conditionGroupId" | "conditionEventId" | "parentEventId" | "about">[],
+  events: Pick<EventRecord, "eventType" | "startPrecision" | "startValue" | "conditionGroupId" | "parentEventId" | "about">[],
   dateOfBirth: string | null,
   issues: HistoryIssue[] = []
 ): string[] {
@@ -327,7 +326,7 @@ export function unansweredQuestionLabels(
 /** Unanswered items in page order: History categories, treatment answers, then Stressors. */
 export function unansweredInterviewLabels(
   screening: ScreeningAnswers,
-  events: Pick<EventRecord, "eventType" | "startPrecision" | "startValue" | "conditionGroupId" | "conditionEventId" | "parentEventId" | "about">[],
+  events: Pick<EventRecord, "eventType" | "startPrecision" | "startValue" | "conditionGroupId" | "parentEventId" | "about">[],
   dateOfBirth: string | null,
   stressors: StressorsRecord,
   issues: HistoryIssue[] = []
@@ -342,7 +341,7 @@ export function unansweredInterviewLabels(
 /** Answered items, counted the same way {@link unansweredInterviewLabels} leaves gaps. */
 export function answeredInterviewCount(
   screening: ScreeningAnswers,
-  events: Pick<EventRecord, "eventType" | "startPrecision" | "startValue" | "conditionGroupId" | "conditionEventId" | "parentEventId" | "about">[],
+  events: Pick<EventRecord, "eventType" | "startPrecision" | "startValue" | "conditionGroupId" | "parentEventId" | "about">[],
   dateOfBirth: string | null,
   stressors: StressorsRecord,
   issues: HistoryIssue[] = []

@@ -2,22 +2,20 @@ import Link from "next/link"
 import { notFound } from "next/navigation"
 import { and, eq } from "drizzle-orm"
 
-import { ActionItemsSection } from "@/app/clients/[client_id]/action-items-section"
-import { ClientMenuSidebar } from "@/app/clients/[client_id]/client-menu-sidebar"
-import { EmergencyContactsSection } from "@/components/emergency-contacts/emergency-contacts-section"
+import { ClientSummaryPanel } from "@/app/clients/[client_id]/client-summary-menu"
+import {
+  ClientPanel,
+  ClientPanelField,
+  ClientPanelFields,
+} from "@/components/clients/client-panel"
 import { ClientStatusControl } from "@/components/clients/client-status-control"
+import { EmergencyContactsSection } from "@/components/emergency-contacts/emergency-contacts-section"
+import { ReferralFundingCard } from "@/components/funding/referral-funding-card"
 import { AppShell } from "@/components/app-shell"
 import { BackButton } from "@/components/ui/back-button"
 import { EntityPageHeader } from "@/components/ui/entity-page-header"
 import { StatusBadge } from "@/components/ui/status-badge"
 import { Button } from "@/components/ui/button"
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
-import { ReferralFundingCard } from "@/components/funding/referral-funding-card"
 import { clients } from "@/db/schema"
 import { getDefaultBatteryAssessments } from "@/lib/assessments/battery-defaults"
 import { loadLatestAssessmentResultForClient } from "@/lib/assessments/load"
@@ -25,7 +23,10 @@ import {
   formatAppointmentDate,
   formatAppointmentTime,
 } from "@/lib/appointments/format"
-import { loadNextAppointmentForClient, loadAttendanceRiskForClient } from "@/lib/appointments/load"
+import {
+  loadNextAppointmentForClient,
+  loadAttendanceRiskForClient,
+} from "@/lib/appointments/load"
 import {
   loadActiveCrisisPlanSummary,
   loadEmergencyContacts,
@@ -34,12 +35,24 @@ import { requirePractitionerContext } from "@/lib/auth"
 import { db } from "@/lib/db"
 import { getReferralFundingCardData } from "@/lib/actions/funding"
 import { buildReferralFundingCardProps } from "@/lib/funding/referral-funding-card-props"
+import { formatDisplayDate } from "@/lib/funding/format"
 import { appendReturnTo } from "@/lib/navigation/back"
 import { buildTemplateVariablesFromLinkResponse } from "@/lib/email/link-response"
 import { getQuestionnaireEmailContext } from "@/lib/email/practitioner-context"
 import { loadActiveTreatmentPlanSummary } from "@/lib/treatment-plans/load"
 import { loadClientBackgroundSummary } from "@/lib/client-background/load"
-import { ATTENDANCE_RISK_CONFIG, CLIENT_STATUS_CONFIG } from "@/lib/status"
+import { formatCommunicationSummary } from "@/lib/clients/communication-summary"
+import {
+  formatCrisisPlanSummary,
+  formatEmergencyContactSummary,
+} from "@/lib/clients/emergency-details-summary"
+import { buildReferralFundingPanelSummary } from "@/lib/clients/referral-funding-summary"
+import {
+  ATTENDANCE_RISK_CONFIG,
+  CLIENT_STATUS_CONFIG,
+  FUNDING_APPROVAL_STATUS_CONFIG,
+} from "@/lib/status"
+import { REPORTING_REQUIREMENT_STATUS_CONFIG } from "@/lib/funding/reporting-status"
 
 function formatDate(value: Date | string | null) {
   if (!value) return "—"
@@ -106,6 +119,12 @@ export default async function ClientDetailPage({
     referralFundingData
   )
 
+  const referralSummary = buildReferralFundingPanelSummary(
+    referralFunding.approvals,
+    referralFunding.formOptions.relationships,
+    formatDisplayDate
+  )
+
   const clientEmail = client.email?.trim() || null
   const estimatedExpiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
   const questionnaireTemplateVariables = emailContext
@@ -132,6 +151,25 @@ export default async function ClientDetailPage({
     emergencyContacts = []
   }
 
+  const communicationLine = formatCommunicationSummary({
+    commsOptOut: client.commsOptOut,
+    reminderOptOut: client.reminderOptOut,
+    preSessionOptOut: client.preSessionOptOut,
+    postSessionOptOut: client.postSessionOptOut,
+    adminCommsOptOut: client.adminCommsOptOut,
+    onlineBookingPermitted: client.onlineBookingPermitted,
+  })
+
+  const relationshipCount = backgroundSummary?.relationshipCount ?? 0
+  const eventCount = backgroundSummary?.eventCount ?? 0
+  const recordedLine = `${relationshipCount} relationship${relationshipCount === 1 ? "" : "s"} · ${eventCount} history entr${eventCount === 1 ? "y" : "ies"}`
+
+  const treatmentPlanHref = activeTreatmentPlan
+    ? `/clients/${clientId}/treatment-plan/${activeTreatmentPlan.treatmentPlanId}`
+    : `/clients/${clientId}/treatment-plan/new`
+
+  const smartGoalsCount = activeTreatmentPlan?.smartGoalItems.length ?? 0
+
   return (
     <AppShell>
       <div className="mb-6">
@@ -142,267 +180,330 @@ export default async function ClientDetailPage({
         name={`${client.firstName} ${client.lastName}`}
         subheading={`Date of birth: ${formatDate(client.dateOfBirth)}`}
         badge={
-          <StatusBadge status={client.clientStatus} statusMap={CLIENT_STATUS_CONFIG} />
-        }
-        subheadingAction={
-          <Button variant="outline" size="sm" asChild>
-            <Link href={`/clients/${clientId}/edit`}>Edit Client</Link>
-          </Button>
+          <StatusBadge
+            status={client.clientStatus}
+            statusMap={CLIENT_STATUS_CONFIG}
+          />
         }
       />
 
-      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[1fr_200px]">
-        <div>
-          <Card className="mb-6">
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>Status</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <dl className="grid gap-3 sm:grid-cols-2">
-                <div>
-                  <dt className="text-sm text-muted-foreground">Client status</dt>
-                  <dd className="font-medium">
-                    <ClientStatusControl
-                      clientId={clientId}
-                      currentStatus={client.clientStatus}
-                    />
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-sm text-muted-foreground">Attendance</dt>
-                  <dd className="font-medium">
-                    <StatusBadge
-                      status={attendanceRisk.tier}
-                      statusMap={ATTENDANCE_RISK_CONFIG}
-                    />
-                  </dd>
-                </div>
-                <div className="sm:col-span-2">
-                  <dt className="text-sm text-muted-foreground">
-                    Next appointment
-                  </dt>
-                  <dd className="font-medium">
-                    {nextAppointment ? (
-                      <Link
-                        href={appendReturnTo(
-                          `/appointments/${nextAppointment.appointmentId}`,
-                          `/clients/${clientId}`
-                        )}
-                        className="text-primary hover:underline"
-                      >
-                        {formatAppointmentDate(nextAppointment.appointmentDate)}{" "}
-                        at {formatAppointmentTime(nextAppointment.appointmentTime)}
-                        {nextAppointment.location?.trim()
-                          ? ` — ${nextAppointment.location.trim()}`
-                          : ""}
+      <div className="mx-auto flex max-w-3xl flex-col gap-4">
+        <ClientSummaryPanel
+          clientId={clientId}
+          clientEmail={clientEmail}
+          practiceId={context.practiceId}
+          practitionerProfileId={context.practitionerProfileId}
+          templateVariables={questionnaireTemplateVariables}
+          defaultAssessments={defaultBatteryAssessments}
+        >
+          <ClientPanelFields>
+            <ClientPanelField label="Client status">
+              <ClientStatusControl
+                clientId={clientId}
+                currentStatus={client.clientStatus}
+              />
+            </ClientPanelField>
+            <ClientPanelField label="Next appointment">
+              {nextAppointment ? (
+                <Link
+                  href={appendReturnTo(
+                    `/appointments/${nextAppointment.appointmentId}`,
+                    `/clients/${clientId}`
+                  )}
+                  className="text-primary hover:underline"
+                >
+                  {formatAppointmentDate(nextAppointment.appointmentDate)} at{" "}
+                  {formatAppointmentTime(nextAppointment.appointmentTime)}
+                  {nextAppointment.location?.trim()
+                    ? ` — ${nextAppointment.location.trim()}`
+                    : ""}
+                </Link>
+              ) : (
+                <span className="font-normal text-muted-foreground">
+                  No upcoming appointment
+                </span>
+              )}
+            </ClientPanelField>
+            <ClientPanelField label="Attendance">
+              <StatusBadge
+                status={attendanceRisk.tier}
+                statusMap={ATTENDANCE_RISK_CONFIG}
+              />
+            </ClientPanelField>
+            <ClientPanelField label="Risk">
+              {latestAsq ? (
+                <span>
+                  ASQ · {formatDate(latestAsq.assessmentDate)}
+                  {latestAsq.score != null ? ` · ${latestAsq.score}` : ""}
+                  {latestAsq.severity
+                    ? ` · ${latestAsq.severity}`
+                    : ""}
+                </span>
+              ) : (
+                <span className="font-normal text-muted-foreground">
+                  No ASQ on file
+                </span>
+              )}
+            </ClientPanelField>
+            <ClientPanelField label="Notes">
+              <div className="max-h-24 overflow-y-auto rounded-md border bg-muted/30 p-2 text-sm font-normal whitespace-pre-wrap">
+                {client.notes?.trim() || (
+                  <span className="text-muted-foreground">None recorded</span>
+                )}
+              </div>
+            </ClientPanelField>
+          </ClientPanelFields>
+        </ClientSummaryPanel>
+
+        <ClientPanel
+          title="Contact details"
+          control="open"
+          openHref={`/clients/${clientId}/edit`}
+        >
+          <ClientPanelFields>
+            <ClientPanelField label="Phone">
+              {client.phone?.trim() || (
+                <span className="font-normal text-muted-foreground">
+                  None recorded
+                </span>
+              )}
+            </ClientPanelField>
+            <ClientPanelField label="Email">
+              {client.email?.trim() || (
+                <span className="font-normal text-muted-foreground">
+                  None recorded
+                </span>
+              )}
+            </ClientPanelField>
+            <ClientPanelField label="Address">
+              {client.address?.trim() || (
+                <span className="font-normal text-muted-foreground">
+                  None recorded
+                </span>
+              )}
+            </ClientPanelField>
+            <ClientPanelField label="Communication">
+              <span className="font-normal">{communicationLine}</span>
+            </ClientPanelField>
+          </ClientPanelFields>
+        </ClientPanel>
+
+        <ClientPanel
+          title="Emergency details"
+          control="expand"
+          expandedContent={
+            <div className="space-y-6">
+              <div className="-mx-4 -mt-2">
+                <EmergencyContactsSection
+                  clientId={clientId}
+                  contacts={emergencyContacts}
+                />
+              </div>
+              <div className="space-y-3 border-t pt-4">
+                <div className="flex items-center justify-between gap-3">
+                  <h3 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+                    Crisis plan
+                  </h3>
+                  {!activeCrisisPlan ? (
+                    <Button asChild size="sm">
+                      <Link href={`/clients/${clientId}/crisis-plan/new`}>
+                        Create crisis plan
                       </Link>
-                    ) : (
-                      "No upcoming appointment"
-                    )}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-sm text-muted-foreground">Risk</dt>
-                  <dd className="mt-0.5">
-                    {latestAsq ? (
-                      <p className="text-sm">
-                        ASQ · {formatDate(latestAsq.assessmentDate)}
-                        {latestAsq.score != null ? ` · ${latestAsq.score}` : ""}
-                        {latestAsq.severity ? ` · ${latestAsq.severity}` : ""}
-                      </p>
-                    ) : (
-                      <p className="text-sm text-muted-foreground">
-                        No ASQ on file
-                      </p>
-                    )}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-sm text-muted-foreground">Feedback</dt>
-                  <dd className="mt-0.5">
-                    {latestPsf ? (
-                      <p className="text-sm">
-                        PSF · {formatDate(latestPsf.assessmentDate)}
-                        {latestPsf.severity ? ` · ${latestPsf.severity}` : ""}
-                      </p>
-                    ) : (
-                      <p className="text-sm text-muted-foreground">
-                        No PSF on file
-                      </p>
-                    )}
-                  </dd>
-                </div>
-              </dl>
-            </CardContent>
-          </Card>
-
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle>Client details</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <dl className="grid gap-3 sm:grid-cols-2">
-                <div>
-                  <dt className="text-sm text-muted-foreground">Email</dt>
-                  <dd className="font-medium">{client.email ?? "—"}</dd>
-                </div>
-                <div>
-                  <dt className="text-sm text-muted-foreground">Phone</dt>
-                  <dd className="font-medium">{client.phone ?? "—"}</dd>
-                </div>
-                <div>
-                  <dt className="text-sm text-muted-foreground">Date of birth</dt>
-                  <dd className="font-medium">
-                    {formatDate(client.dateOfBirth)}
-                  </dd>
-                </div>
-                <div className="sm:col-span-2">
-                  <dt className="text-sm text-muted-foreground">Address</dt>
-                  <dd className="font-medium">{client.address ?? "—"}</dd>
-                </div>
-                <div className="sm:col-span-2">
-                  <dt className="text-sm text-muted-foreground">Notes</dt>
-                  <dd className="mt-1 max-h-24 overflow-y-auto rounded-md border bg-muted/30 p-2 text-sm whitespace-pre-wrap">
-                    {client.notes?.trim() || "—"}
-                  </dd>
-                </div>
-              </dl>
-            </CardContent>
-          </Card>
-
-          <ActionItemsSection
-            clientId={clientId}
-            clientEmail={clientEmail}
-            practiceId={context.practiceId}
-            practitionerProfileId={context.practitionerProfileId}
-            templateVariables={questionnaireTemplateVariables}
-            defaultAssessments={defaultBatteryAssessments}
-          />
-
-          <Card className="mb-6">
-            <EmergencyContactsSection
-              clientId={clientId}
-              contacts={emergencyContacts}
-            />
-          </Card>
-
-          <div className="mb-6">
-            <ReferralFundingCard {...referralFunding} />
-          </div>
-
-          <Card className="mb-6">
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>Client Background</CardTitle>
-              <Button asChild variant="outline" size="sm">
-                <Link href={`/clients/${clientId}/background`}>Open</Link>
-              </Button>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">
-                {backgroundSummary &&
-                (backgroundSummary.relationshipCount > 0 || backgroundSummary.eventCount > 0)
-                  ? `${backgroundSummary.relationshipCount} relationship${backgroundSummary.relationshipCount === 1 ? "" : "s"} · ${backgroundSummary.eventCount} history entr${backgroundSummary.eventCount === 1 ? "y" : "ies"}`
-                  : "Demographics, relationships, history, and risk"}
-              </p>
-              {backgroundSummary?.backgroundCapturedAt ? (
-                <p className="mt-1 text-sm">
-                  Intake interview completed {formatDate(backgroundSummary.backgroundCapturedAt)}
-                </p>
-              ) : null}
-            </CardContent>
-          </Card>
-
-          <Card className="mb-6">
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>Treatment plan</CardTitle>
-              {!activeTreatmentPlan ? (
-                <Button asChild size="sm">
-                  <Link href={`/clients/${clientId}/treatment-plan/new`}>
-                    Create treatment plan
-                  </Link>
-                </Button>
-              ) : (
-                <Button asChild variant="outline" size="sm">
-                  <Link
-                    href={`/clients/${clientId}/treatment-plan/${activeTreatmentPlan.treatmentPlanId}`}
-                  >
-                    View / Edit
-                  </Link>
-                </Button>
-              )}
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {!activeTreatmentPlan ? (
-                <p className="text-sm text-muted-foreground">No treatment plan</p>
-              ) : (
-                <dl className="grid gap-3">
-                  <div>
-                    <dt className="text-sm text-muted-foreground">
-                      Therapeutic target
-                    </dt>
-                    <dd className="font-medium">
-                      {activeTreatmentPlan.therapeuticTarget?.trim() || "—"}
-                    </dd>
-                  </div>
-                </dl>
-              )}
-
-              {activeTreatmentPlan ? (
-                <div className="border-t pt-4">
-                  <p className="mb-2 text-sm font-medium">SMART Goals</p>
-                  {activeTreatmentPlan.smartGoalItems.length > 0 ? (
-                    <ul className="list-inside list-disc space-y-1 text-sm">
-                      {activeTreatmentPlan.smartGoalItems.map(
-                        (target, index) => (
-                          <li key={`${index}-${target}`}>{target}</li>
-                        )
-                      )}
-                    </ul>
+                    </Button>
                   ) : (
-                    <p className="text-sm text-muted-foreground">
-                      No SMART goals set
-                    </p>
+                    <Button asChild variant="outline" size="sm">
+                      <Link
+                        href={`/clients/${clientId}/crisis-plan/${activeCrisisPlan.crisisPlanId}`}
+                      >
+                        View / Edit
+                      </Link>
+                    </Button>
                   )}
                 </div>
-              ) : null}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>Crisis plan</CardTitle>
-              {!activeCrisisPlan ? (
-                <Button asChild size="sm">
-                  <Link href={`/clients/${clientId}/crisis-plan/new`}>
-                    Create crisis plan
-                  </Link>
-                </Button>
-              ) : (
-                <Button asChild variant="outline" size="sm">
-                  <Link
-                    href={`/clients/${clientId}/crisis-plan/${activeCrisisPlan.crisisPlanId}`}
-                  >
-                    View / Edit
-                  </Link>
-                </Button>
-              )}
-            </CardHeader>
-            <CardContent>
-              {!activeCrisisPlan ? (
-                <p className="text-sm text-muted-foreground">No crisis plan</p>
-              ) : (
                 <p className="text-sm font-medium">
-                  v{activeCrisisPlan.versionNumber} (
-                  {formatDate(activeCrisisPlan.dateOfPlan)})
+                  {formatCrisisPlanSummary(activeCrisisPlan)}
                 </p>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+              </div>
+            </div>
+          }
+        >
+          <ClientPanelFields>
+            <ClientPanelField label="Emergency contact">
+              <span
+                className={
+                  emergencyContacts.length === 0
+                    ? "font-normal text-muted-foreground"
+                    : undefined
+                }
+              >
+                {formatEmergencyContactSummary(emergencyContacts)}
+              </span>
+            </ClientPanelField>
+            <ClientPanelField label="Crisis plan">
+              <span
+                className={
+                  !activeCrisisPlan
+                    ? "font-normal text-muted-foreground"
+                    : undefined
+                }
+              >
+                {formatCrisisPlanSummary(activeCrisisPlan)}
+              </span>
+            </ClientPanelField>
+          </ClientPanelFields>
+        </ClientPanel>
 
-        <div className="max-lg:order-last">
-          <ClientMenuSidebar clientId={clientId} />
-        </div>
+        <ClientPanel
+          title="Referrals and funding"
+          control="expand"
+          expandedContent={
+            <div className="-mx-4 -mb-2">
+              <ReferralFundingCard {...referralFunding} hideTitle />
+            </div>
+          }
+        >
+          {referralSummary.approvalLine ? (
+            <ClientPanelFields>
+              <ClientPanelField label="Current approval">
+                <span className="inline-flex flex-wrap items-center gap-2">
+                  <span>{referralSummary.approvalLine}</span>
+                  {referralSummary.approvalStatus ? (
+                    <StatusBadge
+                      status={referralSummary.approvalStatus}
+                      statusMap={FUNDING_APPROVAL_STATUS_CONFIG}
+                    />
+                  ) : null}
+                </span>
+              </ClientPanelField>
+              {referralSummary.referrerLabel && referralSummary.referrerValue ? (
+                <ClientPanelField label={referralSummary.referrerLabel}>
+                  {referralSummary.referrerValue}
+                </ClientPanelField>
+              ) : (
+                <ClientPanelField label="Referrer">
+                  <span className="font-normal text-muted-foreground">
+                    None recorded
+                  </span>
+                </ClientPanelField>
+              )}
+              <ClientPanelField label="Reports">
+                {referralSummary.dueReports.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {referralSummary.dueReports.map((req) => (
+                      <span
+                        key={`${req.appointmentNumber}-${req.reportType}`}
+                        className="inline-flex flex-col gap-1 rounded-md border px-2 py-1 text-xs font-normal sm:flex-row sm:items-center sm:gap-2"
+                      >
+                        <span>
+                          {req.appointmentNumber} · {req.reportType}
+                        </span>
+                        <StatusBadge
+                          status={req.status}
+                          statusMap={REPORTING_REQUIREMENT_STATUS_CONFIG}
+                        />
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <span className="font-normal text-muted-foreground">
+                    None due
+                  </span>
+                )}
+              </ClientPanelField>
+            </ClientPanelFields>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              No funding approval yet
+            </p>
+          )}
+        </ClientPanel>
+
+        <ClientPanel
+          title="Background and history"
+          control="open"
+          openHref={`/clients/${clientId}/background`}
+        >
+          <ClientPanelFields>
+            <ClientPanelField label="Recorded">{recordedLine}</ClientPanelField>
+            <ClientPanelField label="Intake interview">
+              {backgroundSummary?.backgroundCapturedAt ? (
+                `Completed ${formatDate(backgroundSummary.backgroundCapturedAt)}`
+              ) : (
+                <span className="font-normal text-muted-foreground">
+                  Not yet completed
+                </span>
+              )}
+            </ClientPanelField>
+          </ClientPanelFields>
+        </ClientPanel>
+
+        <ClientPanel
+          title="Diagnosis and treatment plan"
+          control="open"
+          openHref={treatmentPlanHref}
+          openLabel={activeTreatmentPlan ? "Open ›" : "Create ›"}
+        >
+          <ClientPanelFields>
+            <ClientPanelField label="Diagnosis">
+              <div className="rounded-md border border-dashed border-muted-foreground/40 bg-muted/20 px-3 py-2 text-sm font-normal text-muted-foreground">
+                Diagnosis — coming soon
+              </div>
+            </ClientPanelField>
+            {activeTreatmentPlan ? (
+              <>
+                <ClientPanelField label="Therapeutic target">
+                  {activeTreatmentPlan.therapeuticTarget?.trim() || (
+                    <span className="font-normal text-muted-foreground">
+                      None recorded
+                    </span>
+                  )}
+                </ClientPanelField>
+                <ClientPanelField label="SMART goals">
+                  {smartGoalsCount > 0 ? (
+                    `${smartGoalsCount} goal${smartGoalsCount === 1 ? "" : "s"}`
+                  ) : (
+                    <span className="font-normal text-muted-foreground">
+                      No SMART goals set
+                    </span>
+                  )}
+                </ClientPanelField>
+              </>
+            ) : (
+              <ClientPanelField label="Treatment plan">
+                <span className="font-normal text-muted-foreground">
+                  No treatment plan
+                </span>
+              </ClientPanelField>
+            )}
+          </ClientPanelFields>
+        </ClientPanel>
+
+        {/* Progress panel is a holding area for now; full Progress design comes later. */}
+        <ClientPanel
+          title="Progress"
+          control="open"
+          openHref={`/clients/${clientId}/assessments/feedback`}
+        >
+          <ClientPanelFields>
+            <ClientPanelField label="Feedback">
+              {latestPsf ? (
+                <span>
+                  PSF · {formatDate(latestPsf.assessmentDate)}
+                  {latestPsf.severity
+                    ? ` · ${latestPsf.severity}`
+                    : ""}
+                </span>
+              ) : (
+                <span className="font-normal text-muted-foreground">
+                  No PSF on file
+                </span>
+              )}
+            </ClientPanelField>
+          </ClientPanelFields>
+          <p className="mt-3 text-xs text-muted-foreground">
+            Holding area for now. The full Progress design comes later.
+          </p>
+        </ClientPanel>
       </div>
     </AppShell>
   )

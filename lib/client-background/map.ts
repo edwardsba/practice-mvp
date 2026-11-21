@@ -27,14 +27,11 @@ export function toRelationship(row: {
   givenName: string | null
   displayOrder: number
   dateOfBirth: string | null
-  approximateAge: number | null
-  approximateAgeRecordedOn: string | null
   healthStatus: string | null
   deceased: boolean
   ageAtDeath: number | null
   dateOfDeath: string | null
   healthOrCauseOfDeath: string | null
-  childType: string | null
   childTypeDetail: string | null
   supportive: string | null
   conflict: string | null
@@ -58,11 +55,8 @@ export function toRelationship(row: {
     sex: row.sex ?? "",
     givenName: row.givenName ?? "",
     dateOfBirth: row.dateOfBirth ?? "",
-    approximateAge: row.approximateAge,
-    approximateAgeRecordedOn: row.approximateAgeRecordedOn ?? "",
     dateOfDeath: row.dateOfDeath ?? "",
     healthOrCauseOfDeath: row.healthOrCauseOfDeath ?? "",
-    childType: row.childType ?? "",
     childTypeDetail: row.childTypeDetail ?? "",
     supportive: row.supportive ?? "",
     conflict: row.conflict ?? "",
@@ -102,7 +96,6 @@ export function toRelationshipBlock(row: {
   arrangementDetail: string | null
   startedOn: string | null
   endedOn: string | null
-  noChildren: boolean
   childrenAnswer?: string | null
   siblingsAnswer?: string | null
   displayOrder: number
@@ -140,7 +133,6 @@ export function toRelationshipBlock(row: {
     arrangementDetail: row.arrangementDetail ?? "",
     startedOn: row.startedOn ?? "",
     endedOn: row.endedOn ?? "",
-    noChildren: row.noChildren,
     childrenAnswer: isBlockAnswer(row.childrenAnswer) ? row.childrenAnswer : "",
     siblingsAnswer: isBlockAnswer(row.siblingsAnswer) ? row.siblingsAnswer : "",
     displayOrder: row.displayOrder,
@@ -181,14 +173,9 @@ export function toEvent(row: {
   endValue: string | null
   endOngoing: boolean
   resolvedOrOngoing: string | null
-  treated: boolean | null
-  treatmentType: string | null
-  treatmentDetail: string | null
-  outcome: string | null
   about: string | null
   aboutOther: string | null
   relationshipRecordId: string | null
-  conditionEventId: string | null
   conditionGroupId: string | null
   parentEventId?: string | null
   admissionType: string | null
@@ -212,12 +199,8 @@ export function toEvent(row: {
     endPrecision: row.endPrecision ?? "",
     endValue: row.endValue ?? "",
     resolvedOrOngoing: row.resolvedOrOngoing ?? "",
-    treatmentType: row.treatmentType ?? "",
-    treatmentDetail: row.treatmentDetail ?? "",
-    outcome: row.outcome ?? "",
     about: row.about ?? "",
     aboutOther: row.aboutOther ?? "",
-    conditionEventId: row.conditionEventId,
     conditionGroupId: row.conditionGroupId,
     parentEventId: row.parentEventId ?? null,
     admissionType: row.admissionType ?? "",

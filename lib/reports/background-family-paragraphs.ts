@@ -72,7 +72,7 @@ function conditionText(event: EventRecord, role: string, kind: string, past: boo
 function historyUnits(kind: string, matched: EventRecord[]): { event: EventRecord; episodes: EventRecord[] }[] {
   if (isTreatmentEvent(kind as EventType)) {
     return matched
-      .filter((event) => !event.conditionEventId && !event.conditionGroupId && !event.parentEventId)
+      .filter((event) => !event.conditionGroupId && !event.parentEventId)
       .map((event) => ({ event, episodes: [event] }))
   }
   if (isConditionEvent(kind as EventType)) {

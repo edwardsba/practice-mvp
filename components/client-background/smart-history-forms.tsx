@@ -210,10 +210,6 @@ export function NewEventForm({
 
   function patch(partial: Partial<EventRecord>) {
     const next = { ...draft, ...partial }
-    next.treated = null
-    next.treatmentType = ""
-    next.treatmentDetail = ""
-    next.outcome = ""
     if (next.resolvedOrOngoing === "ongoing") {
       next.endPrecision = ""
       next.endValue = ""

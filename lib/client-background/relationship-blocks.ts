@@ -195,7 +195,7 @@ export function needsForMember(block: RelationshipBlock, person: RelationshipRec
     if (!person.dateOfBirth.trim()) needs.push("age")
   }
   if (role === "child") {
-    if (!(person.blockRoleType ?? "").trim() && !person.childType) needs.push("type")
+    if (!(person.blockRoleType ?? "").trim()) needs.push("type")
     if (!person.dateOfBirth.trim()) needs.push("age")
   }
   if (role === "sibling" && siblingTypesForBlock(block.kind).length > 1 && !(person.blockRoleType ?? "").trim()) needs.push("type")

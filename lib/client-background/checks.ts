@@ -110,7 +110,7 @@ function intimateUnplacedPerson(person: RelationshipRecord): boolean {
 function childrenAnswerMissing(block: RelationshipBlock, people: RelationshipRecord[]): string | null {
   if (block.kind !== "client_current" && block.kind !== "client_previous") return null
   const hasChildren = people.some((person) => person.relationshipBlockId === block.relationshipBlockId && person.blockRole === "child")
-  if (hasChildren || block.childrenAnswer === "yes" || block.childrenAnswer === "none" || block.childrenAnswer === "not_asked" || block.noChildren) {
+  if (hasChildren || block.childrenAnswer === "yes" || block.childrenAnswer === "none" || block.childrenAnswer === "not_asked") {
     return null
   }
   return block.status.trim() || "this relationship"

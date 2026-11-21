@@ -22,19 +22,11 @@ function person(
     givenName: "",
     displayOrder: 0,
     dateOfBirth: "",
-    approximateAge: null,
-    approximateAgeRecordedOn: "",
     healthStatus: "",
     deceased: false,
     ageAtDeath: null,
     dateOfDeath: "",
     healthOrCauseOfDeath: "",
-    childType:
-      partial.relationshipToClient === "child_step"
-        ? "step_child"
-        : partial.relationshipToClient === "child_biological"
-          ? "biological"
-          : "",
     childTypeDetail: "",
     supportive: "",
     conflict: "",
@@ -367,7 +359,6 @@ const placeholderBlock: RelationshipBlock = {
   arrangementDetail: "",
   startedOn: "",
   endedOn: "",
-  noChildren: false,
   childrenAnswer: "",
   siblingsAnswer: "none",
   displayOrder: 0,

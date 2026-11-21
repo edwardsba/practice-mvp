@@ -37,8 +37,9 @@ export function treeConnectorStyle(
 
 export const treeLayer1ClassName = "text-[15px] font-bold text-zinc-900"
 
+/** Square corners so the 4px left bar stays a straight vertical line (board AD). */
 export const treeLayer2ShellClassName =
-  "flex min-h-[44px] w-full flex-col justify-center rounded-r-[8px] border-l-4 border-[#334155] bg-transparent px-3 py-[7px] text-left"
+  "flex min-h-[44px] w-full flex-col justify-center rounded-none border-l-4 border-[#334155] bg-transparent px-3 py-[7px] text-left"
 
 export const treeLayer2TitleClassName = "text-[14.5px] font-semibold"
 export const treeLayer2MetaClassName = "text-[12.5px] text-zinc-600"
@@ -61,9 +62,13 @@ export const treeLayer4AvatarClassName =
 export function treeItemStateClassName(options: {
   selected?: boolean
   interactive?: boolean
+  /** Layer-2: square fills so the left bar is not bent into a curve. */
+  square?: boolean
 }): string {
   return cn(
-    "rounded-md focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+    options.square
+      ? "rounded-none focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+      : "rounded-md focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
     options.interactive !== false && "hover:bg-zinc-100",
     options.selected && "bg-[#dbeafe] text-[#1e3a8a] hover:bg-[#dbeafe]"
   )

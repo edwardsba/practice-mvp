@@ -98,6 +98,42 @@ const FAMILY_SECTIONS: {
   { title: "Significant events", screening: "family_significant_events", eventType: "significant_history", mode: "event" },
 ]
 
+/**
+ * Singular "+ Add …" labels for each history category title (board AC / Round R).
+ * Kept next to the section definitions — do not string-build from the plural title.
+ */
+export const HISTORY_CATEGORY_ADD_LABELS: Record<string, string> = {
+  "Mental health": "+ Add mental health issue",
+  "Substance use": "+ Add substance use issue",
+  "Physical health": "+ Add physical health issue",
+  "Self-harm": "+ Add self-harm",
+  "Traumatic events": "+ Add traumatic event",
+  "Other significant events": "+ Add significant event",
+  "Significant events": "+ Add significant event",
+  "Other treatment not linked to an issue": "+ Add treatment",
+}
+
+export function historyCategoryAddLabel(title: string): string {
+  return HISTORY_CATEGORY_ADD_LABELS[title] ?? `+ Add ${title.toLowerCase()}`
+}
+
+/**
+ * Visual tree layer for a History node: anything directly under a category is
+ * layer 2 (issue or single event); its children are layer 3; steps are layer 4.
+ */
+export function historyVisualLayer(
+  kind: "band" | "row" | "note" | "actions",
+  options?: { parentLayer?: 1 | 2 | 3 | 4; tag?: "Episode" | "Treatment" | "Other" | "Step" }
+): 2 | 3 | 4 {
+  if (kind === "note" || kind === "actions") return 2
+  if (kind === "band") return 2
+  if (options?.tag === "Step") return 4
+  const parent = options?.parentLayer ?? 1
+  if (parent <= 1) return 2
+  if (parent === 2) return 3
+  return 4
+}
+
 export function buildHistoryTree(input: Input): HistoryTree {
   const issues = resolveHistoryIssues(input.events, input.issues)
   const self = input.events.filter((event) => resolvedAbout(event) === "self" && !event.parentEventId)

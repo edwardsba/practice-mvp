@@ -47,7 +47,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { clientAgeAtStart, formatPartialWhen } from "@/lib/client-background/age"
 import { formatContextStrip, resolveFormContext } from "@/lib/client-background/form-context"
 import { resolveHistoryIssues } from "@/lib/client-background/history-issues"
-import { buildHistoryTree, type HistoryTreeNode } from "@/lib/client-background/history-tree"
+import {
+  buildHistoryTree,
+  historyCategoryAddLabel,
+  historyVisualLayer,
+  type HistoryTreeNode,
+} from "@/lib/client-background/history-tree"
 import { isConditionEvent, isSingleEventType } from "@/lib/client-background/history-links"
 import { smartKindForEventType } from "@/lib/client-background/smart-event-fields"
 import type { ScreeningAnswer, ScreeningAnswers } from "@/lib/client-background/interview-history"
@@ -895,12 +900,7 @@ function CategoryBlock({
         ? node.children.filter((child) => child.kind !== "note")
         : node.children
   const eventType = question?.eventType
-  const addLabel =
-    question?.mode === "other_treatment"
-      ? "+ Add treatment"
-      : question?.mode === "event"
-        ? `+ Add ${node.title.toLowerCase()}`
-        : `+ Add ${node.title.toLowerCase()} issue`
+  const addLabel = historyCategoryAddLabel(node.title)
 
   return (
     <div id={key ? `check-history-${key}` : undefined} className="scroll-mt-28 space-y-2">
@@ -935,6 +935,7 @@ function CategoryBlock({
         <ConnectedList
           nodes={treeChildren}
           about={about}
+          itemLayer={2}
           onOpen={onOpen}
           onAddEvent={onAddEvent}
           onAddNestedEvent={onAddNestedEvent}
@@ -968,6 +969,7 @@ function CategoryBlock({
 function ConnectedList({
   nodes,
   about,
+  itemLayer,
   onOpen,
   onAddEvent,
   onAddNestedEvent,
@@ -977,6 +979,8 @@ function ConnectedList({
 }: {
   nodes: HistoryTreeNode[]
   about: "self" | "significant_other"
+  /** Visual layer for bands/rows in this list (2 under a category, 3 under an item). */
+  itemLayer: 2 | 3 | 4
   onOpen: (id: string) => void
   onAddEvent?: (issueId: string, about: "self" | "significant_other") => void
   onAddNestedEvent?: (parentEventId: string, about: "self" | "significant_other") => void
@@ -990,19 +994,20 @@ function ConnectedList({
         const isLast = index === nodes.length - 1
         if (node.kind === "note") {
           return (
-            <TreeBranch key={nodeKey(node, index)} intoLayer={2} isLast={isLast}>
+            <TreeBranch key={nodeKey(node, index)} intoLayer={itemLayer === 4 ? 3 : itemLayer} isLast={isLast}>
               <p className="flex min-h-10 items-center px-1 text-sm text-muted-foreground italic">{node.text}</p>
             </TreeBranch>
           )
         }
         if (node.kind === "band") {
+          const layer = historyVisualLayer("band", { parentLayer: 1 })
           const selected = selectedId === node.id
           return (
-            <TreeBranch key={nodeKey(node, index)} intoLayer={2} isLast={isLast}>
+            <TreeBranch key={nodeKey(node, index)} intoLayer={layer} isLast={isLast}>
               <button
                 type="button"
                 aria-current={selected ? "true" : undefined}
-                className={cn(treeLayer2ShellClassName, treeItemStateClassName({ selected }))}
+                className={cn(treeLayer2ShellClassName, treeItemStateClassName({ selected, square: true }))}
                 onClick={() => onOpen(node.id)}
               >
                 <span className={cn(treeLayer2TitleClassName, treeSelectedTitleClassName(selected))}>{node.heading}</span>
@@ -1052,6 +1057,7 @@ function ConnectedList({
                 <ConnectedList
                   nodes={node.children}
                   about={about}
+                  itemLayer={3}
                   onOpen={onOpen}
                   onAddEvent={onAddEvent}
                   onAddNestedEvent={onAddNestedEvent}
@@ -1076,14 +1082,36 @@ function ConnectedList({
         }
         if (node.kind === "row") {
           const isStep = node.tag === "Step"
-          const layer = isStep ? 4 : 3
+          const layer = historyVisualLayer("row", { parentLayer: itemLayer === 2 ? 1 : 2, tag: node.tag })
+          // When this list is already under an item (itemLayer 3+), rows stay at that layer
+          // unless they are steps (always 4). Category-level rows use layer 2.
+          const visualLayer: 2 | 3 | 4 = isStep ? 4 : itemLayer === 2 ? 2 : itemLayer === 3 ? 3 : 4
           const selected = selectedId === node.id
           const { title, meta } = splitLine(node.line)
           const rowChildren = node.children.filter((child) => child.kind !== "actions")
+          const shell =
+            visualLayer === 2
+              ? treeLayer2ShellClassName
+              : visualLayer === 4
+                ? treeLayer4ShellClassName
+                : treeLayer3ShellClassName
+          const titleClass =
+            visualLayer === 2
+              ? treeLayer2TitleClassName
+              : visualLayer === 4
+                ? treeLayer4TitleClassName
+                : treeLayer3TitleClassName
+          const metaClass =
+            visualLayer === 2
+              ? treeLayer2MetaClassName
+              : visualLayer === 4
+                ? treeLayer4MetaClassName
+                : treeLayer3MetaClassName
+          void layer
           return (
             <TreeBranch
               key={nodeKey(node, index)}
-              intoLayer={layer}
+              intoLayer={visualLayer}
               isLast={isLast}
               dashed={isStep}
             >
@@ -1091,39 +1119,24 @@ function ConnectedList({
                 type="button"
                 aria-current={selected ? "true" : undefined}
                 className={cn(
-                  isStep ? treeLayer4ShellClassName : treeLayer3ShellClassName,
-                  treeItemStateClassName({ selected })
+                  shell,
+                  treeItemStateClassName({ selected, square: visualLayer === 2 })
                 )}
                 onClick={() => onOpen(node.id)}
               >
                 <span className="flex min-w-0 items-center gap-2">
                   {node.tag ? <Tag label={node.tag} /> : null}
-                  <span
-                    className={cn(
-                      isStep ? treeLayer4TitleClassName : treeLayer3TitleClassName,
-                      treeSelectedTitleClassName(selected),
-                      "min-w-0"
-                    )}
-                  >
-                    {title}
-                  </span>
+                  <span className={cn(titleClass, treeSelectedTitleClassName(selected), "min-w-0")}>{title}</span>
                 </span>
                 {meta ? (
-                  <span
-                    className={cn(
-                      isStep ? treeLayer4MetaClassName : treeLayer3MetaClassName,
-                      selected && "text-[#1e3a8a]",
-                      "w-full"
-                    )}
-                  >
-                    {meta}
-                  </span>
+                  <span className={cn(metaClass, selected && "text-[#1e3a8a]", "w-full")}>{meta}</span>
                 ) : null}
               </button>
               {rowChildren.length > 0 ? (
                 <ConnectedList
                   nodes={rowChildren}
                   about={about}
+                  itemLayer={visualLayer === 2 ? 3 : 4}
                   onOpen={onOpen}
                   onAddEvent={onAddEvent}
                   onAddNestedEvent={onAddNestedEvent}

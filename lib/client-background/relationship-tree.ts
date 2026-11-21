@@ -625,6 +625,52 @@ function sexOf(person: RelationshipRecord): "female" | "male" | "" {
   return ""
 }
 
+/**
+ * Per-section "+ Add relationship" / "+ Add arrangement" on Client Background
+ * and interview — opens the shared New relationship form (not AddForm).
+ */
+export type RelationshipSectionAddSpec = {
+  label: string
+  kind: BlockKind
+  parentSide?: "mother" | "father"
+}
+
+export function relationshipSectionAddSpec(sectionTitle: string): RelationshipSectionAddSpec | null {
+  if (sectionTitle === "Current intimate relationship and children") {
+    return { label: "+ Add relationship", kind: "client_current" }
+  }
+  if (sectionTitle === "Previous intimate relationships and children") {
+    return { label: "+ Add relationship", kind: "client_previous" }
+  }
+  if (sectionTitle.includes("· other relationships")) {
+    if (sectionTitle.startsWith("Mother")) {
+      return { label: "+ Add relationship", kind: "parent_other", parentSide: "mother" }
+    }
+    if (sectionTitle.startsWith("Father")) {
+      return { label: "+ Add relationship", kind: "parent_other", parentSide: "father" }
+    }
+  }
+  if (sectionTitle === "Other caregiver arrangements") {
+    return { label: "+ Add arrangement", kind: "caregiver_arrangement" }
+  }
+  return null
+}
+
+/** Hide add when the section only shows a none / not-asked note. */
+export function relationshipSectionAllowsAdd(children: RelationshipTreeNode[]): boolean {
+  if (children.length === 1 && children[0]?.kind === "note") {
+    const text = children[0].text.toLowerCase()
+    return !(
+      text === "none" ||
+      text === "not asked" ||
+      text === "no children" ||
+      text === "no siblings" ||
+      text.includes("not asked")
+    )
+  }
+  return true
+}
+
 export function addTargetKind(id: string): { kind: BlockKind; parentSide: "" | "mother" | "father" } | null {
   if (id === "new-current") return { kind: "client_current", parentSide: "" }
   if (id === "new-previous") return { kind: "client_previous", parentSide: "" }

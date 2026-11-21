@@ -108,7 +108,6 @@
     "db:history-events": "tsx db/apply-history-events-migration.ts",
     "db:retire-background-fields": "tsx db/apply-retire-background-fields-migration.ts",
     "db:relationship-children-siblings-answers": "tsx db/apply-relationship-children-siblings-answers-migration.ts",
-    "db:round-m-verify": "tsx db/apply-relationship-children-siblings-answers-migration.ts && tsx scripts/seed-test-client-tom.ts && tsx lib/reports/tom-example-db.selftest.ts",
     "db:letter-body": "tsx db/apply-letter-body-migration.ts",
     "db:report-versioning": "tsx db/apply-report-versioning-migration.ts",
     "db:session-note-versioning": "tsx db/apply-session-note-versioning-migration.ts",

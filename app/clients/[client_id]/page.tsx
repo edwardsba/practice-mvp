@@ -297,12 +297,12 @@ export default async function ClientDetailPage({
           openHref={buildEditDetailsHref(clientId, "emergency")}
         >
           <ClientPanelFields>
-            <ClientPanelField label="Emergency contact">
+            <ClientPanelField label="Emergency contacts">
               <span
                 className={
                   emergencyContacts.length === 0
                     ? "font-normal text-muted-foreground"
-                    : undefined
+                    : "whitespace-pre-line font-normal"
                 }
               >
                 {formatEmergencyContactSummary(emergencyContacts)}

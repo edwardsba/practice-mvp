@@ -10,6 +10,8 @@ import {
   updateMedicalContactAction,
   type MedicalContactFormState,
 } from "@/app/clients/[client_id]/medical-contacts/actions"
+import { TappableContactCard } from "@/components/clients/tappable-contact-card"
+import { DeleteConfirmationButton } from "@/components/delete-confirmation-button"
 import { FormCheckboxField } from "@/components/treatment-plan/form-fields"
 import { Button } from "@/components/ui/button"
 import {
@@ -25,7 +27,10 @@ import {
   professionalOptionLabel,
   type ProfessionalOption,
 } from "@/lib/client-background/professionals"
-import { formatMedicalContactLabel } from "@/lib/medical-contacts/rules"
+import {
+  formatMedicalContactLabel,
+  MEDICAL_CONTACT_IN_USE_MESSAGE,
+} from "@/lib/medical-contacts/rules"
 
 export type MedicalContactListItem = {
   medicalContactId: string
@@ -51,22 +56,12 @@ export function MedicalContactsSection({
   const router = useRouter()
   const [addOpen, setAddOpen] = useState(false)
   const [editing, setEditing] = useState<MedicalContactListItem | null>(null)
-  const [deleteError, setDeleteError] = useState<string | null>(null)
 
   const availableToAdd = professionals.filter(
     (professional) =>
       !contacts.some((contact) => contact.professionalId === professional.professionalId)
   )
-
-  async function onDelete(medicalContactId: string) {
-    setDeleteError(null)
-    const result = await deleteMedicalContactAction(clientId, medicalContactId)
-    if (result.error) {
-      setDeleteError(result.error)
-      return
-    }
-    router.refresh()
-  }
+  const addDisabled = availableToAdd.length === 0
 
   return (
     <div className="space-y-3">
@@ -74,68 +69,51 @@ export function MedicalContactsSection({
         <p className="text-sm text-muted-foreground">None recorded</p>
       ) : (
         <ul className="space-y-3">
-          {contacts.map((contact) => (
-            <li
-              key={contact.medicalContactId}
-              className="rounded-md border px-3 py-2 text-sm"
-            >
-              <div className="flex flex-wrap items-start justify-between gap-2">
-                <div className="min-w-0 space-y-1">
-                  <p className="font-medium">
-                    {formatMedicalContactLabel(contact.professional)}
-                    {contact.isResolvedMain ? (
-                      <span className="ml-2 text-xs font-normal text-muted-foreground">
-                        Main contact
-                      </span>
+          {contacts.map((contact) => {
+            const label = formatMedicalContactLabel(contact.professional)
+            return (
+              <li key={contact.medicalContactId}>
+                <TappableContactCard
+                  ariaLabel={`Edit ${label}`}
+                  onClick={() => setEditing(contact)}
+                >
+                  <div className="space-y-1">
+                    <p className="font-medium">
+                      {label}
+                      {contact.isResolvedMain ? (
+                        <span className="ml-2 text-xs font-normal text-muted-foreground">
+                          Main contact
+                        </span>
+                      ) : null}
+                    </p>
+                    <p className="text-muted-foreground">
+                      Supervises: {contact.supervisesLine}
+                    </p>
+                    {contact.notes?.trim() ? (
+                      <p className="text-muted-foreground">{contact.notes}</p>
                     ) : null}
-                  </p>
-                  <p className="text-muted-foreground">
-                    Supervises: {contact.supervisesLine}
-                  </p>
-                  {contact.notes?.trim() ? (
-                    <p className="text-muted-foreground">{contact.notes}</p>
-                  ) : null}
-                </div>
-                <div className="flex shrink-0 gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setEditing(contact)}
-                  >
-                    Edit
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => void onDelete(contact.medicalContactId)}
-                  >
-                    Remove
-                  </Button>
-                </div>
-              </div>
-            </li>
-          ))}
+                  </div>
+                </TappableContactCard>
+              </li>
+            )
+          })}
         </ul>
       )}
 
-      {deleteError ? (
-        <p className="text-sm text-destructive" role="alert">
-          {deleteError}
-        </p>
-      ) : null}
-
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        onClick={() => setAddOpen(true)}
-        disabled={availableToAdd.length === 0}
-      >
-        + Add medical contact
-      </Button>
-      {availableToAdd.length === 0 && professionals.length > 0 ? (
+      {addDisabled ? (
+        <span className="inline-block px-1 text-sm text-muted-foreground">
+          + Add medical contact
+        </span>
+      ) : (
+        <button
+          type="button"
+          className="px-1 text-sm text-primary underline-offset-2 hover:underline"
+          onClick={() => setAddOpen(true)}
+        >
+          + Add medical contact
+        </button>
+      )}
+      {addDisabled && professionals.length > 0 ? (
         <p className="text-xs text-muted-foreground">
           Every professional is already on this list.
         </p>
@@ -150,6 +128,7 @@ export function MedicalContactsSection({
         onDone={() => router.refresh()}
       />
       <MedicalContactDialog
+        key={editing?.medicalContactId ?? "edit"}
         open={Boolean(editing)}
         onOpenChange={(open) => {
           if (!open) setEditing(null)
@@ -186,6 +165,10 @@ function MedicalContactDialog({
     : addMedicalContactAction.bind(null, clientId)
 
   const [state, formAction, pending] = useActionState(action, emptyState)
+  const removalBlocked =
+    contact != null && contact.supervisesLine !== "No current medication"
+      ? MEDICAL_CONTACT_IN_USE_MESSAGE
+      : undefined
 
   useEffect(() => {
     if (state.success) {
@@ -261,18 +244,39 @@ function MedicalContactDialog({
             </p>
           ) : null}
 
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-            >
-              Cancel
-            </Button>
-            <Button type="submit" disabled={pending}>
-              {pending ? "Saving…" : "Save"}
-            </Button>
-          </DialogFooter>
+          <div className="flex flex-col-reverse gap-4 sm:flex-row sm:items-end sm:justify-between">
+            {contact ? (
+              <div className="[&>div]:mt-0 [&>div]:border-0 [&>div]:pt-0">
+                <DeleteConfirmationButton
+                  entityName="medical contact"
+                  blockedReason={removalBlocked}
+                  onDelete={async () => {
+                    const result = await deleteMedicalContactAction(
+                      clientId,
+                      contact.medicalContactId
+                    )
+                    if (result.error) throw new Error(result.error)
+                    onOpenChange(false)
+                    onDone()
+                  }}
+                />
+              </div>
+            ) : (
+              <span />
+            )}
+            <DialogFooter className="sm:justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => onOpenChange(false)}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={pending}>
+                {pending ? "Saving…" : "Save"}
+              </Button>
+            </DialogFooter>
+          </div>
         </form>
       </DialogContent>
     </Dialog>

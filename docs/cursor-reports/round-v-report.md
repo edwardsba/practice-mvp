@@ -6,7 +6,7 @@ Base: `d0b8b78` (Round U)
 ## Commits
 
 - `5f4465b` — Emergency and medical contacts as tappable cards
-- `d5df96a` — Round V report: preview Ready URL and final notes
+- `886d92f` — Round V report: preview Ready URL and final notes
 
 ## What changed
 

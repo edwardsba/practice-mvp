@@ -63,7 +63,7 @@ export function CommunicationPreferencesCard({
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle>Communication Preferences</CardTitle>
         <Button variant="outline" size="sm" asChild>
-          <Link href={`/clients/${clientId}/edit#communication-preferences`}>
+          <Link href={`/clients/${clientId}/edit?open=communication`}>
             Edit
           </Link>
         </Button>

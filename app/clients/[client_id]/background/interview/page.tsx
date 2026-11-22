@@ -13,6 +13,7 @@ import {
   anyReferralRecorded,
   buildReferralFundingCardProps,
 } from "@/lib/funding/referral-funding-card-props"
+import { loadMedicalContactsForClient } from "@/lib/medical-contacts/load"
 
 export default async function BackgroundInterviewRoute({
   params,
@@ -50,11 +51,13 @@ export default async function BackgroundInterviewRoute({
   const data = await loadClientBackground(clientId, context.practiceId)
   if (!data) notFound()
 
-  const [selfReport, reasonSupport, referralFundingData] = await Promise.all([
-    loadLatestBackgroundSelfReport(clientId, context.practiceId),
-    loadReasonSupport(clientId, context.practiceId, null),
-    getReferralFundingCardData(clientId),
-  ])
+  const [selfReport, reasonSupport, referralFundingData, medicalContacts] =
+    await Promise.all([
+      loadLatestBackgroundSelfReport(clientId, context.practiceId),
+      loadReasonSupport(clientId, context.practiceId, null),
+      getReferralFundingCardData(clientId),
+      loadMedicalContactsForClient(clientId, context.practiceId),
+    ])
 
   const referralFunding = buildReferralFundingCardProps(
     context.practiceId,
@@ -72,6 +75,7 @@ export default async function BackgroundInterviewRoute({
         screening={interview.screening}
         selfReport={selfReport}
         reasonSupport={reasonSupport}
+        medicalContacts={medicalContacts.map((row) => row.professional)}
         referralFunding={referralFunding}
         referralRecorded={anyReferralRecorded(referralFunding.approvals)}
       />

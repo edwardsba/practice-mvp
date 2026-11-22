@@ -22,6 +22,11 @@ import {
 import { loadActiveCrisisPlanSummary } from "@/lib/crisis-plans/load"
 import { requirePractitionerContext } from "@/lib/auth"
 import { getQuestionnaireEmailContext } from "@/lib/email/practitioner-context"
+import {
+  loadMedicationEventsForClient,
+  loadProfessionalsForOngoingMedicationPrescribers,
+} from "@/lib/medical-contacts/load"
+import { formatMedicationSupervisedAnswer } from "@/lib/medical-contacts/rules"
 
 function formatVersionDate(value: Date) {
   return value.toLocaleDateString("en-AU", {
@@ -56,14 +61,29 @@ export default async function TreatmentPlanViewPage({
     notFound()
   }
 
-  const [versions, emailContext, crisisPlanSummary] = await Promise.all([
+  const [
+    versions,
+    emailContext,
+    crisisPlanSummary,
+    medicationEvents,
+    medicationProfessionals,
+  ] = await Promise.all([
     loadTreatmentPlanVersions(clientId, context.practiceId),
     getQuestionnaireEmailContext(
       context.practiceId,
       context.practitionerProfileId
     ),
     loadActiveCrisisPlanSummary(clientId, context.practiceId),
+    loadMedicationEventsForClient(clientId, context.practiceId),
+    loadProfessionalsForOngoingMedicationPrescribers(
+      clientId,
+      context.practiceId
+    ),
   ])
+  const medicationSupervised = formatMedicationSupervisedAnswer(
+    medicationEvents,
+    medicationProfessionals
+  )
 
   const clientName = `${client.firstName} ${client.lastName}`
 
@@ -117,6 +137,7 @@ export default async function TreatmentPlanViewPage({
         plan={plan}
         clientId={clientId}
         crisisPlanSummary={crisisPlanSummary}
+        medicationSupervisedLine={medicationSupervised.fullLine}
       />
 
       <Card className="mt-6">

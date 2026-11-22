@@ -1,5 +1,6 @@
 export const EDIT_DETAILS_PANEL_IDS = [
   "details",
+  "demographics",
   "relationships",
   "history",
   "emergency",

@@ -9,13 +9,11 @@ import {
   ClientPanelFields,
 } from "@/components/clients/client-panel"
 import { ClientStatusControl } from "@/components/clients/client-status-control"
-import { EmergencyContactsSection } from "@/components/emergency-contacts/emergency-contacts-section"
 import { ReferralFundingCard } from "@/components/funding/referral-funding-card"
 import { AppShell } from "@/components/app-shell"
 import { BackButton } from "@/components/ui/back-button"
 import { EntityPageHeader } from "@/components/ui/entity-page-header"
 import { StatusBadge } from "@/components/ui/status-badge"
-import { Button } from "@/components/ui/button"
 import { clients } from "@/db/schema"
 import { getDefaultBatteryAssessments } from "@/lib/assessments/battery-defaults"
 import { loadLatestAssessmentResultForClient } from "@/lib/assessments/load"
@@ -40,10 +38,8 @@ import { appendReturnTo } from "@/lib/navigation/back"
 import { buildTemplateVariablesFromLinkResponse } from "@/lib/email/link-response"
 import { getQuestionnaireEmailContext } from "@/lib/email/practitioner-context"
 import { loadActiveTreatmentPlanSummary } from "@/lib/treatment-plans/load"
-import {
-  loadClientBackground,
-  loadClientBackgroundSummary,
-} from "@/lib/client-background/load"
+import { loadClientBackground } from "@/lib/client-background/load"
+import { buildBackgroundPanelSummary } from "@/lib/clients/background-summary"
 import { formatCommunicationSummary } from "@/lib/clients/communication-summary"
 import { buildEditDetailsHref } from "@/lib/clients/edit-details-panels"
 import {
@@ -52,6 +48,11 @@ import {
 } from "@/lib/clients/emergency-details-summary"
 import { buildReferralFundingPanelSummary } from "@/lib/clients/referral-funding-summary"
 import { formatStressorsSummary } from "@/lib/clients/stressors-summary"
+import { loadMedicalContactsForClient } from "@/lib/medical-contacts/load"
+import {
+  formatMedicalContactLabel,
+  resolveMainMedicalContact,
+} from "@/lib/medical-contacts/rules"
 import {
   ATTENDANCE_RISK_CONFIG,
   CLIENT_STATUS_CONFIG,
@@ -103,8 +104,8 @@ export default async function ClientDetailPage({
     attendanceRisk,
     latestAsq,
     latestPsf,
-    backgroundSummary,
     background,
+    medicalContacts,
   ] = await Promise.all([
     loadActiveTreatmentPlanSummary(clientId, context.practiceId),
     loadActiveCrisisPlanSummary(clientId, context.practiceId),
@@ -117,8 +118,8 @@ export default async function ClientDetailPage({
     loadAttendanceRiskForClient(clientId, context.practiceId),
     loadLatestAssessmentResultForClient(clientId, context.practiceId, "ASQ"),
     loadLatestAssessmentResultForClient(clientId, context.practiceId, "PSF"),
-    loadClientBackgroundSummary(clientId, context.practiceId),
     loadClientBackground(clientId, context.practiceId),
+    loadMedicalContactsForClient(clientId, context.practiceId),
   ])
 
   const stressorsLine = formatStressorsSummary(background?.stressors)
@@ -169,9 +170,12 @@ export default async function ClientDetailPage({
     onlineBookingPermitted: client.onlineBookingPermitted,
   })
 
-  const relationshipCount = backgroundSummary?.relationshipCount ?? 0
-  const eventCount = backgroundSummary?.eventCount ?? 0
-  const recordedLine = `${relationshipCount} relationship${relationshipCount === 1 ? "" : "s"} · ${eventCount} history entr${eventCount === 1 ? "y" : "ies"}`
+  const backgroundPanel = buildBackgroundPanelSummary(background)
+  const mainMedicalContact = resolveMainMedicalContact(medicalContacts)
+  const medicalContactLine = mainMedicalContact
+    ? formatMedicalContactLabel(mainMedicalContact.professional)
+    : "None recorded"
+  const crisisPlanLabel = formatCrisisPlanSummary(activeCrisisPlan)
 
   const treatmentPlanHref = activeTreatmentPlan
     ? `/clients/${clientId}/treatment-plan/${activeTreatmentPlan.treatmentPlanId}`
@@ -251,7 +255,7 @@ export default async function ClientDetailPage({
 
         <ClientPanel
           title="Contact details"
-          control="open"
+          control="edit"
           openHref={buildEditDetailsHref(clientId, "details")}
         >
           <ClientPanelFields>
@@ -289,50 +293,8 @@ export default async function ClientDetailPage({
 
         <ClientPanel
           title="Emergency details"
-          control="expand"
-          expandedContent={
-            <div className="space-y-6">
-              <div className="-mx-4 -mt-2">
-                <EmergencyContactsSection
-                  clientId={clientId}
-                  contacts={emergencyContacts}
-                />
-              </div>
-              <div className="space-y-3 border-t pt-4">
-                <div className="flex items-center justify-between gap-3">
-                  <h3 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-                    Crisis plan
-                  </h3>
-                  {!activeCrisisPlan ? (
-                    <Button asChild size="sm">
-                      <Link href={`/clients/${clientId}/crisis-plan/new`}>
-                        Create crisis plan
-                      </Link>
-                    </Button>
-                  ) : (
-                    <Button asChild variant="outline" size="sm">
-                      <Link
-                        href={`/clients/${clientId}/crisis-plan/${activeCrisisPlan.crisisPlanId}`}
-                      >
-                        View / Edit
-                      </Link>
-                    </Button>
-                  )}
-                </div>
-                <p className="text-sm font-medium">
-                  {formatCrisisPlanSummary(activeCrisisPlan)}
-                </p>
-              </div>
-              <div className="border-t pt-4">
-                <Link
-                  href={buildEditDetailsHref(clientId, "emergency")}
-                  className="text-sm text-primary hover:underline"
-                >
-                  Edit emergency contacts ›
-                </Link>
-              </div>
-            </div>
-          }
+          control="edit"
+          openHref={buildEditDetailsHref(clientId, "emergency")}
         >
           <ClientPanelFields>
             <ClientPanelField label="Emergency contact">
@@ -346,16 +308,33 @@ export default async function ClientDetailPage({
                 {formatEmergencyContactSummary(emergencyContacts)}
               </span>
             </ClientPanelField>
-            <ClientPanelField label="Crisis plan">
+            <ClientPanelField label="Medical contact">
               <span
                 className={
-                  !activeCrisisPlan
+                  !mainMedicalContact
                     ? "font-normal text-muted-foreground"
                     : undefined
                 }
               >
-                {formatCrisisPlanSummary(activeCrisisPlan)}
+                {medicalContactLine}
               </span>
+            </ClientPanelField>
+            <ClientPanelField label="Crisis plan">
+              {activeCrisisPlan ? (
+                <Link
+                  href={`/clients/${clientId}/crisis-plan/${activeCrisisPlan.crisisPlanId}`}
+                  className="text-primary hover:underline"
+                >
+                  {crisisPlanLabel}
+                </Link>
+              ) : (
+                <Link
+                  href={`/clients/${clientId}/crisis-plan/new`}
+                  className="font-normal text-primary hover:underline"
+                >
+                  Create crisis plan
+                </Link>
+              )}
             </ClientPanelField>
             <ClientPanelField label="Risk">
               {latestAsq ? (
@@ -446,16 +425,30 @@ export default async function ClientDetailPage({
           openHref={`/clients/${clientId}/background`}
         >
           <ClientPanelFields>
-            <ClientPanelField label="Recorded">{recordedLine}</ClientPanelField>
-            <ClientPanelField label="Intake interview">
-              {backgroundSummary?.backgroundCapturedAt ? (
-                `Completed ${formatDate(backgroundSummary.backgroundCapturedAt)}`
-              ) : (
-                <span className="font-normal text-muted-foreground">
-                  Not yet completed
+            {(
+              [
+                ["Relationship", backgroundPanel.relationship],
+                ["Children", backgroundPanel.children],
+                ["Living situation", backgroundPanel.livingSituation],
+                ["Occupation", backgroundPanel.occupation],
+                ["History", backgroundPanel.history],
+                ["Intake interview", backgroundPanel.intakeInterview],
+              ] as const
+            ).map(([label, value]) => (
+              <ClientPanelField key={label} label={label}>
+                <span
+                  className={
+                    value === "Not recorded" ||
+                    value === "None recorded" ||
+                    value === "Not yet completed"
+                      ? "font-normal text-muted-foreground"
+                      : undefined
+                  }
+                >
+                  {value}
                 </span>
-              )}
-            </ClientPanelField>
+              </ClientPanelField>
+            ))}
           </ClientPanelFields>
         </ClientPanel>
 

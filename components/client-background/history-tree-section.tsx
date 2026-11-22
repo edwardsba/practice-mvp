@@ -102,6 +102,7 @@ export function HistoryTreeSection({
   events,
   relationships,
   screening,
+  medicalContacts = [],
   professionals,
   issues: storedIssues,
   readOnly = false,
@@ -122,6 +123,7 @@ export function HistoryTreeSection({
   events: EventRecord[]
   relationships: RelationshipRecord[]
   screening: ScreeningAnswers
+  medicalContacts?: ProfessionalOption[]
   professionals: ProfessionalOption[]
   issues?: HistoryIssue[]
   readOnly?: boolean
@@ -650,6 +652,8 @@ export function HistoryTreeSection({
                         treatmentType={treatmentType}
                         category={selection.category ?? null}
                         dateOfBirth={dateOfBirth}
+                        clientId={clientId}
+                        medicalContacts={medicalContacts}
                         professionals={professionals}
                         onKindChange={setSmartKind}
                         onTreatmentTypeChange={setTreatmentType}
@@ -663,6 +667,8 @@ export function HistoryTreeSection({
                         dateOfBirth={dateOfBirth}
                         relationships={people}
                         events={shown}
+                        clientId={clientId}
+                        medicalContacts={medicalContacts}
                         professionals={professionals}
                         onChange={setDraft}
                         lockContext

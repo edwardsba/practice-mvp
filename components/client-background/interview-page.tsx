@@ -64,6 +64,7 @@ export function InterviewPage({
   screening,
   selfReport,
   reasonSupport,
+  medicalContacts = [],
   referralFunding,
   referralRecorded = false,
 }: {
@@ -75,6 +76,7 @@ export function InterviewPage({
   screening: ScreeningAnswers
   selfReport: BackgroundSelfReport | null
   reasonSupport: ReasonSupport
+  medicalContacts?: import("@/lib/client-background/professionals").ProfessionalOption[]
   referralFunding: ReferralFundingCardProps
   referralRecorded?: boolean
 }) {
@@ -546,6 +548,7 @@ export function InterviewPage({
           selfReportId={selfReport?.resultId ?? null}
           historyClient={suggestions?.history}
           medicationClient={suggestions?.medication}
+          medicalContacts={medicalContacts}
           professionals={professionals}
           stressorsClient={suggestions?.stressors}
           issues={data.issues}

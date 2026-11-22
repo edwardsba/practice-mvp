@@ -62,6 +62,7 @@ export function TreatmentPlanView({
   plan,
   clientId,
   crisisPlanSummary = null,
+  medicationSupervisedLine = "Medication supervised: No",
 }: {
   plan: TreatmentPlanRow
   clientId: string
@@ -70,6 +71,8 @@ export function TreatmentPlanView({
     versionNumber: number
     dateOfPlan: string
   } | null
+  /** Live line from medical contacts / ongoing medications. */
+  medicationSupervisedLine?: string
 }) {
   const ongoing = plan.ongoingAssessmentsJson ?? {
     phq9: false,
@@ -86,10 +89,6 @@ export function TreatmentPlanView({
   )
   const emptyMulti = { selected: [], other: [] }
   const supportServicesSection = plan.supportServicesJson ?? emptyMulti
-  const medicationSupervision = plan.medicationSupervisionJson ?? {
-    supervised: false,
-    supervisorName: null,
-  }
   const treatmentModelLabel = plan.treatmentModelJson?.selected
     ? optionLabel(TREATMENT_MODEL_OPTIONS, plan.treatmentModelJson.selected)
     : null
@@ -214,11 +213,7 @@ export function TreatmentPlanView({
           </div>
           <div>
             <p className="text-sm text-muted-foreground">Medication supervision</p>
-            <p className="mt-1 text-sm">
-              {medicationSupervision.supervised
-                ? `Yes — supervised by ${medicationSupervision.supervisorName ?? "—"}`
-                : "No"}
-            </p>
+            <p className="mt-1 text-sm">{medicationSupervisedLine}</p>
           </div>
           <div>
             <p className="text-sm text-muted-foreground">Crisis plan</p>

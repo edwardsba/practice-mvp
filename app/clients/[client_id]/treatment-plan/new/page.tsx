@@ -1,4 +1,3 @@
-import Link from "next/link"
 import { notFound } from "next/navigation"
 
 import { TreatmentPlanForm } from "@/components/treatment-plan/treatment-plan-form"
@@ -8,8 +7,11 @@ import { EntityPageHeader } from "@/components/ui/entity-page-header"
 import { verifyClientInPractice } from "@/lib/treatment-plans/load"
 import { loadActiveCrisisPlanSummary } from "@/lib/crisis-plans/load"
 import { requirePractitionerContext } from "@/lib/auth"
-import { loadClientBackground, loadReasonSupport } from "@/lib/client-background/load"
-import { ongoingMedicationEvents } from "@/lib/client-background/medication"
+import {
+  loadMedicationEventsForClient,
+  loadProfessionalsForOngoingMedicationPrescribers,
+} from "@/lib/medical-contacts/load"
+import { formatMedicationSupervisedAnswer } from "@/lib/medical-contacts/rules"
 
 export default async function NewTreatmentPlanPage({
   params,
@@ -24,19 +26,19 @@ export default async function NewTreatmentPlanPage({
     notFound()
   }
 
-  const crisisPlanSummary = await loadActiveCrisisPlanSummary(
-    clientId,
-    context.practiceId
+  const [crisisPlanSummary, medicationEvents, medicationProfessionals] =
+    await Promise.all([
+      loadActiveCrisisPlanSummary(clientId, context.practiceId),
+      loadMedicationEventsForClient(clientId, context.practiceId),
+      loadProfessionalsForOngoingMedicationPrescribers(
+        clientId,
+        context.practiceId
+      ),
+    ])
+  const medicationSupervised = formatMedicationSupervisedAnswer(
+    medicationEvents,
+    medicationProfessionals
   )
-  const [background, reasonSupport] = await Promise.all([
-    loadClientBackground(clientId, context.practiceId),
-    loadReasonSupport(clientId, context.practiceId, null),
-  ])
-  const ongoingMedications = ongoingMedicationEvents(background?.events ?? []).map((event) => ({
-    eventRecordId: event.eventRecordId,
-    title: event.title,
-    prescriberProfessionalId: event.prescriberProfessionalId,
-  }))
 
   const clientName = `${client.firstName} ${client.lastName}`
 
@@ -59,8 +61,7 @@ export default async function NewTreatmentPlanPage({
         sourcePlanId={null}
         cancelHref={`/clients/${clientId}`}
         crisisPlanSummary={crisisPlanSummary}
-        ongoingMedications={ongoingMedications}
-        professionals={reasonSupport.professionals}
+        medicationSupervisedLine={medicationSupervised.fullLine}
       />
     </AppShell>
   )

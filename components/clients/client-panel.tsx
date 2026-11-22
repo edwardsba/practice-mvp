@@ -75,6 +75,16 @@ type ClientPanelOpen = ClientPanelBase & {
   defaultExpanded?: never
 }
 
+/** Same as open, default label "Edit ›". */
+type ClientPanelEdit = ClientPanelBase & {
+  control: "edit"
+  openHref: string
+  openLabel?: string
+  menuContent?: never
+  expandedContent?: never
+  defaultExpanded?: never
+}
+
 type ClientPanelExpand = ClientPanelBase & {
   control: "expand"
   expandedContent: ReactNode
@@ -88,6 +98,7 @@ type ClientPanelExpand = ClientPanelBase & {
 export type ClientPanelProps =
   | ClientPanelMenu
   | ClientPanelOpen
+  | ClientPanelEdit
   | ClientPanelExpand
 
 /**
@@ -124,9 +135,11 @@ export function ClientPanel(props: ClientPanelProps) {
             </DropdownMenuContent>
           </DropdownMenu>
         ) : null}
-        {control === "open" ? (
+        {control === "open" || control === "edit" ? (
           <Button asChild variant="outline" size="sm" className="shrink-0">
-            <Link href={props.openHref}>{props.openLabel ?? "Open ›"}</Link>
+            <Link href={props.openHref}>
+              {props.openLabel ?? (control === "edit" ? "Edit ›" : "Open ›")}
+            </Link>
           </Button>
         ) : null}
         {control === "expand" ? (

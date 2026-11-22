@@ -37,12 +37,35 @@ import {
   updateHistoryIssueTreatmentAnswer,
 } from "@/lib/client-background/mutations"
 import type { BlockKind, BlockRole, RelationshipBlockAnswers, TreatmentAnswer } from "@/lib/client-background/types"
+import { ensureMedicalContact } from "@/lib/medical-contacts/mutations"
 
 function refresh(clientId: string) {
   revalidatePath(`/clients/${clientId}/background`)
   revalidatePath(`/clients/${clientId}/background/interview`)
   revalidatePath(`/clients/${clientId}`)
   revalidatePath(`/clients/${clientId}/edit`)
+}
+
+async function ensurePrescriberOnMedicalContacts(
+  clientId: string,
+  practiceId: string,
+  userId: string,
+  event: unknown
+) {
+  if (!event || typeof event !== "object") return
+  const row = event as {
+    eventType?: string
+    prescriberProfessionalId?: string | null
+  }
+  if (row.eventType !== "medication") return
+  const professionalId = row.prescriberProfessionalId?.trim()
+  if (!professionalId) return
+  await ensureMedicalContact({
+    clientId,
+    practiceId,
+    userId,
+    professionalId,
+  })
 }
 
 export async function saveIdentityAction(clientId: string, identity: unknown) {
@@ -156,7 +179,15 @@ export async function createEventAction(clientId: string, event: unknown) {
     userId: context.userId,
     event,
   })
-  if (!result.error) refresh(clientId)
+  if (!result.error) {
+    await ensurePrescriberOnMedicalContacts(
+      clientId,
+      context.practiceId,
+      context.userId,
+      result.event ?? event
+    )
+    refresh(clientId)
+  }
   return result
 }
 
@@ -204,7 +235,15 @@ export async function updateEventAction(clientId: string, event: unknown) {
     userId: context.userId,
     event,
   })
-  if (!result.error) refresh(clientId)
+  if (!result.error) {
+    await ensurePrescriberOnMedicalContacts(
+      clientId,
+      context.practiceId,
+      context.userId,
+      result.event ?? event
+    )
+    refresh(clientId)
+  }
   return result
 }
 

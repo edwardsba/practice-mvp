@@ -16,6 +16,7 @@ import {
 import { HistoryTreeSection } from "@/components/client-background/history-tree-section"
 import { RelationshipTreeSection } from "@/components/client-background/relationship-tree-section"
 import { EmergencyContactsSection } from "@/components/emergency-contacts/emergency-contacts-section"
+import { MedicalContactsSection } from "@/components/medical-contacts/medical-contacts-section"
 import { AppShell } from "@/components/app-shell"
 import { BackButton } from "@/components/ui/back-button"
 import { EntityPageHeader } from "@/components/ui/entity-page-header"
@@ -36,6 +37,7 @@ import {
 } from "@/lib/clients/edit-details-panels"
 import { loadEmergencyContacts } from "@/lib/crisis-plans/load"
 import { db } from "@/lib/db"
+import { loadMedicalContactsWithSupervises } from "@/lib/medical-contacts/load"
 
 export default async function EditClientPage({
   params,
@@ -88,12 +90,14 @@ export default async function EditClientPage({
     userId: context.userId,
   })
 
-  const [deleteStatus, background, interview, reasonSupport] = await Promise.all([
-    getClientDeleteStatus(clientId),
-    loadClientBackground(clientId, context.practiceId),
-    loadBackgroundInterviewCard(clientId, context.practiceId),
-    loadReasonSupport(clientId, context.practiceId, null),
-  ])
+  const [deleteStatus, background, interview, reasonSupport, medicalBundle] =
+    await Promise.all([
+      getClientDeleteStatus(clientId),
+      loadClientBackground(clientId, context.practiceId),
+      loadBackgroundInterviewCard(clientId, context.practiceId),
+      loadReasonSupport(clientId, context.practiceId, null),
+      loadMedicalContactsWithSupervises(clientId, context.practiceId),
+    ])
 
   if (!background) {
     notFound()
@@ -118,6 +122,16 @@ export default async function EditClientPage({
     adminCommsOptOut: client.adminCommsOptOut,
     onlineBookingPermitted: client.onlineBookingPermitted,
   })
+
+  const medicalContactItems = medicalBundle.contacts.map((contact) => ({
+    medicalContactId: contact.medicalContactId,
+    professionalId: contact.professionalId,
+    isMain: contact.isMain,
+    isResolvedMain: contact.isResolvedMain,
+    notes: contact.notes,
+    supervisesLine: contact.supervisesLine,
+    professional: contact.professional,
+  }))
 
   return (
     <AppShell>
@@ -155,25 +169,36 @@ export default async function EditClientPage({
                   showSaved={showSaved && openPanel === "details"}
                 />
               </section>
-
-              <section className="space-y-6 border-t pt-6">
-                <h3 className="text-sm font-semibold">Demographics</h3>
-                <DemographicsSection
-                  clientId={clientId}
-                  demographics={background.demographics}
-                  relationships={background.relationships}
-                />
-                <LivingSituationSection
-                  clientId={clientId}
-                  livingSituation={background.demographics.livingSituation}
-                  relationships={background.relationships}
-                />
-              </section>
             </div>
           }
         >
           <p className="text-sm text-muted-foreground">
-            Contact information · Demographics
+            Account status · Contact information
+          </p>
+        </ClientPanel>
+
+        <ClientPanel
+          id={editDetailsPanelElementId("demographics")}
+          title="Demographics"
+          control="expand"
+          defaultExpanded={openPanel === "demographics"}
+          expandedContent={
+            <div className="space-y-6">
+              <DemographicsSection
+                clientId={clientId}
+                demographics={background.demographics}
+                relationships={background.relationships}
+              />
+              <LivingSituationSection
+                clientId={clientId}
+                livingSituation={background.demographics.livingSituation}
+                relationships={background.relationships}
+              />
+            </div>
+          }
+        >
+          <p className="text-sm text-muted-foreground">
+            Demographics · Living situation
           </p>
         </ClientPanel>
 
@@ -214,6 +239,9 @@ export default async function EditClientPage({
               relationships={background.relationships}
               screening={interview?.latest?.screening ?? {}}
               professionals={reasonSupport.professionals}
+              medicalContacts={medicalBundle.contacts.map(
+                (row) => row.professional
+              )}
               issues={background.issues}
             />
           }
@@ -239,11 +267,13 @@ export default async function EditClientPage({
                   />
                 </div>
               </section>
-              <section className="space-y-2 border-t pt-6">
+              <section className="space-y-3 border-t pt-6">
                 <h3 className="text-sm font-semibold">Medical contacts</h3>
-                <p className="text-sm text-muted-foreground">
-                  Medical contacts are coming in the next update.
-                </p>
+                <MedicalContactsSection
+                  clientId={clientId}
+                  contacts={medicalContactItems}
+                  professionals={reasonSupport.professionals}
+                />
               </section>
             </div>
           }

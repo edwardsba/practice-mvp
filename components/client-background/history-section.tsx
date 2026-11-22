@@ -45,7 +45,8 @@ import {
 import { formatPartialDate, parsePartialDate, precisionForPartialDate } from "@/lib/client-background/partial-date"
 import { conditionGroups, matchingConditionGroup, personKey, samePerson } from "@/lib/client-background/condition-groups"
 import { entryDetailGap, isConditionEvent, isTreatmentEvent, treatmentNeedsLink, treatmentsForCondition } from "@/lib/client-background/history-links"
-import { professionalOptionLabel, type ProfessionalOption } from "@/lib/client-background/professionals"
+import { PrescriberField } from "@/components/medical-contacts/prescriber-field"
+import type { ProfessionalOption } from "@/lib/client-background/professionals"
 import { personName } from "@/lib/client-background/tree"
 import {
   ADMISSION_TYPES,
@@ -72,6 +73,7 @@ export function HistorySection({
   events,
   relationships,
   interviewSource,
+  medicalContacts = [],
   professionals,
 }: {
   clientId: string
@@ -79,6 +81,7 @@ export function HistorySection({
   events: EventRecord[]
   relationships: RelationshipRecord[]
   interviewSource: BackgroundInterviewAnswerSource | null
+  medicalContacts?: ProfessionalOption[]
   professionals: ProfessionalOption[]
 }) {
   const [entries, setEntries] = useState(events)
@@ -199,6 +202,8 @@ export function HistorySection({
         dateOfBirth={dateOfBirth}
         relationships={relationships}
         events={entries}
+        clientId={clientId}
+        medicalContacts={medicalContacts}
         professionals={professionals}
         onEdit={() => {
           setEditing(true)
@@ -447,6 +452,8 @@ export function HistoryPanel({
   dateOfBirth,
   relationships,
   events = [],
+  clientId,
+  medicalContacts = [],
   professionals = [],
   onEdit,
   onCancel,
@@ -465,6 +472,8 @@ export function HistoryPanel({
   dateOfBirth: string | null
   relationships: RelationshipRecord[]
   events?: EventRecord[]
+  clientId: string
+  medicalContacts?: ProfessionalOption[]
   professionals?: ProfessionalOption[]
   onEdit: () => void
   onCancel: () => void
@@ -507,6 +516,8 @@ export function HistoryPanel({
             dateOfBirth={dateOfBirth}
             relationships={relationships}
             events={events}
+            clientId={clientId}
+            medicalContacts={medicalContacts}
             professionals={professionals}
             onChange={onChange}
           />
@@ -668,6 +679,8 @@ export function EventEditor({
   dateOfBirth,
   relationships,
   events,
+  clientId,
+  medicalContacts,
   professionals,
   onChange,
   /** When set, About / Who / Event type are omitted (shown in the context strip instead). */
@@ -679,6 +692,8 @@ export function EventEditor({
   dateOfBirth: string | null
   relationships: RelationshipRecord[]
   events: EventRecord[]
+  clientId: string
+  medicalContacts: ProfessionalOption[]
   professionals: ProfessionalOption[]
   onChange: (event: EventRecord) => void
   lockContext?: boolean
@@ -883,21 +898,19 @@ export function EventEditor({
         </>
       ) : null}
       {draft.eventType === "medication" ? (
-        <SelectField
-          id={`${draft.eventRecordId}_prescriber`}
-          label="Prescribed or supervised by"
-          value={draft.prescriberProfessionalId ?? ""}
+        <PrescriberField
+          clientId={clientId}
+          value={draft.prescriberProfessionalId}
+          freeTextFallback={draft.prescriberName}
+          medicalContacts={medicalContacts}
+          professionals={professionals}
           onChange={(prescriberProfessionalId) =>
-            patch({ prescriberProfessionalId: prescriberProfessionalId || null, prescriberName: "" })
+            patch({
+              prescriberProfessionalId,
+              prescriberName: "",
+            })
           }
-        >
-          <option value="">{draft.prescriberName.trim() || "Not recorded"}</option>
-          {professionals.map((professional) => (
-            <option key={professional.professionalId} value={professional.professionalId}>
-              {professionalOptionLabel(professional)}
-            </option>
-          ))}
-        </SelectField>
+        />
       ) : null}
       <TextAreaField
         id={`${draft.eventRecordId}_description`}

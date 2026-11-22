@@ -37,6 +37,7 @@ export function ClientBackgroundPage({
   interview,
   numberOfChildren,
   reasonSupport,
+  medicalContacts = [],
   referralFunding,
   referralRecorded = false,
 }: {
@@ -47,6 +48,7 @@ export function ClientBackgroundPage({
   interview: BackgroundInterviewCardData
   numberOfChildren: number | null
   reasonSupport: ReasonSupport
+  medicalContacts?: import("@/lib/client-background/professionals").ProfessionalOption[]
   referralFunding: ReferralFundingCardProps
   referralRecorded?: boolean
 }) {
@@ -140,6 +142,7 @@ export function ClientBackgroundPage({
               events={data.events}
               relationships={data.relationships}
               screening={interview.latest?.screening ?? {}}
+              medicalContacts={medicalContacts}
               professionals={reasonSupport.professionals}
               issues={data.issues}
             />

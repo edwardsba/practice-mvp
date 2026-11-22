@@ -10,7 +10,14 @@ import {
 
 assert.deepEqual(
   [...EDIT_DETAILS_PANEL_IDS],
-  ["details", "relationships", "history", "emergency", "communication"]
+  [
+    "details",
+    "demographics",
+    "relationships",
+    "history",
+    "emergency",
+    "communication",
+  ]
 )
 
 for (const id of EDIT_DETAILS_PANEL_IDS) {

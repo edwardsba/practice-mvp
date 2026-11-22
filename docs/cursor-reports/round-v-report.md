@@ -6,8 +6,7 @@ Base: `d0b8b78` (Round U)
 ## Commits
 
 - `5f4465b` — Emergency and medical contacts as tappable cards
-- `886d92f` — Round V report: preview Ready URL and final notes
-- `f4906b1` — Fix Round V report commit SHA after amend
+- Follow-up commits on the same branch only update this report (preview URL / commit list). Feature code is in `5f4465b`.
 
 ## What changed
 
@@ -58,8 +57,8 @@ docs/cursor-reports/round-v-report.md
 ## Preview
 
 - Branch preview URL: https://practice-mvp-git-test-client-page-panels-benedwards-practicemvp.vercel.app
-- Deploy status: Ready (latest HEAD `f4906b1`; deployment URL `https://practice-fxrpsgcur-benedwards-practicemvp.vercel.app`)
-- Ready at: 2026-11-22 12:44 Australia/Sydney
+- Deploy status: Ready
+- Ready at: 2026-11-22 12:48 Australia/Sydney
 
 ## Manual UI checks (Tom / Ben01)
 

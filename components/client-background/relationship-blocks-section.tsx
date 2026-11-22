@@ -545,9 +545,10 @@ export function RelationshipBlocksSection({
 
   useEffect(() => {
     if (!selection) return
+    const current = selection
     function onKey(event: KeyboardEvent) {
       if (event.key !== "Escape") return
-      if (selection.type === "new_relationship_draft" || selection.type === "new_person_draft") {
+      if (current.type === "new_relationship_draft" || current.type === "new_person_draft") {
         setConfirmLeavePanel(true)
         return
       }

@@ -6,16 +6,16 @@ import { requirePractitionerContext } from "@/lib/auth"
 import {
   addBlockMember,
   createRelationshipBlock,
-  createRelationshipWithMember,
   createUnplacedPerson,
   deleteRelationshipBlock,
-  discardEmptyRelationshipDraft,
   moveBlockMember,
   removeBlockMember,
+  saveRelationshipPersonDraft,
   saveRelationshipStatusWithCurrentBlock,
   setRelationshipBlockAnswer,
   updateBlockMember,
   updateRelationshipBlock,
+  type SaveRelationshipPersonDraftInput,
 } from "@/lib/client-background/block-mutations"
 import {
   completeBackgroundInterview,
@@ -315,28 +315,12 @@ export async function createRelationshipBlockAction(
   return result
 }
 
-export async function createRelationshipWithMemberAction(
+export async function saveRelationshipPersonDraftAction(
   clientId: string,
-  kind: BlockKind,
-  options?: { parentSide?: "mother" | "father" | ""; arrangementType?: string }
+  draft: Omit<SaveRelationshipPersonDraftInput, "clientId" | "practiceId" | "userId">
 ) {
   const context = await requirePractitionerContext()
-  const result = await createRelationshipWithMember({ ...scope(clientId, context), kind, ...options })
-  if (result && !("error" in result && result.error)) refresh(clientId)
-  return result
-}
-
-export async function discardEmptyRelationshipDraftAction(
-  clientId: string,
-  relationshipBlockId: string,
-  memberId: string
-) {
-  const context = await requirePractitionerContext()
-  const result = await discardEmptyRelationshipDraft({
-    ...scope(clientId, context),
-    relationshipBlockId,
-    memberId,
-  })
+  const result = await saveRelationshipPersonDraft({ ...scope(clientId, context), ...draft })
   if (result && !("error" in result && result.error)) refresh(clientId)
   return result
 }

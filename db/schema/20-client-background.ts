@@ -96,31 +96,39 @@ export const clientRelationshipRecords = pgTable("client_relationship_records", 
 })
 
 /** One relationship: its status and dates, and the people who belong to it. */
-export const clientRelationshipBlocks = pgTable("client_relationship_blocks", {
-  relationshipBlockId: uuid("relationship_block_id").primaryKey().defaultRandom(),
-  clientId: uuid("client_id")
-    .notNull()
-    .references(() => clients.clientId),
-  practiceId: uuid("practice_id")
-    .notNull()
-    .references(() => practices.practiceId),
-  kind: text("kind").notNull(),
-  parentRecordId: uuid("parent_record_id"),
-  parentSide: text("parent_side"),
-  status: text("status"),
-  statusDetail: text("status_detail"),
-  arrangementType: text("arrangement_type"),
-  arrangementDetail: text("arrangement_detail"),
-  startedOn: text("started_on"),
-  endedOn: text("ended_on"),
-  /** Explicit Children question (yes / none / not_asked). */
-  childrenAnswer: text("children_answer"),
-  /** Explicit Siblings question (yes / none / not_asked). */
-  siblingsAnswer: text("siblings_answer"),
-  displayOrder: integer("display_order").notNull().default(0),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-})
+export const clientRelationshipBlocks = pgTable(
+  "client_relationship_blocks",
+  {
+    relationshipBlockId: uuid("relationship_block_id").primaryKey().defaultRandom(),
+    clientId: uuid("client_id")
+      .notNull()
+      .references(() => clients.clientId),
+    practiceId: uuid("practice_id")
+      .notNull()
+      .references(() => practices.practiceId),
+    kind: text("kind").notNull(),
+    parentRecordId: uuid("parent_record_id"),
+    parentSide: text("parent_side"),
+    status: text("status"),
+    statusDetail: text("status_detail"),
+    arrangementType: text("arrangement_type"),
+    arrangementDetail: text("arrangement_detail"),
+    startedOn: text("started_on"),
+    endedOn: text("ended_on"),
+    /** Explicit Children question (yes / none / not_asked). */
+    childrenAnswer: text("children_answer"),
+    /** Explicit Siblings question (yes / none / not_asked). */
+    siblingsAnswer: text("siblings_answer"),
+    displayOrder: integer("display_order").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("client_relationship_blocks_one_current")
+      .on(table.clientId)
+      .where(sql`${table.kind} = 'client_current'`),
+  ]
+)
 
 /**
  * An issue (condition) under Mental health / Substance use / Physical health.

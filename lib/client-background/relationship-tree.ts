@@ -41,6 +41,8 @@ export type RelationshipTreeGroup = {
 export type RelationshipTreeBlock = {
   kind: "block"
   id: string
+  /** Underlying relationship block kind when this row maps to a real block. */
+  blockKind?: BlockKind
   heading: string
   meta: string
   children: RelationshipTreeNode[]
@@ -249,6 +251,7 @@ function blockNode(
   return {
     kind: "block",
     id: block.relationshipBlockId,
+    blockKind: block.kind,
     heading: band === "status" ? statusHeading(block) : band === "other" ? otherChildrenHeading(block) : headingFor(block, people),
     meta: metaFor(block, input.dateOfBirth, input.asOf),
     children: childrenFor(block, people, input),
@@ -506,7 +509,10 @@ export function moveTargets(
   for (const block of parentOtherInOrder(blocks, "mother")) add(block)
   for (const block of parentOtherInOrder(blocks, "father")) add(block)
   for (const block of caregiversInOrder(blocks)) add(block)
-  targets.push({ id: NEW_CURRENT_RELATIONSHIP, label: "+ New current relationship", kind: "client_current" })
+  const hasCurrent = blocks.some((block) => block.kind === "client_current")
+  if (!hasCurrent) {
+    targets.push({ id: NEW_CURRENT_RELATIONSHIP, label: "+ New current relationship", kind: "client_current" })
+  }
   targets.push({ id: NEW_PREVIOUS_RELATIONSHIP, label: "+ New previous relationship", kind: "client_previous" })
   return targets
 }
@@ -655,8 +661,18 @@ export function relationshipSectionAddSpec(sectionTitle: string): RelationshipSe
   return null
 }
 
-/** Hide add when the section only shows a none / not-asked note. */
-export function relationshipSectionAllowsAdd(children: RelationshipTreeNode[]): boolean {
+/**
+ * Hide add when the section only shows a none / not-asked note.
+ * For Current intimate relationship: hide while a current block already exists
+ * (one current relationship only — use + on the line for another partner).
+ */
+export function relationshipSectionAllowsAdd(
+  children: RelationshipTreeNode[],
+  options?: { kind?: BlockKind }
+): boolean {
+  if (options?.kind === "client_current" && children.some((child) => child.kind === "block")) {
+    return false
+  }
   if (children.length === 1 && children[0]?.kind === "note") {
     const text = children[0].text.toLowerCase()
     return !(

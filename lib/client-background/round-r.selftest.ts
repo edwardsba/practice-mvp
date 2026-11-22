@@ -80,5 +80,13 @@ assert.equal(
   ]),
   true
 )
+assert.equal(
+  relationshipSectionAllowsAdd(
+    [{ kind: "block", id: "b1", heading: "Married", meta: "", children: [], interactive: true }],
+    { kind: "client_current" }
+  ),
+  false
+)
+assert.equal(relationshipSectionAllowsAdd([], { kind: "client_current" }), true)
 
 console.log("round-r selftest passed")

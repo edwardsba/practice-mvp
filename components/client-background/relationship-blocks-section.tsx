@@ -1757,7 +1757,7 @@ function CurrentBlockTree({
           ) : (
             <SelectField
               id={`${block.relationshipBlockId}-status-inline`}
-              label="Status"
+              label="Relationship status"
               value={block.status}
               onChange={onBlockStatus}
             >
@@ -1834,7 +1834,7 @@ function PreviousBlockTree({
         <div className="min-w-[12rem] flex-1">
           <SelectField
             id={`${block.relationshipBlockId}-status-inline`}
-            label="Status"
+            label="Relationship status"
             value={block.status}
             onChange={onStatus}
           >
@@ -1957,7 +1957,7 @@ function ParentsBlockTree({
       <div className={layer2BandClassName}>
         <div className="flex flex-wrap items-end gap-3">
           <div className="min-w-[12rem] flex-1">
-            <SelectField id={`${block.relationshipBlockId}-status-inline`} label="Status" value={block.status} onChange={onStatus}>
+            <SelectField id={`${block.relationshipBlockId}-status-inline`} label="Relationship status" value={block.status} onChange={onStatus}>
               <option value="">Not recorded</option>
               {statuses.map((status) => (
                 <option key={status} value={status}>
@@ -2025,7 +2025,7 @@ function ParentOtherTree({
     <div className={layer2BandClassName}>
       <div className="flex flex-wrap items-end gap-3">
         <div className="min-w-[12rem] flex-1">
-          <SelectField id={`${block.relationshipBlockId}-status-inline`} label="Status" value={block.status} onChange={onStatus}>
+          <SelectField id={`${block.relationshipBlockId}-status-inline`} label="Relationship status" value={block.status} onChange={onStatus}>
             <option value="">Not recorded</option>
             {statuses.map((status) => (
               <option key={status} value={status}>

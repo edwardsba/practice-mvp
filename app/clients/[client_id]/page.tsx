@@ -9,7 +9,7 @@ import {
   ClientPanelFields,
 } from "@/components/clients/client-panel"
 import { ClientStatusControl } from "@/components/clients/client-status-control"
-import { ReferralFundingCard } from "@/components/funding/referral-funding-card"
+import { ReferralFundingQuickView } from "@/components/clients/referral-funding-quick-view"
 import { AppShell } from "@/components/app-shell"
 import { BackButton } from "@/components/ui/back-button"
 import { EntityPageHeader } from "@/components/ui/entity-page-header"
@@ -31,9 +31,6 @@ import {
 } from "@/lib/crisis-plans/load"
 import { requirePractitionerContext } from "@/lib/auth"
 import { db } from "@/lib/db"
-import { getReferralFundingCardData } from "@/lib/actions/funding"
-import { buildReferralFundingCardProps } from "@/lib/funding/referral-funding-card-props"
-import { formatDisplayDate } from "@/lib/funding/format"
 import { appendReturnTo } from "@/lib/navigation/back"
 import { buildTemplateVariablesFromLinkResponse } from "@/lib/email/link-response"
 import { getQuestionnaireEmailContext } from "@/lib/email/practitioner-context"
@@ -46,7 +43,8 @@ import {
   formatCrisisPlanSummary,
   formatEmergencyContactSummary,
 } from "@/lib/clients/emergency-details-summary"
-import { buildReferralFundingPanelSummary } from "@/lib/clients/referral-funding-summary"
+import { buildReferralFundingQuickView } from "@/lib/funding/claims-page"
+import { loadClaimsPageForClient } from "@/lib/funding/load-claims-page"
 import { formatStressorsSummary } from "@/lib/clients/stressors-summary"
 import { loadMedicalContactsForClient } from "@/lib/medical-contacts/load"
 import {
@@ -56,9 +54,7 @@ import {
 import {
   ATTENDANCE_RISK_CONFIG,
   CLIENT_STATUS_CONFIG,
-  FUNDING_APPROVAL_STATUS_CONFIG,
 } from "@/lib/status"
-import { REPORTING_REQUIREMENT_STATUS_CONFIG } from "@/lib/funding/reporting-status"
 
 function formatDate(value: Date | string | null) {
   if (!value) return "—"
@@ -100,7 +96,7 @@ export default async function ClientDetailPage({
     activeCrisisPlan,
     emailContext,
     nextAppointment,
-    referralFundingData,
+    claimsPage,
     attendanceRisk,
     latestAsq,
     latestPsf,
@@ -114,7 +110,7 @@ export default async function ClientDetailPage({
       context.practitionerProfileId
     ),
     loadNextAppointmentForClient(clientId, context.practiceId),
-    getReferralFundingCardData(clientId),
+    loadClaimsPageForClient(clientId),
     loadAttendanceRiskForClient(clientId, context.practiceId),
     loadLatestAssessmentResultForClient(clientId, context.practiceId, "ASQ"),
     loadLatestAssessmentResultForClient(clientId, context.practiceId, "PSF"),
@@ -124,15 +120,13 @@ export default async function ClientDetailPage({
 
   const stressorsLine = formatStressorsSummary(background?.stressors)
 
-  const referralFunding = buildReferralFundingCardProps(
-    context.practiceId,
-    referralFundingData
-  )
-
-  const referralSummary = buildReferralFundingPanelSummary(
-    referralFunding.approvals,
-    referralFunding.formOptions.relationships,
-    formatDisplayDate
+  const referralQuickViewLines = buildReferralFundingQuickView(
+    claimsPage?.model ?? {
+      referralsWithoutClaim: [],
+      activeClaims: [],
+      inactiveClaims: [],
+      calendarYear: new Date().getFullYear(),
+    }
   )
 
   const clientEmail = client.email?.trim() || null
@@ -356,67 +350,14 @@ export default async function ClientDetailPage({
 
         <ClientPanel
           title="Referrals and funding"
-          control="expand"
-          expandedContent={
-            <div className="-mx-4 -mb-2">
-              <ReferralFundingCard {...referralFunding} hideTitle />
-            </div>
-          }
+          control="open"
+          openHref={`/clients/${clientId}/claims`}
+          openLabel="Open ›"
         >
-          {referralSummary.approvalLine ? (
-            <ClientPanelFields>
-              <ClientPanelField label="Current approval">
-                <span className="inline-flex flex-wrap items-center gap-2">
-                  <span>{referralSummary.approvalLine}</span>
-                  {referralSummary.approvalStatus ? (
-                    <StatusBadge
-                      status={referralSummary.approvalStatus}
-                      statusMap={FUNDING_APPROVAL_STATUS_CONFIG}
-                    />
-                  ) : null}
-                </span>
-              </ClientPanelField>
-              {referralSummary.referrerLabel && referralSummary.referrerValue ? (
-                <ClientPanelField label={referralSummary.referrerLabel}>
-                  {referralSummary.referrerValue}
-                </ClientPanelField>
-              ) : (
-                <ClientPanelField label="Referrer">
-                  <span className="font-normal text-muted-foreground">
-                    None recorded
-                  </span>
-                </ClientPanelField>
-              )}
-              <ClientPanelField label="Reports">
-                {referralSummary.dueReports.length > 0 ? (
-                  <div className="flex flex-wrap gap-2">
-                    {referralSummary.dueReports.map((req) => (
-                      <span
-                        key={`${req.appointmentNumber}-${req.reportType}`}
-                        className="inline-flex flex-col gap-1 rounded-md border px-2 py-1 text-xs font-normal sm:flex-row sm:items-center sm:gap-2"
-                      >
-                        <span>
-                          {req.appointmentNumber} · {req.reportType}
-                        </span>
-                        <StatusBadge
-                          status={req.status}
-                          statusMap={REPORTING_REQUIREMENT_STATUS_CONFIG}
-                        />
-                      </span>
-                    ))}
-                  </div>
-                ) : (
-                  <span className="font-normal text-muted-foreground">
-                    None due
-                  </span>
-                )}
-              </ClientPanelField>
-            </ClientPanelFields>
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              No funding approval yet
-            </p>
-          )}
+          <ReferralFundingQuickView
+            clientId={clientId}
+            lines={referralQuickViewLines}
+          />
         </ClientPanel>
 
         <ClientPanel

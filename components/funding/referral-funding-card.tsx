@@ -165,7 +165,17 @@ export function ReferralFundingCard({
   approvals,
   formOptions,
   hideTitle = false,
-}: ReferralFundingCardProps & { hideTitle?: boolean }) {
+  panelOnly = false,
+  openApprovalId = null,
+  onOpenApprovalIdHandled,
+}: ReferralFundingCardProps & {
+  hideTitle?: boolean
+  /** Hide the list card; only the side panel is used (claims page). */
+  panelOnly?: boolean
+  /** When set, open this approval in view mode (claims page link). */
+  openApprovalId?: string | null
+  onOpenApprovalIdHandled?: () => void
+}) {
   const router = useRouter()
   const [panel, setPanel] = useState<PanelState | null>(null)
   const [mounted, setMounted] = useState(false)
@@ -175,6 +185,12 @@ export function ReferralFundingCard({
   useEffect(() => {
     setRelationships(formOptions.relationships)
   }, [formOptions.relationships])
+
+  useEffect(() => {
+    if (!openApprovalId) return
+    setPanel({ mode: "view", approvalId: openApprovalId })
+    onOpenApprovalIdHandled?.()
+  }, [openApprovalId, onOpenApprovalIdHandled])
 
   const selectedApproval = useMemo(() => {
     if (!panel || panel.mode === "create") return null
@@ -216,93 +232,99 @@ export function ReferralFundingCard({
 
   return (
     <>
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between gap-3 space-y-0">
-          {hideTitle ? <span className="sr-only">Referral and funding</span> : <CardTitle>Referral and funding</CardTitle>}
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className={hideTitle ? "ml-auto" : undefined}
-            onClick={() => setPanel({ mode: "create" })}
-          >
-            + Add funding approval
-          </Button>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {approvals.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              {REFERRAL_FUNDING_CARD_EMPTY_MESSAGE}
-            </p>
-          ) : (
-            approvals.map((approval) => {
-              const lines = bodyLinesForApproval(approval, relationships)
-              return (
-                <div
-                  key={approval.fundingApprovalId}
-                  className="space-y-2 border-b pb-4 last:border-b-0 last:pb-0"
-                >
-                  <button
-                    type="button"
-                    className="w-full rounded-md text-left hover:bg-muted/40"
-                    onClick={() =>
-                      setPanel({
-                        mode: "view",
-                        approvalId: approval.fundingApprovalId,
-                      })
-                    }
+      {panelOnly ? null : (
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between gap-3 space-y-0">
+            {hideTitle ? (
+              <span className="sr-only">Referral and funding</span>
+            ) : (
+              <CardTitle>Referral and funding</CardTitle>
+            )}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className={hideTitle ? "ml-auto" : undefined}
+              onClick={() => setPanel({ mode: "create" })}
+            >
+              + Add funding approval
+            </Button>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {approvals.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                {REFERRAL_FUNDING_CARD_EMPTY_MESSAGE}
+              </p>
+            ) : (
+              approvals.map((approval) => {
+                const lines = bodyLinesForApproval(approval, relationships)
+                return (
+                  <div
+                    key={approval.fundingApprovalId}
+                    className="space-y-2 border-b pb-4 last:border-b-0 last:pb-0"
                   >
-                    <p className="font-semibold">
-                      {approval.approvalTypeName?.trim() || "Funding approval"}
-                    </p>
-                    <p className="mt-0.5 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-                      <span>
-                        {approvalBandText(approval, formatDisplayDate)}
-                      </span>
-                      <StatusBadge
-                        status={approval.approvalStatus}
-                        statusMap={FUNDING_APPROVAL_STATUS_CONFIG}
-                      />
-                    </p>
-                  </button>
-                  {lines.length > 0 ? (
-                    <dl className="space-y-1.5 pl-0.5">
-                      {lines.map((line) => (
-                        <div key={line.label} className="text-sm">
-                          <span className="text-muted-foreground">
-                            {line.label}:{" "}
-                          </span>
-                          <span className="whitespace-pre-wrap">
-                            {line.value}
-                          </span>
-                        </div>
-                      ))}
-                    </dl>
-                  ) : null}
-                  {approval.reportingRequirements.length > 0 ? (
-                    <div className="flex flex-wrap gap-2">
-                      {approval.reportingRequirements.map((req) => (
-                        <span
-                          key={`${approval.fundingApprovalId}-${req.appointmentNumber}-${req.reportType}`}
-                          className="inline-flex flex-col gap-1 rounded-md border px-2 py-1 text-xs sm:flex-row sm:items-center sm:gap-2"
-                        >
-                          <span>
-                            {req.appointmentNumber} · {req.reportType}
-                          </span>
-                          <StatusBadge
-                            status={req.status}
-                            statusMap={REPORTING_REQUIREMENT_STATUS_CONFIG}
-                          />
+                    <button
+                      type="button"
+                      className="w-full rounded-md text-left hover:bg-muted/40"
+                      onClick={() =>
+                        setPanel({
+                          mode: "view",
+                          approvalId: approval.fundingApprovalId,
+                        })
+                      }
+                    >
+                      <p className="font-semibold">
+                        {approval.approvalTypeName?.trim() || "Funding approval"}
+                      </p>
+                      <p className="mt-0.5 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                        <span>
+                          {approvalBandText(approval, formatDisplayDate)}
                         </span>
-                      ))}
-                    </div>
-                  ) : null}
-                </div>
-              )
-            })
-          )}
-        </CardContent>
-      </Card>
+                        <StatusBadge
+                          status={approval.approvalStatus}
+                          statusMap={FUNDING_APPROVAL_STATUS_CONFIG}
+                        />
+                      </p>
+                    </button>
+                    {lines.length > 0 ? (
+                      <dl className="space-y-1.5 pl-0.5">
+                        {lines.map((line) => (
+                          <div key={line.label} className="text-sm">
+                            <span className="text-muted-foreground">
+                              {line.label}:{" "}
+                            </span>
+                            <span className="whitespace-pre-wrap">
+                              {line.value}
+                            </span>
+                          </div>
+                        ))}
+                      </dl>
+                    ) : null}
+                    {approval.reportingRequirements.length > 0 ? (
+                      <div className="flex flex-wrap gap-2">
+                        {approval.reportingRequirements.map((req) => (
+                          <span
+                            key={`${approval.fundingApprovalId}-${req.appointmentNumber}-${req.reportType}`}
+                            className="inline-flex flex-col gap-1 rounded-md border px-2 py-1 text-xs sm:flex-row sm:items-center sm:gap-2"
+                          >
+                            <span>
+                              {req.appointmentNumber} · {req.reportType}
+                            </span>
+                            <StatusBadge
+                              status={req.status}
+                              statusMap={REPORTING_REQUIREMENT_STATUS_CONFIG}
+                            />
+                          </span>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+                )
+              })
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {mounted && panel
         ? createPortal(

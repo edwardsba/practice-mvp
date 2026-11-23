@@ -1,24 +1,13 @@
-import Link from "next/link"
 import { notFound } from "next/navigation"
-import { and, eq } from "drizzle-orm"
 
+import { ClaimsFundingPage } from "@/components/funding/claims-funding-page"
 import { AppShell } from "@/components/app-shell"
 import { BackButton } from "@/components/ui/back-button"
-import { Button } from "@/components/ui/button"
 import { EntityPageHeader } from "@/components/ui/entity-page-header"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
-import { clients } from "@/db/schema"
-import { getClaimsByClientId } from "@/lib/actions/funding"
+import { getReferralFundingCardData } from "@/lib/actions/funding"
 import { requirePractitionerContext } from "@/lib/auth"
-import { db } from "@/lib/db"
-import { formatDisplayDate } from "@/lib/funding/format"
+import { buildReferralFundingCardProps } from "@/lib/funding/referral-funding-card-props"
+import { loadClaimsPageForClient } from "@/lib/funding/load-claims-page"
 
 export default async function ClientClaimsPage({
   params,
@@ -28,104 +17,39 @@ export default async function ClientClaimsPage({
   const { client_id: clientId } = await params
   const context = await requirePractitionerContext()
 
-  const [client] = await db
-    .select({
-      firstName: clients.firstName,
-      lastName: clients.lastName,
-    })
-    .from(clients)
-    .where(
-      and(
-        eq(clients.clientId, clientId),
-        eq(clients.practiceId, context.practiceId),
-        eq(clients.isActive, true)
-      )
-    )
-    .limit(1)
+  const [loaded, referralFundingData] = await Promise.all([
+    loadClaimsPageForClient(clientId),
+    getReferralFundingCardData(clientId),
+  ])
 
-  if (!client) {
+  if (!loaded) {
     notFound()
   }
 
-  const claims = await getClaimsByClientId(clientId)
-  const clientName = `${client.firstName} ${client.lastName}`
-  const returnTo = `/clients/${clientId}/claims`
+  const referralFunding = buildReferralFundingCardProps(
+    context.practiceId,
+    referralFundingData
+  )
 
   return (
     <AppShell>
       <div className="mb-6">
         <BackButton
           fallbackHref={`/clients/${clientId}`}
-          label={`← ${clientName}`}
+          label={`← ${loaded.clientName}`}
         />
       </div>
       <EntityPageHeader
-        kicker="Claims"
-        name={clientName}
-        subheading={`${claims.length} claim${claims.length === 1 ? "" : "s"}`}
-        action={
-          <Button asChild>
-            <Link
-              href={`/funding/claims/new?client_id=${clientId}&returnTo=${encodeURIComponent(returnTo)}`}
-            >
-              Add Claim
-            </Link>
-          </Button>
-        }
+        kicker="Client"
+        name="Claims, referrals and funding"
+        subheading={loaded.clientName}
       />
 
-      <div className="rounded-lg border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Claim type</TableHead>
-              <TableHead>Start date</TableHead>
-              <TableHead>End date</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {claims.length === 0 ? (
-              <TableRow>
-                <TableCell
-                  colSpan={3}
-                  className="h-20 text-center text-muted-foreground"
-                >
-                  No claims yet.
-                </TableCell>
-              </TableRow>
-            ) : (
-              claims.map((claim) => (
-                <TableRow key={claim.claimId} className="hover:bg-muted/50">
-                  <TableCell>
-                    <Link
-                      href={`/funding/claims/${claim.claimId}?returnTo=${encodeURIComponent(returnTo)}`}
-                      className="block font-medium text-primary hover:underline"
-                    >
-                      {claim.claimTypeName}
-                    </Link>
-                  </TableCell>
-                  <TableCell>
-                    <Link
-                      href={`/funding/claims/${claim.claimId}?returnTo=${encodeURIComponent(returnTo)}`}
-                      className="block hover:underline"
-                    >
-                      {formatDisplayDate(claim.startDate)}
-                    </Link>
-                  </TableCell>
-                  <TableCell>
-                    <Link
-                      href={`/funding/claims/${claim.claimId}?returnTo=${encodeURIComponent(returnTo)}`}
-                      className="block hover:underline"
-                    >
-                      {formatDisplayDate(claim.endDate)}
-                    </Link>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
+      <ClaimsFundingPage
+        clientId={clientId}
+        model={loaded.model}
+        referralFunding={referralFunding}
+      />
     </AppShell>
   )
 }

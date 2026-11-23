@@ -119,6 +119,7 @@ export function ClientBackgroundPage({
           {item.id === "relationships" ? (
             <RelationshipTreeSection
               clientId={clientId}
+              clientName={clientName.split(/\s+/)[0] || clientName}
               relationships={data.relationships}
               blocks={data.relationshipBlocks ?? []}
               blockAnswers={data.blockAnswers ?? emptyBlockAnswers()}

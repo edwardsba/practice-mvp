@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, type ReactNode } from "react"
-import { X } from "lucide-react"
+import { ChevronRight, X } from "lucide-react"
 
 import { PartialDatePicker, SelectField, TextAreaField, TextField } from "@/components/client-background/fields"
 import {
@@ -10,7 +10,9 @@ import {
   siblingTypesForBlock,
   statusesForBlock,
 } from "@/lib/client-background/relationship-blocks"
+import { personCardSubtitle } from "@/lib/client-background/relationship-panel-display"
 import { moveTargets } from "@/lib/client-background/relationship-tree"
+import { todayDateString } from "@/lib/dates/practice-time"
 import {
   ARRANGEMENT_TYPE_LABELS,
   ARRANGEMENT_TYPES,
@@ -189,14 +191,92 @@ export function PanelHeader({
   )
 }
 
+/**
+ * Shared group heading for relationship / person panels.
+ * From the second group on, a thin rule runs above the heading.
+ */
+export function PanelGroup({
+  title,
+  index = 0,
+  children,
+  empty,
+}: {
+  title: string
+  /** 0-based group index within the panel — index > 0 draws the divider. */
+  index?: number
+  children?: ReactNode
+  empty?: string
+}) {
+  return (
+    <section className={cn(index > 0 && "border-t border-border pt-3.5 mt-3.5")}>
+      <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">{title}</h3>
+      {children}
+      {empty ? <p className="text-sm text-muted-foreground">{empty}</p> : null}
+    </section>
+  )
+}
+
+export function Facts({ rows }: { rows: { label: string; value: string }[] }) {
+  if (rows.length === 0) return null
+  return (
+    <dl className="space-y-2 text-sm">
+      {rows.map((row) => (
+        <div key={row.label} className="grid grid-cols-[9.5rem_1fr] gap-2">
+          <dt className="text-muted-foreground">{row.label}</dt>
+          <dd>{row.value || "Not recorded"}</dd>
+        </div>
+      ))}
+    </dl>
+  )
+}
+
+/** Tappable person card inside a relationship view / form. */
+export function PersonCard({
+  person,
+  block,
+  onOpen,
+}: {
+  person: RelationshipRecord
+  block: RelationshipBlock | null
+  onOpen: () => void
+}) {
+  const name =
+    person.notKnown && person.blockRole === "parent"
+      ? person.blockRoleType === "father"
+        ? "Father"
+        : "Mother"
+      : person.givenName.trim() || "Unnamed"
+  const subtitle = personCardSubtitle(person, block, todayDateString())
+  return (
+    <button
+      type="button"
+      className="flex min-h-11 w-full items-center gap-2 rounded-md border border-border px-3 py-2 text-left hover:bg-muted/50"
+      onClick={onOpen}
+    >
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm font-semibold">{name}</span>
+        {subtitle ? <span className="block truncate text-sm text-muted-foreground">{subtitle}</span> : null}
+      </span>
+      <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+    </button>
+  )
+}
+
 export function PersonFields({
   idPrefix,
   person,
   block,
   draft,
   onChange,
-  /** New relationship form: Name, Sex, DOB/age, Health (+ caregiver Relationship). */
+  /**
+   * New relationship first-partner strip: Name, Sex, DOB/age only.
+   * Prefer the full four-group form for add/edit person.
+   */
   basicsOnly = false,
+  /** Child Type option labels (e.g. step-child with partner name). */
+  childTypeLabel,
+  /** Start group index when nested inside another panel's groups. */
+  groupIndexOffset = 0,
 }: {
   idPrefix: string
   person: RelationshipRecord
@@ -204,6 +284,8 @@ export function PersonFields({
   draft: PersonDraft
   onChange: (draft: PersonDraft) => void
   basicsOnly?: boolean
+  childTypeLabel?: (type: string) => string
+  groupIndexOffset?: number
 }) {
   function patch(partial: Partial<PersonDraft>) {
     onChange({ ...draft, ...partial })
@@ -212,174 +294,234 @@ export function PersonFields({
   const kind = block?.kind
   const childTypes = kind ? childTypesForBlock(kind) : []
   const siblingTypes = kind ? siblingTypesForBlock(kind) : []
-  return (
-    <div className="space-y-3">
-      <TextField id={`${idPrefix}-name`} label="Name" value={draft.givenName} onChange={(givenName) => patch({ givenName })} />
-      <SelectField id={`${idPrefix}-sex`} label="Sex" value={draft.sex} onChange={(sex) => patch({ sex })}>
-        <option value="">Not recorded</option>
-        {SEX_OPTIONS.map((option) => (
-          <option key={option} value={option}>
-            {option}
-          </option>
-        ))}
-      </SelectField>
-      <PartialDatePicker
-        id={`${idPrefix}-dob`}
-        dateLabel="Date of birth or age"
-        mode="person"
-        value={draft.dateOfBirth}
-        onChange={(dateOfBirth) => patch({ dateOfBirth })}
-      />
-      {!basicsOnly && role === "child" && childTypes.length > 0 ? (
-        <SelectField
-          id={`${idPrefix}-child-type`}
-          label="Type"
-          value={draft.blockRoleType}
-          onChange={(blockRoleType) => patch({ blockRoleType })}
-        >
-          <option value="">Not recorded</option>
-          {childTypes.map((type) => (
-            <option key={type} value={type}>
-              {CHILD_TYPE_LABELS[type]}
-            </option>
-          ))}
-        </SelectField>
-      ) : null}
-      {!basicsOnly && role === "sibling" && siblingTypes.length > 0 ? (
-        <SelectField
-          id={`${idPrefix}-sibling-type`}
-          label="Type"
-          value={draft.blockRoleType}
-          onChange={(blockRoleType) => patch({ blockRoleType })}
-        >
-          {siblingTypes.map((type) => (
-            <option key={type} value={type}>
-              {SIBLING_BLOCK_TYPE_LABELS[type]}
-            </option>
-          ))}
-        </SelectField>
-      ) : null}
-      {!basicsOnly && role === "parent" ? (
-        <SelectField
-          id={`${idPrefix}-parent`}
-          label="Parent"
-          value={draft.blockRoleType || "mother"}
-          onChange={(blockRoleType) => patch({ blockRoleType })}
-        >
-          <option value="mother">Mother</option>
-          <option value="father">Father</option>
-        </SelectField>
-      ) : null}
-      {role === "caregiver" && block?.arrangementType !== "adoption" ? (
-        <SelectField
-          id={`${idPrefix}-caregiver`}
-          label="Relationship"
-          value={draft.blockRoleType}
-          onChange={(blockRoleType) => patch({ blockRoleType })}
-        >
-          <option value="">Not recorded</option>
-          {CAREGIVER_RELATIONSHIPS.map((type) => (
-            <option key={type} value={type}>
-              {CAREGIVER_RELATIONSHIP_LABELS[type]}
-            </option>
-          ))}
-        </SelectField>
-      ) : null}
-      {!basicsOnly && role === "parent" ? (
-        <label className="flex min-h-10 items-center gap-2 text-sm">
-          <input type="checkbox" checked={draft.notKnown} onChange={(event) => patch({ notKnown: event.target.checked })} />
-          Not known
-        </label>
-      ) : null}
+  const showType = role === "child" || role === "sibling"
+  const typeField =
+    role === "child" && childTypes.length > 0 ? (
       <SelectField
-        id={`${idPrefix}-health`}
-        label="Health"
-        value={draft.healthStatus}
-        onChange={(healthStatus) =>
-          patch({
-            healthStatus: healthStatus as PersonDraft["healthStatus"],
-            deceased: healthStatus === "deceased",
-          })
-        }
+        id={`${idPrefix}-child-type`}
+        label="Type"
+        value={draft.blockRoleType}
+        onChange={(blockRoleType) => patch({ blockRoleType })}
       >
         <option value="">Not recorded</option>
-        {HEALTH_STATUSES.map((option) => (
-          <option key={option} value={option}>
-            {HEALTH_STATUS_LABELS[option]}
+        {childTypes.map((type) => (
+          <option key={type} value={type}>
+            {childTypeLabel ? childTypeLabel(type) : CHILD_TYPE_LABELS[type]}
           </option>
         ))}
       </SelectField>
-      {draft.healthStatus === "deceased" || draft.deceased ? (
+    ) : role === "sibling" && siblingTypes.length > 0 ? (
+      <SelectField
+        id={`${idPrefix}-sibling-type`}
+        label="Type"
+        value={draft.blockRoleType}
+        onChange={(blockRoleType) => patch({ blockRoleType })}
+      >
+        {siblingTypes.map((type) => (
+          <option key={type} value={type}>
+            {SIBLING_BLOCK_TYPE_LABELS[type]}
+          </option>
+        ))}
+      </SelectField>
+    ) : null
+
+  if (basicsOnly) {
+    return (
+      <div className="space-y-3">
+        <TextField id={`${idPrefix}-name`} label="Name" value={draft.givenName} onChange={(givenName) => patch({ givenName })} />
+        <SelectField id={`${idPrefix}-sex`} label="Sex" value={draft.sex} onChange={(sex) => patch({ sex })}>
+          <option value="">Not recorded</option>
+          {SEX_OPTIONS.map((option) => (
+            <option key={option} value={option}>
+              {option}
+            </option>
+          ))}
+        </SelectField>
         <PartialDatePicker
-          id={`${idPrefix}-died`}
-          dateLabel="Year of death"
-          mode="date-only"
-          value={draft.dateOfDeath}
-          onChange={(dateOfDeath) => patch({ dateOfDeath })}
+          id={`${idPrefix}-dob`}
+          dateLabel="Date of birth or age"
+          mode="person"
+          value={draft.dateOfBirth}
+          onChange={(dateOfBirth) => patch({ dateOfBirth })}
         />
-      ) : null}
-      {basicsOnly ? null : (
-      <>
-      <SelectField
-        id={`${idPrefix}-support`}
-        label="Supportive"
-        value={draft.supportive}
-        onChange={(supportive) => patch({ supportive: supportive as PersonDraft["supportive"] })}
-      >
-        <option value="">Not recorded</option>
-        {RELATIONSHIP_RATING_VALUES.map((option) => (
-          <option key={option} value={option}>
-            {RELATIONSHIP_RATING_LABELS[option]}
-          </option>
-        ))}
-      </SelectField>
-      <SelectField
-        id={`${idPrefix}-conflict`}
-        label="Conflict or strain"
-        value={draft.conflict}
-        onChange={(conflict) => patch({ conflict: conflict as PersonDraft["conflict"] })}
-      >
-        <option value="">Not recorded</option>
-        {RELATIONSHIP_RATING_VALUES.map((option) => (
-          <option key={option} value={option}>
-            {RELATIONSHIP_RATING_LABELS[option]}
-          </option>
-        ))}
-      </SelectField>
-      <TextAreaField
-        id={`${idPrefix}-comment`}
-        label="Comment"
-        value={draft.qualityOfRelationship}
-        onChange={(qualityOfRelationship) => patch({ qualityOfRelationship })}
-      />
-      <SelectField
-        id={`${idPrefix}-dependency`}
-        label="Dependency"
-        value={draft.dependency}
-        onChange={(dependency) => patch({ dependency: dependency as PersonDraft["dependency"] })}
-      >
-        <option value="">Not recorded</option>
-        {DEPENDENCY_VALUES.map((option) => (
-          <option key={option} value={option}>
-            {DEPENDENCY_LABELS[option]}
-          </option>
-        ))}
-      </SelectField>
-      <SelectField
-        id={`${idPrefix}-living`}
-        label="Living situation"
-        value={draft.livingSituation}
-        onChange={(livingSituation) => patch({ livingSituation: livingSituation as PersonDraft["livingSituation"] })}
-      >
-        <option value="">Not recorded</option>
-        {RELATIONSHIP_LIVING_SITUATIONS.map((option) => (
-          <option key={option} value={option}>
-            {RELATIONSHIP_LIVING_SITUATION_LABELS[option]}
-          </option>
-        ))}
-      </SelectField>
-      </>
-      )}
+        {role === "caregiver" && block?.arrangementType !== "adoption" ? (
+          <SelectField
+            id={`${idPrefix}-caregiver`}
+            label="Relationship"
+            value={draft.blockRoleType}
+            onChange={(blockRoleType) => patch({ blockRoleType })}
+          >
+            <option value="">Not recorded</option>
+            {CAREGIVER_RELATIONSHIPS.map((type) => (
+              <option key={type} value={type}>
+                {CAREGIVER_RELATIONSHIP_LABELS[type]}
+              </option>
+            ))}
+          </SelectField>
+        ) : null}
+      </div>
+    )
+  }
+
+  return (
+    <div>
+      <PanelGroup title="Person's details" index={groupIndexOffset}>
+        <div className="space-y-3">
+          <TextField id={`${idPrefix}-name`} label="Name" value={draft.givenName} onChange={(givenName) => patch({ givenName })} />
+          <div className={cn("grid gap-3", showType || role === "parent" || role === "caregiver" ? "grid-cols-2" : "grid-cols-1")}>
+            <SelectField id={`${idPrefix}-sex`} label="Sex" value={draft.sex} onChange={(sex) => patch({ sex })}>
+              <option value="">Not recorded</option>
+              {SEX_OPTIONS.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </SelectField>
+            {typeField}
+            {role === "parent" ? (
+              <SelectField
+                id={`${idPrefix}-parent`}
+                label="Parent"
+                value={draft.blockRoleType || "mother"}
+                onChange={(blockRoleType) => patch({ blockRoleType })}
+              >
+                <option value="mother">Mother</option>
+                <option value="father">Father</option>
+              </SelectField>
+            ) : null}
+            {role === "caregiver" && block?.arrangementType !== "adoption" ? (
+              <SelectField
+                id={`${idPrefix}-caregiver`}
+                label="Relationship"
+                value={draft.blockRoleType}
+                onChange={(blockRoleType) => patch({ blockRoleType })}
+              >
+                <option value="">Not recorded</option>
+                {CAREGIVER_RELATIONSHIPS.map((type) => (
+                  <option key={type} value={type}>
+                    {CAREGIVER_RELATIONSHIP_LABELS[type]}
+                  </option>
+                ))}
+              </SelectField>
+            ) : null}
+          </div>
+          {role === "parent" ? (
+            <label className="flex min-h-10 items-center gap-2 text-sm">
+              <input type="checkbox" checked={draft.notKnown} onChange={(event) => patch({ notKnown: event.target.checked })} />
+              Not known
+            </label>
+          ) : null}
+          <PartialDatePicker
+            id={`${idPrefix}-dob`}
+            dateLabel="Date of birth or age"
+            mode="person"
+            value={draft.dateOfBirth}
+            onChange={(dateOfBirth) => patch({ dateOfBirth })}
+          />
+        </div>
+      </PanelGroup>
+
+      <PanelGroup title="Health" index={groupIndexOffset + 1}>
+        <div className="space-y-3">
+          <SelectField
+            id={`${idPrefix}-health`}
+            label="Health"
+            value={draft.healthStatus}
+            onChange={(healthStatus) =>
+              patch({
+                healthStatus: healthStatus as PersonDraft["healthStatus"],
+                deceased: healthStatus === "deceased",
+              })
+            }
+          >
+            <option value="">Not recorded</option>
+            {HEALTH_STATUSES.map((option) => (
+              <option key={option} value={option}>
+                {HEALTH_STATUS_LABELS[option]}
+              </option>
+            ))}
+          </SelectField>
+          {draft.healthStatus === "deceased" || draft.deceased ? (
+            <PartialDatePicker
+              id={`${idPrefix}-died`}
+              dateLabel="Year of death"
+              mode="date-only"
+              value={draft.dateOfDeath}
+              onChange={(dateOfDeath) => patch({ dateOfDeath })}
+            />
+          ) : null}
+        </div>
+      </PanelGroup>
+
+      <PanelGroup title="Living situation" index={groupIndexOffset + 2}>
+        <div className="space-y-3">
+          <SelectField
+            id={`${idPrefix}-living`}
+            label="Living situation"
+            value={draft.livingSituation}
+            onChange={(livingSituation) => patch({ livingSituation: livingSituation as PersonDraft["livingSituation"] })}
+          >
+            <option value="">Not recorded</option>
+            {RELATIONSHIP_LIVING_SITUATIONS.map((option) => (
+              <option key={option} value={option}>
+                {RELATIONSHIP_LIVING_SITUATION_LABELS[option]}
+              </option>
+            ))}
+          </SelectField>
+          <SelectField
+            id={`${idPrefix}-dependency`}
+            label="Dependency"
+            value={draft.dependency}
+            onChange={(dependency) => patch({ dependency: dependency as PersonDraft["dependency"] })}
+          >
+            <option value="">Not recorded</option>
+            {DEPENDENCY_VALUES.map((option) => (
+              <option key={option} value={option}>
+                {DEPENDENCY_LABELS[option]}
+              </option>
+            ))}
+          </SelectField>
+        </div>
+      </PanelGroup>
+
+      <PanelGroup title="Quality of relationship" index={groupIndexOffset + 3}>
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <SelectField
+              id={`${idPrefix}-support`}
+              label="Supportive"
+              value={draft.supportive}
+              onChange={(supportive) => patch({ supportive: supportive as PersonDraft["supportive"] })}
+            >
+              <option value="">Not recorded</option>
+              {RELATIONSHIP_RATING_VALUES.map((option) => (
+                <option key={option} value={option}>
+                  {RELATIONSHIP_RATING_LABELS[option]}
+                </option>
+              ))}
+            </SelectField>
+            <SelectField
+              id={`${idPrefix}-conflict`}
+              label="Conflict or strain"
+              value={draft.conflict}
+              onChange={(conflict) => patch({ conflict: conflict as PersonDraft["conflict"] })}
+            >
+              <option value="">Not recorded</option>
+              {RELATIONSHIP_RATING_VALUES.map((option) => (
+                <option key={option} value={option}>
+                  {RELATIONSHIP_RATING_LABELS[option]}
+                </option>
+              ))}
+            </SelectField>
+          </div>
+          <TextAreaField
+            id={`${idPrefix}-comment`}
+            label="Comment"
+            value={draft.qualityOfRelationship}
+            onChange={(qualityOfRelationship) => patch({ qualityOfRelationship })}
+          />
+        </div>
+      </PanelGroup>
     </div>
   )
 }
@@ -407,18 +549,23 @@ export function BlockFields({
       block.status === "dating" ||
       block.status === "engaged" ||
       (block.status in CURRENT_BLOCK_STATUS_LABELS && block.kind !== "client_previous"))
+  const showDates = block.kind !== "client_other_children"
+  const showEnded = showDates && !hideEnded
   return (
     <div className="space-y-3">
       {statuses.length > 0 ? (
         locked ? (
-          <p className="text-sm">
-            {statusLabel(block.status) || "Not recorded"}
-            <span className="mt-1 block text-xs text-muted-foreground">Set by the client&apos;s relationship status.</span>
-          </p>
+          <div>
+            <p className="mb-1.5 text-sm font-medium">Relationship status</p>
+            <p className="text-sm">
+              {statusLabel(block.status) || "Not recorded"}
+              <span className="mt-1 block text-xs text-muted-foreground">Set by the client&apos;s relationship status.</span>
+            </p>
+          </div>
         ) : (
           <SelectField
             id={`${block.relationshipBlockId}-status`}
-            label={block.kind === "client_previous" ? "How it ended" : "Status"}
+            label="Relationship status"
             value={block.status}
             onChange={(status) => onChange({ ...block, status })}
           >
@@ -471,23 +618,25 @@ export function BlockFields({
           onChange={(arrangementDetail) => onChange({ ...block, arrangementDetail })}
         />
       ) : null}
-      {block.kind !== "client_other_children" ? (
-        <PartialDatePicker
-          id={`${block.relationshipBlockId}-start`}
-          dateLabel="Started"
-          mode="date-only"
-          value={block.startedOn}
-          onChange={(startedOn) => onChange({ ...block, startedOn })}
-        />
-      ) : null}
-      {block.kind !== "client_other_children" && !hideEnded ? (
-        <PartialDatePicker
-          id={`${block.relationshipBlockId}-end`}
-          dateLabel="Ended"
-          mode="date-only"
-          value={block.endedOn}
-          onChange={(endedOn) => onChange({ ...block, endedOn })}
-        />
+      {showDates ? (
+        <div className={cn("grid gap-3", showEnded ? "grid-cols-2" : "grid-cols-1")}>
+          <PartialDatePicker
+            id={`${block.relationshipBlockId}-start`}
+            dateLabel="Started"
+            mode="date-only"
+            value={block.startedOn}
+            onChange={(startedOn) => onChange({ ...block, startedOn })}
+          />
+          {showEnded ? (
+            <PartialDatePicker
+              id={`${block.relationshipBlockId}-end`}
+              dateLabel="Ended"
+              mode="date-only"
+              value={block.endedOn}
+              onChange={(endedOn) => onChange({ ...block, endedOn })}
+            />
+          ) : null}
+        </div>
       ) : null}
       {showChildrenQuestion && (block.kind === "client_current" || block.kind === "client_previous") ? (
         <SelectField

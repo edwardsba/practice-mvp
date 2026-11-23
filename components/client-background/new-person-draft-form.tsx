@@ -1,10 +1,14 @@
 "use client"
 
-import { useState } from "react"
+import { useMemo, useState } from "react"
 
 import { DiscardChangesDialog } from "@/components/client-background/discard-changes-dialog"
-import { PartialDatePicker, SelectField, TextField } from "@/components/client-background/fields"
-import { PanelHeader } from "@/components/client-background/relationship-panel-shared"
+import {
+  PanelHeader,
+  PersonFields,
+  emptyPersonDraft,
+  type PersonDraft,
+} from "@/components/client-background/relationship-panel-shared"
 import { RelationshipEditFooter } from "@/components/client-background/relationship-edit-footer"
 import {
   addingToContextLine,
@@ -14,35 +18,17 @@ import {
 import { personDraftHasRequiredContent } from "@/lib/client-background/person-draft"
 import { siblingTypesForBlock } from "@/lib/client-background/relationship-blocks"
 import {
-  CHILD_TYPES,
-  RELATIONSHIP_LIVING_SITUATION_LABELS,
-  RELATIONSHIP_LIVING_SITUATIONS,
-  SEX_OPTIONS,
-  SIBLING_BLOCK_TYPE_LABELS,
   type BlockRole,
   type RelationshipBlock,
   type RelationshipRecord,
 } from "@/lib/client-background/types"
 
-export type NewPersonDraftFields = {
-  givenName: string
-  sex: string
-  dateOfBirth: string
-  blockRoleType: string
-  livingSituation: string
-}
-
-const emptyFields = (): NewPersonDraftFields => ({
-  givenName: "",
-  sex: "",
-  dateOfBirth: "",
-  blockRoleType: "",
-  livingSituation: "",
-})
+/** @deprecated Use PersonDraft — kept as an alias for call sites mid-migration. */
+export type NewPersonDraftFields = PersonDraft
 
 /**
- * Shared browser-only new-person draft (Partner / Child / Sibling).
- * Nothing is written until Save. Used on Client Background and Interview.
+ * Shared browser-only new-person draft (Partner / Child / Sibling / unplaced).
+ * Uses the same PersonFields form as edit. Nothing is written until Save.
  */
 export function NewPersonDraftForm({
   block,
@@ -50,29 +36,73 @@ export function NewPersonDraftForm({
   role,
   error,
   saving = false,
+  contextLine,
+  title: titleOverride,
   onSave,
   onCancel,
 }: {
-  block: RelationshipBlock
+  /** Null for History unplaced-person drafts. */
+  block: RelationshipBlock | null
   people: RelationshipRecord[]
-  role: BlockRole
+  role: BlockRole | "unplaced"
   error: string | null
   saving?: boolean
-  onSave: (draft: NewPersonDraftFields) => void | Promise<void>
+  /** Override the default "Adding to: …" context strip. */
+  contextLine?: string
+  title?: string
+  onSave: (draft: PersonDraft) => void | Promise<void>
   onCancel: () => void
 }) {
-  const [draft, setDraft] = useState<NewPersonDraftFields>(emptyFields)
+  const siblingDefault =
+    role === "sibling" && block ? siblingTypesForBlock(block.kind)[0] ?? "" : ""
+  const [draft, setDraft] = useState<PersonDraft>(() => ({
+    ...emptyPersonDraft,
+    blockRoleType: siblingDefault,
+  }))
   const [confirmDiscard, setConfirmDiscard] = useState(false)
-  const partnerName = firstPartnerGivenName(people, block.relationshipBlockId)
-  const dirty =
-    draft.givenName.trim() !== "" ||
-    draft.sex.trim() !== "" ||
-    draft.dateOfBirth.trim() !== "" ||
-    draft.blockRoleType.trim() !== "" ||
-    draft.livingSituation.trim() !== ""
+  const partnerName = block ? firstPartnerGivenName(people, block.relationshipBlockId) : ""
+  const dirty = JSON.stringify(draft) !== JSON.stringify({ ...emptyPersonDraft, blockRoleType: siblingDefault })
   const canSave = personDraftHasRequiredContent(draft)
   const title =
-    role === "child" ? "New child" : role === "sibling" ? "New sibling" : "New partner"
+    titleOverride ??
+    (role === "child"
+      ? "New child"
+      : role === "sibling"
+        ? "New sibling"
+        : role === "partner"
+          ? "New partner"
+          : role === "caregiver"
+            ? "New caregiver"
+            : "New person")
+
+  const syntheticPerson = useMemo((): RelationshipRecord => {
+    return {
+      relationshipRecordId: "draft-person",
+      relationshipBlockId: block?.relationshipBlockId ?? null,
+      relationshipToClient: "other_caregiver",
+      givenName: draft.givenName,
+      sex: draft.sex,
+      dateOfBirth: draft.dateOfBirth,
+      dateOfDeath: draft.dateOfDeath,
+      deceased: draft.deceased,
+      ageAtDeath: null,
+      healthOrCauseOfDeath: "",
+      childTypeDetail: "",
+      notKnown: draft.notKnown,
+      healthStatus: draft.healthStatus,
+      supportive: draft.supportive,
+      conflict: draft.conflict,
+      qualityOfRelationship: draft.qualityOfRelationship,
+      dependency: draft.dependency,
+      livingSituation: draft.livingSituation as RelationshipRecord["livingSituation"],
+      blockRole: role === "unplaced" ? "" : role,
+      blockRoleType: draft.blockRoleType,
+      caregiverRelationship: "",
+      caregiverRelationshipDetail: "",
+      displayOrder: 0,
+      placementReview: role === "unplaced" ? "unplaced" : "",
+    }
+  }, [block?.relationshipBlockId, draft, role])
 
   function requestClose() {
     if (dirty) {
@@ -82,11 +112,9 @@ export function NewPersonDraftForm({
     onCancel()
   }
 
-  function patch(partial: Partial<NewPersonDraftFields>) {
-    setDraft((current) => ({ ...current, ...partial }))
-  }
-
-  const siblingOptions = role === "sibling" ? siblingTypesForBlock(block.kind) : []
+  const resolvedContext =
+    contextLine ??
+    (block ? addingToContextLine(block, people) : "Adding an unplaced person (History Who)")
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -98,79 +126,17 @@ export function NewPersonDraftForm({
         onClose={requestClose}
       />
       <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
-        <p className="rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground">
-          {addingToContextLine(block, people)}
-        </p>
-        <TextField
-          id={`new-person-${block.relationshipBlockId}-name`}
-          label="Name"
-          value={draft.givenName}
-          onChange={(givenName) => patch({ givenName })}
+        <p className="rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground">{resolvedContext}</p>
+        <PersonFields
+          idPrefix={`new-person-${block?.relationshipBlockId ?? "unplaced"}`}
+          person={syntheticPerson}
+          block={block}
+          draft={draft}
+          onChange={setDraft}
+          childTypeLabel={
+            role === "child" ? (type) => childTypeOptionLabel(type, partnerName) : undefined
+          }
         />
-        <SelectField
-          id={`new-person-${block.relationshipBlockId}-sex`}
-          label="Sex"
-          value={draft.sex}
-          onChange={(sex) => patch({ sex })}
-        >
-          <option value="">Not recorded</option>
-          {SEX_OPTIONS.map((option) => (
-            <option key={option} value={option}>
-              {option}
-            </option>
-          ))}
-        </SelectField>
-        {role === "child" ? (
-          <SelectField
-            id={`new-person-${block.relationshipBlockId}-type`}
-            label="Type"
-            value={draft.blockRoleType}
-            onChange={(blockRoleType) => patch({ blockRoleType })}
-          >
-            <option value="">Select…</option>
-            {CHILD_TYPES.map((type) => (
-              <option key={type} value={type}>
-                {childTypeOptionLabel(type, partnerName)}
-              </option>
-            ))}
-          </SelectField>
-        ) : null}
-        {role === "sibling" ? (
-          <SelectField
-            id={`new-person-${block.relationshipBlockId}-sibling-type`}
-            label="Type"
-            value={draft.blockRoleType || siblingOptions[0] || ""}
-            onChange={(blockRoleType) => patch({ blockRoleType })}
-          >
-            {siblingOptions.map((type) => (
-              <option key={type} value={type}>
-                {SIBLING_BLOCK_TYPE_LABELS[type as keyof typeof SIBLING_BLOCK_TYPE_LABELS] ?? type}
-              </option>
-            ))}
-          </SelectField>
-        ) : null}
-        <PartialDatePicker
-          id={`new-person-${block.relationshipBlockId}-dob`}
-          dateLabel="Date of birth or age"
-          mode="person"
-          value={draft.dateOfBirth}
-          onChange={(dateOfBirth) => patch({ dateOfBirth })}
-        />
-        {role === "child" || role === "partner" ? (
-          <SelectField
-            id={`new-person-${block.relationshipBlockId}-living`}
-            label="Living situation"
-            value={draft.livingSituation}
-            onChange={(livingSituation) => patch({ livingSituation })}
-          >
-            <option value="">Not recorded</option>
-            {RELATIONSHIP_LIVING_SITUATIONS.map((option) => (
-              <option key={option} value={option}>
-                {RELATIONSHIP_LIVING_SITUATION_LABELS[option]}
-              </option>
-            ))}
-          </SelectField>
-        ) : null}
         {error ? <p className="text-sm text-destructive">{error}</p> : null}
       </div>
       <RelationshipEditFooter

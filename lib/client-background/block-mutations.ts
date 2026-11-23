@@ -477,8 +477,51 @@ export async function saveRelationshipPersonDraft(input: SaveRelationshipPersonD
 }
 
 /** Create an unplaced person for History "Who → + Add person". */
-export async function createUnplacedPerson(input: Scope & { givenName?: string }) {
+export type CreateUnplacedPersonInput = Scope & {
+  givenName?: string
+  sex?: string
+  dateOfBirth?: string
+  healthStatus?: string
+  deceased?: boolean
+  dateOfDeath?: string
+  supportive?: string
+  conflict?: string
+  qualityOfRelationship?: string
+  dependency?: string
+  livingSituation?: string
+  notKnown?: boolean
+  blockRoleType?: string
+}
+
+/**
+ * Create an unplaced person (History Who). Refuses an empty draft.
+ * Prefer passing the full person draft from the shared form; nothing is written until Save.
+ */
+export async function createUnplacedPerson(input: CreateUnplacedPersonInput) {
   if (!(await ownedClient(input.clientId, input.practiceId))) return { error: "Client was not found." }
+  const empty = refuseEmptyPersonDraft({
+    givenName: input.givenName ?? "",
+    blockRoleType: input.blockRoleType ?? "",
+  })
+  if (empty) return { error: empty }
+
+  const sanitized = sanitizeRelationship({
+    relationshipRecordId: "",
+    givenName: input.givenName ?? "",
+    sex: input.sex ?? "",
+    dateOfBirth: input.dateOfBirth ?? "",
+    healthStatus: input.healthStatus ?? "",
+    deceased: Boolean(input.deceased),
+    dateOfDeath: input.dateOfDeath ?? "",
+    supportive: input.supportive ?? "",
+    conflict: input.conflict ?? "",
+    qualityOfRelationship: input.qualityOfRelationship ?? "",
+    dependency: input.dependency ?? "",
+    livingSituation: input.livingSituation ?? "",
+    notKnown: Boolean(input.notKnown),
+    relationshipToClient: "other_caregiver",
+  })
+
   const rows = await db
     .select({ displayOrder: clientRelationshipRecords.displayOrder })
     .from(clientRelationshipRecords)
@@ -490,13 +533,27 @@ export async function createUnplacedPerson(input: Scope & { givenName?: string }
       clientId: input.clientId,
       practiceId: input.practiceId,
       relationshipToClient: "other_caregiver",
-      givenName: input.givenName?.trim() || null,
+      givenName: sanitized.givenName || null,
+      sex: sanitized.sex || null,
+      dateOfBirth: sanitized.dateOfBirth || null,
+      healthStatus: sanitized.healthStatus || null,
+      deceased: sanitized.deceased,
+      dateOfDeath: sanitized.dateOfDeath || null,
+      supportive: sanitized.supportive || null,
+      conflict: sanitized.conflict || null,
+      qualityOfRelationship: sanitized.qualityOfRelationship || null,
+      dependency: sanitized.dependency || null,
+      livingSituation: sanitized.livingSituation || null,
+      notKnown: sanitized.notKnown,
       displayOrder,
       placementReview: "unplaced",
     })
     .returning()
   await writeAudit(input, "client_relationship.created", "client_relationship", created.relationshipRecordId)
-  return loadBlockEditorState(input.clientId, input.practiceId)
+  return {
+    ...(await loadBlockEditorState(input.clientId, input.practiceId)),
+    createdMemberId: created.relationshipRecordId,
+  }
 }
 
 export async function createRelationshipBlock(input: Scope & {

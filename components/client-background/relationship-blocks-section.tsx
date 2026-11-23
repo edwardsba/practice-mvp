@@ -602,6 +602,14 @@ export function RelationshipBlocksSection({
       dateOfBirth: string
       blockRoleType: string
       livingSituation: string
+      healthStatus?: string
+      deceased?: boolean
+      dateOfDeath?: string
+      supportive?: string
+      conflict?: string
+      qualityOfRelationship?: string
+      dependency?: string
+      notKnown?: boolean
     }
   ) {
     setPanelSaving(true)
@@ -623,6 +631,14 @@ export function RelationshipBlocksSection({
             blockRole: role,
             blockRoleType: fields.blockRoleType || defaultType,
             livingSituation: fields.livingSituation,
+            healthStatus: fields.healthStatus,
+            deceased: fields.deceased,
+            dateOfDeath: fields.dateOfDeath,
+            supportive: fields.supportive,
+            conflict: fields.conflict,
+            qualityOfRelationship: fields.qualityOfRelationship,
+            dependency: fields.dependency,
+            notKnown: fields.notKnown,
           },
         })
       )

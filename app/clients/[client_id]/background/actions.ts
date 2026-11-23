@@ -15,6 +15,7 @@ import {
   setRelationshipBlockAnswer,
   updateBlockMember,
   updateRelationshipBlock,
+  type CreateUnplacedPersonInput,
   type SaveRelationshipPersonDraftInput,
 } from "@/lib/client-background/block-mutations"
 import {
@@ -325,9 +326,14 @@ export async function saveRelationshipPersonDraftAction(
   return result
 }
 
-export async function createUnplacedPersonAction(clientId: string, givenName?: string) {
+export async function createUnplacedPersonAction(
+  clientId: string,
+  draft?: string | Omit<CreateUnplacedPersonInput, "clientId" | "practiceId" | "userId">
+) {
   const context = await requirePractitionerContext()
-  const result = await createUnplacedPerson({ ...scope(clientId, context), givenName })
+  // Back-compat: older call sites passed a bare givenName string.
+  const fields = typeof draft === "string" ? { givenName: draft } : draft ?? {}
+  const result = await createUnplacedPerson({ ...scope(clientId, context), ...fields })
   if (result && !("error" in result && result.error)) refresh(clientId)
   return result
 }

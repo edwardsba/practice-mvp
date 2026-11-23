@@ -210,6 +210,7 @@ export default async function EditClientPage({
           expandedContent={
             <RelationshipTreeSection
               clientId={clientId}
+              clientName={client.firstName || clientName}
               relationships={background.relationships}
               blocks={background.relationshipBlocks ?? []}
               blockAnswers={background.blockAnswers ?? emptyBlockAnswers()}

@@ -11,7 +11,6 @@ import type {
   CheckboxOption,
   SupportServiceOption,
 } from "@/lib/treatment-plans/fields"
-import { professionalOptionLabel, type ProfessionalOption } from "@/lib/client-background/professionals"
 import type {
   MultiSelectSectionJson,
   OngoingAssessmentsJson,
@@ -228,49 +227,6 @@ export function SupportServicesFields({
               ))}
             </ul>
           ) : null}
-        </div>
-      ))}
-    </div>
-  )
-}
-
-/** One supervisor dropdown per ongoing medication entry. */
-export function MedicationSupervisionFields({
-  medications,
-  professionals,
-}: {
-  medications: { eventRecordId: string; title: string; prescriberProfessionalId: string | null }[]
-  professionals: ProfessionalOption[]
-}) {
-  if (medications.length === 0) {
-    return (
-      <p className="text-sm text-muted-foreground">
-        No ongoing medication is recorded. Add it under Medication in Client Background history.
-      </p>
-    )
-  }
-
-  return (
-    <div className="space-y-4">
-      {medications.map((medication) => (
-        <div key={medication.eventRecordId} className="max-w-sm space-y-2">
-          <input type="hidden" name="medication_event_id" value={medication.eventRecordId} />
-          <Label htmlFor={`medication_supervisor_${medication.eventRecordId}`} className="text-xs">
-            {medication.title.trim() || "Medication"}
-          </Label>
-          <select
-            id={`medication_supervisor_${medication.eventRecordId}`}
-            name="medication_supervisor_id"
-            defaultValue={medication.prescriberProfessionalId ?? ""}
-            className="h-9 w-full rounded-md border bg-transparent px-3 text-sm"
-          >
-            <option value="">Not recorded</option>
-            {professionals.map((professional) => (
-              <option key={professional.professionalId} value={professional.professionalId}>
-                {professionalOptionLabel(professional)}
-              </option>
-            ))}
-          </select>
         </div>
       ))}
     </div>

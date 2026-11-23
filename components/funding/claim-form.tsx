@@ -18,6 +18,7 @@ import {
   isInsuranceClaimType,
   isMedicareClaimType,
 } from "@/lib/funding/format"
+import { safeReturnTo } from "@/lib/navigation/safe-return-to"
 import { cn } from "@/lib/utils"
 
 const selectClassName = cn(
@@ -59,6 +60,7 @@ export function ClaimForm({
   initialValues,
   cancelHref,
   returnTo,
+  lockClient = false,
 }: {
   clients: ClientOption[]
   claimTypes: ClaimTypeOption[]
@@ -66,6 +68,7 @@ export function ClaimForm({
   initialValues?: ClaimInitialValues
   cancelHref: string
   returnTo?: string
+  lockClient?: boolean
 }) {
   const router = useRouter()
   const [state, formAction, pending] = useActionState(
@@ -78,6 +81,7 @@ export function ClaimForm({
   const [selectedClaimTypeId, setSelectedClaimTypeId] = useState(
     initialValues?.claimTypeId ?? claimTypes[0]?.claimTypeId ?? ""
   )
+  const clientLocked = lockClient || Boolean(initialValues?.claimId)
 
   const selectedClaimType = useMemo(
     () => claimTypes.find((type) => type.claimTypeId === selectedClaimTypeId),
@@ -89,9 +93,15 @@ export function ClaimForm({
 
   useEffect(() => {
     if (state.success && state.claimId) {
-      if (returnTo) {
-        const separator = returnTo.includes("?") ? "&" : "?"
-        router.push(`${returnTo}${separator}created_claim_id=${state.claimId}`)
+      const safe = safeReturnTo(returnTo)
+      if (safe) {
+        // Preserve mid-flow "created claim" hand-off when returning to an approval form.
+        if (safe.includes("/funding/approvals")) {
+          const separator = safe.includes("?") ? "&" : "?"
+          router.push(`${safe}${separator}created_claim_id=${state.claimId}`)
+        } else {
+          router.push(safe)
+        }
       } else {
         router.push(`/funding/claims/${state.claimId}`)
       }
@@ -106,7 +116,7 @@ export function ClaimForm({
       </CardHeader>
       <CardContent>
         <form action={formAction} className="space-y-4">
-          {initialValues?.claimId && initialValues.clientId ? (
+          {clientLocked && initialValues?.clientId ? (
             <input
               type="hidden"
               name="client_id"
@@ -123,10 +133,10 @@ export function ClaimForm({
             <Label htmlFor="client_id">Client</Label>
             <select
               id="client_id"
-              name={initialValues?.claimId ? undefined : "client_id"}
-              required={!initialValues?.claimId}
+              name={clientLocked ? undefined : "client_id"}
+              required={!clientLocked}
               defaultValue={initialValues?.clientId ?? ""}
-              disabled={Boolean(initialValues?.claimId)}
+              disabled={clientLocked}
               className={selectClassName}
             >
               <option value="" disabled>

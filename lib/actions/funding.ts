@@ -2185,3 +2185,83 @@ export async function deleteFundingApproval(
   revalidatePath(`/funding/approvals/${fundingApprovalId}`)
   redirect("/funding/approvals")
 }
+
+/**
+ * Attach a referral/approval that has no claim to one of the client's claims.
+ * Verifies the approval and claim both belong to the same client and practice.
+ * Nothing is written until this action runs (Save).
+ */
+export async function attachFundingApprovalToClaim(
+  _prevState: FundingFormState,
+  formData: FormData
+): Promise<FundingFormState> {
+  const context = await requirePractitionerContext()
+
+  const clientId = String(formData.get("client_id") ?? "").trim()
+  const fundingApprovalId = String(
+    formData.get("funding_approval_id") ?? ""
+  ).trim()
+  const claimId = String(formData.get("claim_id") ?? "").trim()
+
+  if (!clientId || !fundingApprovalId || !claimId) {
+    return { error: "Choose a claim to attach." }
+  }
+
+  const [approval] = await db
+    .select({
+      fundingApprovalId: fundingApprovals.fundingApprovalId,
+      clientId: fundingApprovals.clientId,
+      claimId: fundingApprovals.claimId,
+    })
+    .from(fundingApprovals)
+    .where(
+      and(
+        eq(fundingApprovals.fundingApprovalId, fundingApprovalId),
+        eq(fundingApprovals.clientId, clientId),
+        eq(fundingApprovals.practiceId, context.practiceId),
+        eq(fundingApprovals.isActive, true)
+      )
+    )
+    .limit(1)
+
+  if (!approval) {
+    return { error: "Referral or funding approval not found for this client." }
+  }
+
+  const [claim] = await db
+    .select({
+      claimId: claims.claimId,
+      clientId: claims.clientId,
+    })
+    .from(claims)
+    .where(
+      and(
+        eq(claims.claimId, claimId),
+        eq(claims.clientId, clientId),
+        eq(claims.practiceId, context.practiceId)
+      )
+    )
+    .limit(1)
+
+  if (!claim) {
+    return { error: "Claim not found for this client." }
+  }
+
+  await db
+    .update(fundingApprovals)
+    .set({ claimId, updatedAt: new Date() })
+    .where(
+      and(
+        eq(fundingApprovals.fundingApprovalId, fundingApprovalId),
+        eq(fundingApprovals.practiceId, context.practiceId),
+        eq(fundingApprovals.clientId, clientId)
+      )
+    )
+
+  revalidatePath(`/clients/${clientId}`)
+  revalidatePath(`/clients/${clientId}/claims`)
+  revalidatePath(`/funding/approvals/${fundingApprovalId}`)
+  revalidatePath(`/funding/claims/${claimId}`)
+
+  return { success: true, fundingApprovalId }
+}

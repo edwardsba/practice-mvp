@@ -11,10 +11,10 @@ import { requirePractitionerContext } from "@/lib/auth"
 import { loadBackgroundInterviewCard, loadClientBackground, loadLatestBackgroundSelfReport, loadReasonSupport } from "@/lib/client-background/load"
 import { ensureFamilyOfOrigin } from "@/lib/client-background/mutations"
 import { db } from "@/lib/db"
-import {
-  anyReferralRecorded,
-  buildReferralFundingCardProps,
-} from "@/lib/funding/referral-funding-card-props"
+import { buildReferralFundingQuickView } from "@/lib/funding/claims-page"
+import { loadClaimsPageForClient } from "@/lib/funding/load-claims-page"
+import { anyReferralRecorded } from "@/lib/funding/referral-funding-card-props"
+import { loadMedicalContactsForClient } from "@/lib/medical-contacts/load"
 
 export default async function ClientBackgroundRoute({
   params,
@@ -49,19 +49,26 @@ export default async function ClientBackgroundRoute({
 
   const data = await loadClientBackground(clientId, context.practiceId)
   if (!data) notFound()
-  const [interview, selfReport, reasonSupport, referralFundingData] = await Promise.all([
-    loadBackgroundInterviewCard(clientId, context.practiceId),
-    loadLatestBackgroundSelfReport(clientId, context.practiceId),
-    loadReasonSupport(clientId, context.practiceId, null),
-    getReferralFundingCardData(clientId),
-  ])
+  const [interview, selfReport, reasonSupport, claimsPage, referralFundingData, medicalContacts] =
+    await Promise.all([
+      loadBackgroundInterviewCard(clientId, context.practiceId),
+      loadLatestBackgroundSelfReport(clientId, context.practiceId),
+      loadReasonSupport(clientId, context.practiceId, null),
+      loadClaimsPageForClient(clientId),
+      getReferralFundingCardData(clientId),
+      loadMedicalContactsForClient(clientId, context.practiceId),
+    ])
   if (!interview) notFound()
 
-  const referralFunding = buildReferralFundingCardProps(
-    context.practiceId,
-    referralFundingData
+  const referralQuickViewLines = buildReferralFundingQuickView(
+    claimsPage?.model ?? {
+      referralsWithoutClaim: [],
+      activeClaims: [],
+      inactiveClaims: [],
+      calendarYear: new Date().getFullYear(),
+    }
   )
-  const referralRecorded = anyReferralRecorded(referralFunding.approvals)
+  const referralRecorded = anyReferralRecorded(referralFundingData.approvals)
   const clientName = `${client.firstName} ${client.lastName}`
 
   return (
@@ -82,7 +89,8 @@ export default async function ClientBackgroundRoute({
         interview={interview}
         numberOfChildren={selfReport?.answers.familyHome.numberOfChildren ?? null}
         reasonSupport={reasonSupport}
-        referralFunding={referralFunding}
+        medicalContacts={medicalContacts.map((row) => row.professional)}
+        referralQuickViewLines={referralQuickViewLines}
         referralRecorded={referralRecorded}
       />
     </AppShell>

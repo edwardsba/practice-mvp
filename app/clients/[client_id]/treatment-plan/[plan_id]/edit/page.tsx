@@ -1,4 +1,3 @@
-import Link from "next/link"
 import { notFound } from "next/navigation"
 
 import { deleteTreatmentPlan } from "@/app/clients/[client_id]/treatment-plan/actions"
@@ -14,8 +13,11 @@ import {
 } from "@/lib/treatment-plans/load"
 import { loadActiveCrisisPlanSummary } from "@/lib/crisis-plans/load"
 import { requirePractitionerContext } from "@/lib/auth"
-import { loadClientBackground, loadReasonSupport } from "@/lib/client-background/load"
-import { ongoingMedicationEvents } from "@/lib/client-background/medication"
+import {
+  loadMedicationEventsForClient,
+  loadProfessionalsForOngoingMedicationPrescribers,
+} from "@/lib/medical-contacts/load"
+import { formatMedicationSupervisedAnswer } from "@/lib/medical-contacts/rules"
 
 export default async function EditTreatmentPlanPage({
   params,
@@ -43,19 +45,19 @@ export default async function EditTreatmentPlanPage({
     notFound()
   }
 
-  const crisisPlanSummary = await loadActiveCrisisPlanSummary(
-    clientId,
-    context.practiceId
+  const [crisisPlanSummary, medicationEvents, medicationProfessionals] =
+    await Promise.all([
+      loadActiveCrisisPlanSummary(clientId, context.practiceId),
+      loadMedicationEventsForClient(clientId, context.practiceId),
+      loadProfessionalsForOngoingMedicationPrescribers(
+        clientId,
+        context.practiceId
+      ),
+    ])
+  const medicationSupervised = formatMedicationSupervisedAnswer(
+    medicationEvents,
+    medicationProfessionals
   )
-  const [background, reasonSupport] = await Promise.all([
-    loadClientBackground(clientId, context.practiceId),
-    loadReasonSupport(clientId, context.practiceId, null),
-  ])
-  const ongoingMedications = ongoingMedicationEvents(background?.events ?? []).map((event) => ({
-    eventRecordId: event.eventRecordId,
-    title: event.title,
-    prescriberProfessionalId: event.prescriberProfessionalId,
-  }))
 
   const clientName = `${client.firstName} ${client.lastName}`
 
@@ -81,8 +83,7 @@ export default async function EditTreatmentPlanPage({
         isNewVersion
         cancelHref={`/clients/${clientId}/treatment-plan/${planId}`}
         crisisPlanSummary={crisisPlanSummary}
-        ongoingMedications={ongoingMedications}
-        professionals={reasonSupport.professionals}
+        medicationSupervisedLine={medicationSupervised.fullLine}
       />
 
       <EntityDeleteSection

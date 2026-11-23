@@ -3,10 +3,12 @@ import {
   pgTable,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core'
+import { sql } from 'drizzle-orm'
 
-import { practices } from './01-core'
+import { clients, practices } from './01-core'
 
 export const professions = pgTable('professions', {
   professionId: uuid('profession_id').primaryKey().defaultRandom(),
@@ -88,4 +90,38 @@ export const professionalOrganisationLinks = pgTable(
       .notNull()
       .defaultNow(),
   }
+)
+
+/** Professionals listed as a client's medical contacts (GPs, psychiatrists, etc.). */
+export const clientMedicalContacts = pgTable(
+  'client_medical_contacts',
+  {
+    medicalContactId: uuid('medical_contact_id').primaryKey().defaultRandom(),
+    clientId: uuid('client_id')
+      .notNull()
+      .references(() => clients.clientId),
+    practiceId: uuid('practice_id')
+      .notNull()
+      .references(() => practices.practiceId),
+    professionalId: uuid('professional_id')
+      .notNull()
+      .references(() => professionals.professionalId),
+    isMain: boolean('is_main').notNull().default(false),
+    notes: text('notes'),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex('client_medical_contacts_client_professional_uidx').on(
+      table.clientId,
+      table.professionalId
+    ),
+    uniqueIndex('client_medical_contacts_one_main_uidx')
+      .on(table.clientId)
+      .where(sql`${table.isMain} = true`),
+  ]
 )

@@ -86,6 +86,7 @@ export async function createEmergencyContact(
   }
 
   revalidatePath(`/clients/${clientId}`)
+  revalidatePath(`/clients/${clientId}/edit`)
   return { success: true }
 }
 
@@ -139,6 +140,7 @@ export async function updateEmergencyContact(
   })
 
   revalidatePath(`/clients/${clientId}`)
+  revalidatePath(`/clients/${clientId}/edit`)
   return { success: true }
 }
 
@@ -178,5 +180,6 @@ export async function deleteEmergencyContact(
   })
 
   revalidatePath(`/clients/${clientId}`)
+  revalidatePath(`/clients/${clientId}/edit`)
   return { success: true }
 }

@@ -6,8 +6,6 @@ import {
   TREATMENT_MODEL_OPTIONS,
 } from "@/lib/treatment-plans/fields"
 import type {
-  MedicationSupervisionJson,
-  MedicationSupervisorAssignment,
   MultiSelectSectionJson,
   OngoingAssessmentsJson,
   SingleSelectSectionJson,
@@ -74,29 +72,6 @@ function parseSmartGoals(formData: FormData): SmartGoalsJson {
   return { items }
 }
 
-function parseMedicationSupervisors(formData: FormData): MedicationSupervisorAssignment[] {
-  const eventIds = formData.getAll("medication_event_id").map(String)
-  const supervisors = formData.getAll("medication_supervisor_id").map(String)
-  return eventIds
-    .map((eventId, index) => ({
-      eventId: eventId.trim(),
-      professionalId: supervisors[index]?.trim() || null,
-    }))
-    .filter((item) => item.eventId)
-}
-
-function parseMedicationSupervision(formData: FormData): MedicationSupervisionJson {
-  const supervised = formData.get("medication_supervised") === "on"
-  const supervisorName = String(
-    formData.get("medication_supervisor_name") ?? ""
-  ).trim()
-
-  return {
-    supervised,
-    supervisorName: supervised && supervisorName ? supervisorName : null,
-  }
-}
-
 function parseSuicideAttempts(formData: FormData): SuicideAttemptsJson {
   const ids = formData.getAll("suicide_attempt_id").map(String)
   const years = formData.getAll("suicide_attempt_year").map(String)
@@ -143,8 +118,9 @@ export function parseTreatmentPlanFormData(
     ),
     suicideAttempts: parseSuicideAttempts(formData),
     ongoingAssessments: parseOngoingAssessments(formData),
-    medicationSupervision: parseMedicationSupervision(formData),
-    medicationSupervisors: parseMedicationSupervisors(formData),
+    // Live from History / medical contacts — not written from the form.
+    medicationSupervision: { supervised: false, supervisorName: null },
+    medicationSupervisors: [],
     supportServices: parseMultiSection(
       formData,
       "support",
@@ -169,7 +145,7 @@ export function formValuesToDbColumns(values: TreatmentPlanFormValues) {
     treatmentModalitiesJson: values.treatmentModalities,
     suicideAttemptsJson: values.suicideAttempts,
     ongoingAssessmentsJson: values.ongoingAssessments,
-    medicationSupervisionJson: values.medicationSupervision,
+    // Stop writing medication_supervision_json; column remains for a later removal round.
     supportServicesJson: values.supportServices,
     treatmentModelJson: values.treatmentModel,
   }

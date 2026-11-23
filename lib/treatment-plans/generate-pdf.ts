@@ -14,6 +14,11 @@ import {
   sortAttemptsChronologically,
 } from "@/lib/treatment-plans/format-attempt-date"
 import { loadActiveCrisisPlanSummary } from "@/lib/crisis-plans/load"
+import {
+  loadMedicationEventsForClient,
+  loadProfessionalsForOngoingMedicationPrescribers,
+} from "@/lib/medical-contacts/load"
+import { formatMedicationSupervisedAnswer } from "@/lib/medical-contacts/rules"
 
 const PAGE_MARGIN = 50
 const PAGE_WIDTH = 595.28
@@ -92,9 +97,18 @@ export async function generateTreatmentPlanPdf(
   plan: TreatmentPlanRow,
   client: TreatmentPlanPdfClient
 ): Promise<Buffer> {
-  const crisisPlanSummary = await loadActiveCrisisPlanSummary(
-    plan.clientId,
-    plan.practiceId
+  const [crisisPlanSummary, medicationEvents, medicationProfessionals] =
+    await Promise.all([
+      loadActiveCrisisPlanSummary(plan.clientId, plan.practiceId),
+      loadMedicationEventsForClient(plan.clientId, plan.practiceId),
+      loadProfessionalsForOngoingMedicationPrescribers(
+        plan.clientId,
+        plan.practiceId
+      ),
+    ])
+  const medicationSupervised = formatMedicationSupervisedAnswer(
+    medicationEvents,
+    medicationProfessionals
   )
 
   return new Promise((resolve, reject) => {
@@ -206,10 +220,6 @@ export async function generateTreatmentPlanPdf(
     }
     doc.moveDown(0.35)
 
-    const medicationSupervision = plan.medicationSupervisionJson ?? {
-      supervised: false,
-      supervisorName: null,
-    }
     doc
       .font("Helvetica-Bold")
       .fontSize(BASE_FONT_SIZE)
@@ -220,12 +230,7 @@ export async function generateTreatmentPlanPdf(
       .font("Helvetica")
       .fontSize(BASE_FONT_SIZE)
       .fillColor(TEXT_COLOR)
-      .text(
-        medicationSupervision.supervised
-          ? `Yes — supervised by ${medicationSupervision.supervisorName ?? "—"}`
-          : "No",
-        { lineGap: LINE_GAP }
-      )
+      .text(medicationSupervised.fullLine, { lineGap: LINE_GAP })
     doc.moveDown(0.35)
 
     doc

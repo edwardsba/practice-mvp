@@ -36,8 +36,8 @@ import {
   type TreatmentAnswer,
   type TreatmentTypeChoice,
 } from "@/lib/client-background/types"
+import { PrescriberField } from "@/components/medical-contacts/prescriber-field"
 import type { ProfessionalOption } from "@/lib/client-background/professionals"
-import { professionalOptionLabel } from "@/lib/client-background/professionals"
 
 export function NewIssueForm({
   draft,
@@ -191,6 +191,8 @@ export function NewEventForm({
   treatmentType,
   category,
   dateOfBirth,
+  clientId,
+  medicalContacts,
   professionals,
   onKindChange,
   onTreatmentTypeChange,
@@ -201,6 +203,8 @@ export function NewEventForm({
   treatmentType: TreatmentTypeChoice | ""
   category: EventRecord["eventType"] | null
   dateOfBirth: string | null
+  clientId: string
+  medicalContacts: ProfessionalOption[]
   professionals: ProfessionalOption[]
   onKindChange: (kind: SmartEventKind) => void
   onTreatmentTypeChange: (value: TreatmentTypeChoice | "") => void
@@ -330,21 +334,19 @@ export function NewEventForm({
         />
       ) : null}
       {fields.includes("prescriber") ? (
-        <SelectField
-          id="new_event_prescriber"
-          label="Prescribed or supervised by"
-          value={draft.prescriberProfessionalId ?? ""}
+        <PrescriberField
+          clientId={clientId}
+          value={draft.prescriberProfessionalId}
+          freeTextFallback={draft.prescriberName}
+          medicalContacts={medicalContacts}
+          professionals={professionals}
           onChange={(prescriberProfessionalId) =>
-            patch({ prescriberProfessionalId: prescriberProfessionalId || null, prescriberName: "" })
+            patch({
+              prescriberProfessionalId,
+              prescriberName: "",
+            })
           }
-        >
-          <option value="">{draft.prescriberName.trim() || "Not recorded"}</option>
-          {professionals.map((professional) => (
-            <option key={professional.professionalId} value={professional.professionalId}>
-              {professionalOptionLabel(professional)}
-            </option>
-          ))}
-        </SelectField>
+        />
       ) : null}
       {fields.includes("other_title") || fields.includes("title") ? (
         <TextField

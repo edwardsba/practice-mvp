@@ -1,12 +1,15 @@
 "use client"
 
+import { useRouter } from "next/navigation"
 import { useActionState, useEffect } from "react"
 
 import {
   createEmergencyContact,
+  deleteEmergencyContact,
   updateEmergencyContact,
   type EmergencyContactFormState,
 } from "@/app/clients/[client_id]/emergency-contacts/actions"
+import { DeleteConfirmationButton } from "@/components/delete-confirmation-button"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -30,6 +33,7 @@ export function EmergencyContactDialog({
   clientId: string
   contact?: EmergencyContactRow | null
 }) {
+  const router = useRouter()
   const action = contact
     ? updateEmergencyContact.bind(null, clientId, contact.contactId)
     : createEmergencyContact.bind(null, clientId)
@@ -97,18 +101,38 @@ export function EmergencyContactDialog({
             </p>
           ) : null}
 
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-            >
-              Cancel
-            </Button>
-            <Button type="submit" disabled={pending}>
-              {pending ? "Saving…" : "Save"}
-            </Button>
-          </DialogFooter>
+          <div className="flex flex-col-reverse gap-4 sm:flex-row sm:items-end sm:justify-between">
+            {contact ? (
+              <div className="[&>div]:mt-0 [&>div]:border-0 [&>div]:pt-0">
+                <DeleteConfirmationButton
+                  entityName="emergency contact"
+                  onDelete={async () => {
+                    const result = await deleteEmergencyContact(
+                      clientId,
+                      contact.contactId
+                    )
+                    if (result.error) throw new Error(result.error)
+                    onOpenChange(false)
+                    router.refresh()
+                  }}
+                />
+              </div>
+            ) : (
+              <span />
+            )}
+            <DialogFooter className="sm:justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => onOpenChange(false)}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={pending}>
+                {pending ? "Saving…" : "Save"}
+              </Button>
+            </DialogFooter>
+          </div>
         </form>
       </DialogContent>
     </Dialog>

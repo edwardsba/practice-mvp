@@ -2,22 +2,18 @@ import Link from "next/link"
 import { notFound } from "next/navigation"
 import { and, eq } from "drizzle-orm"
 
-import { ActionItemsSection } from "@/app/clients/[client_id]/action-items-section"
-import { ClientMenuSidebar } from "@/app/clients/[client_id]/client-menu-sidebar"
-import { EmergencyContactsSection } from "@/components/emergency-contacts/emergency-contacts-section"
+import { ClientSummaryPanel } from "@/app/clients/[client_id]/client-summary-menu"
+import {
+  ClientPanel,
+  ClientPanelField,
+  ClientPanelFields,
+} from "@/components/clients/client-panel"
 import { ClientStatusControl } from "@/components/clients/client-status-control"
+import { ReferralFundingQuickView } from "@/components/clients/referral-funding-quick-view"
 import { AppShell } from "@/components/app-shell"
 import { BackButton } from "@/components/ui/back-button"
 import { EntityPageHeader } from "@/components/ui/entity-page-header"
 import { StatusBadge } from "@/components/ui/status-badge"
-import { Button } from "@/components/ui/button"
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
-import { ReferralFundingCard } from "@/components/funding/referral-funding-card"
 import { clients } from "@/db/schema"
 import { getDefaultBatteryAssessments } from "@/lib/assessments/battery-defaults"
 import { loadLatestAssessmentResultForClient } from "@/lib/assessments/load"
@@ -25,21 +21,40 @@ import {
   formatAppointmentDate,
   formatAppointmentTime,
 } from "@/lib/appointments/format"
-import { loadNextAppointmentForClient, loadAttendanceRiskForClient } from "@/lib/appointments/load"
+import {
+  loadNextAppointmentForClient,
+  loadAttendanceRiskForClient,
+} from "@/lib/appointments/load"
 import {
   loadActiveCrisisPlanSummary,
   loadEmergencyContacts,
 } from "@/lib/crisis-plans/load"
 import { requirePractitionerContext } from "@/lib/auth"
 import { db } from "@/lib/db"
-import { getReferralFundingCardData } from "@/lib/actions/funding"
-import { buildReferralFundingCardProps } from "@/lib/funding/referral-funding-card-props"
 import { appendReturnTo } from "@/lib/navigation/back"
 import { buildTemplateVariablesFromLinkResponse } from "@/lib/email/link-response"
 import { getQuestionnaireEmailContext } from "@/lib/email/practitioner-context"
 import { loadActiveTreatmentPlanSummary } from "@/lib/treatment-plans/load"
-import { loadClientBackgroundSummary } from "@/lib/client-background/load"
-import { ATTENDANCE_RISK_CONFIG, CLIENT_STATUS_CONFIG } from "@/lib/status"
+import { loadClientBackground } from "@/lib/client-background/load"
+import { buildBackgroundPanelSummary } from "@/lib/clients/background-summary"
+import { formatCommunicationSummary } from "@/lib/clients/communication-summary"
+import { buildEditDetailsHref } from "@/lib/clients/edit-details-panels"
+import {
+  formatCrisisPlanSummary,
+  formatEmergencyContactSummary,
+} from "@/lib/clients/emergency-details-summary"
+import { buildReferralFundingQuickView } from "@/lib/funding/claims-page"
+import { loadClaimsPageForClient } from "@/lib/funding/load-claims-page"
+import { formatStressorsSummary } from "@/lib/clients/stressors-summary"
+import { loadMedicalContactsForClient } from "@/lib/medical-contacts/load"
+import {
+  formatMedicalContactLabel,
+  resolveMainMedicalContact,
+} from "@/lib/medical-contacts/rules"
+import {
+  ATTENDANCE_RISK_CONFIG,
+  CLIENT_STATUS_CONFIG,
+} from "@/lib/status"
 
 function formatDate(value: Date | string | null) {
   if (!value) return "—"
@@ -81,11 +96,12 @@ export default async function ClientDetailPage({
     activeCrisisPlan,
     emailContext,
     nextAppointment,
-    referralFundingData,
+    claimsPage,
     attendanceRisk,
     latestAsq,
     latestPsf,
-    backgroundSummary,
+    background,
+    medicalContacts,
   ] = await Promise.all([
     loadActiveTreatmentPlanSummary(clientId, context.practiceId),
     loadActiveCrisisPlanSummary(clientId, context.practiceId),
@@ -94,16 +110,23 @@ export default async function ClientDetailPage({
       context.practitionerProfileId
     ),
     loadNextAppointmentForClient(clientId, context.practiceId),
-    getReferralFundingCardData(clientId),
+    loadClaimsPageForClient(clientId),
     loadAttendanceRiskForClient(clientId, context.practiceId),
     loadLatestAssessmentResultForClient(clientId, context.practiceId, "ASQ"),
     loadLatestAssessmentResultForClient(clientId, context.practiceId, "PSF"),
-    loadClientBackgroundSummary(clientId, context.practiceId),
+    loadClientBackground(clientId, context.practiceId),
+    loadMedicalContactsForClient(clientId, context.practiceId),
   ])
 
-  const referralFunding = buildReferralFundingCardProps(
-    context.practiceId,
-    referralFundingData
+  const stressorsLine = formatStressorsSummary(background?.stressors)
+
+  const referralQuickViewLines = buildReferralFundingQuickView(
+    claimsPage?.model ?? {
+      referralsWithoutClaim: [],
+      activeClaims: [],
+      inactiveClaims: [],
+      calendarYear: new Date().getFullYear(),
+    }
   )
 
   const clientEmail = client.email?.trim() || null
@@ -132,6 +155,28 @@ export default async function ClientDetailPage({
     emergencyContacts = []
   }
 
+  const communicationLine = formatCommunicationSummary({
+    commsOptOut: client.commsOptOut,
+    reminderOptOut: client.reminderOptOut,
+    preSessionOptOut: client.preSessionOptOut,
+    postSessionOptOut: client.postSessionOptOut,
+    adminCommsOptOut: client.adminCommsOptOut,
+    onlineBookingPermitted: client.onlineBookingPermitted,
+  })
+
+  const backgroundPanel = buildBackgroundPanelSummary(background)
+  const mainMedicalContact = resolveMainMedicalContact(medicalContacts)
+  const medicalContactLine = mainMedicalContact
+    ? formatMedicalContactLabel(mainMedicalContact.professional)
+    : "None recorded"
+  const crisisPlanLabel = formatCrisisPlanSummary(activeCrisisPlan)
+
+  const treatmentPlanHref = activeTreatmentPlan
+    ? `/clients/${clientId}/treatment-plan/${activeTreatmentPlan.treatmentPlanId}`
+    : `/clients/${clientId}/treatment-plan/new`
+
+  const smartGoalsCount = activeTreatmentPlan?.smartGoalItems.length ?? 0
+
   return (
     <AppShell>
       <div className="mb-6">
@@ -142,267 +187,291 @@ export default async function ClientDetailPage({
         name={`${client.firstName} ${client.lastName}`}
         subheading={`Date of birth: ${formatDate(client.dateOfBirth)}`}
         badge={
-          <StatusBadge status={client.clientStatus} statusMap={CLIENT_STATUS_CONFIG} />
-        }
-        subheadingAction={
-          <Button variant="outline" size="sm" asChild>
-            <Link href={`/clients/${clientId}/edit`}>Edit Client</Link>
-          </Button>
+          <StatusBadge
+            status={client.clientStatus}
+            statusMap={CLIENT_STATUS_CONFIG}
+          />
         }
       />
 
-      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[1fr_200px]">
-        <div>
-          <Card className="mb-6">
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>Status</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <dl className="grid gap-3 sm:grid-cols-2">
-                <div>
-                  <dt className="text-sm text-muted-foreground">Client status</dt>
-                  <dd className="font-medium">
-                    <ClientStatusControl
-                      clientId={clientId}
-                      currentStatus={client.clientStatus}
-                    />
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-sm text-muted-foreground">Attendance</dt>
-                  <dd className="font-medium">
-                    <StatusBadge
-                      status={attendanceRisk.tier}
-                      statusMap={ATTENDANCE_RISK_CONFIG}
-                    />
-                  </dd>
-                </div>
-                <div className="sm:col-span-2">
-                  <dt className="text-sm text-muted-foreground">
-                    Next appointment
-                  </dt>
-                  <dd className="font-medium">
-                    {nextAppointment ? (
-                      <Link
-                        href={appendReturnTo(
-                          `/appointments/${nextAppointment.appointmentId}`,
-                          `/clients/${clientId}`
-                        )}
-                        className="text-primary hover:underline"
-                      >
-                        {formatAppointmentDate(nextAppointment.appointmentDate)}{" "}
-                        at {formatAppointmentTime(nextAppointment.appointmentTime)}
-                        {nextAppointment.location?.trim()
-                          ? ` — ${nextAppointment.location.trim()}`
-                          : ""}
-                      </Link>
-                    ) : (
-                      "No upcoming appointment"
-                    )}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-sm text-muted-foreground">Risk</dt>
-                  <dd className="mt-0.5">
-                    {latestAsq ? (
-                      <p className="text-sm">
-                        ASQ · {formatDate(latestAsq.assessmentDate)}
-                        {latestAsq.score != null ? ` · ${latestAsq.score}` : ""}
-                        {latestAsq.severity ? ` · ${latestAsq.severity}` : ""}
-                      </p>
-                    ) : (
-                      <p className="text-sm text-muted-foreground">
-                        No ASQ on file
-                      </p>
-                    )}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-sm text-muted-foreground">Feedback</dt>
-                  <dd className="mt-0.5">
-                    {latestPsf ? (
-                      <p className="text-sm">
-                        PSF · {formatDate(latestPsf.assessmentDate)}
-                        {latestPsf.severity ? ` · ${latestPsf.severity}` : ""}
-                      </p>
-                    ) : (
-                      <p className="text-sm text-muted-foreground">
-                        No PSF on file
-                      </p>
-                    )}
-                  </dd>
-                </div>
-              </dl>
-            </CardContent>
-          </Card>
-
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle>Client details</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <dl className="grid gap-3 sm:grid-cols-2">
-                <div>
-                  <dt className="text-sm text-muted-foreground">Email</dt>
-                  <dd className="font-medium">{client.email ?? "—"}</dd>
-                </div>
-                <div>
-                  <dt className="text-sm text-muted-foreground">Phone</dt>
-                  <dd className="font-medium">{client.phone ?? "—"}</dd>
-                </div>
-                <div>
-                  <dt className="text-sm text-muted-foreground">Date of birth</dt>
-                  <dd className="font-medium">
-                    {formatDate(client.dateOfBirth)}
-                  </dd>
-                </div>
-                <div className="sm:col-span-2">
-                  <dt className="text-sm text-muted-foreground">Address</dt>
-                  <dd className="font-medium">{client.address ?? "—"}</dd>
-                </div>
-                <div className="sm:col-span-2">
-                  <dt className="text-sm text-muted-foreground">Notes</dt>
-                  <dd className="mt-1 max-h-24 overflow-y-auto rounded-md border bg-muted/30 p-2 text-sm whitespace-pre-wrap">
-                    {client.notes?.trim() || "—"}
-                  </dd>
-                </div>
-              </dl>
-            </CardContent>
-          </Card>
-
-          <ActionItemsSection
-            clientId={clientId}
-            clientEmail={clientEmail}
-            practiceId={context.practiceId}
-            practitionerProfileId={context.practitionerProfileId}
-            templateVariables={questionnaireTemplateVariables}
-            defaultAssessments={defaultBatteryAssessments}
-          />
-
-          <Card className="mb-6">
-            <EmergencyContactsSection
-              clientId={clientId}
-              contacts={emergencyContacts}
-            />
-          </Card>
-
-          <div className="mb-6">
-            <ReferralFundingCard {...referralFunding} />
-          </div>
-
-          <Card className="mb-6">
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>Client Background</CardTitle>
-              <Button asChild variant="outline" size="sm">
-                <Link href={`/clients/${clientId}/background`}>Open</Link>
-              </Button>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">
-                {backgroundSummary &&
-                (backgroundSummary.relationshipCount > 0 || backgroundSummary.eventCount > 0)
-                  ? `${backgroundSummary.relationshipCount} relationship${backgroundSummary.relationshipCount === 1 ? "" : "s"} · ${backgroundSummary.eventCount} history entr${backgroundSummary.eventCount === 1 ? "y" : "ies"}`
-                  : "Demographics, relationships, history, and risk"}
-              </p>
-              {backgroundSummary?.backgroundCapturedAt ? (
-                <p className="mt-1 text-sm">
-                  Intake interview completed {formatDate(backgroundSummary.backgroundCapturedAt)}
-                </p>
-              ) : null}
-            </CardContent>
-          </Card>
-
-          <Card className="mb-6">
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>Treatment plan</CardTitle>
-              {!activeTreatmentPlan ? (
-                <Button asChild size="sm">
-                  <Link href={`/clients/${clientId}/treatment-plan/new`}>
-                    Create treatment plan
-                  </Link>
-                </Button>
-              ) : (
-                <Button asChild variant="outline" size="sm">
-                  <Link
-                    href={`/clients/${clientId}/treatment-plan/${activeTreatmentPlan.treatmentPlanId}`}
-                  >
-                    View / Edit
-                  </Link>
-                </Button>
-              )}
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {!activeTreatmentPlan ? (
-                <p className="text-sm text-muted-foreground">No treatment plan</p>
-              ) : (
-                <dl className="grid gap-3">
-                  <div>
-                    <dt className="text-sm text-muted-foreground">
-                      Therapeutic target
-                    </dt>
-                    <dd className="font-medium">
-                      {activeTreatmentPlan.therapeuticTarget?.trim() || "—"}
-                    </dd>
-                  </div>
-                </dl>
-              )}
-
-              {activeTreatmentPlan ? (
-                <div className="border-t pt-4">
-                  <p className="mb-2 text-sm font-medium">SMART Goals</p>
-                  {activeTreatmentPlan.smartGoalItems.length > 0 ? (
-                    <ul className="list-inside list-disc space-y-1 text-sm">
-                      {activeTreatmentPlan.smartGoalItems.map(
-                        (target, index) => (
-                          <li key={`${index}-${target}`}>{target}</li>
-                        )
-                      )}
-                    </ul>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">
-                      No SMART goals set
-                    </p>
+      <div className="mx-auto flex max-w-3xl flex-col gap-4">
+        <ClientSummaryPanel
+          clientId={clientId}
+          clientEmail={clientEmail}
+          practiceId={context.practiceId}
+          practitionerProfileId={context.practitionerProfileId}
+          templateVariables={questionnaireTemplateVariables}
+          defaultAssessments={defaultBatteryAssessments}
+        >
+          <ClientPanelFields>
+            <ClientPanelField label="Client status">
+              <ClientStatusControl
+                clientId={clientId}
+                currentStatus={client.clientStatus}
+              />
+            </ClientPanelField>
+            <ClientPanelField label="Next appointment">
+              {nextAppointment ? (
+                <Link
+                  href={appendReturnTo(
+                    `/appointments/${nextAppointment.appointmentId}`,
+                    `/clients/${clientId}`
                   )}
-                </div>
-              ) : null}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>Crisis plan</CardTitle>
-              {!activeCrisisPlan ? (
-                <Button asChild size="sm">
-                  <Link href={`/clients/${clientId}/crisis-plan/new`}>
-                    Create crisis plan
-                  </Link>
-                </Button>
+                  className="text-primary hover:underline"
+                >
+                  {formatAppointmentDate(nextAppointment.appointmentDate)} at{" "}
+                  {formatAppointmentTime(nextAppointment.appointmentTime)}
+                  {nextAppointment.location?.trim()
+                    ? ` — ${nextAppointment.location.trim()}`
+                    : ""}
+                </Link>
               ) : (
-                <Button asChild variant="outline" size="sm">
-                  <Link
-                    href={`/clients/${clientId}/crisis-plan/${activeCrisisPlan.crisisPlanId}`}
-                  >
-                    View / Edit
-                  </Link>
-                </Button>
+                <span className="font-normal text-muted-foreground">
+                  No upcoming appointment
+                </span>
               )}
-            </CardHeader>
-            <CardContent>
-              {!activeCrisisPlan ? (
-                <p className="text-sm text-muted-foreground">No crisis plan</p>
-              ) : (
-                <p className="text-sm font-medium">
-                  v{activeCrisisPlan.versionNumber} (
-                  {formatDate(activeCrisisPlan.dateOfPlan)})
-                </p>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+            </ClientPanelField>
+            <ClientPanelField label="Attendance">
+              <StatusBadge
+                status={attendanceRisk.tier}
+                statusMap={ATTENDANCE_RISK_CONFIG}
+              />
+            </ClientPanelField>
+            <ClientPanelField label="Notes">
+              <div className="max-h-24 overflow-y-auto rounded-md border bg-muted/30 p-2 text-sm font-normal whitespace-pre-wrap">
+                {client.notes?.trim() || (
+                  <span className="text-muted-foreground">None recorded</span>
+                )}
+              </div>
+            </ClientPanelField>
+          </ClientPanelFields>
+        </ClientSummaryPanel>
 
-        <div className="max-lg:order-last">
-          <ClientMenuSidebar clientId={clientId} />
-        </div>
+        <ClientPanel
+          title="Contact details"
+          control="edit"
+          openHref={buildEditDetailsHref(clientId, "details")}
+        >
+          <ClientPanelFields>
+            <ClientPanelField label="Phone">
+              {client.phone?.trim() || (
+                <span className="font-normal text-muted-foreground">
+                  None recorded
+                </span>
+              )}
+            </ClientPanelField>
+            <ClientPanelField label="Email">
+              {client.email?.trim() || (
+                <span className="font-normal text-muted-foreground">
+                  None recorded
+                </span>
+              )}
+            </ClientPanelField>
+            <ClientPanelField label="Address">
+              {client.address?.trim() || (
+                <span className="font-normal text-muted-foreground">
+                  None recorded
+                </span>
+              )}
+            </ClientPanelField>
+            <ClientPanelField label="Communication">
+              <Link
+                href={buildEditDetailsHref(clientId, "communication")}
+                className="font-normal text-primary hover:underline"
+              >
+                {communicationLine}
+              </Link>
+            </ClientPanelField>
+          </ClientPanelFields>
+        </ClientPanel>
+
+        <ClientPanel
+          title="Emergency details"
+          control="edit"
+          openHref={buildEditDetailsHref(clientId, "emergency")}
+        >
+          <ClientPanelFields>
+            <ClientPanelField label="Emergency contacts">
+              <span
+                className={
+                  emergencyContacts.length === 0
+                    ? "font-normal text-muted-foreground"
+                    : "whitespace-pre-line font-normal"
+                }
+              >
+                {formatEmergencyContactSummary(emergencyContacts)}
+              </span>
+            </ClientPanelField>
+            <ClientPanelField label="Medical contact">
+              <span
+                className={
+                  !mainMedicalContact
+                    ? "font-normal text-muted-foreground"
+                    : undefined
+                }
+              >
+                {medicalContactLine}
+              </span>
+            </ClientPanelField>
+            <ClientPanelField label="Crisis plan">
+              {activeCrisisPlan ? (
+                <Link
+                  href={`/clients/${clientId}/crisis-plan/${activeCrisisPlan.crisisPlanId}`}
+                  className="text-primary hover:underline"
+                >
+                  {crisisPlanLabel}
+                </Link>
+              ) : (
+                <Link
+                  href={`/clients/${clientId}/crisis-plan/new`}
+                  className="font-normal text-primary hover:underline"
+                >
+                  Create crisis plan
+                </Link>
+              )}
+            </ClientPanelField>
+            <ClientPanelField label="Risk">
+              {latestAsq ? (
+                <span>
+                  ASQ · {formatDate(latestAsq.assessmentDate)}
+                  {latestAsq.score != null ? ` · ${latestAsq.score}` : ""}
+                  {latestAsq.severity
+                    ? ` · ${latestAsq.severity}`
+                    : ""}
+                </span>
+              ) : (
+                <span className="font-normal text-muted-foreground">
+                  No ASQ on file
+                </span>
+              )}
+            </ClientPanelField>
+          </ClientPanelFields>
+        </ClientPanel>
+
+        <ClientPanel
+          title="Referrals and funding"
+          control="open"
+          openHref={`/clients/${clientId}/claims`}
+          openLabel="Open ›"
+        >
+          <ReferralFundingQuickView
+            clientId={clientId}
+            lines={referralQuickViewLines}
+            returnTo={`/clients/${clientId}`}
+          />
+        </ClientPanel>
+
+        <ClientPanel
+          title="Background and history"
+          control="open"
+          openHref={`/clients/${clientId}/background`}
+        >
+          <ClientPanelFields>
+            {(
+              [
+                ["Relationship", backgroundPanel.relationship],
+                ["Children", backgroundPanel.children],
+                ["Living situation", backgroundPanel.livingSituation],
+                ["Occupation", backgroundPanel.occupation],
+                ["History", backgroundPanel.history],
+                ["Intake interview", backgroundPanel.intakeInterview],
+              ] as const
+            ).map(([label, value]) => (
+              <ClientPanelField key={label} label={label}>
+                <span
+                  className={
+                    value === "Not recorded" ||
+                    value === "None recorded" ||
+                    value === "Not yet completed"
+                      ? "font-normal text-muted-foreground"
+                      : undefined
+                  }
+                >
+                  {value}
+                </span>
+              </ClientPanelField>
+            ))}
+          </ClientPanelFields>
+        </ClientPanel>
+
+        <ClientPanel
+          title="Diagnosis and treatment plan"
+          control="open"
+          openHref={treatmentPlanHref}
+          openLabel={activeTreatmentPlan ? "Open ›" : "Create ›"}
+        >
+          <ClientPanelFields>
+            <ClientPanelField label="Diagnosis">
+              <div className="rounded-md border border-dashed border-muted-foreground/40 bg-muted/20 px-3 py-2 text-sm font-normal text-muted-foreground">
+                Diagnosis — coming soon
+              </div>
+            </ClientPanelField>
+            {activeTreatmentPlan ? (
+              <>
+                <ClientPanelField label="Therapeutic target">
+                  {activeTreatmentPlan.therapeuticTarget?.trim() || (
+                    <span className="font-normal text-muted-foreground">
+                      None recorded
+                    </span>
+                  )}
+                </ClientPanelField>
+                <ClientPanelField label="SMART goals">
+                  {smartGoalsCount > 0 ? (
+                    `${smartGoalsCount} goal${smartGoalsCount === 1 ? "" : "s"}`
+                  ) : (
+                    <span className="font-normal text-muted-foreground">
+                      No SMART goals set
+                    </span>
+                  )}
+                </ClientPanelField>
+              </>
+            ) : (
+              <ClientPanelField label="Treatment plan">
+                <span className="font-normal text-muted-foreground">
+                  No treatment plan
+                </span>
+              </ClientPanelField>
+            )}
+          </ClientPanelFields>
+        </ClientPanel>
+
+        {/* Progress panel is a holding area for now; full Progress design comes later. */}
+        <ClientPanel
+          title="Progress"
+          control="open"
+          openHref={`/clients/${clientId}/assessments/feedback`}
+        >
+          <ClientPanelFields>
+            <ClientPanelField label="Feedback">
+              {latestPsf ? (
+                <span>
+                  PSF · {formatDate(latestPsf.assessmentDate)}
+                  {latestPsf.severity
+                    ? ` · ${latestPsf.severity}`
+                    : ""}
+                </span>
+              ) : (
+                <span className="font-normal text-muted-foreground">
+                  No PSF on file
+                </span>
+              )}
+            </ClientPanelField>
+            <ClientPanelField label="Stressors">
+              <span
+                className={
+                  stressorsLine === "None recorded"
+                    ? "font-normal text-muted-foreground"
+                    : "font-normal"
+                }
+              >
+                {stressorsLine}
+              </span>
+            </ClientPanelField>
+          </ClientPanelFields>
+          <p className="mt-3 text-xs text-muted-foreground">
+            Holding area for now. The full Progress design comes later.
+          </p>
+        </ClientPanel>
       </div>
     </AppShell>
   )

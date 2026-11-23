@@ -25,9 +25,11 @@ import {
 } from "@/components/client-background/interview-section-card"
 import { RelationshipBlocksSection } from "@/components/client-background/relationship-blocks-section"
 import { scrollToBackgroundCheck } from "@/components/client-background/worth-checking"
-import { ReferralFundingCard } from "@/components/funding/referral-funding-card"
+import { ReferralFundingQuickView } from "@/components/clients/referral-funding-quick-view"
+import { InterviewFundingAddPanel } from "@/components/funding/interview-funding-add-panel"
 import { Button } from "@/components/ui/button"
-import type { ReferralFundingCardProps } from "@/lib/funding/referral-funding-card-props"
+import type { QuickViewLine } from "@/lib/funding/claims-page"
+import type { ReferralFundingCardFormOptions } from "@/lib/funding/referral-funding-card-props"
 import { backgroundAnswersToClientBackground } from "@/lib/background-questionnaire/to-client-background"
 import type { BackgroundSelfReport } from "@/lib/background-questionnaire/types"
 import { assessAge, displayedAge } from "@/lib/client-background/age"
@@ -57,14 +59,16 @@ function clientAge(dateOfBirth: string | null) {
 
 export function InterviewPage({
   clientId,
-  practiceId: _practiceId,
+  practiceId,
   clientName,
   initialPage,
   data,
   screening,
   selfReport,
   reasonSupport,
-  referralFunding,
+  medicalContacts = [],
+  referralQuickViewLines,
+  referralFormOptions,
   referralRecorded = false,
 }: {
   clientId: string
@@ -75,10 +79,13 @@ export function InterviewPage({
   screening: ScreeningAnswers
   selfReport: BackgroundSelfReport | null
   reasonSupport: ReasonSupport
-  referralFunding: ReferralFundingCardProps
+  medicalContacts?: import("@/lib/client-background/professionals").ProfessionalOption[]
+  referralQuickViewLines: QuickViewLine[]
+  referralFormOptions: ReferralFundingCardFormOptions
   referralRecorded?: boolean
 }) {
   const router = useRouter()
+  const [fundingAddOpen, setFundingAddOpen] = useState(false)
   const identityRef = useRef(data.demographics.identity)
   const occupationRef = useRef(data.demographics.occupation)
   const livingRef = useRef(data.demographics.livingSituation)
@@ -376,7 +383,27 @@ export function InterviewPage({
           onToggle={() => toggleSection("reason")}
           badge={needsBadge(sectionNeeds("reason"))}
         >
-          <ReferralFundingCard {...referralFunding} hideTitle />
+          <ReferralFundingQuickView
+            clientId={clientId}
+            lines={referralQuickViewLines}
+            returnTo={`/clients/${clientId}/background/interview`}
+            footer={
+              <button
+                type="button"
+                className="inline-flex min-h-11 items-center text-sm font-medium text-primary hover:underline"
+                onClick={() => setFundingAddOpen(true)}
+              >
+                + Add referral or funding approval
+              </button>
+            }
+          />
+          <InterviewFundingAddPanel
+            clientId={clientId}
+            practiceId={practiceId}
+            formOptions={referralFormOptions}
+            open={fundingAddOpen}
+            onOpenChange={setFundingAddOpen}
+          />
         </InterviewSectionCard>
         <InterviewSectionCard
           id="check-identity"
@@ -546,6 +573,7 @@ export function InterviewPage({
           selfReportId={selfReport?.resultId ?? null}
           historyClient={suggestions?.history}
           medicationClient={suggestions?.medication}
+          medicalContacts={medicalContacts}
           professionals={professionals}
           stressorsClient={suggestions?.stressors}
           issues={data.issues}

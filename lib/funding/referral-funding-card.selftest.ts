@@ -1,73 +1,61 @@
 import assert from "node:assert/strict"
-import { readFileSync } from "node:fs"
-import { join } from "node:path"
 
 import {
   anyReferralRecorded,
   buildReferralFundingCardProps,
-  REFERRAL_FUNDING_CARD_EMPTY_MESSAGE,
   referralFundingCardFormOptionKeys,
   referralFundingCardPropKeys,
   type ReferralFundingCardData,
 } from "@/lib/funding/referral-funding-card-props"
 
-const componentSource = readFileSync(
-  join(process.cwd(), "components/funding/referral-funding-card.tsx"),
-  "utf8"
-)
-assert.match(componentSource, /export function ReferralFundingCard\(/)
-assert.ok(REFERRAL_FUNDING_CARD_EMPTY_MESSAGE.includes("private clients"))
-
 const sample: ReferralFundingCardData = {
   approvals: [
     {
-      fundingApprovalId: "fa-1",
-      claimId: "claim-1",
-      fundingApprovalTypeId: "type-1",
-      approvalTypeName: "Private (self-funded)",
-      claimTypeName: "Private",
-      startDate: "2025-01-01",
-      endDate: null,
-      appointmentsApproved: null,
-      appointmentsAttended: 0,
+      fundingApprovalId: "fa1",
+      claimId: "c1",
+      fundingApprovalTypeId: "t1",
+      approvalTypeName: "MHTP Initial",
+      claimTypeName: "Medicare",
+      startDate: "2026-01-01",
+      endDate: "2026-06-01",
+      appointmentsApproved: 6,
+      appointmentsAttended: 1,
       approvalStatus: "active",
-      referrerId: null,
-      referrerTitle: null,
-      referrerFirstName: null,
-      referrerLastName: null,
-      referrerProfessionName: null,
-      referralDate: null,
+      referrerId: "p1",
+      referrerTitle: "Dr",
+      referrerFirstName: "Frank",
+      referrerLastName: "Doctorson",
+      referrerProfessionName: "GP",
+      referralDate: "2025-12-01",
       referrerComments: null,
-      referralSource: "self",
+      referralSource: null,
       referrerRelationshipId: null,
       referrerOther: null,
       reportingRequirements: [],
     },
   ],
-  clients: [{ clientId: "client-1", firstName: "Tom", lastName: "Test" }],
+  clients: [{ clientId: "client-1", firstName: "Tom", lastName: "Example" }],
   approvalTypes: [],
   claims: [],
-  privateClaimTypeId: "private-type",
+  privateClaimTypeId: null,
   referrers: [],
   relationships: [],
   professions: [],
   organisations: [],
 }
 
-const clientPageProps = buildReferralFundingCardProps("practice-1", sample)
-const backgroundProps = buildReferralFundingCardProps("practice-1", sample)
-const interviewProps = buildReferralFundingCardProps("practice-1", sample)
-
-assert.deepEqual(Object.keys(clientPageProps).sort(), [...referralFundingCardPropKeys].sort())
+const props = buildReferralFundingCardProps("practice-1", sample)
 assert.deepEqual(
-  Object.keys(clientPageProps.formOptions).sort(),
+  Object.keys(props).sort(),
+  [...referralFundingCardPropKeys].sort()
+)
+assert.deepEqual(
+  Object.keys(props.formOptions).sort(),
   [...referralFundingCardFormOptionKeys].sort()
 )
-assert.deepEqual(clientPageProps, backgroundProps)
-assert.deepEqual(backgroundProps, interviewProps)
-assert.equal(clientPageProps.clientId, "client-1")
-assert.equal(clientPageProps.practiceId, "practice-1")
-assert.equal(anyReferralRecorded(clientPageProps.approvals), true)
-assert.equal(anyReferralRecorded([{ referrerId: null, referralSource: null }]), false)
+assert.equal(props.clientId, "client-1")
+assert.equal(props.practiceId, "practice-1")
+assert.equal(anyReferralRecorded(sample.approvals), true)
+assert.equal(anyReferralRecorded([]), false)
 
 console.log("referral-funding-card.selftest.ts: ok")

@@ -6,16 +6,17 @@ import { requirePractitionerContext } from "@/lib/auth"
 import {
   addBlockMember,
   createRelationshipBlock,
-  createRelationshipWithMember,
   createUnplacedPerson,
   deleteRelationshipBlock,
-  discardEmptyRelationshipDraft,
   moveBlockMember,
   removeBlockMember,
+  saveRelationshipPersonDraft,
   saveRelationshipStatusWithCurrentBlock,
   setRelationshipBlockAnswer,
   updateBlockMember,
   updateRelationshipBlock,
+  type CreateUnplacedPersonInput,
+  type SaveRelationshipPersonDraftInput,
 } from "@/lib/client-background/block-mutations"
 import {
   completeBackgroundInterview,
@@ -37,11 +38,35 @@ import {
   updateHistoryIssueTreatmentAnswer,
 } from "@/lib/client-background/mutations"
 import type { BlockKind, BlockRole, RelationshipBlockAnswers, TreatmentAnswer } from "@/lib/client-background/types"
+import { ensureMedicalContact } from "@/lib/medical-contacts/mutations"
 
 function refresh(clientId: string) {
   revalidatePath(`/clients/${clientId}/background`)
   revalidatePath(`/clients/${clientId}/background/interview`)
   revalidatePath(`/clients/${clientId}`)
+  revalidatePath(`/clients/${clientId}/edit`)
+}
+
+async function ensurePrescriberOnMedicalContacts(
+  clientId: string,
+  practiceId: string,
+  userId: string,
+  event: unknown
+) {
+  if (!event || typeof event !== "object") return
+  const row = event as {
+    eventType?: string
+    prescriberProfessionalId?: string | null
+  }
+  if (row.eventType !== "medication") return
+  const professionalId = row.prescriberProfessionalId?.trim()
+  if (!professionalId) return
+  await ensureMedicalContact({
+    clientId,
+    practiceId,
+    userId,
+    professionalId,
+  })
 }
 
 export async function saveIdentityAction(clientId: string, identity: unknown) {
@@ -155,7 +180,15 @@ export async function createEventAction(clientId: string, event: unknown) {
     userId: context.userId,
     event,
   })
-  if (!result.error) refresh(clientId)
+  if (!result.error) {
+    await ensurePrescriberOnMedicalContacts(
+      clientId,
+      context.practiceId,
+      context.userId,
+      result.event ?? event
+    )
+    refresh(clientId)
+  }
   return result
 }
 
@@ -203,7 +236,15 @@ export async function updateEventAction(clientId: string, event: unknown) {
     userId: context.userId,
     event,
   })
-  if (!result.error) refresh(clientId)
+  if (!result.error) {
+    await ensurePrescriberOnMedicalContacts(
+      clientId,
+      context.practiceId,
+      context.userId,
+      result.event ?? event
+    )
+    refresh(clientId)
+  }
   return result
 }
 
@@ -275,35 +316,24 @@ export async function createRelationshipBlockAction(
   return result
 }
 
-export async function createRelationshipWithMemberAction(
+export async function saveRelationshipPersonDraftAction(
   clientId: string,
-  kind: BlockKind,
-  options?: { parentSide?: "mother" | "father" | ""; arrangementType?: string }
+  draft: Omit<SaveRelationshipPersonDraftInput, "clientId" | "practiceId" | "userId">
 ) {
   const context = await requirePractitionerContext()
-  const result = await createRelationshipWithMember({ ...scope(clientId, context), kind, ...options })
+  const result = await saveRelationshipPersonDraft({ ...scope(clientId, context), ...draft })
   if (result && !("error" in result && result.error)) refresh(clientId)
   return result
 }
 
-export async function discardEmptyRelationshipDraftAction(
+export async function createUnplacedPersonAction(
   clientId: string,
-  relationshipBlockId: string,
-  memberId: string
+  draft?: string | Omit<CreateUnplacedPersonInput, "clientId" | "practiceId" | "userId">
 ) {
   const context = await requirePractitionerContext()
-  const result = await discardEmptyRelationshipDraft({
-    ...scope(clientId, context),
-    relationshipBlockId,
-    memberId,
-  })
-  if (result && !("error" in result && result.error)) refresh(clientId)
-  return result
-}
-
-export async function createUnplacedPersonAction(clientId: string, givenName?: string) {
-  const context = await requirePractitionerContext()
-  const result = await createUnplacedPerson({ ...scope(clientId, context), givenName })
+  // Back-compat: older call sites passed a bare givenName string.
+  const fields = typeof draft === "string" ? { givenName: draft } : draft ?? {}
+  const result = await createUnplacedPerson({ ...scope(clientId, context), ...fields })
   if (result && !("error" in result && result.error)) refresh(clientId)
   return result
 }

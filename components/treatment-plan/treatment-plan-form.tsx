@@ -15,7 +15,6 @@ import {
   type SaveTreatmentPlanState,
 } from "@/app/clients/[client_id]/treatment-plan/actions"
 import {
-  MedicationSupervisionFields,
   MultiSelectSectionFields,
   OngoingAssessmentsFields,
   SingleSelectSectionFields,
@@ -43,7 +42,6 @@ import {
   TREATMENT_SUMMARY_ITEMS,
 } from "@/lib/treatment-plans/fields"
 import { formatDateForInput, todayDateInput } from "@/lib/dates/practice-time"
-import type { ProfessionalOption } from "@/lib/client-background/professionals"
 import type { TreatmentPlanRow } from "@/lib/treatment-plans/types"
 
 function downloadBase64Pdf(pdfBase64: string, filename: string) {
@@ -108,16 +106,14 @@ export function TreatmentPlanForm({
   isNewVersion = false,
   cancelHref,
   crisisPlanSummary = null,
-  ongoingMedications,
-  professionals,
+  medicationSupervisedLine = "Medication supervised: No",
 }: {
   clientId: string
   sourcePlanId: string | null
   initialPlan?: TreatmentPlanRow
   isNewVersion?: boolean
   cancelHref: string
-  ongoingMedications: { eventRecordId: string; title: string; prescriberProfessionalId: string | null }[]
-  professionals: ProfessionalOption[]
+  medicationSupervisedLine?: string
   crisisPlanSummary?: {
     crisisPlanId: string
     versionNumber: number
@@ -327,7 +323,13 @@ export function TreatmentPlanForm({
             </div>
             <div className="space-y-2">
               <Label>Medication supervision</Label>
-              <MedicationSupervisionFields medications={ongoingMedications} professionals={professionals} />
+              <p className="text-sm">{medicationSupervisedLine}</p>
+              <Link
+                href={`/clients/${clientId}/edit?open=emergency`}
+                className="text-sm text-primary hover:underline"
+              >
+                Change in Edit details
+              </Link>
             </div>
             <div className="space-y-2">
               <Label>Crisis plan</Label>

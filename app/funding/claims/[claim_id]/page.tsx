@@ -34,6 +34,7 @@ import {
 import { formatReportType } from "@/lib/reports/snapshot"
 import { BackButton } from "@/components/ui/back-button"
 import { EntityPageHeader } from "@/components/ui/entity-page-header"
+import { safeReturnTo } from "@/lib/navigation/safe-return-to"
 
 function displayValue(value: string | null | undefined) {
   return value?.trim() || "—"
@@ -47,7 +48,8 @@ export default async function ClaimDetailPage({
   searchParams: Promise<{ returnTo?: string }>
 }) {
   const { claim_id: claimId } = await params
-  const { returnTo } = await searchParams
+  const { returnTo: returnToRaw } = await searchParams
+  const returnTo = safeReturnTo(returnToRaw)
   const claim = await getClaimById(claimId)
 
   if (!claim) {
@@ -57,6 +59,9 @@ export default async function ClaimDetailPage({
   const claimUrl = returnTo
     ? `/funding/claims/${claimId}?returnTo=${encodeURIComponent(returnTo)}`
     : `/funding/claims/${claimId}`
+  const editHref = returnTo
+    ? `/funding/claims/${claimId}/edit?returnTo=${encodeURIComponent(returnTo)}`
+    : `/funding/claims/${claimId}/edit`
 
   const showMedicare = isMedicareClaimType(claim.claimTypeName)
   const showInsurance = isInsuranceClaimType(claim.claimTypeName)
@@ -78,7 +83,7 @@ export default async function ClaimDetailPage({
         subheading={claim.claimTypeName}
         subheadingAction={
           <Button variant="outline" size="sm" asChild>
-            <Link href={`/funding/claims/${claimId}/edit`}>Edit</Link>
+            <Link href={editHref}>Edit</Link>
           </Button>
         }
       />
@@ -190,7 +195,7 @@ export default async function ClaimDetailPage({
                     <TableRow key={approval.fundingApprovalId}>
                       <TableCell>
                         <Link
-                          href={`/funding/approvals/${approval.fundingApprovalId}`}
+                          href={`/funding/approvals/${approval.fundingApprovalId}?returnTo=${encodeURIComponent(claimUrl)}`}
                           className="text-primary hover:underline"
                         >
                           {formatDisplayDate(approval.startDate)}
@@ -264,7 +269,7 @@ export default async function ClaimDetailPage({
                       <TableCell>
                         {appointment.fundingApprovalId ? (
                           <Link
-                            href={`/funding/approvals/${appointment.fundingApprovalId}`}
+                            href={`/funding/approvals/${appointment.fundingApprovalId}?returnTo=${encodeURIComponent(claimUrl)}`}
                             className="text-primary hover:underline"
                           >
                             {approvalNameById.get(appointment.fundingApprovalId) ??

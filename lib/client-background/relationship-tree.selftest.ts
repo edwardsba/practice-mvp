@@ -185,9 +185,9 @@ assert.deepEqual(sallyTargets, [
   "tom-larry",
   "tom-phil",
   "tom-joan",
-  NEW_CURRENT_RELATIONSHIP,
   NEW_PREVIOUS_RELATIONSHIP,
 ])
+assert.equal(sallyTargets.includes(NEW_CURRENT_RELATIONSHIP), false)
 assert.equal(sallyTargets.includes("tom-bio"), false)
 
 const sample = tomBlocks()[0]
@@ -216,9 +216,9 @@ assert.deepEqual(wider, [
   "tom-phil",
   "tom-father",
   "tom-joan",
-  NEW_CURRENT_RELATIONSHIP,
   NEW_PREVIOUS_RELATIONSHIP,
 ])
+assert.equal(wider.includes(NEW_CURRENT_RELATIONSHIP), false)
 
 const widerLabels = moveTargets(widerBlocks, null, tomRelationships()).map((item) => item.label)
 assert.equal(widerLabels[0], "Current · Married")

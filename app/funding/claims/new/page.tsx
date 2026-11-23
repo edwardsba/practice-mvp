@@ -6,6 +6,7 @@ import { ListPageHeader } from "@/components/ui/list-page-header"
 import { getClaimTypes } from "@/lib/actions/funding"
 import { getProfessionalOrganisations } from "@/lib/actions/contacts"
 import { requirePractitionerContext } from "@/lib/auth"
+import { safeReturnTo } from "@/lib/navigation/safe-return-to"
 
 export default async function NewClaimPage({
   searchParams,
@@ -13,7 +14,9 @@ export default async function NewClaimPage({
   searchParams: Promise<{ returnTo?: string; client_id?: string }>
 }) {
   const context = await requirePractitionerContext()
-  const { returnTo, client_id: searchParamsClientId } = await searchParams
+  const { returnTo: returnToRaw, client_id: searchParamsClientId } =
+    await searchParams
+  const returnTo = safeReturnTo(returnToRaw) ?? undefined
   const [clients, claimTypes, organisations] = await Promise.all([
     getActiveClients(),
     getClaimTypes(context.practiceId),
@@ -23,10 +26,7 @@ export default async function NewClaimPage({
   return (
     <AppShell>
       <div className="mb-6">
-        <BackButton
-          fallbackHref={returnTo ?? "/funding/claims"}
-          label="← Back"
-        />
+        <BackButton fallbackHref="/funding/claims" label="← Back" />
       </div>
       <ListPageHeader heading="Add claim" />
 
@@ -45,6 +45,7 @@ export default async function NewClaimPage({
             ? { clientId: searchParamsClientId }
             : undefined
         }
+        lockClient={Boolean(searchParamsClientId)}
         cancelHref={returnTo ?? "/funding/claims"}
         returnTo={returnTo}
       />

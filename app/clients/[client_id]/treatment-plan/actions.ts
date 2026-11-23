@@ -1,13 +1,11 @@
 "use server"
 
-import { and, eq, inArray } from "drizzle-orm"
+import { and, eq } from "drizzle-orm"
 import { redirect } from "next/navigation"
 import { revalidatePath } from "next/cache"
 
-import { professionals, professions, treatmentPlans } from "@/db/schema"
+import { treatmentPlans } from "@/db/schema"
 import { requirePractitionerContext } from "@/lib/auth"
-import { medicationSupervisionFromAssignments } from "@/lib/client-background/medication"
-import { professionalOptionLabel } from "@/lib/client-background/professionals"
 import { db } from "@/lib/db"
 import { commitTreatmentPlan } from "@/lib/treatment-plans/commit"
 import { buildTreatmentPlanFilename } from "@/lib/treatment-plans/filename"
@@ -48,7 +46,6 @@ export async function previewTreatmentPlan(
   }
 
   const values = parseTreatmentPlanFormData(formData)
-  await applyMedicationSupervisorSnapshot(values, context.practiceId)
   const columns = formValuesToDbColumns(values)
 
   let nextVersion = 1
@@ -72,6 +69,7 @@ export async function previewTreatmentPlan(
     versionNumber: nextVersion,
     isActive: true,
     ...columns,
+    medicationSupervisionJson: null,
     createdAt: new Date(),
     updatedAt: new Date(),
   }
@@ -82,28 +80,6 @@ export async function previewTreatmentPlan(
     pdfBase64: buffer.toString("base64"),
     valuesJson: JSON.stringify(values),
   }
-}
-
-async function applyMedicationSupervisorSnapshot(values: TreatmentPlanFormValues, practiceId: string) {
-  const ids = [
-    ...new Set(values.medicationSupervisors.map((item) => item.professionalId).filter((id): id is string => Boolean(id))),
-  ]
-  const rows =
-    ids.length === 0
-      ? []
-      : await db
-          .select({
-            professionalId: professionals.professionalId,
-            title: professionals.title,
-            firstName: professionals.firstName,
-            lastName: professionals.lastName,
-            professionName: professions.professionName,
-          })
-          .from(professionals)
-          .leftJoin(professions, eq(professionals.professionId, professions.professionId))
-          .where(and(eq(professionals.practiceId, practiceId), inArray(professionals.professionalId, ids)))
-  const labels = new Map(rows.map((row) => [row.professionalId, professionalOptionLabel(row)]))
-  values.medicationSupervision = medicationSupervisionFromAssignments(values.medicationSupervisors, (id) => labels.get(id) ?? null)
 }
 
 function parseValuesJson(formData: FormData): TreatmentPlanFormValues {

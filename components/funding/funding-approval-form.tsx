@@ -17,6 +17,10 @@ import {
   saveFundingApprovalDraft,
 } from "@/lib/funding/funding-approval-draft"
 import {
+  defaultFundingFormKind,
+  type FundingFormKind,
+} from "@/lib/funding/funding-form-kind"
+import {
   claimOptionsWithPrivateFirst,
   CREATE_PRIVATE_CLAIM,
   isPrivateClaimSelection,
@@ -25,6 +29,7 @@ import {
   REFERRAL_SOURCES,
   type ReferralSource,
 } from "@/lib/funding/referral"
+import { safeReturnTo } from "@/lib/navigation/safe-return-to"
 import {
   ADDABLE_RELATIONSHIP_GROUPS,
   RELATIONSHIP_TO_CLIENT_LABELS,
@@ -145,6 +150,7 @@ export function FundingApprovalForm({
   organisations = [],
   privateClaimTypeId = null,
   initialValues,
+  initialKind,
   cancelHref,
   returnTo,
   lockClient = false,
@@ -163,6 +169,8 @@ export function FundingApprovalForm({
   organisations?: OrganisationOption[]
   privateClaimTypeId?: string | null
   initialValues?: FundingApprovalFormInitialValues
+  /** Query/default kind for new forms (`referral` | `approval`). */
+  initialKind?: string | null
   cancelHref?: string
   returnTo?: string
   lockClient?: boolean
@@ -185,6 +193,13 @@ export function FundingApprovalForm({
     {} as FundingFormState
   )
 
+  const [formKind, setFormKind] = useState<FundingFormKind>(() =>
+    defaultFundingFormKind({
+      kindQuery: initialKind,
+      fundingApprovalTypeId: initialValues?.fundingApprovalTypeId,
+      isExisting: Boolean(initialValues?.fundingApprovalId),
+    })
+  )
   const [clientId, setClientId] = useState(initialValues?.clientId ?? "")
   const [claimId, setClaimId] = useState(initialValues?.claimId ?? "")
   const [referrerId, setReferrerId] = useState(initialValues?.referrerId ?? "")
@@ -214,6 +229,9 @@ export function FundingApprovalForm({
   const [endDate, setEndDate] = useState(initialValues?.endDate ?? "")
   const [appointmentsApproved, setAppointmentsApproved] = useState(
     initialValues?.appointmentsApproved?.toString() ?? ""
+  )
+  const [approvalStatus, setApprovalStatus] = useState(
+    initialValues?.approvalStatus ?? "active"
   )
   const [relationshipOptions, setRelationshipOptions] = useState(
     initialRelationships
@@ -370,14 +388,48 @@ export function FundingApprovalForm({
         router.refresh()
         return
       }
-      if (returnTo) {
-        router.push(returnTo)
+      const safe = safeReturnTo(returnTo)
+      if (safe) {
+        router.push(safe)
       } else {
         router.push(`/funding/approvals/${state.fundingApprovalId}`)
       }
       router.refresh()
     }
   }, [state.success, state.fundingApprovalId, returnTo, router, embedded, onSaved])
+
+  const isReferral = formKind === "referral"
+  const hasFundingValues = Boolean(
+    approvalTypeId ||
+      startDate ||
+      endDate ||
+      appointmentsApproved ||
+      (approvalStatus && approvalStatus !== "active")
+  )
+
+  function clearFundingFields() {
+    setApprovalTypeId("")
+    setStartDate("")
+    setEndDate("")
+    setAppointmentsApproved("")
+    setApprovalStatus("active")
+  }
+
+  function onFormKindChange(next: FundingFormKind) {
+    if (next === formKind) return
+    if (
+      next === "referral" &&
+      formKind === "approval" &&
+      (initialValues?.fundingApprovalId || hasFundingValues)
+    ) {
+      const ok = window.confirm(
+        "This will clear the funding details. Continue?"
+      )
+      if (!ok) return
+      clearFundingFields()
+    }
+    setFormKind(next)
+  }
 
   function saveCurrentDraft() {
     saveFundingApprovalDraft(draftId, {
@@ -464,6 +516,32 @@ export function FundingApprovalForm({
 
   const formBody = (
     <form action={formAction} className="space-y-6">
+      <fieldset className="space-y-2">
+        <legend className="text-sm font-medium">Type</legend>
+        <div className="flex flex-wrap gap-4">
+          <label className="inline-flex min-h-11 items-center gap-2 text-sm">
+            <input
+              type="radio"
+              name="form_kind"
+              value="referral"
+              checked={isReferral}
+              onChange={() => onFormKindChange("referral")}
+            />
+            Referral
+          </label>
+          <label className="inline-flex min-h-11 items-center gap-2 text-sm">
+            <input
+              type="radio"
+              name="form_kind"
+              value="approval"
+              checked={!isReferral}
+              onChange={() => onFormKindChange("approval")}
+            />
+            Funding approval
+          </label>
+        </div>
+      </fieldset>
+
       {hideClientField ? (
         <input type="hidden" name="client_id" value={clientId} />
       ) : (
@@ -492,20 +570,20 @@ export function FundingApprovalForm({
         </div>
       )}
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className={cn("grid gap-4", !isReferral && "sm:grid-cols-2")}>
         <div className="space-y-2">
           <Label htmlFor="claim_id">Claim</Label>
           <div className="flex flex-wrap items-center gap-2">
             <select
               id="claim_id"
               name="claim_id"
-              required
+              required={!isReferral}
               value={claimId}
               onChange={(event) => onClaimChange(event.target.value)}
               className={selectClassName}
             >
-              <option value="" disabled>
-                Select claim
+              <option value="" disabled={!isReferral}>
+                {isReferral ? "No claim (optional)" : "Select claim"}
               </option>
               {claimSelectOptions.map((claim) => (
                 <option key={claim.claimId} value={claim.claimId}>
@@ -532,29 +610,33 @@ export function FundingApprovalForm({
           </div>
         </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="funding_approval_type_id">Funding approval type</Label>
-          <select
-            id="funding_approval_type_id"
-            name="funding_approval_type_id"
-            required
-            value={approvalTypeId}
-            onChange={(event) => setApprovalTypeId(event.target.value)}
-            className={selectClassName}
-          >
-            <option value="" disabled>
-              Select approval type
-            </option>
-            {filteredApprovalTypes.map((type) => (
-              <option
-                key={type.fundingApprovalTypeId}
-                value={type.fundingApprovalTypeId}
-              >
-                {type.name}
+        {isReferral ? (
+          <input type="hidden" name="funding_approval_type_id" value="" />
+        ) : (
+          <div className="space-y-2">
+            <Label htmlFor="funding_approval_type_id">Funding approval type</Label>
+            <select
+              id="funding_approval_type_id"
+              name="funding_approval_type_id"
+              required
+              value={approvalTypeId}
+              onChange={(event) => setApprovalTypeId(event.target.value)}
+              className={selectClassName}
+            >
+              <option value="" disabled>
+                Select approval type
               </option>
-            ))}
-          </select>
-        </div>
+              {filteredApprovalTypes.map((type) => (
+                <option
+                  key={type.fundingApprovalTypeId}
+                  value={type.fundingApprovalTypeId}
+                >
+                  {type.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
 
       <fieldset className="space-y-4 rounded-lg border p-4">
@@ -828,83 +910,93 @@ export function FundingApprovalForm({
         </div>
       </fieldset>
 
-      <fieldset className="space-y-4 rounded-lg border p-4">
-        <legend className="px-1 text-sm font-medium">Approval</legend>
+      {isReferral ? (
+        <>
+          <input type="hidden" name="start_date" value="" />
+          <input type="hidden" name="end_date" value="" />
+          <input type="hidden" name="appointments_approved" value="" />
+          <input type="hidden" name="approval_status" value="active" />
+        </>
+      ) : (
+        <fieldset className="space-y-4 rounded-lg border p-4">
+          <legend className="px-1 text-sm font-medium">Approval</legend>
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-2">
-            <Label htmlFor="start_date">Start date</Label>
-            <Input
-              id="start_date"
-              name="start_date"
-              type="date"
-              value={startDate}
-              onChange={(event) => {
-                const value = event.target.value
-                setStartDate(value)
-                if (selectedType?.durationMonths) {
-                  setEndDate(
-                    addMonthsToDateString(
-                      value,
-                      selectedType.durationMonths
-                    ) ?? ""
-                  )
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="start_date">Start date</Label>
+              <Input
+                id="start_date"
+                name="start_date"
+                type="date"
+                value={startDate}
+                onChange={(event) => {
+                  const value = event.target.value
+                  setStartDate(value)
+                  if (selectedType?.durationMonths) {
+                    setEndDate(
+                      addMonthsToDateString(
+                        value,
+                        selectedType.durationMonths
+                      ) ?? ""
+                    )
+                  }
+                }}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="end_date">End date</Label>
+              <Input
+                id="end_date"
+                name="end_date"
+                type="date"
+                value={endDate}
+                onChange={(event) => setEndDate(event.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="appointments_approved">Appointments approved</Label>
+              <Input
+                id="appointments_approved"
+                name="appointments_approved"
+                type="number"
+                min={0}
+                value={appointmentsApproved}
+                onChange={(event) =>
+                  setAppointmentsApproved(event.target.value)
                 }
-              }}
-            />
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Appointments attended</Label>
+              <Input
+                readOnly
+                value={initialValues?.appointmentsAttended ?? 0}
+                className="bg-muted"
+              />
+            </div>
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="end_date">End date</Label>
-            <Input
-              id="end_date"
-              name="end_date"
-              type="date"
-              value={endDate}
-              onChange={(event) => setEndDate(event.target.value)}
-            />
-          </div>
-        </div>
 
-        <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2">
-            <Label htmlFor="appointments_approved">Appointments approved</Label>
-            <Input
-              id="appointments_approved"
-              name="appointments_approved"
-              type="number"
-              min={0}
-              value={appointmentsApproved}
-              onChange={(event) =>
-                setAppointmentsApproved(event.target.value)
-              }
-            />
+            <Label htmlFor="approval_status">Status</Label>
+            <select
+              id="approval_status"
+              name="approval_status"
+              value={approvalStatus}
+              onChange={(event) => setApprovalStatus(event.target.value)}
+              className={selectClassName}
+            >
+              {APPROVAL_STATUSES.map((status) => (
+                <option key={status} value={status}>
+                  {APPROVAL_STATUS_LABELS[status]}
+                </option>
+              ))}
+            </select>
           </div>
-          <div className="space-y-2">
-            <Label>Appointments attended</Label>
-            <Input
-              readOnly
-              value={initialValues?.appointmentsAttended ?? 0}
-              className="bg-muted"
-            />
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="approval_status">Status</Label>
-          <select
-            id="approval_status"
-            name="approval_status"
-            defaultValue={initialValues?.approvalStatus ?? "active"}
-            className={selectClassName}
-          >
-            {APPROVAL_STATUSES.map((status) => (
-              <option key={status} value={status}>
-                {APPROVAL_STATUS_LABELS[status]}
-              </option>
-            ))}
-          </select>
-        </div>
-      </fieldset>
+        </fieldset>
+      )}
 
       {state.error ? (
         <p className="text-sm text-destructive" role="alert">
@@ -985,14 +1077,18 @@ export function FundingApprovalForm({
     return formBody
   }
 
+  const cardTitle = initialValues?.fundingApprovalId
+    ? isReferral
+      ? "Edit referral"
+      : "Edit funding approval"
+    : isReferral
+      ? "Add referral"
+      : "Add funding approval"
+
   return (
     <Card className="max-w-3xl">
       <CardHeader>
-        <CardTitle>
-          {initialValues?.fundingApprovalId
-            ? "Edit funding approval"
-            : "Add funding approval"}
-        </CardTitle>
+        <CardTitle>{cardTitle}</CardTitle>
       </CardHeader>
       <CardContent>{formBody}</CardContent>
     </Card>

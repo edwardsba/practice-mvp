@@ -66,6 +66,7 @@ export async function updateClientStatus(
   })
 
   revalidatePath(`/clients/${clientId}`)
+  revalidatePath(`/clients/${clientId}/edit`)
   revalidatePath("/clients")
 
   return {}

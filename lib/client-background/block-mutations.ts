@@ -21,7 +21,10 @@ import {
 } from "@/lib/client-background/relationship-blocks"
 import { sanitizeRelationship } from "@/lib/client-background/sanitize"
 import { saveClientRelationshipStatus } from "@/lib/client-background/mutations"
-import { isEmptyNewRelationshipDraft } from "@/lib/client-background/new-relationship-draft"
+import {
+  refuseEmptyPersonDraft,
+  refuseSecondCurrentFromBlocks,
+} from "@/lib/client-background/person-draft"
 import {
   CAREGIVER_RELATIONSHIPS,
   CHILD_TYPES,
@@ -174,78 +177,351 @@ async function ownedPerson(scope: Scope, personId: string) {
   return person ?? null
 }
 
-/**
- * Create a relationship block and its first partner/caregiver together (Round Q).
- * Opens as one "New relationship" / "New arrangement" form.
- */
-export async function createRelationshipWithMember(input: Scope & {
-  kind: BlockKind
+async function refuseSecondCurrent(scope: Scope, kind: BlockKind): Promise<string | null> {
+  if (kind !== "client_current") return null
+  const state = await loadBlockEditorState(scope.clientId, scope.practiceId)
+  if (!state) return "Client was not found."
+  return refuseSecondCurrentFromBlocks(state.blocks, kind)
+}
+
+export type SaveRelationshipPersonDraftInput = Scope & {
+  /** Existing block — add the person here. Omit to create a new block. */
+  relationshipBlockId?: string
+  kind?: BlockKind
   parentSide?: "mother" | "father" | ""
   arrangementType?: string
-}) {
-  const created = await createRelationshipBlock(input)
-  if (!created || !("blocks" in created) || !created.blocks) return created
-  const kind = input.kind
-  const newest = created.blocks
-    .filter((block) => block.kind === kind)
-    .sort((a, b) => b.displayOrder - a.displayOrder)[0]
-  if (!newest) return created
-  const role: BlockRole = kind === "caregiver_arrangement" ? "caregiver" : "partner"
-  const withMember = await addBlockMember({
-    ...input,
-    relationshipBlockId: newest.relationshipBlockId,
-    role,
-    roleType: "",
-  })
-  if (!withMember || !("relationships" in withMember) || !withMember.relationships) return withMember
-  const member = withMember.relationships
-    .filter((person) => person.relationshipBlockId === newest.relationshipBlockId && person.blockRole === role)
-    .sort((a, b) => b.displayOrder - a.displayOrder)[0]
-  return {
-    ...withMember,
-    createdBlockId: newest.relationshipBlockId,
-    createdMemberId: member?.relationshipRecordId ?? null,
+  block?: {
+    status?: string
+    statusDetail?: string
+    arrangementType?: string
+    arrangementDetail?: string
+    startedOn?: string
+    endedOn?: string
+    childrenAnswer?: string
+    siblingsAnswer?: string
+  }
+  person: {
+    givenName?: string
+    sex?: string
+    dateOfBirth?: string
+    blockRole: BlockRole
+    blockRoleType?: string
+    livingSituation?: string
+    healthStatus?: string
+    deceased?: boolean
+    dateOfDeath?: string
+    supportive?: string
+    conflict?: string
+    qualityOfRelationship?: string
+    dependency?: string
+    notKnown?: boolean
   }
 }
 
 /**
- * Remove a brand-new empty relationship draft (block + first member) when the
- * practitioner closes without entering anything.
+ * Create a relationship block (if needed) and one person in a single transaction.
+ * Refuses an empty person and a second client_current block. No write until Save.
  */
-export async function discardEmptyRelationshipDraft(input: Scope & {
-  relationshipBlockId: string
-  memberId: string
-}) {
-  const block = await ownedBlock(input, input.relationshipBlockId)
-  const member = await ownedPerson(input, input.memberId)
-  if (!block || !member) return { error: "Relationship was not found." }
-  if (member.relationshipBlockId !== block.relationshipBlockId) {
-    return { error: "That person is not in this relationship." }
+export async function saveRelationshipPersonDraft(input: SaveRelationshipPersonDraftInput) {
+  if (!(await ownedClient(input.clientId, input.practiceId))) return { error: "Client was not found." }
+  const empty = refuseEmptyPersonDraft({
+    givenName: input.person.givenName ?? "",
+    blockRoleType: input.person.blockRoleType ?? "",
+  })
+  if (empty) return { error: empty }
+
+  const role = input.person.blockRole
+  let blockId = input.relationshipBlockId?.trim() || ""
+  let kind: BlockKind | null = null
+
+  if (blockId) {
+    const existing = await ownedBlock(input, blockId)
+    if (!existing) return { error: "Relationship was not found." }
+    kind = toRelationshipBlock(existing).kind
+    if (!rolesForBlock(kind).includes(role)) {
+      return { error: "That person does not belong in this relationship." }
+    }
+  } else {
+    kind = input.kind ?? null
+    if (!kind) return { error: "Choose a relationship type." }
+    const second = await refuseSecondCurrent(input, kind)
+    if (second) return { error: second }
+    if (!rolesForBlock(kind).includes(role)) {
+      return { error: "That person does not belong in this relationship." }
+    }
   }
-  if (!isEmptyNewRelationshipDraft(toRelationshipBlock(block), toRelationship(member))) {
-    return loadBlockEditorState(input.clientId, input.practiceId)
+
+  const roleType = (input.person.blockRoleType ?? "").trim()
+  const arrangementForCheck =
+    input.block?.arrangementType ||
+    input.arrangementType ||
+    ""
+  if (role !== "partner" && role !== "caregiver" && roleType && kind) {
+    if (!allowedType(kind, role, roleType, arrangementForCheck)) {
+      return { error: "Choose a type for this relationship." }
+    }
   }
-  await db
-    .delete(clientRelationshipRecords)
-    .where(
-      and(
-        eq(clientRelationshipRecords.relationshipRecordId, member.relationshipRecordId),
-        eq(clientRelationshipRecords.practiceId, input.practiceId)
+
+  const sanitizedPerson = sanitizeRelationship({
+    relationshipRecordId: "",
+    givenName: input.person.givenName ?? "",
+    sex: input.person.sex ?? "",
+    dateOfBirth: input.person.dateOfBirth ?? "",
+    blockRole: role,
+    blockRoleType: roleType,
+    livingSituation: input.person.livingSituation ?? "",
+    healthStatus: input.person.healthStatus ?? "",
+    deceased: Boolean(input.person.deceased),
+    dateOfDeath: input.person.dateOfDeath ?? "",
+    supportive: input.person.supportive ?? "",
+    conflict: input.person.conflict ?? "",
+    qualityOfRelationship: input.person.qualityOfRelationship ?? "",
+    dependency: input.person.dependency ?? "",
+    notKnown: Boolean(input.person.notKnown),
+  })
+
+  let createdBlockId: string | null = null
+  let createdMemberId: string | null = null
+
+  await db.transaction(async (tx) => {
+    if (!blockId && kind) {
+      const state = await loadBlockEditorState(input.clientId, input.practiceId)
+      if (!state) throw new Error("Client was not found.")
+      if (kind === "biological_parents" || kind === "client_other_children") {
+        const existing = state.blocks.find((block) => block.kind === kind)
+        if (existing) {
+          blockId = existing.relationshipBlockId
+        }
+      }
+      if (!blockId) {
+        const siblings = state.blocks.filter((block) => block.kind === kind)
+        let parentRecordId: string | null = null
+        const parentSide =
+          input.parentSide === "mother" || input.parentSide === "father" ? input.parentSide : ""
+        if (kind === "parent_other") {
+          if (!parentSide) throw new Error("Choose which parent.")
+          parentRecordId =
+            state.relationships.find((person) => person.relationshipToClient === parentSide)
+              ?.relationshipRecordId ?? null
+        }
+        const arrangementType =
+          (input.block?.arrangementType || input.arrangementType) &&
+          isArrangementType(input.block?.arrangementType || input.arrangementType || "")
+            ? input.block?.arrangementType || input.arrangementType || ""
+            : ""
+        const [created] = await tx
+          .insert(clientRelationshipBlocks)
+          .values({
+            clientId: input.clientId,
+            practiceId: input.practiceId,
+            kind,
+            parentRecordId,
+            parentSide: parentSide || null,
+            arrangementType: arrangementType || null,
+            status: input.block?.status?.trim() || null,
+            statusDetail: input.block?.statusDetail?.trim() || null,
+            arrangementDetail: input.block?.arrangementDetail?.trim() || null,
+            startedOn: input.block?.startedOn?.trim() || null,
+            endedOn: input.block?.endedOn?.trim() || null,
+            childrenAnswer: isBlockAnswer(input.block?.childrenAnswer ?? "")
+              ? input.block?.childrenAnswer
+              : null,
+            siblingsAnswer: isBlockAnswer(input.block?.siblingsAnswer ?? "")
+              ? input.block?.siblingsAnswer
+              : null,
+            displayOrder: siblings.reduce((max, block) => Math.max(max, block.displayOrder), -1) + 1,
+          })
+          .returning()
+        blockId = created.relationshipBlockId
+        createdBlockId = created.relationshipBlockId
+        await tx.insert(auditEvents).values({
+          practiceId: input.practiceId,
+          userId: input.userId,
+          clientId: input.clientId,
+          eventType: "client_relationship_block.created",
+          entityType: "client_relationship_block",
+          entityId: created.relationshipBlockId,
+        })
+        const answerKey = answerKeyForBlock(toRelationshipBlock(created))
+        if (answerKey) {
+          const [background] = await tx
+            .select({ id: clientBackgrounds.clientBackgroundId, practiceId: clientBackgrounds.practiceId })
+            .from(clientBackgrounds)
+            .where(eq(clientBackgrounds.clientId, input.clientId))
+            .limit(1)
+          const answerValues = {
+            previousRelationships: answerKey === "previousRelationships" ? "yes" : undefined,
+            otherChildren: answerKey === "otherChildren" ? "yes" : undefined,
+            motherOtherRelationships: answerKey === "motherOtherRelationships" ? "yes" : undefined,
+            fatherOtherRelationships: answerKey === "fatherOtherRelationships" ? "yes" : undefined,
+            caregiverArrangements: answerKey === "caregiverArrangements" ? "yes" : undefined,
+            updatedAt: new Date(),
+          }
+          if (!background) {
+            await tx.insert(clientBackgrounds).values({
+              clientId: input.clientId,
+              practiceId: input.practiceId,
+              previousRelationships: answerKey === "previousRelationships" ? "yes" : null,
+              otherChildren: answerKey === "otherChildren" ? "yes" : null,
+              motherOtherRelationships: answerKey === "motherOtherRelationships" ? "yes" : null,
+              fatherOtherRelationships: answerKey === "fatherOtherRelationships" ? "yes" : null,
+              caregiverArrangements: answerKey === "caregiverArrangements" ? "yes" : null,
+            })
+          } else if (background.practiceId === input.practiceId) {
+            const patch: Record<string, unknown> = { updatedAt: answerValues.updatedAt }
+            if (answerKey === "previousRelationships") patch.previousRelationships = "yes"
+            if (answerKey === "otherChildren") patch.otherChildren = "yes"
+            if (answerKey === "motherOtherRelationships") patch.motherOtherRelationships = "yes"
+            if (answerKey === "fatherOtherRelationships") patch.fatherOtherRelationships = "yes"
+            if (answerKey === "caregiverArrangements") patch.caregiverArrangements = "yes"
+            await tx
+              .update(clientBackgrounds)
+              .set(patch)
+              .where(eq(clientBackgrounds.clientBackgroundId, background.id))
+          }
+        }
+      }
+    } else if (blockId && input.block) {
+      const existing = await ownedBlock(input, blockId)
+      if (existing) {
+        await tx
+          .update(clientRelationshipBlocks)
+          .set({
+            status: input.block.status?.trim() || existing.status,
+            statusDetail: input.block.statusDetail?.trim() || existing.statusDetail,
+            arrangementType: input.block.arrangementType?.trim() || existing.arrangementType,
+            arrangementDetail: input.block.arrangementDetail?.trim() || existing.arrangementDetail,
+            startedOn: input.block.startedOn?.trim() || existing.startedOn,
+            endedOn: input.block.endedOn?.trim() || existing.endedOn,
+            childrenAnswer: isBlockAnswer(input.block.childrenAnswer ?? "")
+              ? input.block.childrenAnswer
+              : existing.childrenAnswer,
+            siblingsAnswer: isBlockAnswer(input.block.siblingsAnswer ?? "")
+              ? input.block.siblingsAnswer
+              : existing.siblingsAnswer,
+            updatedAt: new Date(),
+          })
+          .where(eq(clientRelationshipBlocks.relationshipBlockId, blockId))
+      }
+    }
+
+    if (!blockId || !kind) throw new Error("Relationship was not found.")
+
+    const rows = await tx
+      .select({ displayOrder: clientRelationshipRecords.displayOrder })
+      .from(clientRelationshipRecords)
+      .where(
+        and(
+          eq(clientRelationshipRecords.clientId, input.clientId),
+          eq(clientRelationshipRecords.practiceId, input.practiceId)
+        )
       )
-    )
-  await writeAudit(input, "client_relationship.deleted", "client_relationship", member.relationshipRecordId)
-  await db
-    .delete(clientRelationshipBlocks)
-    .where(eq(clientRelationshipBlocks.relationshipBlockId, block.relationshipBlockId))
-  await writeAudit(input, "client_relationship_block.deleted", "client_relationship_block", block.relationshipBlockId)
-  const key = answerKeyForBlock(toRelationshipBlock(block))
-  if (key) await refreshAnswer(input, key)
-  return loadBlockEditorState(input.clientId, input.practiceId)
+    const displayOrder = rows.reduce((max, row) => Math.max(max, row.displayOrder), -1) + 1
+    const siblingType =
+      role === "sibling" ? roleType || siblingTypesForBlock(kind)[0] || "" : roleType
+    const legacy = legacyRoleForMember(kind, role, siblingType)
+    const [createdPerson] = await tx
+      .insert(clientRelationshipRecords)
+      .values({
+        clientId: input.clientId,
+        practiceId: input.practiceId,
+        relationshipToClient: legacy,
+        givenName: sanitizedPerson.givenName || null,
+        sex: sanitizedPerson.sex || null,
+        dateOfBirth: sanitizedPerson.dateOfBirth || null,
+        deceased: sanitizedPerson.deceased,
+        healthStatus: sanitizedPerson.healthStatus || null,
+        dateOfDeath: sanitizedPerson.dateOfDeath || null,
+        supportive: sanitizedPerson.supportive || null,
+        conflict: sanitizedPerson.conflict || null,
+        qualityOfRelationship: sanitizedPerson.qualityOfRelationship || null,
+        dependency: sanitizedPerson.dependency || null,
+        livingSituation: sanitizedPerson.livingSituation || null,
+        notKnown: sanitizedPerson.notKnown,
+        displayOrder,
+        relationshipBlockId: blockId,
+        blockRole: role,
+        blockRoleType: siblingType || null,
+        caregiverRelationship: role === "caregiver" ? siblingType || null : null,
+      })
+      .returning()
+    createdMemberId = createdPerson.relationshipRecordId
+    await tx.insert(auditEvents).values({
+      practiceId: input.practiceId,
+      userId: input.userId,
+      clientId: input.clientId,
+      eventType: "client_relationship.created",
+      entityType: "client_relationship",
+      entityId: createdPerson.relationshipRecordId,
+    })
+    if (role === "child") {
+      await tx
+        .update(clientRelationshipBlocks)
+        .set({ childrenAnswer: "yes", updatedAt: new Date() })
+        .where(eq(clientRelationshipBlocks.relationshipBlockId, blockId))
+    }
+    if (role === "sibling") {
+      await tx
+        .update(clientRelationshipBlocks)
+        .set({ siblingsAnswer: "yes", updatedAt: new Date() })
+        .where(eq(clientRelationshipBlocks.relationshipBlockId, blockId))
+    }
+  })
+
+  const state = await loadBlockEditorState(input.clientId, input.practiceId)
+  return {
+    ...state,
+    createdBlockId,
+    createdMemberId,
+  }
 }
 
 /** Create an unplaced person for History "Who → + Add person". */
-export async function createUnplacedPerson(input: Scope & { givenName?: string }) {
+export type CreateUnplacedPersonInput = Scope & {
+  givenName?: string
+  sex?: string
+  dateOfBirth?: string
+  healthStatus?: string
+  deceased?: boolean
+  dateOfDeath?: string
+  supportive?: string
+  conflict?: string
+  qualityOfRelationship?: string
+  dependency?: string
+  livingSituation?: string
+  notKnown?: boolean
+  blockRoleType?: string
+}
+
+/**
+ * Create an unplaced person (History Who). Refuses an empty draft.
+ * Prefer passing the full person draft from the shared form; nothing is written until Save.
+ */
+export async function createUnplacedPerson(input: CreateUnplacedPersonInput) {
   if (!(await ownedClient(input.clientId, input.practiceId))) return { error: "Client was not found." }
+  const empty = refuseEmptyPersonDraft({
+    givenName: input.givenName ?? "",
+    blockRoleType: input.blockRoleType ?? "",
+  })
+  if (empty) return { error: empty }
+
+  const sanitized = sanitizeRelationship({
+    relationshipRecordId: "",
+    givenName: input.givenName ?? "",
+    sex: input.sex ?? "",
+    dateOfBirth: input.dateOfBirth ?? "",
+    healthStatus: input.healthStatus ?? "",
+    deceased: Boolean(input.deceased),
+    dateOfDeath: input.dateOfDeath ?? "",
+    supportive: input.supportive ?? "",
+    conflict: input.conflict ?? "",
+    qualityOfRelationship: input.qualityOfRelationship ?? "",
+    dependency: input.dependency ?? "",
+    livingSituation: input.livingSituation ?? "",
+    notKnown: Boolean(input.notKnown),
+    relationshipToClient: "other_caregiver",
+  })
+
   const rows = await db
     .select({ displayOrder: clientRelationshipRecords.displayOrder })
     .from(clientRelationshipRecords)
@@ -257,13 +533,27 @@ export async function createUnplacedPerson(input: Scope & { givenName?: string }
       clientId: input.clientId,
       practiceId: input.practiceId,
       relationshipToClient: "other_caregiver",
-      givenName: input.givenName?.trim() || null,
+      givenName: sanitized.givenName || null,
+      sex: sanitized.sex || null,
+      dateOfBirth: sanitized.dateOfBirth || null,
+      healthStatus: sanitized.healthStatus || null,
+      deceased: sanitized.deceased,
+      dateOfDeath: sanitized.dateOfDeath || null,
+      supportive: sanitized.supportive || null,
+      conflict: sanitized.conflict || null,
+      qualityOfRelationship: sanitized.qualityOfRelationship || null,
+      dependency: sanitized.dependency || null,
+      livingSituation: sanitized.livingSituation || null,
+      notKnown: sanitized.notKnown,
       displayOrder,
       placementReview: "unplaced",
     })
     .returning()
   await writeAudit(input, "client_relationship.created", "client_relationship", created.relationshipRecordId)
-  return loadBlockEditorState(input.clientId, input.practiceId)
+  return {
+    ...(await loadBlockEditorState(input.clientId, input.practiceId)),
+    createdMemberId: created.relationshipRecordId,
+  }
 }
 
 export async function createRelationshipBlock(input: Scope & {
@@ -273,6 +563,8 @@ export async function createRelationshipBlock(input: Scope & {
 }) {
   if (!(await ownedClient(input.clientId, input.practiceId))) return { error: "Client was not found." }
   const kind = input.kind
+  const second = await refuseSecondCurrent(input, kind)
+  if (second) return { error: second }
   if (kind === "biological_parents" || kind === "client_other_children") {
     const state = await loadBlockEditorState(input.clientId, input.practiceId)
     if (state?.blocks.some((block) => block.kind === kind)) return loadBlockEditorState(input.clientId, input.practiceId)
@@ -560,12 +852,17 @@ export async function moveBlockMember(input: Scope & {
   if (!person) return { error: "Person was not found." }
   let destinationId = input.relationshipBlockId
   if (destinationId === NEW_CURRENT_RELATIONSHIP || destinationId === NEW_PREVIOUS_RELATIONSHIP) {
+    const kind = destinationId === NEW_CURRENT_RELATIONSHIP ? "client_current" : "client_previous"
+    if (kind === "client_current") {
+      const second = await refuseSecondCurrent(input, kind)
+      if (second) return { error: second }
+    }
     const created = await createRelationshipBlock({
       ...input,
-      kind: destinationId === NEW_CURRENT_RELATIONSHIP ? "client_current" : "client_previous",
+      kind,
     })
     if (!created || !("blocks" in created) || !created.blocks) return created ?? { error: "Could not add the relationship." }
-    const kind = destinationId === NEW_CURRENT_RELATIONSHIP ? "client_current" : "client_previous"
+    if ("error" in created && created.error) return created
     const newest = created.blocks
       .filter((block) => block.kind === kind)
       .sort((a, b) => b.displayOrder - a.displayOrder)[0]

@@ -9,13 +9,18 @@ import { getClaimById, getClaimTypes, deleteClaim, getClaimDeleteStatus } from "
 import { getProfessionalOrganisations } from "@/lib/actions/contacts"
 import { requirePractitionerContext } from "@/lib/auth"
 import { EntityDeleteSection } from "@/components/entity-delete-section"
+import { safeReturnTo } from "@/lib/navigation/safe-return-to"
 
 export default async function EditClaimPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ claim_id: string }>
+  searchParams: Promise<{ returnTo?: string }>
 }) {
   const { claim_id: claimId } = await params
+  const { returnTo: returnToRaw } = await searchParams
+  const returnTo = safeReturnTo(returnToRaw) ?? undefined
   const context = await requirePractitionerContext()
   const [claim, clients, claimTypes, organisations] = await Promise.all([
     getClaimById(claimId),
@@ -28,13 +33,17 @@ export default async function EditClaimPage({
     notFound()
   }
 
+  const detailHref = returnTo
+    ? `/funding/claims/${claimId}?returnTo=${encodeURIComponent(returnTo)}`
+    : `/funding/claims/${claimId}`
+
   const deleteStatus = await getClaimDeleteStatus(claimId, context.practiceId)
 
   return (
     <AppShell>
       <div className="mb-6">
         <BackButton
-          fallbackHref={`/funding/claims/${claimId}`}
+          fallbackHref={detailHref}
           label="← Back to claim"
         />
       </div>
@@ -65,7 +74,8 @@ export default async function EditClaimPage({
           startDate: claim.startDate,
           endDate: claim.endDate,
         }}
-        cancelHref={`/funding/claims/${claimId}`}
+        cancelHref={detailHref}
+        returnTo={returnTo}
       />
 
       <EntityDeleteSection

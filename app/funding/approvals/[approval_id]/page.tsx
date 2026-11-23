@@ -47,6 +47,8 @@ import {
   formatAppointmentDate,
   formatAppointmentTime,
 } from "@/lib/appointments/format"
+import { safeReturnTo } from "@/lib/navigation/safe-return-to"
+
 function displayValue(value: string | null | undefined) {
   return value?.trim() || "—"
 }
@@ -59,7 +61,8 @@ export default async function FundingApprovalDetailPage({
   searchParams: Promise<{ returnTo?: string }>
 }) {
   const { approval_id: approvalId } = await params
-  const { returnTo } = await searchParams
+  const { returnTo: returnToRaw } = await searchParams
+  const returnTo = safeReturnTo(returnToRaw)
   const approval = await getFundingApprovalById(approvalId)
 
   if (!approval) {
@@ -69,6 +72,9 @@ export default async function FundingApprovalDetailPage({
   const approvalUrl = returnTo
     ? `/funding/approvals/${approvalId}?returnTo=${encodeURIComponent(returnTo)}`
     : `/funding/approvals/${approvalId}`
+  const editHref = returnTo
+    ? `/funding/approvals/${approvalId}/edit?returnTo=${encodeURIComponent(returnTo)}`
+    : `/funding/approvals/${approvalId}/edit`
 
   const progress = formatApprovalProgress(
     approval.appointmentsAttended,
@@ -126,7 +132,7 @@ export default async function FundingApprovalDetailPage({
         }
         subheadingAction={
           <Button variant="outline" size="sm" asChild>
-            <Link href={`/funding/approvals/${approvalId}/edit`}>Edit</Link>
+            <Link href={editHref}>Edit</Link>
           </Button>
         }
       />

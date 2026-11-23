@@ -13,6 +13,11 @@ import {
 } from "@/app/clients/[client_id]/background/actions"
 import { ContextStrip } from "@/components/client-background/context-strip"
 import { ClientAnswer, ReadOnlyField, SaveRow, SelectField } from "@/components/client-background/fields"
+import { NewPersonDraftForm } from "@/components/client-background/new-person-draft-form"
+import {
+  RelationshipPanelShell,
+  type PersonDraft,
+} from "@/components/client-background/relationship-panel-shared"
 import { EventEditor } from "@/components/client-background/history-section"
 import {
   NewEventForm,
@@ -102,6 +107,7 @@ export function HistoryTreeSection({
   events,
   relationships,
   screening,
+  medicalContacts = [],
   professionals,
   issues: storedIssues,
   readOnly = false,
@@ -122,6 +128,7 @@ export function HistoryTreeSection({
   events: EventRecord[]
   relationships: RelationshipRecord[]
   screening: ScreeningAnswers
+  medicalContacts?: ProfessionalOption[]
   professionals: ProfessionalOption[]
   issues?: HistoryIssue[]
   readOnly?: boolean
@@ -179,11 +186,21 @@ export function HistoryTreeSection({
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
   const [ready, setReady] = useState(false)
+  const [unplacedDraftOpen, setUnplacedDraftOpen] = useState(false)
+  const [unplacedDraftSaving, setUnplacedDraftSaving] = useState(false)
+  const [unplacedDraftError, setUnplacedDraftError] = useState<string | null>(null)
   useEffect(() => setReady(true), [])
   useEffect(() => {
-    if (!selection) return
+    if (!selection && !unplacedDraftOpen) return
     function onKey(event: KeyboardEvent) {
-      if (event.key === "Escape") close()
+      if (event.key === "Escape") {
+        if (unplacedDraftOpen) {
+          setUnplacedDraftOpen(false)
+          setUnplacedDraftError(null)
+          return
+        }
+        close()
+      }
     }
     window.addEventListener("keydown", onKey)
     return () => window.removeEventListener("keydown", onKey)
@@ -366,17 +383,52 @@ export function HistoryTreeSection({
     setError(null)
   }
 
-  async function addPersonForWho() {
-    const before = people.map((person) => person.relationshipRecordId)
-    const result = await createUnplacedPersonAction(clientId)
-    if (!result || !("relationships" in result) || !result.relationships) {
-      setError(result && "error" in result && result.error ? String(result.error) : "Could not add a person.")
-      return
-    }
-    setLocalPeople(result.relationships)
-    const created = result.relationships.find((person) => !before.includes(person.relationshipRecordId))
-    if (created && issueDraft) {
-      setIssueDraft({ ...issueDraft, relationshipRecordId: created.relationshipRecordId, aboutOther: "" })
+  /** Browser-only — opens the shared person form; no write until Save. */
+  function startUnplacedPersonDraft() {
+    setUnplacedDraftOpen(true)
+    setUnplacedDraftError(null)
+  }
+
+  async function saveUnplacedPersonDraft(fields: PersonDraft) {
+    setUnplacedDraftSaving(true)
+    setUnplacedDraftError(null)
+    try {
+      const result = await createUnplacedPersonAction(clientId, {
+        givenName: fields.givenName,
+        sex: fields.sex,
+        dateOfBirth: fields.dateOfBirth,
+        healthStatus: fields.healthStatus,
+        deceased: fields.deceased,
+        dateOfDeath: fields.dateOfDeath,
+        supportive: fields.supportive,
+        conflict: fields.conflict,
+        qualityOfRelationship: fields.qualityOfRelationship,
+        dependency: fields.dependency,
+        livingSituation: fields.livingSituation,
+        notKnown: fields.notKnown,
+        blockRoleType: fields.blockRoleType,
+      })
+      if (!result || ("error" in result && result.error)) {
+        setUnplacedDraftError(
+          result && "error" in result && result.error ? String(result.error) : "Could not add a person."
+        )
+        return
+      }
+      if ("relationships" in result && result.relationships) {
+        setLocalPeople(result.relationships)
+        const createdId =
+          "createdMemberId" in result && typeof result.createdMemberId === "string"
+            ? result.createdMemberId
+            : result.relationships.find(
+                (person) => !people.some((existing) => existing.relationshipRecordId === person.relationshipRecordId)
+              )?.relationshipRecordId
+        if (createdId && issueDraft) {
+          setIssueDraft({ ...issueDraft, relationshipRecordId: createdId, aboutOther: "" })
+        }
+      }
+      setUnplacedDraftOpen(false)
+    } finally {
+      setUnplacedDraftSaving(false)
     }
   }
 
@@ -641,7 +693,7 @@ export function HistoryTreeSection({
                         relationships={people}
                         onIssueChange={setIssueDraft}
                         onEpisodeChange={setDraft}
-                        onAddPerson={() => void addPersonForWho()}
+                        onAddPerson={startUnplacedPersonDraft}
                       />
                     ) : selection.kind === "new_event" && draft ? (
                       <NewEventForm
@@ -650,6 +702,8 @@ export function HistoryTreeSection({
                         treatmentType={treatmentType}
                         category={selection.category ?? null}
                         dateOfBirth={dateOfBirth}
+                        clientId={clientId}
+                        medicalContacts={medicalContacts}
                         professionals={professionals}
                         onKindChange={setSmartKind}
                         onTreatmentTypeChange={setTreatmentType}
@@ -663,6 +717,8 @@ export function HistoryTreeSection({
                         dateOfBirth={dateOfBirth}
                         relationships={people}
                         events={shown}
+                        clientId={clientId}
+                        medicalContacts={medicalContacts}
                         professionals={professionals}
                         onChange={setDraft}
                         lockContext
@@ -740,6 +796,33 @@ export function HistoryTreeSection({
                 )}
               </aside>
             </div>,
+            document.body
+          )
+        : null}
+      {ready && unplacedDraftOpen
+        ? createPortal(
+            <RelationshipPanelShell
+              ariaLabel="New person"
+              onDismiss={() => {
+                setUnplacedDraftOpen(false)
+                setUnplacedDraftError(null)
+              }}
+            >
+              <NewPersonDraftForm
+                block={null}
+                people={people}
+                role="unplaced"
+                error={unplacedDraftError}
+                saving={unplacedDraftSaving}
+                title="New person"
+                contextLine="Adding an unplaced person for History Who"
+                onSave={(fields) => void saveUnplacedPersonDraft(fields)}
+                onCancel={() => {
+                  setUnplacedDraftOpen(false)
+                  setUnplacedDraftError(null)
+                }}
+              />
+            </RelationshipPanelShell>,
             document.body
           )
         : null}

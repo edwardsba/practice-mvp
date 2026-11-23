@@ -55,6 +55,7 @@ export function InterviewHistory({
   selfReportId,
   historyClient,
   medicationClient,
+  medicalContacts = [],
   professionals,
   stressorsClient,
   issues,
@@ -76,6 +77,7 @@ export function InterviewHistory({
   selfReportId: string | null
   historyClient?: ClientBackgroundSuggestions["history"]
   medicationClient?: ClientBackgroundSuggestions["medication"]
+  medicalContacts?: ProfessionalOption[]
   professionals: ProfessionalOption[]
   stressorsClient?: ClientBackgroundSuggestions["stressors"]
   issues?: HistoryIssue[]
@@ -229,6 +231,7 @@ export function InterviewHistory({
         events={entries}
         relationships={relationships}
         screening={answers}
+        medicalContacts={medicalContacts}
         professionals={professionals}
         issues={issues}
         presentation="interview"

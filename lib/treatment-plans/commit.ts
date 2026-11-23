@@ -1,60 +1,10 @@
 import { and, eq } from "drizzle-orm"
 
-import { auditEvents, clientEventRecords, treatmentPlans } from "@/db/schema"
+import { auditEvents, treatmentPlans } from "@/db/schema"
 import { db } from "@/lib/db"
 import { formValuesToDbColumns } from "@/lib/treatment-plans/parse-form"
 import { loadTreatmentPlanForPractice } from "@/lib/treatment-plans/load"
-import type { MedicationSupervisorAssignment, TreatmentPlanFormValues } from "@/lib/treatment-plans/types"
-
-type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0]
-
-async function syncMedicationSupervision(
-  tx: Tx,
-  input: {
-    clientId: string
-    practiceId: string
-    userId: string
-    supervisors: MedicationSupervisorAssignment[]
-    now: Date
-  }
-) {
-  for (const assignment of input.supervisors) {
-    const [existing] = await tx
-      .select({ eventRecordId: clientEventRecords.eventRecordId })
-      .from(clientEventRecords)
-      .where(
-        and(
-          eq(clientEventRecords.eventRecordId, assignment.eventId),
-          eq(clientEventRecords.clientId, input.clientId),
-          eq(clientEventRecords.practiceId, input.practiceId),
-          eq(clientEventRecords.eventType, "medication")
-        )
-      )
-      .limit(1)
-    if (!existing) continue
-    await tx
-      .update(clientEventRecords)
-      .set({
-        prescriberProfessionalId: assignment.professionalId,
-        ...(assignment.professionalId ? { prescriberName: "" } : {}),
-        updatedAt: input.now,
-      })
-      .where(
-        and(
-          eq(clientEventRecords.eventRecordId, existing.eventRecordId),
-          eq(clientEventRecords.practiceId, input.practiceId)
-        )
-      )
-    await tx.insert(auditEvents).values({
-      practiceId: input.practiceId,
-      userId: input.userId,
-      clientId: input.clientId,
-      eventType: "client_background.updated",
-      entityType: "client_event_record",
-      entityId: existing.eventRecordId,
-    })
-  }
-}
+import type { TreatmentPlanFormValues } from "@/lib/treatment-plans/types"
 
 function dayBeforeDateString(dateString: string): string {
   const date = new Date(`${dateString}T00:00:00`)
@@ -106,14 +56,6 @@ export async function commitTreatmentPlan({
         eventType: "treatment_plan.created",
         entityType: "treatment_plan",
         entityId: plan.treatmentPlanId,
-      })
-
-      await syncMedicationSupervision(tx, {
-        clientId,
-        practiceId,
-        userId,
-        supervisors: values.medicationSupervisors ?? [],
-        now,
       })
     })
 
@@ -175,14 +117,6 @@ export async function commitTreatmentPlan({
       eventType: "treatment_plan.updated",
       entityType: "treatment_plan",
       entityId: plan.treatmentPlanId,
-    })
-
-    await syncMedicationSupervision(tx, {
-      clientId,
-      practiceId,
-      userId,
-      supervisors: values.medicationSupervisors ?? [],
-      now,
     })
   })
 

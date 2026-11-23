@@ -9,12 +9,12 @@ import { BackgroundInterviewCard } from "@/components/client-background/intervie
 import { BackgroundStressorsSection } from "@/components/client-background/medication-stressors"
 import { RelationshipTreeSection } from "@/components/client-background/relationship-tree-section"
 import { scrollToBackgroundCheck } from "@/components/client-background/worth-checking"
-import { ReferralFundingCard } from "@/components/funding/referral-funding-card"
+import { ReferralFundingQuickView } from "@/components/clients/referral-funding-quick-view"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { backgroundChecks, backgroundSectionForCheck, type BackgroundCheck } from "@/lib/client-background/checks"
 import type { BackgroundInterviewCardData, ReasonSupport } from "@/lib/client-background/load"
 import { emptyBlockAnswers, type ClientBackgroundData } from "@/lib/client-background/types"
-import type { ReferralFundingCardProps } from "@/lib/funding/referral-funding-card-props"
+import type { QuickViewLine } from "@/lib/funding/claims-page"
 import { cn } from "@/lib/utils"
 
 const SECTIONS = [
@@ -37,7 +37,8 @@ export function ClientBackgroundPage({
   interview,
   numberOfChildren,
   reasonSupport,
-  referralFunding,
+  medicalContacts = [],
+  referralQuickViewLines,
   referralRecorded = false,
 }: {
   clientId: string
@@ -47,7 +48,8 @@ export function ClientBackgroundPage({
   interview: BackgroundInterviewCardData
   numberOfChildren: number | null
   reasonSupport: ReasonSupport
-  referralFunding: ReferralFundingCardProps
+  medicalContacts?: import("@/lib/client-background/professionals").ProfessionalOption[]
+  referralQuickViewLines: QuickViewLine[]
   referralRecorded?: boolean
 }) {
   const [open, setOpen] = useState<SectionId | null>(null)
@@ -106,7 +108,13 @@ export function ClientBackgroundPage({
           open={open === item.id}
           onToggle={() => toggle(item.id)}
         >
-          {item.id === "reason" ? <ReferralFundingCard {...referralFunding} hideTitle /> : null}
+          {item.id === "reason" ? (
+            <ReferralFundingQuickView
+              clientId={clientId}
+              lines={referralQuickViewLines}
+              returnTo={`/clients/${clientId}/background`}
+            />
+          ) : null}
           {item.id === "demographics" ? (
             <DemographicsSection
               clientId={clientId}
@@ -117,6 +125,7 @@ export function ClientBackgroundPage({
           {item.id === "relationships" ? (
             <RelationshipTreeSection
               clientId={clientId}
+              clientName={clientName.split(/\s+/)[0] || clientName}
               relationships={data.relationships}
               blocks={data.relationshipBlocks ?? []}
               blockAnswers={data.blockAnswers ?? emptyBlockAnswers()}
@@ -140,6 +149,7 @@ export function ClientBackgroundPage({
               events={data.events}
               relationships={data.relationships}
               screening={interview.latest?.screening ?? {}}
+              medicalContacts={medicalContacts}
               professionals={reasonSupport.professionals}
               issues={data.issues}
             />

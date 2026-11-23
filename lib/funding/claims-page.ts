@@ -3,6 +3,7 @@
  * and the Client page Referrals and funding quick view.
  */
 
+import { isClaimPeriodActive } from "@/lib/funding/claim-period-active"
 import {
   REFERRAL_SOURCE_LABELS,
   type ReferralSource,
@@ -94,22 +95,21 @@ export type QuickViewLine =
       fundingApprovalId: string
       title: string
       subtitle: string
-      hrefAnchor: string
     }
   | {
       kind: "active_claim"
       claimId: string
+      fundingApprovalId: string | null
       title: string
       subtitle: string
       reportTag: string | null
-      hrefAnchor: string
     }
   | {
       kind: "inactive_fallback"
       claimId: string
+      fundingApprovalId: string | null
       title: string
       subtitle: string
-      hrefAnchor: string
     }
   | {
       kind: "empty"
@@ -337,6 +337,9 @@ function enrichApproval(
  * Group a client's claims and approvals into the page model:
  * referrals without a claim, active claims, inactive claims;
  * ordering; which cards start open.
+ *
+ * Soft-deleted claims (`isActive === false`) are excluded.
+ * Active/Inactive uses claim end date vs today (not soft-delete).
  */
 export function buildClaimsPageModel(
   claims: ClaimsPageClaimInput[],
@@ -362,6 +365,7 @@ export function buildClaimsPageModel(
 
   function toClaimModel(
     claim: ClaimsPageClaimInput,
+    periodActive: boolean,
     initiallyOpen: boolean
   ): ClaimsPageClaimModel {
     const claimApprovals = byClaim.get(claim.claimId) ?? []
@@ -378,6 +382,8 @@ export function buildClaimsPageModel(
       enriched.length === 1 ? "1 approval" : `${enriched.length} approvals`
     return {
       ...claim,
+      // Surface period Active/Inactive to the UI (soft-deleted already filtered out).
+      isActive: periodActive,
       sessionsClaimedInYear,
       calendarYear,
       approvals: enriched,
@@ -387,13 +393,15 @@ export function buildClaimsPageModel(
     }
   }
 
-  const sortedClaims = sortClaimsNewestFirst(claims)
-  const activeClaims = sortedClaims
-    .filter((claim) => claim.isActive)
-    .map((claim) => toClaimModel(claim, true))
-  const inactiveClaims = sortedClaims
-    .filter((claim) => !claim.isActive)
-    .map((claim) => toClaimModel(claim, false))
+  const liveClaims = sortClaimsNewestFirst(
+    claims.filter((claim) => claim.isActive)
+  )
+  const activeClaims = liveClaims
+    .filter((claim) => isClaimPeriodActive(claim.endDate, today))
+    .map((claim) => toClaimModel(claim, true, true))
+  const inactiveClaims = liveClaims
+    .filter((claim) => !isClaimPeriodActive(claim.endDate, today))
+    .map((claim) => toClaimModel(claim, false, false))
 
   return {
     referralsWithoutClaim: unattached,
@@ -424,16 +432,12 @@ function inactiveEndedLabel(
   formatDate: (value: string | null | undefined) => string
 ): string {
   if (claim.endDate?.trim()) return formatDate(claim.endDate)
-  const ends = claim.approvals
-    .map((row) => row.endDate?.trim())
-    .filter((value): value is string => Boolean(value))
-    .sort((a, b) => b.localeCompare(a))
-  if (ends[0]) return formatDate(ends[0])
   return "—"
 }
 
 /**
  * Client page quick-view lines for Referrals and funding.
+ * Soft-deleted claims never appear (filtered in buildClaimsPageModel).
  */
 export function buildReferralFundingQuickView(
   model: ClaimsPageModel,
@@ -447,7 +451,6 @@ export function buildReferralFundingQuickView(
       fundingApprovalId: referral.fundingApprovalId,
       title: "Referral, no claim yet",
       subtitle: [referral.name, referral.headerDetail].filter(Boolean).join(" · "),
-      hrefAnchor: `referral-${referral.fundingApprovalId}`,
     })
   }
 
@@ -460,10 +463,10 @@ export function buildReferralFundingQuickView(
       lines.push({
         kind: "active_claim",
         claimId: claim.claimId,
+        fundingApprovalId: claim.approvals[0]?.fundingApprovalId ?? null,
         title: `${claim.claimTypeName} · ${newestApprovalName(claim)}`,
         subtitle: usedAndClaimedSubtitle(claim),
         reportTag: due?.label ?? null,
-        hrefAnchor: `claim-${claim.claimId}`,
       })
     }
     return lines
@@ -487,9 +490,9 @@ export function buildReferralFundingQuickView(
   lines.push({
     kind: "inactive_fallback",
     claimId: mostRecent.claimId,
+    fundingApprovalId: mostRecent.approvals[0]?.fundingApprovalId ?? null,
     title: mostRecent.claimTypeName,
     subtitle: `Last claim · ended ${ended} · ${mostRecent.sessionsClaimedInYear} claimed in ${mostRecent.calendarYear}`,
-    hrefAnchor: `claim-${mostRecent.claimId}`,
   })
   return lines
 }

@@ -9,6 +9,8 @@ import { requirePractitionerContext } from "@/lib/auth"
 import { loadClientBackground, loadInProgressInterview, loadLatestBackgroundSelfReport, loadReasonSupport } from "@/lib/client-background/load"
 import { ensureFamilyOfOrigin } from "@/lib/client-background/mutations"
 import { db } from "@/lib/db"
+import { buildReferralFundingQuickView } from "@/lib/funding/claims-page"
+import { loadClaimsPageForClient } from "@/lib/funding/load-claims-page"
 import {
   anyReferralRecorded,
   buildReferralFundingCardProps,
@@ -51,17 +53,26 @@ export default async function BackgroundInterviewRoute({
   const data = await loadClientBackground(clientId, context.practiceId)
   if (!data) notFound()
 
-  const [selfReport, reasonSupport, referralFundingData, medicalContacts] =
+  const [selfReport, reasonSupport, claimsPage, referralFundingData, medicalContacts] =
     await Promise.all([
       loadLatestBackgroundSelfReport(clientId, context.practiceId),
       loadReasonSupport(clientId, context.practiceId, null),
+      loadClaimsPageForClient(clientId),
       getReferralFundingCardData(clientId),
       loadMedicalContactsForClient(clientId, context.practiceId),
     ])
 
-  const referralFunding = buildReferralFundingCardProps(
+  const referralCard = buildReferralFundingCardProps(
     context.practiceId,
     referralFundingData
+  )
+  const referralQuickViewLines = buildReferralFundingQuickView(
+    claimsPage?.model ?? {
+      referralsWithoutClaim: [],
+      activeClaims: [],
+      inactiveClaims: [],
+      calendarYear: new Date().getFullYear(),
+    }
   )
 
   return (
@@ -76,8 +87,9 @@ export default async function BackgroundInterviewRoute({
         selfReport={selfReport}
         reasonSupport={reasonSupport}
         medicalContacts={medicalContacts.map((row) => row.professional)}
-        referralFunding={referralFunding}
-        referralRecorded={anyReferralRecorded(referralFunding.approvals)}
+        referralQuickViewLines={referralQuickViewLines}
+        referralFormOptions={referralCard.formOptions}
+        referralRecorded={anyReferralRecorded(referralFundingData.approvals)}
       />
     </AppShell>
   )

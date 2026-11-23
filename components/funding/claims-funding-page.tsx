@@ -2,11 +2,18 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
+import { Plus } from "lucide-react"
 
 import { AttachToClaimPicker } from "@/components/funding/attach-to-claim-picker"
 import { CollapsibleFundingCard } from "@/components/funding/collapsible-funding-card"
-import { ReferralFundingCard } from "@/components/funding/referral-funding-card"
 import { StatusBadge } from "@/components/ui/status-badge"
+import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { formatDisplayDate } from "@/lib/funding/format"
 import type { ClaimsPageModel } from "@/lib/funding/claims-page"
 import {
@@ -14,11 +21,16 @@ import {
   REFERRAL_SOURCES,
   type ReferralSource,
 } from "@/lib/funding/referral"
-import type { ReferralFundingCardProps } from "@/lib/funding/referral-funding-card-props"
 import { FUNDING_APPROVAL_STATUS_CONFIG } from "@/lib/status"
 import { Badge } from "@/components/ui/badge"
 import { personRoleLabel } from "@/lib/client-background/tree"
 import type { RelationshipToClient } from "@/lib/client-background/types"
+
+type RelationshipOption = {
+  relationshipRecordId: string
+  givenName: string
+  relationshipToClient: string
+}
 
 function asReferralSource(
   value: string | null | undefined
@@ -57,6 +69,24 @@ function ProgressBar({ used, approved }: { used: number; approved: number }) {
   )
 }
 
+function approvalDetailsHref(approvalId: string, returnPath: string) {
+  return `/funding/approvals/${approvalId}?returnTo=${encodeURIComponent(returnPath)}`
+}
+
+function newApprovalHref(opts: {
+  clientId: string
+  returnPath: string
+  claimId?: string
+  kind: "approval" | "referral"
+}) {
+  const params = new URLSearchParams()
+  params.set("client_id", opts.clientId)
+  params.set("kind", opts.kind)
+  params.set("returnTo", opts.returnPath)
+  if (opts.claimId) params.set("claim_id", opts.claimId)
+  return `/funding/approvals/new?${params.toString()}`
+}
+
 function ApprovalCardBody({
   approval,
   relationships,
@@ -64,15 +94,13 @@ function ApprovalCardBody({
   clientId,
   claims,
   returnPath,
-  onOpenCard,
 }: {
   approval: ClaimsPageModel["referralsWithoutClaim"][number]
-  relationships: ReferralFundingCardProps["formOptions"]["relationships"]
+  relationships: RelationshipOption[]
   showAttach: boolean
   clientId: string
   claims: Array<{ claimId: string; claimTypeName: string; isActive: boolean }>
   returnPath: string
-  onOpenCard: (approvalId: string) => void
 }) {
   const [attachOpen, setAttachOpen] = useState(false)
   const closeAttach = useCallback(() => setAttachOpen(false), [])
@@ -174,13 +202,12 @@ function ApprovalCardBody({
       ) : null}
 
       <div className="flex flex-col items-start gap-2">
-        <button
-          type="button"
+        <Link
+          href={approvalDetailsHref(approval.fundingApprovalId, returnPath)}
           className="text-sm font-medium text-primary hover:underline"
-          onClick={() => onOpenCard(approval.fundingApprovalId)}
         >
-          Open referral and funding card ›
-        </button>
+          Funding approval details ›
+        </Link>
         {showAttach ? (
           attachOpen ? (
             <AttachToClaimPicker
@@ -212,15 +239,13 @@ function ApprovalCard({
   clientId,
   claims,
   returnPath,
-  onOpenCard,
 }: {
   approval: ClaimsPageModel["referralsWithoutClaim"][number]
-  relationships: ReferralFundingCardProps["formOptions"]["relationships"]
+  relationships: RelationshipOption[]
   showAttach?: boolean
   clientId: string
   claims: Array<{ claimId: string; claimTypeName: string; isActive: boolean }>
   returnPath: string
-  onOpenCard: (approvalId: string) => void
 }) {
   return (
     <CollapsibleFundingCard
@@ -253,7 +278,6 @@ function ApprovalCard({
         clientId={clientId}
         claims={claims}
         returnPath={returnPath}
-        onOpenCard={onOpenCard}
       />
     </CollapsibleFundingCard>
   )
@@ -265,14 +289,12 @@ function ClaimCard({
   returnPath,
   relationships,
   allClaims,
-  onOpenCard,
 }: {
   claim: ClaimsPageModel["activeClaims"][number]
   clientId: string
   returnPath: string
-  relationships: ReferralFundingCardProps["formOptions"]["relationships"]
+  relationships: RelationshipOption[]
   allClaims: Array<{ claimId: string; claimTypeName: string; isActive: boolean }>
-  onOpenCard: (approvalId: string) => void
 }) {
   return (
     <CollapsibleFundingCard
@@ -338,16 +360,33 @@ function ClaimCard({
                 clientId={clientId}
                 claims={allClaims}
                 returnPath={returnPath}
-                onOpenCard={onOpenCard}
               />
             ))}
           </div>
-          <Link
-            href={`/funding/approvals/new?claimId=${claim.claimId}&client_id=${clientId}&returnTo=${encodeURIComponent(returnPath)}`}
-            className="inline-flex min-h-11 items-center text-sm font-medium text-primary hover:underline"
-          >
-            + Add referral or funding approval
-          </Link>
+          <div className="flex flex-wrap gap-x-4 gap-y-1">
+            <Link
+              href={newApprovalHref({
+                clientId,
+                returnPath,
+                claimId: claim.claimId,
+                kind: "approval",
+              })}
+              className="inline-flex min-h-11 items-center text-sm font-medium text-primary hover:underline"
+            >
+              + Funding approval
+            </Link>
+            <Link
+              href={newApprovalHref({
+                clientId,
+                returnPath,
+                claimId: claim.claimId,
+                kind: "referral",
+              })}
+              className="inline-flex min-h-11 items-center text-sm font-medium text-primary hover:underline"
+            >
+              + Referral
+            </Link>
+          </div>
         </div>
       </div>
     </CollapsibleFundingCard>
@@ -357,14 +396,13 @@ function ClaimCard({
 export function ClaimsFundingPage({
   clientId,
   model,
-  referralFunding,
+  relationships,
 }: {
   clientId: string
   model: ClaimsPageModel
-  referralFunding: ReferralFundingCardProps
+  relationships: RelationshipOption[]
 }) {
   const returnPath = `/clients/${clientId}/claims`
-  const [openApprovalId, setOpenApprovalId] = useState<string | null>(null)
 
   const allClaims = useMemo(
     () =>
@@ -375,12 +413,6 @@ export function ClaimsFundingPage({
       })),
     [model.activeClaims, model.inactiveClaims]
   )
-
-  const handleOpenCard = useCallback((approvalId: string) => {
-    setOpenApprovalId(approvalId)
-  }, [])
-
-  const clearOpen = useCallback(() => setOpenApprovalId(null), [])
 
   useEffect(() => {
     if (typeof window === "undefined") return
@@ -399,6 +431,48 @@ export function ClaimsFundingPage({
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-8">
+      <div className="flex justify-end">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button type="button" className="min-h-11 gap-1.5">
+              <Plus className="size-4" aria-hidden />
+              Add
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem asChild>
+              <Link
+                href={`/funding/claims/new?client_id=${clientId}&returnTo=${encodeURIComponent(returnPath)}`}
+              >
+                New claim
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link
+                href={newApprovalHref({
+                  clientId,
+                  returnPath,
+                  kind: "approval",
+                })}
+              >
+                New funding approval
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link
+                href={newApprovalHref({
+                  clientId,
+                  returnPath,
+                  kind: "referral",
+                })}
+              >
+                New referral
+              </Link>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+
       {!hasAny ? (
         <p className="text-sm text-muted-foreground">
           No claims, referrals or funding recorded yet.
@@ -413,15 +487,24 @@ export function ClaimsFundingPage({
               <ApprovalCard
                 key={approval.fundingApprovalId}
                 approval={approval}
-                relationships={referralFunding.formOptions.relationships}
+                relationships={relationships}
                 showAttach
                 clientId={clientId}
                 claims={allClaims}
                 returnPath={returnPath}
-                onOpenCard={handleOpenCard}
               />
             ))}
           </div>
+          <Link
+            href={newApprovalHref({
+              clientId,
+              returnPath,
+              kind: "referral",
+            })}
+            className="inline-flex min-h-11 items-center text-sm font-medium text-primary hover:underline"
+          >
+            + Referral
+          </Link>
         </section>
       ) : null}
 
@@ -435,9 +518,8 @@ export function ClaimsFundingPage({
                 claim={claim}
                 clientId={clientId}
                 returnPath={returnPath}
-                relationships={referralFunding.formOptions.relationships}
+                relationships={relationships}
                 allClaims={allClaims}
-                onOpenCard={handleOpenCard}
               />
             ))}
           </div>
@@ -454,28 +536,13 @@ export function ClaimsFundingPage({
                 claim={claim}
                 clientId={clientId}
                 returnPath={returnPath}
-                relationships={referralFunding.formOptions.relationships}
+                relationships={relationships}
                 allClaims={allClaims}
-                onOpenCard={handleOpenCard}
               />
             ))}
           </div>
         </section>
       ) : null}
-
-      <Link
-        href={`/funding/claims/new?client_id=${clientId}&returnTo=${encodeURIComponent(returnPath)}`}
-        className="inline-flex min-h-11 items-center text-sm font-medium text-primary hover:underline"
-      >
-        + New claim
-      </Link>
-
-      <ReferralFundingCard
-        {...referralFunding}
-        panelOnly
-        openApprovalId={openApprovalId}
-        onOpenApprovalIdHandled={clearOpen}
-      />
     </div>
   )
 }

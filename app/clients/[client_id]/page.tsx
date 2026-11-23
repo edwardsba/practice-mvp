@@ -357,6 +357,7 @@ export default async function ClientDetailPage({
           <ReferralFundingQuickView
             clientId={clientId}
             lines={referralQuickViewLines}
+            returnTo={`/clients/${clientId}`}
           />
         </ClientPanel>
 

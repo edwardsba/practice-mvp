@@ -42,7 +42,8 @@ async function countAppointmentsAttended(fundingApprovalId: string) {
 
 /**
  * Load the claims / referrals / funding page model for one client.
- * Includes active and inactive claims (is_active true/false).
+ * Soft-deleted claims (is_active = false) are loaded then excluded in
+ * buildClaimsPageModel. Active/Inactive sections use claim end date vs today.
  */
 export async function loadClaimsPageForClient(
   clientId: string

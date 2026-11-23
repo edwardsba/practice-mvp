@@ -1,13 +1,16 @@
+import { safeReturnTo } from "@/lib/navigation/safe-return-to"
+
 export function resolveBackNavigation(
   returnTo: string | undefined,
   defaultHref: string,
   defaultLabel: string
 ): { href: string; label: string } {
-  if (!returnTo) {
+  const safe = safeReturnTo(returnTo)
+  if (!safe) {
     return { href: defaultHref, label: defaultLabel }
   }
 
-  return { href: returnTo, label: labelForReturnTo(returnTo, defaultLabel) }
+  return { href: safe, label: labelForReturnTo(safe, defaultLabel) }
 }
 
 function labelForReturnTo(returnTo: string, defaultLabel: string): string {
@@ -23,6 +26,15 @@ function labelForReturnTo(returnTo: string, defaultLabel: string): string {
     }
     if (/^\/clients\/[^/]+\/reports$/.test(returnTo)) {
       return "← Back to reports"
+    }
+    if (/^\/clients\/[^/]+\/claims$/.test(returnTo)) {
+      return "← Back to claims"
+    }
+    if (/^\/clients\/[^/]+\/background\/interview/.test(returnTo)) {
+      return "← Back to interview"
+    }
+    if (/^\/clients\/[^/]+\/background$/.test(returnTo)) {
+      return "← Back to background"
     }
     return "← Back to client"
   }

@@ -5,8 +5,6 @@ import { AppShell } from "@/components/app-shell"
 import { BackButton } from "@/components/ui/back-button"
 import { EntityPageHeader } from "@/components/ui/entity-page-header"
 import { getReferralFundingCardData } from "@/lib/actions/funding"
-import { requirePractitionerContext } from "@/lib/auth"
-import { buildReferralFundingCardProps } from "@/lib/funding/referral-funding-card-props"
 import { loadClaimsPageForClient } from "@/lib/funding/load-claims-page"
 
 export default async function ClientClaimsPage({
@@ -15,7 +13,6 @@ export default async function ClientClaimsPage({
   params: Promise<{ client_id: string }>
 }) {
   const { client_id: clientId } = await params
-  const context = await requirePractitionerContext()
 
   const [loaded, referralFundingData] = await Promise.all([
     loadClaimsPageForClient(clientId),
@@ -25,11 +22,6 @@ export default async function ClientClaimsPage({
   if (!loaded) {
     notFound()
   }
-
-  const referralFunding = buildReferralFundingCardProps(
-    context.practiceId,
-    referralFundingData
-  )
 
   return (
     <AppShell>
@@ -48,7 +40,7 @@ export default async function ClientClaimsPage({
       <ClaimsFundingPage
         clientId={clientId}
         model={loaded.model}
-        referralFunding={referralFunding}
+        relationships={referralFundingData.relationships}
       />
     </AppShell>
   )

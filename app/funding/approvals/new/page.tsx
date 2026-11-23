@@ -14,6 +14,7 @@ import {
 import { getProfessions, getProfessionalOrganisations } from "@/lib/actions/contacts"
 import { requirePractitionerContext } from "@/lib/auth"
 import { PRIVATE_CLAIM_TYPE_NAME } from "@/lib/funding/referral"
+import { safeReturnTo } from "@/lib/navigation/safe-return-to"
 import { and, eq } from "drizzle-orm"
 import { claimTypes } from "@/db/schema"
 import { db } from "@/lib/db"
@@ -25,16 +26,23 @@ export default async function NewFundingApprovalPage({
     returnTo?: string
     client_id?: string
     clientId?: string
+    claim_id?: string
     claimId?: string
+    kind?: string
   }>
 }) {
   const context = await requirePractitionerContext()
   const {
-    returnTo,
+    returnTo: returnToRaw,
     client_id: clientIdSnake,
     clientId: clientIdCamel,
-    claimId: claimIdParam,
+    claim_id: claimIdSnake,
+    claimId: claimIdCamel,
+    kind,
   } = await searchParams
+
+  const returnTo = safeReturnTo(returnToRaw) ?? undefined
+  const claimIdParam = claimIdSnake ?? claimIdCamel
 
   const claimFromParam = claimIdParam
     ? await getClaimById(claimIdParam)
@@ -96,15 +104,20 @@ export default async function NewFundingApprovalPage({
         startDate: claim.startDate,
       }))
 
+  const heading =
+    kind?.trim().toLowerCase() === "referral"
+      ? "Add referral"
+      : "Add funding approval"
+
   return (
     <AppShell>
       <div className="mb-6">
         <BackButton
-          fallbackHref={returnTo ?? "/funding/approvals"}
+          fallbackHref="/funding/approvals"
           label="← Back"
         />
       </div>
-      <ListPageHeader heading="Add funding approval" />
+      <ListPageHeader heading={heading} />
 
       <FundingApprovalForm
         practiceId={context.practiceId}
@@ -120,6 +133,7 @@ export default async function NewFundingApprovalPage({
         }))}
         privateClaimTypeId={privateClaimType[0]?.claimTypeId ?? null}
         lockClient={Boolean(initialClientId)}
+        initialKind={kind}
         initialValues={
           initialClientId || initialClaimId
             ? {

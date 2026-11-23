@@ -125,10 +125,18 @@ const claims: ClaimsPageClaimInput[] = [
   claim({
     claimId: "c-wc-inactive",
     claimTypeName: "WorkCover",
-    isActive: false,
+    isActive: true,
     startDate: "2024-06-01",
     endDate: "2025-06-01",
     createdAt: "2024-06-01T00:00:00.000Z",
+  }),
+  claim({
+    claimId: "c-wc-deleted",
+    claimTypeName: "WorkCover",
+    isActive: false,
+    startDate: "2023-01-01",
+    endDate: "2027-12-31",
+    createdAt: "2023-01-01T00:00:00.000Z",
   }),
 ]
 
@@ -232,7 +240,14 @@ assert.deepEqual(
 )
 assert.equal(model.inactiveClaims.length, 1)
 assert.equal(model.inactiveClaims[0]?.claimId, "c-wc-inactive")
+assert.equal(model.inactiveClaims[0]?.isActive, false)
 assert.equal(model.inactiveClaims[0]?.initiallyOpen, false)
+// Soft-deleted claim never appears
+assert.ok(
+  ![...model.activeClaims, ...model.inactiveClaims].some(
+    (row) => row.claimId === "c-wc-deleted"
+  )
+)
 
 // Active claims open; newest approval open inside each
 for (const active of model.activeClaims) {
@@ -308,16 +323,24 @@ if (quick[1]?.kind === "active_claim") {
   assert.equal(quick[1].reportTag, "Report due at session 4")
 }
 
-// --- Quick view: inactive fallback ---
+// --- Quick view: inactive fallback (ended claim, not soft-deleted) ---
 const inactiveOnly = buildClaimsPageModel(
   [
     claim({
       claimId: "old",
       claimTypeName: "Medicare",
-      isActive: false,
+      isActive: true,
       startDate: "2024-01-01",
       endDate: "2025-01-01",
       createdAt: "2024-01-01T00:00:00.000Z",
+    }),
+    claim({
+      claimId: "deleted",
+      claimTypeName: "WorkCover",
+      isActive: false,
+      startDate: "2024-01-01",
+      endDate: "2027-01-01",
+      createdAt: "2024-06-01T00:00:00.000Z",
     }),
   ],
   [
@@ -349,9 +372,14 @@ assert.equal(inactiveQuick.length, 1)
 assert.equal(inactiveQuick[0]?.kind, "inactive_fallback")
 if (inactiveQuick[0]?.kind === "inactive_fallback") {
   assert.equal(inactiveQuick[0].title, "Medicare")
+  assert.equal(inactiveQuick[0].fundingApprovalId, "old-a")
   assert.match(inactiveQuick[0].subtitle, /Last claim · ended 1 Jan 2025/)
   assert.match(inactiveQuick[0].subtitle, /1 claimed in 2026/)
 }
+// Deleted claim excluded from model and quick view
+assert.equal(inactiveOnly.activeClaims.length, 0)
+assert.equal(inactiveOnly.inactiveClaims.length, 1)
+assert.equal(inactiveOnly.inactiveClaims[0]?.claimId, "old")
 
 // --- Quick view: empty ---
 const emptyQuick = buildReferralFundingQuickView(

@@ -17,22 +17,31 @@ import { getProfessions, getProfessionalOrganisations } from "@/lib/actions/cont
 import { requirePractitionerContext } from "@/lib/auth"
 import { EntityDeleteSection } from "@/components/entity-delete-section"
 import { PRIVATE_CLAIM_TYPE_NAME } from "@/lib/funding/referral"
+import { safeReturnTo } from "@/lib/navigation/safe-return-to"
 import { and, eq } from "drizzle-orm"
 import { claimTypes } from "@/db/schema"
 import { db } from "@/lib/db"
 
 export default async function EditFundingApprovalPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ approval_id: string }>
+  searchParams: Promise<{ returnTo?: string }>
 }) {
   const { approval_id: approvalId } = await params
+  const { returnTo: returnToRaw } = await searchParams
+  const returnTo = safeReturnTo(returnToRaw) ?? undefined
   const context = await requirePractitionerContext()
   const approval = await getFundingApprovalById(approvalId)
 
   if (!approval) {
     notFound()
   }
+
+  const detailHref = returnTo
+    ? `/funding/approvals/${approvalId}?returnTo=${encodeURIComponent(returnTo)}`
+    : `/funding/approvals/${approvalId}`
 
   const [
     clients,
@@ -68,7 +77,7 @@ export default async function EditFundingApprovalPage({
     <AppShell>
       <div className="mb-6">
         <BackButton
-          fallbackHref={`/funding/approvals/${approvalId}`}
+          fallbackHref={detailHref}
           label="← Back to funding approval"
         />
       </div>
@@ -116,7 +125,8 @@ export default async function EditFundingApprovalPage({
           approvalStatus: approval.approvalStatus,
           linkedAppointments: approval.linkedAppointments,
         }}
-        cancelHref={`/funding/approvals/${approvalId}`}
+        cancelHref={detailHref}
+        returnTo={returnTo}
       />
 
       <EntityDeleteSection

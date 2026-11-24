@@ -11,12 +11,12 @@ import {
   clients,
 } from "@/db/schema"
 import {
-  cleanAnswers,
   toResponseRows,
   validateAnswers,
   type FormAnswers,
 } from "@/lib/assessments/form-rules"
 import { loadFormDefinitionByCode } from "@/lib/assessments/load-form-definition"
+import { usesSharedPractitionerForm } from "@/lib/assessments/practitioner-routes"
 import { requirePractitionerContext } from "@/lib/auth"
 import { practiceLocalToUtc } from "@/lib/dates/practice-time"
 import { db } from "@/lib/db"
@@ -84,7 +84,14 @@ export async function saveNewPractitionerAssessment(
   }
 
   const definition = await loadFormDefinitionByCode(assessmentCode)
-  if (!definition || !definition.practitionerCompletable) {
+  if (
+    !definition ||
+    !usesSharedPractitionerForm({
+      assessmentCode: definition.assessmentCode,
+      clientCompletable: definition.clientCompletable,
+      practitionerCompletable: definition.practitionerCompletable,
+    })
+  ) {
     return { error: "Assessment definition not found." }
   }
 
@@ -113,8 +120,6 @@ export async function saveNewPractitionerAssessment(
     safeReturnTo(String(formData.get("return_to") ?? "")) ??
     `/clients/${clientId}/assessments`
 
-  let instanceId = ""
-
   await db.transaction(async (tx) => {
     const [instance] = await tx
       .insert(assessmentInstances)
@@ -130,8 +135,6 @@ export async function saveNewPractitionerAssessment(
       .returning({
         assessmentInstanceId: assessmentInstances.assessmentInstanceId,
       })
-
-    instanceId = instance.assessmentInstanceId
 
     if (rows.length > 0) {
       await tx.insert(assessmentResponses).values(
@@ -173,8 +176,6 @@ export async function saveNewPractitionerAssessment(
     })
   })
 
-  void instanceId
-  void cleanAnswers
   redirect(returnTo)
 }
 
@@ -211,6 +212,7 @@ export async function saveEditPractitionerAssessment(
     return { error: "Assessment instance not found." }
   }
 
+  // Gate on the instance's own definition (not only the posted code).
   const assessmentCode = String(formData.get("assessment_code") ?? "").trim()
   const definition = await loadFormDefinitionByCode(assessmentCode)
   if (
@@ -218,6 +220,15 @@ export async function saveEditPractitionerAssessment(
     definition.assessmentDefinitionId !== instance.assessmentDefinitionId
   ) {
     return { error: "Assessment definition not found." }
+  }
+  if (
+    !usesSharedPractitionerForm({
+      assessmentCode: definition.assessmentCode,
+      clientCompletable: definition.clientCompletable,
+      practitionerCompletable: definition.practitionerCompletable,
+    })
+  ) {
+    return { error: "This assessment cannot be edited with the shared form." }
   }
 
   const answers = parseAnswersJson(String(formData.get("answers_json") ?? ""))

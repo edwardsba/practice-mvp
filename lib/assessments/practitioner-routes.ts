@@ -13,6 +13,24 @@ const LEGACY_START: Record<string, string> = {
   mse: "mse/new",
 }
 
+/**
+ * Single gate for the shared practitioner form (new/edit routes + save actions).
+ *
+ * True only for practitioner-only instruments that are not on a legacy page.
+ * Today that is LRAMP. Client questionnaires join later, once scoring is shared.
+ * ASQ and MSE join by deleting their LEGACY_START lines.
+ */
+export function usesSharedPractitionerForm(params: {
+  assessmentCode: string
+  clientCompletable: boolean
+  practitionerCompletable: boolean
+}): boolean {
+  if (!params.practitionerCompletable) return false
+  if (params.clientCompletable) return false
+  if (params.assessmentCode in LEGACY_START) return false
+  return true
+}
+
 export function practitionerStartTarget(
   assessmentCode: string
 ): PractitionerStartTarget {

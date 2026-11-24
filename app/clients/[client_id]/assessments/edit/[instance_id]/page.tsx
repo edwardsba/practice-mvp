@@ -6,6 +6,7 @@ import { AppShell } from "@/components/app-shell"
 import { clients, practitionerProfiles } from "@/db/schema"
 import { loadFormDefinitionByCode } from "@/lib/assessments/load-form-definition"
 import { loadAssessmentInstanceForForm } from "@/lib/assessments/load-instance-for-form"
+import { usesSharedPractitionerForm } from "@/lib/assessments/practitioner-routes"
 import { saveEditPractitionerAssessment } from "@/lib/assessments/save-practitioner-assessment"
 import { requirePractitionerContext } from "@/lib/auth"
 import { todayDateInput } from "@/lib/dates/practice-time"
@@ -49,7 +50,17 @@ export default async function EditPractitionerAssessmentPage({
   if (!instance) notFound()
 
   const definition = await loadFormDefinitionByCode(instance.assessmentCode)
-  if (!definition || definition.elements.length === 0) notFound()
+  if (
+    !definition ||
+    definition.elements.length === 0 ||
+    !usesSharedPractitionerForm({
+      assessmentCode: definition.assessmentCode,
+      clientCompletable: definition.clientCompletable,
+      practitionerCompletable: definition.practitionerCompletable,
+    })
+  ) {
+    notFound()
+  }
 
   const [practitioner] = await db
     .select({

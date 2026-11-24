@@ -43,6 +43,19 @@ export const assessmentAccessLinks = pgTable('assessment_access_links', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 })
 
+/**
+ * Storage rule: one row per answer.
+ * - Radio and Yes/No: one row.
+ * - Checkbox: one row per ticked option (response_value = option value).
+ * - Text list: one row per non-blank entry, with response_order.
+ * - Long/short text and date: one row.
+ * - Tick: one row with response_value `ticked`.
+ * - Hidden or unanswered elements: no row.
+ * - score_value = 0 for unscored types (option score for scored radio).
+ *
+ * response_order: position of an entry within a text_list (1, 2, 3, …), or of a
+ * ticked checkbox option. Null for existing single-value rows.
+ */
 export const assessmentResponses = pgTable('assessment_responses', {
   assessmentResponseId: uuid('assessment_response_id').primaryKey().defaultRandom(),
   assessmentInstanceId: uuid('assessment_instance_id').notNull().references(() => assessmentInstances.assessmentInstanceId),
@@ -51,6 +64,7 @@ export const assessmentResponses = pgTable('assessment_responses', {
   practiceId: uuid('practice_id').notNull().references(() => practices.practiceId),
   responseValue: text('response_value').notNull(),
   scoreValue: integer('score_value').notNull(),
+  responseOrder: integer('response_order'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 })
 

@@ -516,9 +516,3 @@ export function questionDisplayLabel(element: FormElement): string {
   if (short) return `${short}. ${element.questionText}`
   return element.questionText
 }
-
-/** Side-by-side option buttons when the option set is short. */
-export function shouldUseOptionButtons(options: FormOption[]): boolean {
-  if (options.length === 0 || options.length > 4) return false
-  return options.every((option) => option.label.length <= 40)
-}

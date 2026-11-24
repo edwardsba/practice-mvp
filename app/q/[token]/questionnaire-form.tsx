@@ -16,8 +16,8 @@ import type {
   QuestionnaireData,
   QuestionnaireQuestion,
 } from "@/lib/assessments/load-questionnaire"
+import { RadioOptionList } from "@/components/assessments/form/radio-option-list"
 import { Button } from "@/components/ui/button"
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { cn } from "@/lib/utils"
 
 const STANDALONE_CONFIRMATION =
@@ -370,27 +370,12 @@ function QuestionBlock({
           You already told us this — feel free to update it if anything&apos;s changed.
         </p>
       ) : null}
-      <RadioGroup
+      <RadioOptionList
+        options={question.options}
         value={value}
         onValueChange={onValueChange}
-        className="gap-2"
         required
-      >
-        {question.options.map((option) => (
-          <label
-            key={option.value}
-            className={cn(
-              "flex cursor-pointer items-start gap-3 rounded-lg border px-3 py-3 transition-colors",
-              value === option.value
-                ? "border-primary bg-primary/5"
-                : "border-transparent hover:bg-muted/60"
-            )}
-          >
-            <RadioGroupItem value={option.value} className="mt-0.5" />
-            <span className="text-sm leading-snug">{option.label}</span>
-          </label>
-        ))}
-      </RadioGroup>
+      />
       {hasError ? (
         <p className="text-sm text-destructive">This question is required</p>
       ) : null}

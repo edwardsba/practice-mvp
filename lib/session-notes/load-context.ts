@@ -2,6 +2,7 @@ import { and, desc, eq } from "drizzle-orm"
 
 import {
   assessmentDefinitions,
+  assessmentElements,
   assessmentInstances,
   assessmentResponses,
   assessmentResults,
@@ -62,6 +63,13 @@ export type SessionNoteMseInstance = {
   sentence: string | null
 } | null
 
+export type SessionNoteLrampInstance = {
+  assessmentInstanceId: string
+  submittedAt: Date | null
+  assessmentDate: Date | null
+  summaryLine: string | null
+} | null
+
 export type SessionNoteCrisisPlanInfo = {
   crisisPlanId: string
   versionNumber: number
@@ -86,6 +94,7 @@ export type SessionNoteViewContext = {
   assistResult: SessionNoteAssessmentResult | null
   asqResult: SessionNoteAsqResult
   mseInstance: SessionNoteMseInstance
+  lrampInstance: SessionNoteLrampInstance
   crisisPlan: SessionNoteCrisisPlanInfo
   nextAppointment: SessionNoteNextAppointment
   practitionerName: string
@@ -338,6 +347,89 @@ async function loadMseForSession(
   }
 }
 
+async function loadLrampForSession(
+  note: SessionNoteRow
+): Promise<SessionNoteLrampInstance> {
+  const [row] = await db
+    .select({
+      assessmentInstanceId: assessmentInstances.assessmentInstanceId,
+      submittedAt: assessmentInstances.submittedAt,
+      assessmentDate: assessmentResults.assessmentDate,
+    })
+    .from(assessmentInstances)
+    .innerJoin(
+      assessmentDefinitions,
+      eq(
+        assessmentInstances.assessmentDefinitionId,
+        assessmentDefinitions.assessmentDefinitionId
+      )
+    )
+    .leftJoin(
+      assessmentResults,
+      eq(
+        assessmentResults.assessmentInstanceId,
+        assessmentInstances.assessmentInstanceId
+      )
+    )
+    .where(
+      and(
+        eq(assessmentInstances.sessionNoteId, note.sessionNoteId),
+        eq(assessmentDefinitions.assessmentCode, "LRAMP")
+      )
+    )
+    .orderBy(desc(assessmentInstances.submittedAt))
+    .limit(1)
+
+  if (!row) return null
+
+  const { lrampSessionSummaryLine } = await import(
+    "@/lib/assessments/lramp-session-summary"
+  )
+  const { loadFormDefinitionByCode } = await import(
+    "@/lib/assessments/load-form-definition"
+  )
+  const { answersFromResponseRows } = await import(
+    "@/lib/assessments/form-rules"
+  )
+
+  const definition = await loadFormDefinitionByCode("LRAMP")
+  let summaryLine: string | null = null
+  if (definition) {
+    const responseRows = await db
+      .select({
+        elementKey: assessmentElements.elementKey,
+        responseValue: assessmentResponses.responseValue,
+        responseOrder: assessmentResponses.responseOrder,
+      })
+      .from(assessmentResponses)
+      .innerJoin(
+        assessmentElements,
+        eq(
+          assessmentResponses.assessmentElementId,
+          assessmentElements.assessmentElementId
+        )
+      )
+      .where(
+        eq(
+          assessmentResponses.assessmentInstanceId,
+          row.assessmentInstanceId
+        )
+      )
+
+    summaryLine = lrampSessionSummaryLine(
+      definition.elements,
+      answersFromResponseRows(responseRows)
+    )
+  }
+
+  return {
+    assessmentInstanceId: row.assessmentInstanceId,
+    submittedAt: row.submittedAt,
+    assessmentDate: row.assessmentDate,
+    summaryLine,
+  }
+}
+
 async function loadCrisisPlanForSession(
   note: SessionNoteRow
 ): Promise<SessionNoteCrisisPlanInfo> {
@@ -390,22 +482,32 @@ export async function loadSessionNoteViewContext(
     )
     .limit(1)
 
-  const [phq9, gad7, assist, btpTargets, asqResult, mseInstance, crisisPlan, nextAppt] =
-    await Promise.all([
-      loadAssessmentForSession(note, "PHQ9", PHQ9_IMPAIRMENT_ELEMENT_KEY),
-      loadAssessmentForSession(note, "GAD7", GAD7_IMPAIRMENT_ELEMENT_KEY),
-      loadAssessmentForSession(note, "ASSIST"),
-      loadBtpForSession(note),
-      loadAsqForSession(note),
-      loadMseForSession(note),
-      loadCrisisPlanForSession(note),
-      loadNextAppointmentAfterSession(
-        note.clientId,
-        note.practiceId,
-        note.sessionDate,
-        note.sessionTime
-      ),
-    ])
+  const [
+    phq9,
+    gad7,
+    assist,
+    btpTargets,
+    asqResult,
+    mseInstance,
+    lrampInstance,
+    crisisPlan,
+    nextAppt,
+  ] = await Promise.all([
+    loadAssessmentForSession(note, "PHQ9", PHQ9_IMPAIRMENT_ELEMENT_KEY),
+    loadAssessmentForSession(note, "GAD7", GAD7_IMPAIRMENT_ELEMENT_KEY),
+    loadAssessmentForSession(note, "ASSIST"),
+    loadBtpForSession(note),
+    loadAsqForSession(note),
+    loadMseForSession(note),
+    loadLrampForSession(note),
+    loadCrisisPlanForSession(note),
+    loadNextAppointmentAfterSession(
+      note.clientId,
+      note.practiceId,
+      note.sessionDate,
+      note.sessionTime
+    ),
+  ])
 
   const assistEnabled = treatmentPlan?.ongoingAssessmentsJson?.assist ?? false
 
@@ -423,6 +525,7 @@ export async function loadSessionNoteViewContext(
     assistResult: assistEnabled ? assist : null,
     asqResult,
     mseInstance,
+    lrampInstance,
     crisisPlan,
     nextAppointment: nextAppt
       ? {

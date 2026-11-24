@@ -1,6 +1,6 @@
 /**
- * Accept only internal return paths under /clients/ or /funding/.
- * Rejects scheme URLs, protocol-relative "//…", and ".." segments.
+ * Accept only internal return paths under /clients/, /funding/, or
+ * /session-notes/. Rejects scheme URLs, protocol-relative "//…", and ".." segments.
  */
 export function safeReturnTo(
   value: string | null | undefined
@@ -12,7 +12,14 @@ export function safeReturnTo(
   if (path.startsWith("//")) return null
   if (path.includes("://")) return null
   if (path.includes("..")) return null
-  if (!(path.startsWith("/clients/") || path.startsWith("/funding/"))) {
+  if (
+    !(
+      path.startsWith("/clients/") ||
+      path.startsWith("/funding/") ||
+      path === "/session-notes" ||
+      path.startsWith("/session-notes/")
+    )
+  ) {
     return null
   }
   return path

@@ -1,0 +1,404 @@
+"use client"
+
+import Link from "next/link"
+import { useRouter } from "next/navigation"
+import { useEffect, useMemo, useState, useTransition } from "react"
+
+import { AssessmentFormCore } from "@/components/assessments/form/assessment-form-core"
+import { DiscardChangesDialog } from "@/components/client-background/discard-changes-dialog"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import {
+  clearAssessmentDraft,
+  readAssessmentDraft,
+  writeAssessmentDraft,
+} from "@/lib/assessments/draft-storage"
+import {
+  sectionStatuses,
+  validateAnswers,
+  type FormAnswers,
+  type FormElement,
+  type FormValidationError,
+  type SectionStatus,
+} from "@/lib/assessments/form-rules"
+import type { SavePractitionerAssessmentState } from "@/lib/assessments/save-practitioner-assessment"
+import { cn } from "@/lib/utils"
+
+function statusPill(section: SectionStatus) {
+  if (section.status === "skipped") return "Skipped"
+  if (section.status === "done") return "Complete"
+  return `${section.left} to answer`
+}
+
+function progressClass(section: SectionStatus) {
+  if (section.status === "done") {
+    return "border-emerald-600 bg-emerald-50 text-emerald-800"
+  }
+  if (section.status === "left") {
+    return "border-amber-500 bg-amber-50 text-amber-900"
+  }
+  return "border-dashed border-muted-foreground/40 bg-muted/30 text-muted-foreground"
+}
+
+export function PractitionerAssessmentForm({
+  mode,
+  clientId,
+  clientName,
+  practitionerName,
+  assessmentCode,
+  shortName,
+  elements,
+  initialAnswers,
+  initialAssessmentDate,
+  sessionNoteId,
+  returnTo,
+  instanceId,
+  saveAction,
+}: {
+  mode: "new" | "edit"
+  clientId: string
+  clientName: string
+  practitionerName: string
+  assessmentCode: string
+  shortName: string
+  elements: FormElement[]
+  initialAnswers: FormAnswers
+  initialAssessmentDate: string
+  sessionNoteId: string | null
+  returnTo: string
+  instanceId?: string | null
+  saveAction: (
+    prev: SavePractitionerAssessmentState,
+    formData: FormData
+  ) => Promise<SavePractitionerAssessmentState>
+}) {
+  const router = useRouter()
+  const [answers, setAnswers] = useState<FormAnswers>(initialAnswers)
+  const [assessmentDate, setAssessmentDate] = useState(initialAssessmentDate)
+  const [errors, setErrors] = useState<FormValidationError[]>([])
+  const [banner, setBanner] = useState<string | null>(null)
+  const [dirty, setDirty] = useState(false)
+  const [discardOpen, setDiscardOpen] = useState(false)
+  const [pendingHref, setPendingHref] = useState<string | null>(null)
+  const [pending, startTransition] = useTransition()
+  const [hydrated, setHydrated] = useState(false)
+
+  const sections = useMemo(
+    () => sectionStatuses(elements, answers),
+    [elements, answers]
+  )
+
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>(
+    () => {
+      const initial: Record<string, boolean> = {}
+      const statuses = sectionStatuses(elements, initialAnswers)
+      statuses.forEach((section, index) => {
+        if (mode === "new") {
+          initial[section.groupLabel] = index === 0
+        } else {
+          initial[section.groupLabel] = false
+        }
+      })
+      return initial
+    }
+  )
+
+  useEffect(() => {
+    const draft = readAssessmentDraft({
+      clientId,
+      assessmentCode,
+      instanceId,
+    })
+    if (draft) {
+      setAnswers(draft.answers)
+      setAssessmentDate(draft.assessmentDate)
+      setDirty(true)
+    }
+    setHydrated(true)
+  }, [clientId, assessmentCode, instanceId])
+
+  useEffect(() => {
+    if (!hydrated || !dirty) return
+    writeAssessmentDraft({
+      clientId,
+      assessmentCode,
+      instanceId,
+      draft: {
+        answers,
+        assessmentDate,
+        savedAt: new Date().toISOString(),
+      },
+    })
+  }, [
+    answers,
+    assessmentDate,
+    hydrated,
+    dirty,
+    clientId,
+    assessmentCode,
+    instanceId,
+  ])
+
+  function updateAnswers(next: FormAnswers) {
+    setAnswers(next)
+    setDirty(true)
+    if (errors.length > 0) {
+      setErrors(validateAnswers(elements, next))
+    }
+  }
+
+  function toggleSection(groupLabel: string) {
+    setOpenSections((prev) => ({
+      ...prev,
+      [groupLabel]: !prev[groupLabel],
+    }))
+  }
+
+  function openSectionAndScroll(groupLabel: string, letter: string) {
+    setOpenSections((prev) => ({ ...prev, [groupLabel]: true }))
+    const el = document.getElementById(`section-${letter}`)
+    el?.scrollIntoView({ behavior: "smooth", block: "start" })
+  }
+
+  function requestLeave(href: string) {
+    if (!dirty) {
+      router.push(href)
+      return
+    }
+    setPendingHref(href)
+    setDiscardOpen(true)
+  }
+
+  function confirmDiscard() {
+    clearAssessmentDraft({ clientId, assessmentCode, instanceId })
+    setDiscardOpen(false)
+    const href = pendingHref ?? returnTo
+    setPendingHref(null)
+    setDirty(false)
+    router.push(href)
+  }
+
+  function handleSave() {
+    const fieldErrors = validateAnswers(elements, answers)
+    if (fieldErrors.length > 0) {
+      setErrors(fieldErrors)
+      setBanner(
+        `${fieldErrors.length} question${fieldErrors.length === 1 ? "" : "s"} still need an answer`
+      )
+      const errorKeys = new Set(fieldErrors.map((e) => e.elementKey))
+      const nextOpen: Record<string, boolean> = {}
+      for (const section of sections) {
+        const sectionHasError = elements.some(
+          (el) =>
+            el.groupLabel === section.groupLabel &&
+            errorKeys.has(el.elementKey)
+        )
+        nextOpen[section.groupLabel] = sectionHasError
+      }
+      setOpenSections(nextOpen)
+      const firstKey = fieldErrors[0]?.elementKey
+      if (firstKey) {
+        requestAnimationFrame(() => {
+          document
+            .getElementById(`question-${firstKey}`)
+            ?.scrollIntoView({ behavior: "smooth", block: "center" })
+        })
+      }
+      return
+    }
+
+    setBanner(null)
+    setErrors([])
+
+    const formData = new FormData()
+    formData.set("answers_json", JSON.stringify(answers))
+    formData.set("assessment_date", assessmentDate)
+    formData.set("return_to", returnTo)
+    formData.set("assessment_code", assessmentCode)
+    if (sessionNoteId) formData.set("session_note_id", sessionNoteId)
+
+    // Clear the local draft before the server redirect so Cancel/reload
+    // cannot resurrect answers after a successful Save.
+    clearAssessmentDraft({ clientId, assessmentCode, instanceId })
+    setDirty(false)
+
+    startTransition(async () => {
+      const result = await saveAction({}, formData)
+      if (result?.error) {
+        setBanner(result.error)
+        if (result.fieldErrors?.length) {
+          setErrors(result.fieldErrors)
+        }
+        setDirty(true)
+        return
+      }
+    })
+  }
+
+  return (
+    <div className="pb-28">
+      <div className="mb-4 space-y-2">
+        <button
+          type="button"
+          className="text-sm text-primary hover:underline"
+          onClick={() => requestLeave(returnTo)}
+        >
+          ← Back
+        </button>
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">{shortName}</h1>
+          <p className="text-sm text-muted-foreground">
+            {clientName} · {practitionerName}
+          </p>
+        </div>
+        <div className="max-w-xs space-y-1">
+          <label htmlFor="assessment_date" className="text-sm font-medium">
+            Date of assessment
+          </label>
+          <Input
+            id="assessment_date"
+            type="date"
+            value={assessmentDate}
+            onChange={(event) => {
+              setAssessmentDate(event.target.value)
+              setDirty(true)
+            }}
+            className="min-h-11"
+          />
+        </div>
+      </div>
+
+      <div className="sticky top-0 z-20 -mx-4 border-b bg-background/95 px-4 py-3 backdrop-blur">
+        <div className="flex flex-wrap gap-2">
+          {sections.map((section) => (
+            <button
+              key={section.groupLabel}
+              type="button"
+              onClick={() =>
+                openSectionAndScroll(section.groupLabel, section.letter)
+              }
+              className={cn(
+                "min-h-11 min-w-11 rounded-md border px-3 text-sm font-semibold",
+                progressClass(section)
+              )}
+              title={`${section.letter}. ${section.title} — ${statusPill(section)}`}
+            >
+              {section.letter}
+              {section.status === "left" ? (
+                <span className="ml-1 text-xs font-normal">
+                  {section.left} left
+                </span>
+              ) : null}
+            </button>
+          ))}
+        </div>
+        <p className="mt-2 border-b-2 border-blue-500 pb-2 text-sm text-blue-800">
+          Not saved yet. Answers are kept on this device until you press Save.
+        </p>
+      </div>
+
+      <div className="mt-4 space-y-3">
+        {sections.map((section) => {
+          const open = Boolean(openSections[section.groupLabel])
+          return (
+            <section
+              key={section.groupLabel}
+              id={`section-${section.letter}`}
+              className="rounded-lg border"
+            >
+              <h2>
+                <button
+                  type="button"
+                  className="flex w-full items-center gap-3 px-4 py-3 text-left"
+                  aria-expanded={open}
+                  onClick={() => toggleSection(section.groupLabel)}
+                >
+                  <span
+                    className={cn(
+                      "inline-flex min-h-9 min-w-9 items-center justify-center rounded-md border text-sm font-semibold",
+                      progressClass(section)
+                    )}
+                  >
+                    {section.letter}
+                  </span>
+                  <span className="flex-1 text-sm font-semibold">
+                    {section.title}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    {statusPill(section)}
+                  </span>
+                  <span className="text-muted-foreground" aria-hidden>
+                    {open ? "▾" : "▸"}
+                  </span>
+                </button>
+              </h2>
+              {open ? (
+                <div className="border-t px-4 py-4">
+                  {section.status === "skipped" ? (
+                    <p className="text-sm text-muted-foreground">
+                      Not asked, because of an earlier answer.
+                    </p>
+                  ) : (
+                    <AssessmentFormCore
+                      elements={elements}
+                      groupLabel={section.groupLabel}
+                      answers={answers}
+                      onAnswersChange={updateAnswers}
+                      errors={errors}
+                      disabled={pending}
+                    />
+                  )}
+                </div>
+              ) : null}
+            </section>
+          )
+        })}
+      </div>
+
+      <div className="fixed inset-x-0 bottom-0 z-30 border-t bg-background/95 px-4 py-3 backdrop-blur">
+        <div className="mx-auto flex max-w-3xl flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          {banner ? (
+            <p className="text-sm text-destructive" role="alert">
+              {banner}
+            </p>
+          ) : (
+            <span />
+          )}
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              className="min-h-11"
+              disabled={pending}
+              onClick={() => requestLeave(returnTo)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              className="min-h-11"
+              disabled={pending}
+              onClick={handleSave}
+            >
+              {pending ? "Saving…" : `Save ${shortName}`}
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      <DiscardChangesDialog
+        open={discardOpen}
+        onDiscard={confirmDiscard}
+        onKeepEditing={() => {
+          setDiscardOpen(false)
+          setPendingHref(null)
+        }}
+      />
+
+      {/* Keep Link available for progressive enhancement / crawlers */}
+      <Link href={returnTo} className="sr-only">
+        Back
+      </Link>
+    </div>
+  )
+}

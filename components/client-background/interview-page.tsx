@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import { useCallback, useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 
@@ -70,6 +71,7 @@ export function InterviewPage({
   referralQuickViewLines,
   referralFormOptions,
   referralRecorded = false,
+  lrampStartHref = null,
 }: {
   clientId: string
   practiceId: string
@@ -83,6 +85,8 @@ export function InterviewPage({
   referralQuickViewLines: QuickViewLine[]
   referralFormOptions: ReferralFundingCardFormOptions
   referralRecorded?: boolean
+  /** Start LRAMP (shared practitioner form). Shown in the interview header. */
+  lrampStartHref?: string | null
 }) {
   const router = useRouter()
   const [fundingAddOpen, setFundingAddOpen] = useState(false)
@@ -333,9 +337,19 @@ export function InterviewPage({
               {age ? `, ${age}` : ""}
             </p>
           </div>
-          <button type="button" className="min-h-11 shrink-0 text-sm underline" onClick={() => void leave()}>
-            Save and leave
-          </button>
+          <div className="flex shrink-0 flex-col items-end gap-1 sm:flex-row sm:items-center sm:gap-3">
+            {lrampStartHref ? (
+              <Link
+                href={lrampStartHref}
+                className="inline-flex min-h-11 items-center text-sm font-medium text-primary underline"
+              >
+                Start LRAMP
+              </Link>
+            ) : null}
+            <button type="button" className="min-h-11 text-sm underline" onClick={() => void leave()}>
+              Save and leave
+            </button>
+          </div>
         </div>
         <div className="flex flex-wrap items-center gap-3 pb-3">
           <div role="group" aria-label="Interview page" className="inline-flex rounded-md border p-0.5">

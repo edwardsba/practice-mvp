@@ -57,7 +57,31 @@ export type FormResponseRow = {
   scoreValue: number
 }
 
-const TICK_VALUE = "ticked"
+export type SectionStatusKind = "skipped" | "left" | "done"
+
+export type SectionStatus = {
+  groupLabel: string
+  letter: string
+  title: string
+  status: SectionStatusKind
+  left: number
+}
+
+export const TICK_VALUE = "ticked"
+
+/** Letter before the first "." in a group label (e.g. "A" from "A. Reason…"). */
+export function sectionLetter(groupLabel: string): string {
+  const dot = groupLabel.indexOf(".")
+  if (dot <= 0) return groupLabel.trim().slice(0, 1).toUpperCase() || "?"
+  return groupLabel.slice(0, dot).trim()
+}
+
+/** Title after "A. " in a group label. */
+export function sectionTitle(groupLabel: string): string {
+  const dot = groupLabel.indexOf(".")
+  if (dot < 0) return groupLabel.trim()
+  return groupLabel.slice(dot + 1).trim()
+}
 
 function elementByKey(
   elements: FormElement[]
@@ -359,4 +383,142 @@ export function toResponseRows(
   }
 
   return rows
+}
+
+/**
+ * Sections are distinct non-null group_label values, in first-seen display order.
+ * - skipped: no element in the section is visible
+ * - left: visible required elements still unanswered; each unanswered
+ *   "at least one" group counts once
+ * - done: visible and nothing left
+ */
+export function sectionStatuses(
+  elements: FormElement[],
+  answers: FormAnswers
+): SectionStatus[] {
+  const visible = visibleElementKeys(elements, answers)
+  const orderedLabels: string[] = []
+  const byLabel = new Map<string, FormElement[]>()
+
+  for (const element of elements) {
+    const label = element.groupLabel
+    if (!label) continue
+    if (!byLabel.has(label)) {
+      byLabel.set(label, [])
+      orderedLabels.push(label)
+    }
+    byLabel.get(label)!.push(element)
+  }
+
+  return orderedLabels.map((groupLabel) => {
+    const sectionElements = byLabel.get(groupLabel) ?? []
+    const visibleInSection = sectionElements.filter((el) =>
+      visible.has(el.elementKey)
+    )
+
+    if (visibleInSection.length === 0) {
+      return {
+        groupLabel,
+        letter: sectionLetter(groupLabel),
+        title: sectionTitle(groupLabel),
+        status: "skipped" as const,
+        left: 0,
+      }
+    }
+
+    let left = 0
+    const countedGroups = new Set<string>()
+
+    for (const element of visibleInSection) {
+      if (element.requiredGroupKey) {
+        if (countedGroups.has(element.requiredGroupKey)) continue
+        countedGroups.add(element.requiredGroupKey)
+        const groupMembers = visibleInSection.filter(
+          (el) => el.requiredGroupKey === element.requiredGroupKey
+        )
+        if (!groupMembers.some((el) => hasAnswer(el, answers))) {
+          left += 1
+        }
+        continue
+      }
+
+      if (element.isRequired && !hasAnswer(element, answers)) {
+        left += 1
+      }
+    }
+
+    if (left > 0) {
+      return {
+        groupLabel,
+        letter: sectionLetter(groupLabel),
+        title: sectionTitle(groupLabel),
+        status: "left" as const,
+        left,
+      }
+    }
+
+    return {
+      groupLabel,
+      letter: sectionLetter(groupLabel),
+      title: sectionTitle(groupLabel),
+      status: "done" as const,
+      left: 0,
+    }
+  })
+}
+
+/**
+ * Turns saved response rows back into FormAnswers, ordered by response_order.
+ */
+export function answersFromResponseRows(
+  rows: Array<{
+    elementKey: string
+    responseValue: string
+    responseOrder: number | null
+  }>
+): FormAnswers {
+  const sorted = [...rows].sort((a, b) => {
+    if (a.elementKey !== b.elementKey) {
+      return a.elementKey.localeCompare(b.elementKey)
+    }
+    const ao = a.responseOrder ?? 0
+    const bo = b.responseOrder ?? 0
+    return ao - bo
+  })
+
+  const answers: FormAnswers = {}
+  for (const row of sorted) {
+    const list = answers[row.elementKey] ?? []
+    list.push(row.responseValue)
+    answers[row.elementKey] = list
+  }
+  return answers
+}
+
+/**
+ * Short label from an element key when it has a clear section number
+ * (e.g. lramp_a1 → "A1", lramp_e11_1 → "E11.1"). Otherwise null.
+ */
+export function elementShortLabel(elementKey: string): string | null {
+  const stripped = elementKey.replace(/^[a-z]+_/i, "")
+  const match = /^([a-z])(\d+)(?:_(\d+))?$/i.exec(stripped)
+  if (!match) return null
+  const letter = match[1].toUpperCase()
+  const major = String(Number(match[2]))
+  if (match[3]) {
+    return `${letter}${major}.${Number(match[3])}`
+  }
+  return `${letter}${major}`
+}
+
+export function questionDisplayLabel(element: FormElement): string {
+  const short = elementShortLabel(element.elementKey)
+  if (short) return `${short}. ${element.questionText}`
+  return element.questionText
+}
+
+/** Side-by-side option buttons when the option set is short. */
+export function shouldUseOptionButtons(options: FormOption[]): boolean {
+  if (options.length === 0 || options.length > 4) return false
+  return options.every((option) => option.label.length <= 40)
 }

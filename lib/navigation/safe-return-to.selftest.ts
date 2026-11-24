@@ -9,6 +9,11 @@ assert.equal(
 )
 assert.equal(safeReturnTo("/clients/abc"), "/clients/abc")
 assert.equal(safeReturnTo("/funding/claims/new"), "/funding/claims/new")
+assert.equal(safeReturnTo("/session-notes"), "/session-notes")
+assert.equal(
+  safeReturnTo("/session-notes/abc-123"),
+  "/session-notes/abc-123"
+)
 
 assert.equal(safeReturnTo(null), null)
 assert.equal(safeReturnTo(undefined), null)

@@ -3,11 +3,16 @@ import { and, eq } from "drizzle-orm"
 
 import { AppShell } from "@/components/app-shell"
 import { InterviewPage } from "@/components/client-background/interview-page"
-import { clients } from "@/db/schema"
+import { clients, sessionNotes } from "@/db/schema"
 import { getReferralFundingCardData } from "@/lib/actions/funding"
+import { buildPractitionerStartHref } from "@/lib/assessments/practitioner-routes"
+import {
+  chooseTodaysSessionNote,
+} from "@/lib/assessments/start-list"
 import { requirePractitionerContext } from "@/lib/auth"
 import { loadClientBackground, loadInProgressInterview, loadLatestBackgroundSelfReport, loadReasonSupport } from "@/lib/client-background/load"
 import { ensureFamilyOfOrigin } from "@/lib/client-background/mutations"
+import { todayDateString } from "@/lib/dates/practice-time"
 import { db } from "@/lib/db"
 import { buildReferralFundingQuickView } from "@/lib/funding/claims-page"
 import { loadClaimsPageForClient } from "@/lib/funding/load-claims-page"
@@ -75,6 +80,29 @@ export default async function BackgroundInterviewRoute({
     }
   )
 
+  const today = todayDateString()
+  const notes = await db
+    .select({
+      sessionNoteId: sessionNotes.sessionNoteId,
+      sessionDate: sessionNotes.sessionDate,
+    })
+    .from(sessionNotes)
+    .where(
+      and(
+        eq(sessionNotes.clientId, clientId),
+        eq(sessionNotes.practiceId, context.practiceId),
+        eq(sessionNotes.isActive, true)
+      )
+    )
+  const todaysNote = chooseTodaysSessionNote(notes, today)
+  const interviewReturnTo = `/clients/${clientId}/background/interview`
+  const lrampStartHref = buildPractitionerStartHref({
+    clientId,
+    assessmentCode: "LRAMP",
+    sessionNoteId: todaysNote?.sessionNoteId ?? null,
+    returnTo: interviewReturnTo,
+  })
+
   return (
     <AppShell>
       <InterviewPage
@@ -90,6 +118,7 @@ export default async function BackgroundInterviewRoute({
         referralQuickViewLines={referralQuickViewLines}
         referralFormOptions={referralCard.formOptions}
         referralRecorded={anyReferralRecorded(referralFundingData.approvals)}
+        lrampStartHref={lrampStartHref}
       />
     </AppShell>
   )

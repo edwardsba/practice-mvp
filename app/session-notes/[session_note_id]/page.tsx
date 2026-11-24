@@ -35,9 +35,11 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { formatClientNameLastFirst } from "@/lib/appointments/format"
+import { buildPractitionerEditHref } from "@/lib/assessments/practitioner-routes"
 import { requirePractitionerContext } from "@/lib/auth"
 import { appendReturnTo } from "@/lib/navigation/back"
 import { formatSessionNoteDate } from "@/lib/session-notes/format"
+import { PRACTICE_TIMEZONE } from "@/lib/dates/practice-time"
 import { loadSessionNoteViewContext } from "@/lib/session-notes/load-context"
 import { loadSessionNoteForPractice } from "@/lib/session-notes/load"
 import { loadSessionNoteVersionHistory } from "@/lib/session-notes/version-history"
@@ -156,6 +158,62 @@ export default async function SessionNoteViewPage({
                   >
                     Administer MSE
                   </Link>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>LRAMP</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {viewContext.lrampInstance ? (
+                  <div className="space-y-3">
+                    <div className="flex flex-wrap items-center gap-3">
+                      <p className="text-sm text-muted-foreground">
+                        Completed{" "}
+                        {(
+                          viewContext.lrampInstance.submittedAt ??
+                          viewContext.lrampInstance.assessmentDate
+                        )?.toLocaleString("en-AU", {
+                          timeZone: PRACTICE_TIMEZONE,
+                          day: "numeric",
+                          month: "short",
+                          year: "numeric",
+                          hour: "numeric",
+                          minute: "2-digit",
+                        }) ?? "—"}
+                      </p>
+                      <Link
+                        href={buildPractitionerEditHref({
+                          clientId: note.clientId,
+                          instanceId:
+                            viewContext.lrampInstance.assessmentInstanceId,
+                          returnTo: sessionNoteUrl,
+                        })}
+                        className="text-sm font-medium text-primary hover:underline"
+                      >
+                        Edit
+                      </Link>
+                    </div>
+                    {viewContext.lrampInstance.summaryLine ? (
+                      <p className="text-sm leading-relaxed">
+                        {viewContext.lrampInstance.summaryLine}
+                      </p>
+                    ) : null}
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <p className="text-sm text-muted-foreground">
+                      Not completed for this session
+                    </p>
+                    <Link
+                      href={`/clients/${note.clientId}/assessments/new/LRAMP?session_note_id=${sessionNoteId}&returnTo=${encodeURIComponent(sessionNoteUrl)}`}
+                      className="text-sm font-medium text-primary hover:underline"
+                    >
+                      Start LRAMP
+                    </Link>
+                  </div>
                 )}
               </CardContent>
             </Card>

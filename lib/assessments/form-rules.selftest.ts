@@ -2,7 +2,9 @@ import assert from "node:assert/strict"
 
 import { LRAMP_ELEMENTS } from "@/lib/assessments/definitions/lramp"
 import {
+  answersFromResponseRows,
   cleanAnswers,
+  sectionStatuses,
   toResponseRows,
   validateAnswers,
   visibleElementKeys,
@@ -457,5 +459,59 @@ const SYNTH: FormElement[] = [
 }
 
 check("element count is 98", LRAMP_ELEMENTS.length, 98)
+
+// ---------------------------------------------------------------------------
+// sectionStatuses + answersFromResponseRows
+// ---------------------------------------------------------------------------
+
+{
+  const yesPath = sectionStatuses(LRAMP_ELEMENTS, validB1Yes())
+  check(
+    "sectionStatuses B1=Yes → no skipped C/D",
+    yesPath.filter((s) => s.status === "skipped").map((s) => s.letter),
+    []
+  )
+  check(
+    "sectionStatuses B1=Yes fully answered → all done",
+    yesPath.every((s) => s.status === "done"),
+    true
+  )
+
+  const noPath = sectionStatuses(LRAMP_ELEMENTS, validB1No())
+  check(
+    "sectionStatuses B1=No → C and D skipped",
+    noPath.filter((s) => s.status === "skipped").map((s) => s.letter),
+    ["C", "D"]
+  )
+  check(
+    "sectionStatuses B1=No fully answered → A/B/E/F done",
+    noPath
+      .filter((s) => ["A", "B", "E", "F"].includes(s.letter))
+      .every((s) => s.status === "done"),
+    true
+  )
+
+  const incompleteB = { ...validB1No() }
+  delete incompleteB.lramp_b2
+  const bStatuses = sectionStatuses(LRAMP_ELEMENTS, incompleteB)
+  const sectionB = bStatuses.find((s) => s.letter === "B")
+  check(
+    "at-least-one group counts once in left",
+    sectionB?.status === "left" && sectionB.left === 1,
+    true
+  )
+}
+
+{
+  const rows = [
+    { elementKey: "list", responseValue: "beta", responseOrder: 2 },
+    { elementKey: "list", responseValue: "alpha", responseOrder: 1 },
+    { elementKey: "single", responseValue: "yes", responseOrder: null },
+  ]
+  check("answersFromResponseRows orders by response_order", answersFromResponseRows(rows), {
+    list: ["alpha", "beta"],
+    single: ["yes"],
+  })
+}
 
 console.log("All form-rules self-tests passed.")

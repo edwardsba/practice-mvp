@@ -31,6 +31,8 @@ const ASSESSMENT_TYPE_LABELS: Record<string, string> = {
   BTP: "BTP",
   PSF: "Post-Session Feedback",
   BACKGROUND_SR: "Background questionnaire",
+  LRAMP: "LRAMP",
+  mse: "MSE",
 }
 
 type AssessmentResultRow = {

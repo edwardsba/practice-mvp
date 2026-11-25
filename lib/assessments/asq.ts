@@ -11,6 +11,36 @@ export type AsqFlags = {
 }
 
 /**
+ * Derives the three ASQ screen flags from elementKey + responseValue pairs.
+ * Single rule used by the shared scorer and the legacy ASQ save actions.
+ */
+export function asqFlagsFromResponses(
+  responses: Array<{ elementKey: string; responseValue?: string | null }>
+): AsqFlags {
+  let historicalPositive = false
+  let recentPositive = false
+  let currentPositive = false
+
+  for (const row of responses) {
+    const value = row.responseValue
+    if (row.elementKey === ASQ_HISTORICAL_ELEMENT_KEY && value === "yes") {
+      historicalPositive = true
+    }
+    if (
+      (ASQ_RECENT_ELEMENT_KEYS as readonly string[]).includes(row.elementKey) &&
+      value === "yes"
+    ) {
+      recentPositive = true
+    }
+    if (row.elementKey === ASQ_Q5_ELEMENT_KEY && value === "yes") {
+      currentPositive = true
+    }
+  }
+
+  return { historicalPositive, recentPositive, currentPositive }
+}
+
+/**
  * Computes the ASQ severity rating from the three independent flags:
  * Historical (Q4 — lifetime attempt), Recent (Q1–3), Current (Q5).
  * This is the single source of truth for ASQ severity — the result is

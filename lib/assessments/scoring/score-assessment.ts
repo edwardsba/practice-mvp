@@ -30,6 +30,10 @@ import {
   pcl5SeverityLabel,
 } from "@/lib/assessments/pcl5"
 import {
+  asqFlagsFromResponses,
+  asqScreenOutcome,
+} from "@/lib/assessments/asq"
+import {
   anxietySubtypeSeverityFromScore,
   asrmSeverityFromScore,
   phq15SeverityFromScore,
@@ -64,8 +68,9 @@ export type ScoreAssessmentInput = {
  * - severity
  * - structuredScoreJson
  *
- * acute_risk_rating is a schema column but the submit route never sets it
- * for these questionnaires (ASQ sets it on its own path, unchanged here).
+ * acute_risk_rating is a schema column but neither the submit route nor the
+ * shared practitioner save sets it (including ASQ — left null unless set
+ * elsewhere).
  */
 export type ScoreAssessmentResult = {
   score: number | null
@@ -99,6 +104,7 @@ export function scoreAssessment(
   const isSeparationAnxiety = assessmentCode === "SEPARATION_ANXIETY"
   const isSpecificPhobia = assessmentCode === "SPECIFIC_PHOBIA"
   const isPcl5 = assessmentCode === "PCL5"
+  const isAsq = assessmentCode === "ASQ"
 
   let totalScore = 0
   const psfResponseScores: number[] = []
@@ -127,6 +133,7 @@ export function scoreAssessment(
       !isPcl5 &&
       row.dataType === "integer"
     ) {
+      // ASQ included: sum of integer option scores (Yes = 1), same as legacy save.
       totalScore += row.scoreValue
     }
 
@@ -221,6 +228,10 @@ export function scoreAssessment(
     resultScore = pcl5Total
     severity = pcl5SeverityLabel(pcl5Total, pcl5Structured)
     structuredScore = pcl5Structured
+  } else if (isAsq) {
+    resultScore = totalScore
+    severity = asqScreenOutcome(asqFlagsFromResponses(responses))
+    structuredScore = null
   } else {
     resultScore = totalScore
     severity = severityFromAssessmentCode(assessmentCode, totalScore)

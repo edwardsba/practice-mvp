@@ -35,7 +35,10 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { formatClientNameLastFirst } from "@/lib/appointments/format"
-import { buildPractitionerEditHref } from "@/lib/assessments/practitioner-routes"
+import {
+  buildPractitionerEditHref,
+  buildPractitionerStartHref,
+} from "@/lib/assessments/practitioner-routes"
 import { requirePractitionerContext } from "@/lib/auth"
 import { appendReturnTo } from "@/lib/navigation/back"
 import { formatSessionNoteDate } from "@/lib/session-notes/format"
@@ -258,7 +261,12 @@ export default async function SessionNoteViewPage({
                       score: viewContext.asqResult?.score ?? null,
                       maxScore: viewContext.asqResult?.maxScore ?? null,
                       acuteRiskRating: viewContext.asqResult?.acuteRiskRating ?? null,
-                      administerHref: `/clients/${note.clientId}/asq/new?session_note_id=${sessionNoteId}&returnTo=${encodeURIComponent(sessionNoteUrl)}`,
+                      administerHref: buildPractitionerStartHref({
+                        clientId: note.clientId,
+                        assessmentCode: "ASQ",
+                        sessionNoteId,
+                        returnTo: sessionNoteUrl,
+                      }),
                     } satisfies RiskAssessmentRow,
                   ]}
                   clientId={note.clientId}

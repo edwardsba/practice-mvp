@@ -31,9 +31,9 @@ check(
 )
 
 check(
-  "ASQ → canComplete false (legacy)",
+  "ASQ → canComplete true (shared)",
   gate({ assessmentCode: "ASQ", clientCompletable: false }),
-  false
+  true
 )
 
 check(
@@ -119,13 +119,13 @@ check(
 )
 
 check(
-  "ASQ → usesSharedResultsLayout false",
+  "ASQ → usesSharedResultsLayout true",
   usesSharedResultsLayout({
     assessmentCode: "ASQ",
     clientCompletable: false,
     practitionerCompletable: true,
   }),
-  false
+  true
 )
 
 console.log("practitioner-routes.selftest.ts: ok")

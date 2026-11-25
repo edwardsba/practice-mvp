@@ -1,7 +1,7 @@
 /**
  * Where each practitioner assessment opens from the Start page.
- * Keep ASQ/MSE on their existing routes until they move onto the shared form —
- * then delete one line each.
+ * Keep MSE on its existing route until it moves onto the shared form —
+ * then delete that line. ASQ uses the shared form.
  */
 
 export type PractitionerStartTarget =
@@ -9,7 +9,6 @@ export type PractitionerStartTarget =
   | { kind: "shared" }
 
 const LEGACY_START: Record<string, string> = {
-  ASQ: "asq/new",
   mse: "mse/new",
 }
 
@@ -17,12 +16,12 @@ const LEGACY_START: Record<string, string> = {
  * Client-completable codes that must not use the shared practitioner form yet.
  * BTP: questions are built from SMART goals at send time.
  * BACKGROUND_SR: own questionnaire / results path.
- * ASQ / mse: legacy practitioner pages (also listed in LEGACY_START).
+ * mse: legacy practitioner page (also listed in LEGACY_START).
+ * ASQ is practitioner-only and uses the shared form (not listed here).
  */
 const SHARED_FORM_EXCLUDED_CLIENT_CODES = [
   "BTP",
   "BACKGROUND_SR",
-  "ASQ",
   "mse",
 ] as const
 
@@ -65,9 +64,9 @@ export function canCompleteInSharedForm(
 }
 
 /**
- * True only for practitioner-only, non-legacy assessments (LRAMP today).
- * Keeps the Round AD early Results branch for the LRAMP only; scored
- * questionnaires keep the default Results layout.
+ * True for practitioner-only, non-legacy assessments (LRAMP, ASQ).
+ * Shared early Results branch (summary box + answer sections); scored
+ * client questionnaires keep the default Results layout.
  */
 export function usesSharedResultsLayout(params: {
   assessmentCode: string

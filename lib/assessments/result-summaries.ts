@@ -4,6 +4,10 @@
  */
 
 import {
+  asqResultSummary,
+  type AsqResultSummaryExtras,
+} from "@/lib/assessments/asq-summary"
+import {
   lrampResultSummary,
   type ResultSummaryLine,
 } from "@/lib/assessments/lramp-summary"
@@ -11,13 +15,18 @@ import type { FormAnswers, FormElement } from "@/lib/assessments/form-rules"
 
 export type { ResultSummaryLine }
 
+/** Optional stored-result fields some builders (ASQ) read. */
+export type ResultSummaryExtras = AsqResultSummaryExtras
+
 export type ResultSummaryBuilder = (
   answers: FormAnswers,
-  elements: FormElement[]
+  elements: FormElement[],
+  extras?: ResultSummaryExtras
 ) => ResultSummaryLine[]
 
 const REGISTRY: Record<string, ResultSummaryBuilder> = {
   LRAMP: lrampResultSummary,
+  ASQ: asqResultSummary,
 }
 
 export function getResultSummaryBuilder(

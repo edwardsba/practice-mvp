@@ -53,7 +53,6 @@ import { getResultSummaryBuilder } from "@/lib/assessments/result-summaries"
 import { instanceHasAccessLink } from "@/lib/assessments/instance-access-link"
 import { requirePractitionerContext } from "@/lib/auth"
 import { db } from "@/lib/db"
-import { appendReturnTo } from "@/lib/navigation/back"
 import { safeReturnTo } from "@/lib/navigation/safe-return-to"
 import { formatPractitionerPreferredName } from "@/lib/practitioner/format"
 import type { SageSrCoreResponseParsedResult } from "@/lib/sage-sr/parse-core-response"
@@ -199,7 +198,7 @@ export default async function AssessmentResultDetailPage({
     notFound()
   }
 
-  // Shared practitioner-only results layout (LRAMP today): early return — leave
+  // Shared practitioner-only results layout (LRAMP, ASQ): early return — leave
   // every other layout branch below untouched. Scored questionnaires use the
   // default Results branch with the shared answer table.
   if (
@@ -282,7 +281,10 @@ export default async function AssessmentResultDetailPage({
 
     const summaryBuilder = getResultSummaryBuilder(result.assessmentCode)
     const summaryRows = summaryBuilder
-      ? summaryBuilder(answers, definition.elements)
+      ? summaryBuilder(answers, definition.elements, {
+          severity: result.severity,
+          acuteRiskRating: result.acuteRiskRating,
+        })
       : null
 
     return (
@@ -308,7 +310,6 @@ export default async function AssessmentResultDetailPage({
     )
   }
 
-  const isAsq = result.assessmentCode === "ASQ"
   const isPsf = result.assessmentCode === "PSF"
   const isSageSrCore = result.assessmentCode === "SAGE_SR_CORE"
   const isSageSrBackground = result.assessmentCode === "SAGE_SR_BACKGROUND"
@@ -1086,9 +1087,9 @@ export default async function AssessmentResultDetailPage({
     )
   }
 
-  const maxScore = isAsq
-    ? 5
-    : await getMaxScoreForAssessmentDefinition(result.assessmentDefinitionId)
+  const maxScore = await getMaxScoreForAssessmentDefinition(
+    result.assessmentDefinitionId
+  )
 
   let functionalImpairmentLabel: string | null = null
   if (result.assessmentCode === "PHQ9") {
@@ -1177,17 +1178,6 @@ export default async function AssessmentResultDetailPage({
         subheading={`Completed ${formatDate(result.assessmentDate)}`}
         action={
           <div className="flex items-center gap-3">
-            {isAsq ? (
-              <Link
-                href={appendReturnTo(
-                  `/clients/${clientId}/asq/${result.assessmentInstanceId}/edit`,
-                  resultsHref
-                )}
-                className="text-sm font-medium text-primary hover:underline"
-              >
-                Edit ASQ
-              </Link>
-            ) : null}
             {sharedEditHref ? (
               <Link
                 href={sharedEditHref}
@@ -1222,9 +1212,7 @@ export default async function AssessmentResultDetailPage({
               </p>
             </div>
             <div className="sm:border-l sm:pl-6">
-              <p className="text-sm text-muted-foreground">
-                {isAsq ? "Screen outcome" : "Severity"}
-              </p>
+              <p className="text-sm text-muted-foreground">Severity</p>
               <p className="text-xl font-medium capitalize">{result.severity}</p>
             </div>
           </div>

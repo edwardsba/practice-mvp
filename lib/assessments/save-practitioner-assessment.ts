@@ -139,7 +139,7 @@ export async function saveNewPractitionerAssessment(
           return {
             elementKey: row.elementKey,
             domainCode: meta?.domainCode ?? null,
-            dataType: meta?.dataType ?? "integer",
+            dataType: meta?.dataType ?? "",
             scoreValue: row.scoreValue,
             responseValue: row.responseValue,
           }
@@ -329,7 +329,7 @@ export async function saveEditPractitionerAssessment(
           return {
             elementKey: row.elementKey,
             domainCode: meta?.domainCode ?? null,
-            dataType: meta?.dataType ?? "integer",
+            dataType: meta?.dataType ?? "",
             scoreValue: row.scoreValue,
             responseValue: row.responseValue,
           }

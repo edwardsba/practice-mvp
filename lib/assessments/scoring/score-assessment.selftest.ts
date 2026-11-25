@@ -5,6 +5,7 @@
  */
 import assert from "node:assert/strict"
 
+import { asqScreenOutcome } from "@/lib/assessments/asq"
 import { calculateAgoraphobiaScore } from "@/lib/assessments/agoraphobia"
 import { calculateAsrmScore } from "@/lib/assessments/asrm"
 import {
@@ -641,6 +642,142 @@ anxietyFixture("SPECIFIC_PHOBIA", "specific_phobia_", calculateSpecificPhobiaSco
     scoreAssessment({ assessmentCode: "BTP", responses: [] }),
     { score: 0, severity: null, structuredScoreJson: null }
   )
+}
+
+// ─── ASQ — all eight flag combinations (+ score totals) ─────────────────────
+
+{
+  type FlagTriple = {
+    historicalPositive: boolean
+    recentPositive: boolean
+    currentPositive: boolean
+  }
+
+  function asqResponses(flags: FlagTriple): ScoreAssessmentResponse[] {
+    // Minimal Yes set that realises the three flags (Q1 for recent when needed).
+    return [
+      {
+        elementKey: "asq_q1",
+        domainCode: null,
+        scoreValue: flags.recentPositive ? 1 : 0,
+        dataType: "integer",
+        responseValue: flags.recentPositive ? "yes" : "no",
+      },
+      {
+        elementKey: "asq_q2",
+        domainCode: null,
+        scoreValue: 0,
+        dataType: "integer",
+        responseValue: "no",
+      },
+      {
+        elementKey: "asq_q3",
+        domainCode: null,
+        scoreValue: 0,
+        dataType: "integer",
+        responseValue: "no",
+      },
+      {
+        elementKey: "asq_q4",
+        domainCode: null,
+        scoreValue: flags.historicalPositive ? 1 : 0,
+        dataType: "integer",
+        responseValue: flags.historicalPositive ? "yes" : "no",
+      },
+      {
+        elementKey: "asq_q5",
+        domainCode: null,
+        scoreValue: flags.currentPositive ? 1 : 0,
+        dataType: "integer",
+        responseValue: flags.currentPositive ? "yes" : "no",
+      },
+    ]
+  }
+
+  const combinations: Array<{ name: string; flags: FlagTriple }> = [
+    {
+      name: "no history, no recent, no current",
+      flags: {
+        historicalPositive: false,
+        recentPositive: false,
+        currentPositive: false,
+      },
+    },
+    {
+      name: "historical only",
+      flags: {
+        historicalPositive: true,
+        recentPositive: false,
+        currentPositive: false,
+      },
+    },
+    {
+      name: "historical + recent, no current",
+      flags: {
+        historicalPositive: true,
+        recentPositive: true,
+        currentPositive: false,
+      },
+    },
+    {
+      name: "historical + recent + current",
+      flags: {
+        historicalPositive: true,
+        recentPositive: true,
+        currentPositive: true,
+      },
+    },
+    {
+      name: "recent only, no current",
+      flags: {
+        historicalPositive: false,
+        recentPositive: true,
+        currentPositive: false,
+      },
+    },
+    {
+      name: "recent + current, no historical",
+      flags: {
+        historicalPositive: false,
+        recentPositive: true,
+        currentPositive: true,
+      },
+    },
+    {
+      name: "current only",
+      flags: {
+        historicalPositive: false,
+        recentPositive: false,
+        currentPositive: true,
+      },
+    },
+    {
+      name: "historical + current, no recent",
+      flags: {
+        historicalPositive: true,
+        recentPositive: false,
+        currentPositive: true,
+      },
+    },
+  ]
+
+  for (const { name, flags } of combinations) {
+    const responses = asqResponses(flags)
+    const expectedScore =
+      (flags.historicalPositive ? 1 : 0) +
+      (flags.recentPositive ? 1 : 0) +
+      (flags.currentPositive ? 1 : 0)
+    const expectedSeverity = asqScreenOutcome(flags)
+    check(
+      `ASQ ${name}`,
+      scoreAssessment({ assessmentCode: "ASQ", responses }),
+      {
+        score: expectedScore,
+        severity: expectedSeverity,
+        structuredScoreJson: null,
+      }
+    )
+  }
 }
 
 console.log("score-assessment.selftest.ts: ok")

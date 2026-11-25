@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 
-import { asqScreenOutcome } from "./asq"
+import { asqFlagsFromResponses, asqScreenOutcome } from "./asq"
 
 function check(
   name: string,
@@ -52,5 +52,25 @@ check(
   { historicalPositive: true, recentPositive: false, currentPositive: true },
   "Historical attempt, current TOSH"
 )
+
+{
+  const flags = asqFlagsFromResponses([
+    { elementKey: "asq_q1", responseValue: "no" },
+    { elementKey: "asq_q2", responseValue: "yes" },
+    { elementKey: "asq_q3", responseValue: "no" },
+    { elementKey: "asq_q4", responseValue: "yes" },
+    { elementKey: "asq_q5", responseValue: "yes" },
+  ])
+  assert.deepEqual(
+    flags,
+    {
+      historicalPositive: true,
+      recentPositive: true,
+      currentPositive: true,
+    },
+    "asqFlagsFromResponses: Q2+Q4+Q5 yes"
+  )
+  console.log("ok — asqFlagsFromResponses: Q2+Q4+Q5 yes")
+}
 
 console.log("\nAll 8 ASQ severity states passed.")

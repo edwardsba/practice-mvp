@@ -255,7 +255,7 @@ export async function POST(request: Request) {
         assessmentElementId: row.assessmentElementId,
         elementKey: meta?.elementKey ?? "",
         domainCode: meta?.domainCode ?? null,
-        dataType: meta?.dataType ?? "integer",
+        dataType: meta?.dataType ?? "",
         scoreValue: row.scoreValue,
         responseValue: row.responseValue,
       }

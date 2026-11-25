@@ -13,9 +13,7 @@ import {
   clients,
 } from "@/db/schema"
 import {
-  ASQ_HISTORICAL_ELEMENT_KEY,
-  ASQ_RECENT_ELEMENT_KEYS,
-  ASQ_Q5_ELEMENT_KEY,
+  asqFlagsFromResponses,
   asqScreenOutcome,
 } from "@/lib/assessments/asq"
 import { getAsqDefinitionId } from "@/lib/assessments/load-asq"
@@ -119,11 +117,9 @@ export async function saveAsqResult(
   )
 
   let totalScore = 0
-  let historicalPositive = false
-  let recentPositive = false
-  let currentPositive = false
   const responseRows: {
     assessmentElementId: string
+    elementKey: string
     responseValue: string
     scoreValue: number
   }[] = []
@@ -135,8 +131,10 @@ export async function saveAsqResult(
       return { error: "One or more responses are invalid." }
     }
 
+    const elementKey = elementKeyById.get(elementId) ?? ""
     responseRows.push({
       assessmentElementId: elementId,
+      elementKey,
       responseValue,
       scoreValue,
     })
@@ -144,20 +142,9 @@ export async function saveAsqResult(
     if (dataTypeByElementId.get(elementId) === "integer") {
       totalScore += scoreValue
     }
-
-    const elementKey = elementKeyById.get(elementId)
-    if (elementKey === ASQ_HISTORICAL_ELEMENT_KEY && responseValue === "yes") {
-      historicalPositive = true
-    }
-    if (ASQ_RECENT_ELEMENT_KEYS.includes(elementKey ?? "") && responseValue === "yes") {
-      recentPositive = true
-    }
-    if (elementKey === ASQ_Q5_ELEMENT_KEY && responseValue === "yes") {
-      currentPositive = true
-    }
   }
 
-  const severity = asqScreenOutcome({ historicalPositive, recentPositive, currentPositive })
+  const severity = asqScreenOutcome(asqFlagsFromResponses(responseRows))
   const now = new Date()
 
   await db.transaction(async (tx) => {
@@ -319,11 +306,9 @@ export async function updateAsqResult(
   )
 
   let totalScore = 0
-  let historicalPositive = false
-  let recentPositive = false
-  let currentPositive = false
   const responseRows: {
     assessmentElementId: string
+    elementKey: string
     responseValue: string
     scoreValue: number
   }[] = []
@@ -335,8 +320,10 @@ export async function updateAsqResult(
       return { error: "One or more responses are invalid." }
     }
 
+    const elementKey = elementKeyById.get(elementId) ?? ""
     responseRows.push({
       assessmentElementId: elementId,
+      elementKey,
       responseValue,
       scoreValue,
     })
@@ -344,20 +331,9 @@ export async function updateAsqResult(
     if (dataTypeByElementId.get(elementId) === "integer") {
       totalScore += scoreValue
     }
-
-    const elementKey = elementKeyById.get(elementId)
-    if (elementKey === ASQ_HISTORICAL_ELEMENT_KEY && responseValue === "yes") {
-      historicalPositive = true
-    }
-    if (ASQ_RECENT_ELEMENT_KEYS.includes(elementKey ?? "") && responseValue === "yes") {
-      recentPositive = true
-    }
-    if (elementKey === ASQ_Q5_ELEMENT_KEY && responseValue === "yes") {
-      currentPositive = true
-    }
   }
 
-  const severity = asqScreenOutcome({ historicalPositive, recentPositive, currentPositive })
+  const severity = asqScreenOutcome(asqFlagsFromResponses(responseRows))
   const now = new Date()
 
   await db.transaction(async (tx) => {

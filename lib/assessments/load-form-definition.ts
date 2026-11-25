@@ -13,6 +13,11 @@ import type {
 } from "@/lib/assessments/form-rules"
 import { db } from "@/lib/db"
 
+export type ElementScoreMeta = {
+  domainCode: string | null
+  dataType: string
+}
+
 export type LoadedFormDefinition = {
   assessmentDefinitionId: string
   assessmentCode: string
@@ -21,8 +26,11 @@ export type LoadedFormDefinition = {
   scoringEnabled: boolean
   clientCompletable: boolean
   practitionerCompletable: boolean
+  isActive: boolean
   elements: FormElement[]
   elementIdByKey: Record<string, string>
+  /** Scoring metadata keyed by elementKey (domain + data type). */
+  elementScoreMetaByKey: Record<string, ElementScoreMeta>
 }
 
 const ELEMENT_TYPES = new Set<FormElementType>([
@@ -68,6 +76,7 @@ export async function loadFormDefinitionByCode(
       scoringEnabled: assessmentDefinitions.scoringEnabled,
       clientCompletable: assessmentDefinitions.clientCompletable,
       practitionerCompletable: assessmentDefinitions.practitionerCompletable,
+      isActive: assessmentDefinitions.isActive,
     })
     .from(assessmentDefinitions)
     .where(
@@ -94,6 +103,8 @@ export async function loadFormDefinitionByCode(
       showWhenJson: assessmentElements.showWhenJson,
       requiredGroupKey: assessmentElements.requiredGroupKey,
       helpText: assessmentElements.helpText,
+      domainCode: assessmentElements.domainCode,
+      dataType: assessmentElements.dataType,
     })
     .from(assessmentElements)
     .where(
@@ -140,8 +151,13 @@ export async function loadFormDefinitionByCode(
   }
 
   const elementIdByKey: Record<string, string> = {}
+  const elementScoreMetaByKey: Record<string, ElementScoreMeta> = {}
   const elements: FormElement[] = elementRows.map((row) => {
     elementIdByKey[row.elementKey] = row.assessmentElementId
+    elementScoreMetaByKey[row.elementKey] = {
+      domainCode: row.domainCode,
+      dataType: row.dataType,
+    }
     return {
       elementKey: row.elementKey,
       elementType: asElementType(row.elementType),
@@ -166,7 +182,9 @@ export async function loadFormDefinitionByCode(
     scoringEnabled: definition.scoringEnabled,
     clientCompletable: definition.clientCompletable,
     practitionerCompletable: definition.practitionerCompletable,
+    isActive: definition.isActive,
     elements,
     elementIdByKey,
+    elementScoreMetaByKey,
   }
 }

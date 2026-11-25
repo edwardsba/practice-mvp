@@ -6,7 +6,8 @@ import { AppShell } from "@/components/app-shell"
 import { clients, practitionerProfiles } from "@/db/schema"
 import { loadFormDefinitionByCode } from "@/lib/assessments/load-form-definition"
 import { loadAssessmentInstanceForForm } from "@/lib/assessments/load-instance-for-form"
-import { usesSharedPractitionerForm } from "@/lib/assessments/practitioner-routes"
+import { instanceHasAccessLink } from "@/lib/assessments/instance-access-link"
+import { canCompleteInSharedForm } from "@/lib/assessments/practitioner-routes"
 import { saveEditPractitionerAssessment } from "@/lib/assessments/save-practitioner-assessment"
 import { requirePractitionerContext } from "@/lib/auth"
 import { todayDateInput } from "@/lib/dates/practice-time"
@@ -49,14 +50,18 @@ export default async function EditPractitionerAssessmentPage({
   })
   if (!instance) notFound()
 
+  // Link-completed instances: clients' own answers must never be edited.
+  if (await instanceHasAccessLink(instanceId)) notFound()
+
   const definition = await loadFormDefinitionByCode(instance.assessmentCode)
   if (
     !definition ||
-    definition.elements.length === 0 ||
-    !usesSharedPractitionerForm({
+    !canCompleteInSharedForm({
       assessmentCode: definition.assessmentCode,
       clientCompletable: definition.clientCompletable,
       practitionerCompletable: definition.practitionerCompletable,
+      isActive: definition.isActive,
+      hasActiveElements: definition.elements.length > 0,
     })
   ) {
     notFound()

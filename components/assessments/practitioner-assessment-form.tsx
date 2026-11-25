@@ -15,6 +15,7 @@ import {
 } from "@/lib/assessments/draft-storage"
 import {
   sectionStatuses,
+  showSectionProgressBar,
   validateAnswers,
   type FormAnswers,
   type FormElement,
@@ -22,6 +23,7 @@ import {
   type SectionStatus,
 } from "@/lib/assessments/form-rules"
 import type { SavePractitionerAssessmentState } from "@/lib/assessments/save-practitioner-assessment"
+import { UNGROUPED_SECTION_KEY } from "@/lib/assessments/section-presentation"
 import { cn } from "@/lib/utils"
 
 function statusPill(section: SectionStatus) {
@@ -86,6 +88,10 @@ export function PractitionerAssessmentForm({
   const sections = useMemo(
     () => sectionStatuses(elements, answers),
     [elements, answers]
+  )
+  const showProgress = useMemo(
+    () => showSectionProgressBar(elements),
+    [elements]
   )
 
   const [openSections, setOpenSections] = useState<Record<string, boolean>>(
@@ -269,71 +275,83 @@ export function PractitionerAssessmentForm({
       </div>
 
       <div className="sticky top-0 z-20 -mx-4 border-b bg-background/95 px-4 py-3 backdrop-blur">
-        <div className="flex flex-wrap gap-2">
-          {sections.map((section) => (
-            <button
-              key={section.groupLabel}
-              type="button"
-              onClick={() =>
-                openSectionAndScroll(section.groupLabel, section.letter)
-              }
-              className={cn(
-                "min-h-11 min-w-11 rounded-md border px-3 text-sm font-semibold",
-                progressClass(section)
-              )}
-              title={`${section.letter}. ${section.title} — ${statusPill(section)}`}
-            >
-              {section.letter}
-              {section.status === "left" ? (
-                <span className="ml-1 text-xs font-normal">
-                  {section.left} left
-                </span>
-              ) : null}
-            </button>
-          ))}
-        </div>
-        <p className="mt-2 border-b-2 border-blue-500 pb-2 text-sm text-blue-800">
+        {showProgress ? (
+          <div className="flex flex-wrap gap-2">
+            {sections.map((section) => (
+              <button
+                key={section.groupLabel}
+                type="button"
+                onClick={() =>
+                  openSectionAndScroll(section.groupLabel, section.letter)
+                }
+                className={cn(
+                  "min-h-11 min-w-11 rounded-md border px-3 text-sm font-semibold",
+                  progressClass(section)
+                )}
+                title={`${section.letter}. ${section.title} — ${statusPill(section)}`}
+              >
+                {section.letter}
+                {section.status === "left" ? (
+                  <span className="ml-1 text-xs font-normal">
+                    {section.left} left
+                  </span>
+                ) : null}
+              </button>
+            ))}
+          </div>
+        ) : null}
+        <p
+          className={cn(
+            "border-b-2 border-blue-500 pb-2 text-sm text-blue-800",
+            showProgress ? "mt-2" : null
+          )}
+        >
           Not saved yet. Answers are kept on this device until you press Save.
         </p>
       </div>
 
       <div className="mt-4 space-y-3">
         {sections.map((section) => {
-          const open = Boolean(openSections[section.groupLabel])
+          const ungrouped = section.groupLabel === UNGROUPED_SECTION_KEY
+          const open = ungrouped
+            ? true
+            : Boolean(openSections[section.groupLabel])
           return (
             <section
-              key={section.groupLabel}
+              key={section.groupLabel || "ungrouped"}
               id={`section-${section.letter}`}
               className="rounded-lg border"
             >
-              <h2>
-                <button
-                  type="button"
-                  className="flex w-full items-center gap-3 px-4 py-3 text-left"
-                  aria-expanded={open}
-                  onClick={() => toggleSection(section.groupLabel)}
-                >
-                  <span
-                    className={cn(
-                      "inline-flex min-h-9 min-w-9 items-center justify-center rounded-md border text-sm font-semibold",
-                      progressClass(section)
-                    )}
+              {ungrouped ? null : (
+                <h2>
+                  <button
+                    type="button"
+                    className="flex w-full items-center gap-3 px-4 py-3 text-left"
+                    aria-expanded={open}
+                    onClick={() => toggleSection(section.groupLabel)}
                   >
-                    {section.letter}
-                  </span>
-                  <span className="flex-1 text-sm font-semibold">
-                    {section.title}
-                  </span>
-                  <span className="text-xs text-muted-foreground">
-                    {statusPill(section)}
-                  </span>
-                  <span className="text-muted-foreground" aria-hidden>
-                    {open ? "▾" : "▸"}
-                  </span>
-                </button>
-              </h2>
+                    <span
+                      className={cn(
+                        "inline-flex min-h-9 min-w-9 items-center justify-center rounded-md border text-sm font-semibold",
+                        progressClass(section)
+                      )}
+                    >
+                      {section.letter}
+                    </span>
+                    <span className="flex-1 text-sm font-semibold">
+                      {section.title}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {statusPill(section)}
+                    </span>
+                    <span className="text-muted-foreground" aria-hidden>
+                      {open ? "▾" : "▸"}
+                    </span>
+                  </button>
+                </h2>
+              )}
               {open ? (
-                <div className="border-t px-4 py-4">
+                <div className={cn("px-4 py-4", ungrouped ? null : "border-t")}>
                   {section.status === "skipped" ? (
                     <p className="text-sm text-muted-foreground">
                       Not asked, because of an earlier answer.
@@ -341,7 +359,9 @@ export function PractitionerAssessmentForm({
                   ) : (
                     <AssessmentFormCore
                       elements={elements}
-                      groupLabel={section.groupLabel}
+                      groupLabel={
+                        ungrouped ? undefined : section.groupLabel
+                      }
                       answers={answers}
                       onAnswersChange={updateAnswers}
                       errors={errors}

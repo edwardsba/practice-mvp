@@ -2,6 +2,8 @@
  * Pure helpers for the Assessments › Start page list and today's session note.
  */
 
+import { canCompleteInSharedForm } from "@/lib/assessments/practitioner-routes"
+
 export type StartListDefinition = {
   assessmentCode: string
   assessmentName: string
@@ -16,6 +18,8 @@ export type StartListRow = {
   assessmentName: string
   enabled: boolean
   section: "practitioner" | "client"
+  /** Shown instead of Start / Coming soon when set (e.g. BTP). */
+  disabledNote?: string
 }
 
 export type SessionNoteForStart = {
@@ -26,7 +30,9 @@ export type SessionNoteForStart = {
 /**
  * Practitioner section: active, practitioner_completable, not client_completable,
  * with elements — sorted A–Z by code (ASQ, LRAMP, mse…).
- * Client section: every other active definition with elements, A–Z, disabled.
+ * Client section: every other active definition with elements, A–Z.
+ * Client rows are enabled when canCompleteInSharedForm accepts them; BTP stays
+ * disabled with "Sent before sessions".
  */
 export function buildStartAssessmentList(
   definitions: StartListDefinition[]
@@ -55,14 +61,23 @@ export function buildStartAssessmentList(
 
   const client = withElements
     .filter((d) => !practitionerCodes.has(d.assessmentCode))
-    .map(
-      (d): StartListRow => ({
+    .map((d): StartListRow => {
+      const enabled = canCompleteInSharedForm({
+        assessmentCode: d.assessmentCode,
+        clientCompletable: d.clientCompletable,
+        practitionerCompletable: d.practitionerCompletable,
+        isActive: d.isActive,
+        hasActiveElements: d.elementCount > 0,
+      })
+      const isBtp = d.assessmentCode === "BTP"
+      return {
         assessmentCode: d.assessmentCode,
         assessmentName: d.assessmentName,
-        enabled: false,
+        enabled,
         section: "client",
-      })
-    )
+        disabledNote: !enabled && isBtp ? "Sent before sessions" : undefined,
+      }
+    })
     .sort((a, b) =>
       a.assessmentCode.localeCompare(b.assessmentCode, "en", {
         sensitivity: "base",

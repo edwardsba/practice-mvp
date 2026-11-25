@@ -14,13 +14,62 @@ const LEGACY_START: Record<string, string> = {
 }
 
 /**
- * Single gate for the shared practitioner form (new/edit routes + save actions).
- *
- * True only for practitioner-only instruments that are not on a legacy page.
- * Today that is LRAMP. Client questionnaires join later, once scoring is shared.
- * ASQ and MSE join by deleting their LEGACY_START lines.
+ * Client-completable codes that must not use the shared practitioner form yet.
+ * BTP: questions are built from SMART goals at send time.
+ * BACKGROUND_SR: own questionnaire / results path.
+ * ASQ / mse: legacy practitioner pages (also listed in LEGACY_START).
  */
-export function usesSharedPractitionerForm(params: {
+const SHARED_FORM_EXCLUDED_CLIENT_CODES = [
+  "BTP",
+  "BACKGROUND_SR",
+  "ASQ",
+  "mse",
+] as const
+
+export type SharedFormDefinitionGate = {
+  assessmentCode: string
+  clientCompletable: boolean
+  practitionerCompletable: boolean
+  isActive: boolean
+  hasActiveElements: boolean
+}
+
+/**
+ * True when the shared practitioner form (new/edit + save) may complete this
+ * definition: practitioner-only non-legacy instruments (LRAMP today), and
+ * active client questionnaires that are also practitioner-completable with
+ * elements — except the excluded codes above.
+ */
+export function canCompleteInSharedForm(
+  def: SharedFormDefinitionGate
+): boolean {
+  if (!def.isActive) return false
+  if (!def.hasActiveElements) return false
+  if (!def.practitionerCompletable) return false
+  if (def.assessmentCode in LEGACY_START) return false
+
+  if (!def.clientCompletable) {
+    // Practitioner-only, non-legacy (LRAMP).
+    return true
+  }
+
+  if (
+    (SHARED_FORM_EXCLUDED_CLIENT_CODES as readonly string[]).includes(
+      def.assessmentCode
+    )
+  ) {
+    return false
+  }
+
+  return true
+}
+
+/**
+ * True only for practitioner-only, non-legacy assessments (LRAMP today).
+ * Keeps the Round AD early Results branch for the LRAMP only; scored
+ * questionnaires keep the default Results layout.
+ */
+export function usesSharedResultsLayout(params: {
   assessmentCode: string
   clientCompletable: boolean
   practitionerCompletable: boolean

@@ -4,13 +4,15 @@
 
 import {
   questionDisplayLabel,
-  sectionLetter,
-  sectionTitle,
   visibleElementKeys,
   type FormAnswers,
   type FormElement,
 } from "@/lib/assessments/form-rules"
 import { PRACTICE_TIMEZONE } from "@/lib/dates/practice-time"
+import {
+  presentSectionLabels,
+  UNGROUPED_SECTION_KEY,
+} from "@/lib/assessments/section-presentation"
 
 export type AnswerDisplay =
   | { kind: "text"; value: string }
@@ -118,6 +120,7 @@ function displayAnswer(
 /**
  * Build display sections for a completed assessment instance.
  * Sections follow group_label order; rows are visible answered elements only.
+ * When every element has a null group_label, returns one ungrouped section.
  */
 export function buildAnswerSections(
   elements: FormElement[],
@@ -139,8 +142,15 @@ export function buildAnswerSections(
     byLabel.get(label)!.push(element)
   }
 
-  return orderedLabels.map((groupLabel) => {
-    const sectionElements = (byLabel.get(groupLabel) ?? [])
+  const presentation = presentSectionLabels(orderedLabels)
+
+  return presentation.sections.map((presented) => {
+    const groupLabel = presented.groupLabel
+    const sectionElements = (
+      groupLabel === UNGROUPED_SECTION_KEY
+        ? elements
+        : (byLabel.get(groupLabel) ?? [])
+    )
       .slice()
       .sort((a, b) => a.displayOrder - b.displayOrder)
 
@@ -158,10 +168,7 @@ export function buildAnswerSections(
         if (!answer) continue
 
         const subgroup = element.subgroupLabel
-        if (
-          subgroup &&
-          subgroup !== lastSubgroup
-        ) {
+        if (subgroup && subgroup !== lastSubgroup) {
           rows.push({ kind: "subheading", label: subgroup })
           lastSubgroup = subgroup
         } else if (!subgroup) {
@@ -180,8 +187,8 @@ export function buildAnswerSections(
 
     return {
       groupLabel,
-      letter: sectionLetter(groupLabel),
-      title: sectionTitle(groupLabel),
+      letter: presented.badge,
+      title: presented.title || "Responses",
       skipped,
       rows,
     }

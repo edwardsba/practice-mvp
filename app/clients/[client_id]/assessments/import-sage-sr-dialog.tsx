@@ -59,9 +59,25 @@ function isSuccessResponse(
   return data.ok === true
 }
 
-export function ImportSageSrDialog({ clientId }: { clientId: string }) {
+export function ImportSageSrDialog({
+  clientId,
+  open: controlledOpen,
+  onOpenChange: controlledOnOpenChange,
+  hideTrigger = false,
+}: {
+  clientId: string
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
+  hideTrigger?: boolean
+}) {
   const router = useRouter()
-  const [open, setOpen] = useState(false)
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false)
+  const isControlled = controlledOpen !== undefined
+  const open = isControlled ? controlledOpen : uncontrolledOpen
+  const setOpen = (next: boolean) => {
+    if (!isControlled) setUncontrolledOpen(next)
+    controlledOnOpenChange?.(next)
+  }
   const [entries, setEntries] = useState<FileEntry[]>([])
   const [importing, setImporting] = useState(false)
 
@@ -192,9 +208,11 @@ export function ImportSageSrDialog({ clientId }: { clientId: string }) {
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogTrigger asChild>
-        <Button variant="outline">Import SAGE-SR report</Button>
-      </DialogTrigger>
+      {hideTrigger ? null : (
+        <DialogTrigger asChild>
+          <Button variant="outline">Import SAGE-SR report</Button>
+        </DialogTrigger>
+      )}
       <DialogContent
         className="max-h-[90vh] overflow-y-auto"
         onPointerDownOutside={(event) => {

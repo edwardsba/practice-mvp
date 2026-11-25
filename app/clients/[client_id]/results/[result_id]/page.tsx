@@ -3,6 +3,7 @@ import { notFound } from "next/navigation"
 import { and, asc, eq } from "drizzle-orm"
 
 import { MarkReviewedButton } from "@/app/clients/[client_id]/results/[result_id]/mark-reviewed-button"
+import { SharedPractitionerResultView } from "@/components/assessments/answers/shared-practitioner-result"
 import { AppShell } from "@/components/app-shell"
 import { BackButton } from "@/components/ui/back-button"
 import { Badge } from "@/components/ui/badge"
@@ -29,17 +30,25 @@ import {
   assessmentResponses,
   assessmentResults,
   clients,
+  practitionerProfiles,
+  sessionNotes,
 } from "@/db/schema"
+import { answersFromResponseRows } from "@/lib/assessments/form-rules"
 import {
   GAD7_IMPAIRMENT_ELEMENT_KEY,
   getFunctionalImpairmentLabelForResult,
   PHQ9_IMPAIRMENT_ELEMENT_KEY,
 } from "@/lib/assessments/impairment"
+import { loadFormDefinitionByCode } from "@/lib/assessments/load-form-definition"
 import { getMaxScoreForAssessmentDefinition } from "@/lib/assessments/max-score"
+import { usesSharedPractitionerForm } from "@/lib/assessments/practitioner-routes"
 import { calculatePsfScore } from "@/lib/assessments/psf"
+import { getResultSummaryBuilder } from "@/lib/assessments/result-summaries"
 import { requirePractitionerContext } from "@/lib/auth"
 import { db } from "@/lib/db"
 import { appendReturnTo } from "@/lib/navigation/back"
+import { safeReturnTo } from "@/lib/navigation/safe-return-to"
+import { formatPractitionerPreferredName } from "@/lib/practitioner/format"
 import type { SageSrCoreResponseParsedResult } from "@/lib/sage-sr/parse-core-response"
 import type {
   SageSrCoreStoredClinicianData,
@@ -148,7 +157,11 @@ export default async function AssessmentResultDetailPage({
       status: assessmentResults.status,
       assessmentName: assessmentDefinitions.assessmentName,
       assessmentCode: assessmentDefinitions.assessmentCode,
+      clientCompletable: assessmentDefinitions.clientCompletable,
+      practitionerCompletable: assessmentDefinitions.practitionerCompletable,
       assessmentDefinitionId: assessmentInstances.assessmentDefinitionId,
+      sessionNoteId: assessmentInstances.sessionNoteId,
+      practitionerProfileId: assessmentInstances.practitionerProfileId,
     })
     .from(assessmentResults)
     .innerJoin(
@@ -176,6 +189,114 @@ export default async function AssessmentResultDetailPage({
 
   if (!result) {
     notFound()
+  }
+
+  // Shared practitioner form results (LRAMP today): early return — leave every
+  // other layout branch below untouched.
+  if (
+    usesSharedPractitionerForm({
+      assessmentCode: result.assessmentCode,
+      clientCompletable: result.clientCompletable,
+      practitionerCompletable: result.practitionerCompletable,
+    })
+  ) {
+    const definition = await loadFormDefinitionByCode(result.assessmentCode)
+    if (!definition) notFound()
+
+    const responseRows = await db
+      .select({
+        elementKey: assessmentElements.elementKey,
+        responseValue: assessmentResponses.responseValue,
+        responseOrder: assessmentResponses.responseOrder,
+      })
+      .from(assessmentResponses)
+      .innerJoin(
+        assessmentElements,
+        eq(
+          assessmentResponses.assessmentElementId,
+          assessmentElements.assessmentElementId
+        )
+      )
+      .where(
+        and(
+          eq(
+            assessmentResponses.assessmentInstanceId,
+            result.assessmentInstanceId
+          ),
+          eq(assessmentResponses.clientId, clientId),
+          eq(assessmentResponses.practiceId, context.practiceId)
+        )
+      )
+      .orderBy(
+        asc(assessmentElements.displayOrder),
+        asc(assessmentResponses.responseOrder)
+      )
+
+    const answers = answersFromResponseRows(responseRows)
+
+    const [practitioner] = await db
+      .select({
+        firstName: practitionerProfiles.firstName,
+        preferredName: practitionerProfiles.preferredName,
+        lastName: practitionerProfiles.lastName,
+      })
+      .from(practitionerProfiles)
+      .where(
+        eq(
+          practitionerProfiles.practitionerProfileId,
+          result.practitionerProfileId
+        )
+      )
+      .limit(1)
+
+    let sessionDate: string | null = null
+    if (result.sessionNoteId) {
+      const [note] = await db
+        .select({ sessionDate: sessionNotes.sessionDate })
+        .from(sessionNotes)
+        .where(
+          and(
+            eq(sessionNotes.sessionNoteId, result.sessionNoteId),
+            eq(sessionNotes.practiceId, context.practiceId),
+            eq(sessionNotes.clientId, clientId)
+          )
+        )
+        .limit(1)
+      sessionDate = note?.sessionDate ?? null
+    }
+
+    const assessmentsHref = `/clients/${clientId}/assessments`
+    const backHref = safeReturnTo(returnTo) ?? assessmentsHref
+    const resultsHref = returnTo
+      ? `/clients/${clientId}/results/${resultId}?returnTo=${encodeURIComponent(returnTo)}`
+      : `/clients/${clientId}/results/${resultId}`
+
+    const summaryBuilder = getResultSummaryBuilder(result.assessmentCode)
+    const summaryRows = summaryBuilder
+      ? summaryBuilder(answers, definition.elements)
+      : null
+
+    return (
+      <SharedPractitionerResultView
+        clientId={clientId}
+        shortName={definition.shortName}
+        clientName={`${client.firstName} ${client.lastName}`.trim()}
+        practitionerName={
+          practitioner
+            ? formatPractitionerPreferredName(practitioner)
+            : "Practitioner"
+        }
+        assessmentDate={result.assessmentDate}
+        sessionNoteId={result.sessionNoteId}
+        sessionDate={sessionDate}
+        instanceId={result.assessmentInstanceId}
+        backHref={backHref}
+        editReturnTo={resultsHref}
+        summaryRows={summaryRows}
+        elements={definition.elements}
+        answers={answers}
+      />
+    )
   }
 
   const isAsq = result.assessmentCode === "ASQ"

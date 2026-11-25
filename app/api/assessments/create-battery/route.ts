@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 
-import { DEFAULT_BATTERY_CODES, normalizeBatteryCodes } from "@/lib/assessments/battery-codes"
+import { DEFAULT_BATTERY_CODES } from "@/lib/assessments/battery-codes"
 import { createBatteryInstance } from "@/lib/assessments/create-battery-instance"
 import { getPractitionerContext } from "@/lib/auth"
 
@@ -25,9 +25,11 @@ export async function POST(request: Request) {
 
   const clientId = body.client_id?.trim()
   const practitionerProfileId = body.practitioner_profile_id?.trim()
+  // Pass codes through unchanged so resolveBatteryChainCodes can refuse
+  // non-sendable ones; default remains the pre-session battery pair.
   const requestedCodes = body.assessment_codes?.length
-    ? normalizeBatteryCodes(body.assessment_codes)
-    : DEFAULT_BATTERY_CODES
+    ? body.assessment_codes.map((code) => String(code).trim()).filter(Boolean)
+    : [...DEFAULT_BATTERY_CODES]
 
   if (!clientId || !practitionerProfileId) {
     return NextResponse.json(
@@ -49,7 +51,11 @@ export async function POST(request: Request) {
   })
 
   if (!result.ok) {
-    const status = result.error.includes("not found") ? 404 : 500
+    const status = result.error.includes("not found")
+      ? 404
+      : result.error.includes("can't be sent")
+        ? 400
+        : 500
     return NextResponse.json({ error: result.error }, { status })
   }
 

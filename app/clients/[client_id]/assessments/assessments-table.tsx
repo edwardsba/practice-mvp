@@ -31,6 +31,8 @@ const ASSESSMENT_TYPE_LABELS: Record<string, string> = {
   BTP: "BTP",
   PSF: "Post-Session Feedback",
   BACKGROUND_SR: "Background questionnaire",
+  LRAMP: "LRAMP",
+  mse: "MSE",
 }
 
 type AssessmentResultRow = {
@@ -41,6 +43,7 @@ type AssessmentResultRow = {
   acuteRiskRating: string | null
   assessmentCode: string
   assessmentName: string
+  scoreLabel?: string | null
 }
 
 function formatDate(value: Date | string) {
@@ -59,6 +62,7 @@ function formatAssessmentType(code: string, name: string) {
 
 function formatScore(result: AssessmentResultRow) {
   if (result.assessmentCode === "BACKGROUND_SR") return "—"
+  if (result.scoreLabel) return result.scoreLabel
   if (result.score === null) return "—"
   if (result.assessmentCode === "PSF") {
     return result.score > 0 ? `+${result.score}` : String(result.score)

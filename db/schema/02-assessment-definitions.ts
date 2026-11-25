@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, boolean, integer, timestamp } from 'drizzle-orm/pg-core'
+import { pgTable, uuid, text, boolean, integer, timestamp, jsonb } from 'drizzle-orm/pg-core'
 
 export const assessmentDefinitions = pgTable('assessment_definitions', {
   assessmentDefinitionId: uuid('assessment_definition_id').primaryKey().defaultRandom(),
@@ -19,6 +19,32 @@ export const assessmentDefinitions = pgTable('assessment_definitions', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 })
 
+/**
+ * Shared assessment form elements.
+ *
+ * element_type allowed values:
+ * - radio: pick one from options (existing).
+ * - yes_no: pick one of two options, Yes / No. Stored exactly like radio, with
+ *   option rows `yes` and `no`.
+ * - checkbox: tick all that apply; options in assessment_options.
+ * - tick: a single tick box; its answer is the value `ticked`.
+ * - text_list: a growing list of short text entries. One empty box shows; a new
+ *   one appears as you type; blanks are ignored.
+ * - long_text: one large text box.
+ * - short_text: one short text box.
+ * - date: a date (YYYY-MM-DD).
+ *
+ * For new types (everything except existing radio instruments that use integer
+ * scores), data_type is `text`.
+ *
+ * parent_element_key: the element this one sits under, for indenting and
+ * visibility. Null = top level.
+ * show_when_json: when this element is shown. Shape:
+ *   {"key": "<element_key>", "in": ["<value>", ...]}. Null = always shown
+ *   (subject to its parent).
+ * required_group_key: elements with the same key form an "at least one" group.
+ * help_text: optional short guidance under a question.
+ */
 export const assessmentElements = pgTable('assessment_elements', {
   assessmentElementId: uuid('assessment_element_id').primaryKey().defaultRandom(),
   assessmentDefinitionId: uuid('assessment_definition_id').notNull().references(() => assessmentDefinitions.assessmentDefinitionId),
@@ -34,6 +60,10 @@ export const assessmentElements = pgTable('assessment_elements', {
   subgroupLabel: text('subgroup_label'), // e.g. "Perceptions", "Thoughts", "Cognitions" — null if the assessment has no secondary grouping
   domainCode: text('domain_code'), // e.g. 'depression', 'anxiety', 'psychosis' — used by battery_trigger_rules to evaluate Level 1 XC domain flags. Null for non-diagnostic-battery assessments.
   isUrgentFlag: boolean('is_urgent_flag').notNull().default(false), // true only for the SI item (Level 1 XC #11) — drives the highlighted row in the Diagnostic Assessment Report
+  parentElementKey: text('parent_element_key'),
+  showWhenJson: jsonb('show_when_json').$type<{ key: string; in: string[] } | null>(),
+  requiredGroupKey: text('required_group_key'),
+  helpText: text('help_text'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 })
 

@@ -184,6 +184,14 @@ export default async function SessionNoteViewPage({
                           minute: "2-digit",
                         }) ?? "—"}
                       </p>
+                      {viewContext.lrampInstance.assessmentResultId ? (
+                        <Link
+                          href={`/clients/${note.clientId}/results/${viewContext.lrampInstance.assessmentResultId}?returnTo=${encodeURIComponent(sessionNoteUrl)}`}
+                          className="text-sm font-medium text-primary hover:underline"
+                        >
+                          View
+                        </Link>
+                      ) : null}
                       <Link
                         href={buildPractitionerEditHref({
                           clientId: note.clientId,

@@ -65,6 +65,7 @@ export type SessionNoteMseInstance = {
 
 export type SessionNoteLrampInstance = {
   assessmentInstanceId: string
+  assessmentResultId: string | null
   submittedAt: Date | null
   assessmentDate: Date | null
   summaryLine: string | null
@@ -353,6 +354,7 @@ async function loadLrampForSession(
   const [row] = await db
     .select({
       assessmentInstanceId: assessmentInstances.assessmentInstanceId,
+      assessmentResultId: assessmentResults.assessmentResultId,
       submittedAt: assessmentInstances.submittedAt,
       assessmentDate: assessmentResults.assessmentDate,
     })
@@ -424,6 +426,7 @@ async function loadLrampForSession(
 
   return {
     assessmentInstanceId: row.assessmentInstanceId,
+    assessmentResultId: row.assessmentResultId ?? null,
     submittedAt: row.submittedAt,
     assessmentDate: row.assessmentDate,
     summaryLine,

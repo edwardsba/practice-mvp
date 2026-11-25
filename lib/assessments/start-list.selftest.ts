@@ -45,6 +45,14 @@ const defs = [
     isActive: true,
   },
   {
+    assessmentCode: "BTP",
+    assessmentName: "Behavioural Target Progress",
+    clientCompletable: true,
+    practitionerCompletable: false,
+    elementCount: 1,
+    isActive: true,
+  },
+  {
     assessmentCode: "EMPTY",
     assessmentName: "Empty",
     clientCompletable: false,
@@ -67,13 +75,25 @@ const defs = [
     true
   )
   check(
-    "client section includes PHQ9 disabled",
+    "client section includes PHQ9 enabled",
     client.find((r) => r.assessmentCode === "PHQ9"),
     {
       assessmentCode: "PHQ9",
       assessmentName: "PHQ-9",
+      enabled: true,
+      section: "client",
+      disabledNote: undefined,
+    }
+  )
+  check(
+    "BTP disabled with Sent before sessions",
+    client.find((r) => r.assessmentCode === "BTP"),
+    {
+      assessmentCode: "BTP",
+      assessmentName: "Behavioural Target Progress",
       enabled: false,
       section: "client",
+      disabledNote: "Sent before sessions",
     }
   )
   check(

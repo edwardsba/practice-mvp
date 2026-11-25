@@ -3,6 +3,7 @@ import { notFound } from "next/navigation"
 import { and, asc, eq } from "drizzle-orm"
 
 import { MarkReviewedButton } from "@/app/clients/[client_id]/results/[result_id]/mark-reviewed-button"
+import { AnswerSections } from "@/components/assessments/answers/answer-sections"
 import { SharedPractitionerResultView } from "@/components/assessments/answers/shared-practitioner-result"
 import { AppShell } from "@/components/app-shell"
 import { BackButton } from "@/components/ui/back-button"
@@ -33,6 +34,7 @@ import {
   practitionerProfiles,
   sessionNotes,
 } from "@/db/schema"
+import { buildAnswerSections } from "@/lib/assessments/answer-rows"
 import { answersFromResponseRows } from "@/lib/assessments/form-rules"
 import {
   GAD7_IMPAIRMENT_ELEMENT_KEY,
@@ -41,9 +43,14 @@ import {
 } from "@/lib/assessments/impairment"
 import { loadFormDefinitionByCode } from "@/lib/assessments/load-form-definition"
 import { getMaxScoreForAssessmentDefinition } from "@/lib/assessments/max-score"
-import { usesSharedPractitionerForm } from "@/lib/assessments/practitioner-routes"
+import {
+  buildPractitionerEditHref,
+  canCompleteInSharedForm,
+  usesSharedResultsLayout,
+} from "@/lib/assessments/practitioner-routes"
 import { calculatePsfScore } from "@/lib/assessments/psf"
 import { getResultSummaryBuilder } from "@/lib/assessments/result-summaries"
+import { instanceHasAccessLink } from "@/lib/assessments/instance-access-link"
 import { requirePractitionerContext } from "@/lib/auth"
 import { db } from "@/lib/db"
 import { appendReturnTo } from "@/lib/navigation/back"
@@ -159,6 +166,7 @@ export default async function AssessmentResultDetailPage({
       assessmentCode: assessmentDefinitions.assessmentCode,
       clientCompletable: assessmentDefinitions.clientCompletable,
       practitionerCompletable: assessmentDefinitions.practitionerCompletable,
+      definitionIsActive: assessmentDefinitions.isActive,
       assessmentDefinitionId: assessmentInstances.assessmentDefinitionId,
       sessionNoteId: assessmentInstances.sessionNoteId,
       practitionerProfileId: assessmentInstances.practitionerProfileId,
@@ -191,10 +199,11 @@ export default async function AssessmentResultDetailPage({
     notFound()
   }
 
-  // Shared practitioner form results (LRAMP today): early return — leave every
-  // other layout branch below untouched.
+  // Shared practitioner-only results layout (LRAMP today): early return — leave
+  // every other layout branch below untouched. Scored questionnaires use the
+  // default Results branch with the shared answer table.
   if (
-    usesSharedPractitionerForm({
+    usesSharedResultsLayout({
       assessmentCode: result.assessmentCode,
       clientCompletable: result.clientCompletable,
       practitionerCompletable: result.practitionerCompletable,
@@ -1094,6 +1103,66 @@ export default async function AssessmentResultDetailPage({
     )
   }
 
+  const formDefinition = await loadFormDefinitionByCode(result.assessmentCode)
+  const answerResponseRows = formDefinition
+    ? await db
+        .select({
+          elementKey: assessmentElements.elementKey,
+          responseValue: assessmentResponses.responseValue,
+          responseOrder: assessmentResponses.responseOrder,
+        })
+        .from(assessmentResponses)
+        .innerJoin(
+          assessmentElements,
+          eq(
+            assessmentResponses.assessmentElementId,
+            assessmentElements.assessmentElementId
+          )
+        )
+        .where(
+          and(
+            eq(
+              assessmentResponses.assessmentInstanceId,
+              result.assessmentInstanceId
+            ),
+            eq(assessmentResponses.clientId, clientId),
+            eq(assessmentResponses.practiceId, context.practiceId)
+          )
+        )
+        .orderBy(
+          asc(assessmentElements.displayOrder),
+          asc(assessmentResponses.responseOrder)
+        )
+    : []
+  const formAnswers = answersFromResponseRows(answerResponseRows)
+  const answerSections =
+    formDefinition != null
+      ? buildAnswerSections(formDefinition.elements, formAnswers)
+      : []
+
+  const resultsHref = returnTo
+    ? `/clients/${clientId}/results/${resultId}?returnTo=${encodeURIComponent(returnTo)}`
+    : `/clients/${clientId}/results/${resultId}`
+
+  const canShowSharedEdit =
+    formDefinition != null &&
+    canCompleteInSharedForm({
+      assessmentCode: result.assessmentCode,
+      clientCompletable: result.clientCompletable,
+      practitionerCompletable: result.practitionerCompletable,
+      isActive: result.definitionIsActive,
+      hasActiveElements: formDefinition.elements.length > 0,
+    }) &&
+    !(await instanceHasAccessLink(result.assessmentInstanceId))
+
+  const sharedEditHref = canShowSharedEdit
+    ? buildPractitionerEditHref({
+        clientId,
+        instanceId: result.assessmentInstanceId,
+        returnTo: resultsHref,
+      })
+    : null
+
   return (
     <AppShell>
       <div className="mb-6">
@@ -1112,13 +1181,19 @@ export default async function AssessmentResultDetailPage({
               <Link
                 href={appendReturnTo(
                   `/clients/${clientId}/asq/${result.assessmentInstanceId}/edit`,
-                  returnTo
-                    ? `/clients/${clientId}/results/${resultId}?returnTo=${encodeURIComponent(returnTo)}`
-                    : `/clients/${clientId}/results/${resultId}`
+                  resultsHref
                 )}
                 className="text-sm font-medium text-primary hover:underline"
               >
                 Edit ASQ
+              </Link>
+            ) : null}
+            {sharedEditHref ? (
+              <Link
+                href={sharedEditHref}
+                className="text-sm font-medium text-primary hover:underline"
+              >
+                Edit
               </Link>
             ) : null}
             <MarkReviewedButton
@@ -1164,48 +1239,20 @@ export default async function AssessmentResultDetailPage({
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Question responses</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="rounded-lg border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="min-w-[200px]">Question</TableHead>
-                  <TableHead>Response</TableHead>
-                  <TableHead className="w-20 text-right">Score</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {responses.length === 0 ? (
-                  <TableRow>
-                    <TableCell
-                      colSpan={3}
-                      className="h-20 text-center text-muted-foreground"
-                    >
-                      No response data available.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  responses.map((row, index) => (
-                    <TableRow key={`${row.displayOrder}-${index}`}>
-                      <TableCell className="whitespace-normal">
-                        {row.questionText}
-                      </TableCell>
-                      <TableCell>{row.responseLabel}</TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {row.scoreValue}
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="space-y-3">
+        <h2 className="text-lg font-semibold tracking-tight">
+          Question responses
+        </h2>
+        {answerSections.length > 0 ? (
+          <AnswerSections sections={answerSections} />
+        ) : (
+          <Card>
+            <CardContent className="py-10 text-center text-muted-foreground">
+              No response data available.
+            </CardContent>
+          </Card>
+        )}
+      </div>
     </AppShell>
   )
 }

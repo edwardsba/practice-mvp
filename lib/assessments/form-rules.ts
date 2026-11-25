@@ -6,6 +6,11 @@
  * - checkbox / text_list → many values
  */
 
+import {
+  presentSectionLabels,
+  UNGROUPED_SECTION_KEY,
+} from "@/lib/assessments/section-presentation"
+
 export type FormElementType =
   | "radio"
   | "yes_no"
@@ -71,16 +76,14 @@ export const TICK_VALUE = "ticked"
 
 /** Letter before the first "." in a group label (e.g. "A" from "A. Reason…"). */
 export function sectionLetter(groupLabel: string): string {
-  const dot = groupLabel.indexOf(".")
-  if (dot <= 0) return groupLabel.trim().slice(0, 1).toUpperCase() || "?"
-  return groupLabel.slice(0, dot).trim()
+  if (!groupLabel) return "1"
+  return presentSectionLabels([groupLabel]).sections[0]?.badge ?? "?"
 }
 
-/** Title after "A. " in a group label. */
+/** Title after "A. " in a group label — or the full label when unnumbered. */
 export function sectionTitle(groupLabel: string): string {
-  const dot = groupLabel.indexOf(".")
-  if (dot < 0) return groupLabel.trim()
-  return groupLabel.slice(dot + 1).trim()
+  if (!groupLabel) return ""
+  return presentSectionLabels([groupLabel]).sections[0]?.title ?? groupLabel
 }
 
 function elementByKey(
@@ -387,6 +390,8 @@ export function toResponseRows(
 
 /**
  * Sections are distinct non-null group_label values, in first-seen display order.
+ * When every element has a null group_label, returns one ungrouped section
+ * (see presentSectionLabels / UNGROUPED_SECTION_KEY).
  * - skipped: no element in the section is visible
  * - left: visible required elements still unanswered; each unanswered
  *   "at least one" group counts once
@@ -410,8 +415,14 @@ export function sectionStatuses(
     byLabel.get(label)!.push(element)
   }
 
-  return orderedLabels.map((groupLabel) => {
-    const sectionElements = byLabel.get(groupLabel) ?? []
+  const presentation = presentSectionLabels(orderedLabels)
+
+  return presentation.sections.map((presented) => {
+    const groupLabel = presented.groupLabel
+    const sectionElements =
+      groupLabel === UNGROUPED_SECTION_KEY
+        ? elements
+        : (byLabel.get(groupLabel) ?? [])
     const visibleInSection = sectionElements.filter((el) =>
       visible.has(el.elementKey)
     )
@@ -419,8 +430,8 @@ export function sectionStatuses(
     if (visibleInSection.length === 0) {
       return {
         groupLabel,
-        letter: sectionLetter(groupLabel),
-        title: sectionTitle(groupLabel),
+        letter: presented.badge,
+        title: presented.title,
         status: "skipped" as const,
         left: 0,
       }
@@ -450,8 +461,8 @@ export function sectionStatuses(
     if (left > 0) {
       return {
         groupLabel,
-        letter: sectionLetter(groupLabel),
-        title: sectionTitle(groupLabel),
+        letter: presented.badge,
+        title: presented.title,
         status: "left" as const,
         left,
       }
@@ -459,12 +470,17 @@ export function sectionStatuses(
 
     return {
       groupLabel,
-      letter: sectionLetter(groupLabel),
-      title: sectionTitle(groupLabel),
+      letter: presented.badge,
+      title: presented.title,
       status: "done" as const,
       left: 0,
     }
   })
+}
+
+/** Whether the form should show the sticky section progress bar. */
+export function showSectionProgressBar(elements: FormElement[]): boolean {
+  return elements.some((el) => Boolean(el.groupLabel))
 }
 
 /**

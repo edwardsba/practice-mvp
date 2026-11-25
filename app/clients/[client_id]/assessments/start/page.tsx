@@ -159,25 +159,54 @@ export default async function StartAssessmentPage({
           Client questionnaires (completed with the client)
         </h2>
         <ul className="divide-y rounded-lg border">
-          {clientRows.map((row) => (
-            <li
-              key={row.assessmentCode}
-              className={cn(
-                "flex min-h-14 items-center justify-between gap-3 px-4 py-3 opacity-60"
-              )}
-              aria-disabled
-            >
-              <span>
-                <span className="block font-medium">{row.assessmentCode}</span>
-                <span className="block text-sm text-muted-foreground">
-                  {row.assessmentName}
+          {clientRows.map((row) => {
+            if (row.enabled) {
+              const href = buildPractitionerStartHref({
+                clientId,
+                assessmentCode: row.assessmentCode,
+                sessionNoteId: todaysNote?.sessionNoteId ?? null,
+                returnTo: startReturnTo,
+              })
+              return (
+                <li key={row.assessmentCode}>
+                  <Link
+                    href={href}
+                    className="flex min-h-14 items-center justify-between gap-3 px-4 py-3 hover:bg-muted/40"
+                  >
+                    <span>
+                      <span className="block font-medium">
+                        {row.assessmentCode}
+                      </span>
+                      <span className="block text-sm text-muted-foreground">
+                        {row.assessmentName}
+                      </span>
+                    </span>
+                    <span className="text-sm text-primary">Start</span>
+                  </Link>
+                </li>
+              )
+            }
+
+            return (
+              <li
+                key={row.assessmentCode}
+                className={cn(
+                  "flex min-h-14 items-center justify-between gap-3 px-4 py-3 opacity-60"
+                )}
+                aria-disabled
+              >
+                <span>
+                  <span className="block font-medium">{row.assessmentCode}</span>
+                  <span className="block text-sm text-muted-foreground">
+                    {row.assessmentName}
+                  </span>
                 </span>
-              </span>
-              <span className="rounded-md border px-2 py-0.5 text-xs">
-                Coming soon
-              </span>
-            </li>
-          ))}
+                <span className="rounded-md border px-2 py-0.5 text-xs">
+                  {row.disabledNote ?? "Coming soon"}
+                </span>
+              </li>
+            )
+          })}
         </ul>
       </section>
 

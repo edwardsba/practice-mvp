@@ -15,8 +15,10 @@ import {
   validateAnswers,
   type FormAnswers,
 } from "@/lib/assessments/form-rules"
+import { instanceHasAccessLink } from "@/lib/assessments/instance-access-link"
 import { loadFormDefinitionByCode } from "@/lib/assessments/load-form-definition"
-import { usesSharedPractitionerForm } from "@/lib/assessments/practitioner-routes"
+import { canCompleteInSharedForm } from "@/lib/assessments/practitioner-routes"
+import { scoreAssessment } from "@/lib/assessments/scoring/score-assessment"
 import { requirePractitionerContext } from "@/lib/auth"
 import { practiceLocalToUtc } from "@/lib/dates/practice-time"
 import { db } from "@/lib/db"
@@ -59,6 +61,22 @@ async function assertClientInPractice(clientId: string, practiceId: string) {
   return Boolean(client)
 }
 
+function sharedFormGate(definition: {
+  assessmentCode: string
+  clientCompletable: boolean
+  practitionerCompletable: boolean
+  isActive: boolean
+  elements: unknown[]
+}) {
+  return canCompleteInSharedForm({
+    assessmentCode: definition.assessmentCode,
+    clientCompletable: definition.clientCompletable,
+    practitionerCompletable: definition.practitionerCompletable,
+    isActive: definition.isActive,
+    hasActiveElements: definition.elements.length > 0,
+  })
+}
+
 export async function saveNewPractitionerAssessment(
   clientId: string,
   assessmentCode: string,
@@ -84,14 +102,7 @@ export async function saveNewPractitionerAssessment(
   }
 
   const definition = await loadFormDefinitionByCode(assessmentCode)
-  if (
-    !definition ||
-    !usesSharedPractitionerForm({
-      assessmentCode: definition.assessmentCode,
-      clientCompletable: definition.clientCompletable,
-      practitionerCompletable: definition.practitionerCompletable,
-    })
-  ) {
+  if (!definition || !sharedFormGate(definition)) {
     return { error: "Assessment definition not found." }
   }
 
@@ -119,6 +130,22 @@ export async function saveNewPractitionerAssessment(
   const returnTo =
     safeReturnTo(String(formData.get("return_to") ?? "")) ??
     `/clients/${clientId}/assessments`
+
+  const scored = definition.scoringEnabled
+    ? scoreAssessment({
+        assessmentCode: definition.assessmentCode,
+        responses: rows.map((row) => {
+          const meta = definition.elementScoreMetaByKey[row.elementKey]
+          return {
+            elementKey: row.elementKey,
+            domainCode: meta?.domainCode ?? null,
+            dataType: meta?.dataType ?? "integer",
+            scoreValue: row.scoreValue,
+            responseValue: row.responseValue,
+          }
+        }),
+      })
+    : null
 
   await db.transaction(async (tx) => {
     const [instance] = await tx
@@ -156,24 +183,61 @@ export async function saveNewPractitionerAssessment(
       )
     }
 
-    await tx.insert(assessmentResults).values({
-      assessmentInstanceId: instance.assessmentInstanceId,
-      clientId,
-      practiceId: context.practiceId,
-      score: null,
-      severity: null,
-      status: "completed",
-      assessmentDate,
-    })
+    if (scored) {
+      // Same result columns + default status ("scored") as the client submit route.
+      const [result] = await tx
+        .insert(assessmentResults)
+        .values({
+          assessmentInstanceId: instance.assessmentInstanceId,
+          clientId,
+          practiceId: context.practiceId,
+          score: scored.score,
+          severity: scored.severity,
+          structuredScoreJson: scored.structuredScoreJson,
+          assessmentDate,
+        })
+        .returning({
+          assessmentResultId: assessmentResults.assessmentResultId,
+        })
 
-    await tx.insert(auditEvents).values({
-      practiceId: context.practiceId,
-      userId: context.userId,
-      clientId,
-      eventType: "assessment.submitted",
-      entityType: "assessment_instance",
-      entityId: instance.assessmentInstanceId,
-    })
+      await tx.insert(auditEvents).values({
+        practiceId: context.practiceId,
+        userId: context.userId,
+        clientId,
+        eventType: "assessment.submitted",
+        entityType: "assessment_instance",
+        entityId: instance.assessmentInstanceId,
+      })
+
+      await tx.insert(auditEvents).values({
+        practiceId: context.practiceId,
+        userId: context.userId,
+        clientId,
+        eventType: "assessment_result.scored",
+        entityType: "assessment_result",
+        entityId: result.assessmentResultId,
+      })
+    } else {
+      // Unscored practitioner-only (LRAMP): status completed, no numeric score.
+      await tx.insert(assessmentResults).values({
+        assessmentInstanceId: instance.assessmentInstanceId,
+        clientId,
+        practiceId: context.practiceId,
+        score: null,
+        severity: null,
+        status: "completed",
+        assessmentDate,
+      })
+
+      await tx.insert(auditEvents).values({
+        practiceId: context.practiceId,
+        userId: context.userId,
+        clientId,
+        eventType: "assessment.submitted",
+        entityType: "assessment_instance",
+        entityId: instance.assessmentInstanceId,
+      })
+    }
   })
 
   redirect(returnTo)
@@ -212,6 +276,13 @@ export async function saveEditPractitionerAssessment(
     return { error: "Assessment instance not found." }
   }
 
+  // Clients' own answers must never be edited.
+  if (await instanceHasAccessLink(instanceId)) {
+    return {
+      error: "This assessment was completed by the client and cannot be edited.",
+    }
+  }
+
   // Gate on the instance's own definition (not only the posted code).
   const assessmentCode = String(formData.get("assessment_code") ?? "").trim()
   const definition = await loadFormDefinitionByCode(assessmentCode)
@@ -221,13 +292,7 @@ export async function saveEditPractitionerAssessment(
   ) {
     return { error: "Assessment definition not found." }
   }
-  if (
-    !usesSharedPractitionerForm({
-      assessmentCode: definition.assessmentCode,
-      clientCompletable: definition.clientCompletable,
-      practitionerCompletable: definition.practitionerCompletable,
-    })
-  ) {
+  if (!sharedFormGate(definition)) {
     return { error: "This assessment cannot be edited with the shared form." }
   }
 
@@ -256,6 +321,22 @@ export async function saveEditPractitionerAssessment(
     safeReturnTo(String(formData.get("return_to") ?? "")) ??
     `/clients/${clientId}/assessments`
 
+  const scored = definition.scoringEnabled
+    ? scoreAssessment({
+        assessmentCode: definition.assessmentCode,
+        responses: rows.map((row) => {
+          const meta = definition.elementScoreMetaByKey[row.elementKey]
+          return {
+            elementKey: row.elementKey,
+            domainCode: meta?.domainCode ?? null,
+            dataType: meta?.dataType ?? "integer",
+            scoreValue: row.scoreValue,
+            responseValue: row.responseValue,
+          }
+        }),
+      })
+    : null
+
   await db.transaction(async (tx) => {
     await tx
       .delete(assessmentResponses)
@@ -281,10 +362,22 @@ export async function saveEditPractitionerAssessment(
       )
     }
 
-    await tx
-      .update(assessmentResults)
-      .set({ assessmentDate })
-      .where(eq(assessmentResults.assessmentInstanceId, instanceId))
+    if (scored) {
+      await tx
+        .update(assessmentResults)
+        .set({
+          score: scored.score,
+          severity: scored.severity,
+          structuredScoreJson: scored.structuredScoreJson,
+          assessmentDate,
+        })
+        .where(eq(assessmentResults.assessmentInstanceId, instanceId))
+    } else {
+      await tx
+        .update(assessmentResults)
+        .set({ assessmentDate })
+        .where(eq(assessmentResults.assessmentInstanceId, instanceId))
+    }
 
     await tx
       .update(assessmentInstances)

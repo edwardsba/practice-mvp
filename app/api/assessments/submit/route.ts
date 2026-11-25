@@ -17,30 +17,8 @@ import {
   markBatteryInProgress,
   validateBatteryNextToken,
 } from "@/lib/assessments/battery-chain"
-import { calculateAsrsPartAScore, calculateAsrsPartBRawScores } from "@/lib/assessments/asrs"
-import { calculateDass21SubscaleScores } from "@/lib/assessments/dass21"
 import { evaluateAndAppendTriggers } from "@/lib/assessments/evaluate-triggers"
-import { calculateLevel1XcDomainScores } from "@/lib/assessments/level1xc"
-import { calculatePcPtsd5Score } from "@/lib/assessments/pcptsd5"
-import { calculatePhq15Score } from "@/lib/assessments/phq15"
-import { calculatePsfScore, formatPsfSeverity } from "@/lib/assessments/psf"
-import { calculateDesBScore } from "@/lib/assessments/des-b"
-import { calculateAsrmScore } from "@/lib/assessments/asrm"
-import { calculateSciScore } from "@/lib/assessments/sci"
-import { calculateSubstanceUseL2Scores } from "@/lib/assessments/substance-use-l2"
-import { calculatePid5FbfScores } from "@/lib/assessments/pid5-fbf"
-import { calculateSpecificDisorderSelectorScores } from "@/lib/assessments/specific-disorder-selector"
-import { calculatePanicDisorderScore } from "@/lib/assessments/panic-disorder"
-import { calculateAgoraphobiaScore } from "@/lib/assessments/agoraphobia"
-import { calculateSocialAnxietyScore } from "@/lib/assessments/social-anxiety"
-import { calculateSeparationAnxietyScore } from "@/lib/assessments/separation-anxiety"
-import { calculateSpecificPhobiaScore } from "@/lib/assessments/specific-phobia"
-import {
-  calculatePcl5TotalScore,
-  calculatePcl5StructuredScore,
-  pcl5SeverityLabel,
-} from "@/lib/assessments/pcl5"
-import { anxietySubtypeSeverityFromScore, asrmSeverityFromScore, phq15SeverityFromScore, sciSeverityFromScore, severityFromAssessmentCode } from "@/lib/assessments/severity"
+import { scoreAssessment } from "@/lib/assessments/scoring/score-assessment"
 import { hashAssessmentToken } from "@/lib/assessments/token"
 import { db } from "@/lib/db"
 
@@ -141,25 +119,6 @@ export async function POST(request: Request) {
   }
 
   const isBtp = definition.assessmentCode === "BTP"
-  const isPsf = definition.assessmentCode === "PSF"
-  const isLevel1Xc = definition.assessmentCode === "LEVEL1_XC"
-  const isPcPtsd5 = definition.assessmentCode === "PC_PTSD5"
-  const isAsrsPartA = definition.assessmentCode === "ASRS_PART_A"
-  const isAsrsPartB = definition.assessmentCode === "ASRS_PART_B"
-  const isDass21 = definition.assessmentCode === "DASS21"
-  const isPhq15 = definition.assessmentCode === "PHQ15"
-  const isSubstanceUseL2 = definition.assessmentCode === "SUBSTANCE_USE_L2"
-  const isDesB = definition.assessmentCode === "DES_B"
-  const isSci = definition.assessmentCode === "SCI"
-  const isAsrm = definition.assessmentCode === "ASRM"
-  const isPid5Fbf = definition.assessmentCode === "PID5_FBF"
-  const isSpecificDisorderSelector = definition.assessmentCode === "SPECIFIC_DISORDER_SELECTOR"
-  const isPanicDisorder = definition.assessmentCode === "PANIC_DISORDER"
-  const isAgoraphobia = definition.assessmentCode === "AGORAPHOBIA"
-  const isSocialAnxiety = definition.assessmentCode === "SOCIAL_ANXIETY"
-  const isSeparationAnxiety = definition.assessmentCode === "SEPARATION_ANXIETY"
-  const isSpecificPhobia = definition.assessmentCode === "SPECIFIC_PHOBIA"
-  const isPcl5 = definition.assessmentCode === "PCL5"
 
   const elementIds = Object.keys(responses)
   if (elementIds.length === 0) {
@@ -196,13 +155,14 @@ export async function POST(request: Request) {
           )
     )
 
-  const dataTypeByElementId = new Map(
-    activeElements.map((row) => [row.assessmentElementId, row.dataType])
-  )
   const elementMetaById = new Map(
     activeElements.map((row) => [
       row.assessmentElementId,
-      { elementKey: row.elementKey, domainCode: row.domainCode },
+      {
+        elementKey: row.elementKey,
+        domainCode: row.domainCode,
+        dataType: row.dataType,
+      },
     ])
   )
   const requiredElementIds = new Set(
@@ -237,9 +197,6 @@ export async function POST(request: Request) {
     scoreValue: number
   }[] = []
 
-  let totalScore = 0
-  const psfResponseScores: number[] = []
-
   for (const elementId of elementIds) {
     const responseValue = String(responses[elementId] ?? "").trim()
     if (!responseValue) {
@@ -262,36 +219,6 @@ export async function POST(request: Request) {
       responseValue,
       scoreValue,
     })
-
-    if (
-      !isBtp &&
-      !isPsf &&
-      !isLevel1Xc &&
-      !isPcPtsd5 &&
-      !isAsrsPartA &&
-      !isAsrsPartB &&
-      !isDass21 &&
-      !isPhq15 &&
-      !isSubstanceUseL2 &&
-      !isDesB &&
-      !isSci &&
-      !isAsrm &&
-      !isPid5Fbf &&
-      !isSpecificDisorderSelector &&
-      !isPanicDisorder &&
-      !isAgoraphobia &&
-      !isSocialAnxiety &&
-      !isSeparationAnxiety &&
-      !isSpecificPhobia &&
-      !isPcl5 &&
-      dataTypeByElementId.get(elementId) === "integer"
-    ) {
-      totalScore += scoreValue
-    }
-
-    if (isPsf && dataTypeByElementId.get(elementId) === "integer") {
-      psfResponseScores.push(scoreValue)
-    }
   }
 
   if (
@@ -320,94 +247,24 @@ export async function POST(request: Request) {
     }
   }
 
-  let resultScore: number | null
-  let severity: string | null
-  let structuredScore: Record<string, unknown> | null = null
-
-  const scoredResponses = responseRows.map((row) => {
-    const meta = elementMetaById.get(row.assessmentElementId)
-    return {
-      elementKey: meta?.elementKey ?? "",
-      domainCode: meta?.domainCode ?? null,
-      scoreValue: row.scoreValue,
-    }
+  const scored = scoreAssessment({
+    assessmentCode: definition.assessmentCode,
+    responses: responseRows.map((row) => {
+      const meta = elementMetaById.get(row.assessmentElementId)
+      return {
+        assessmentElementId: row.assessmentElementId,
+        elementKey: meta?.elementKey ?? "",
+        domainCode: meta?.domainCode ?? null,
+        dataType: meta?.dataType ?? "integer",
+        scoreValue: row.scoreValue,
+        responseValue: row.responseValue,
+      }
+    }),
   })
 
-  if (isBtp) {
-    resultScore = 0
-    severity = null
-  } else if (isPsf) {
-    const psfResult = calculatePsfScore(psfResponseScores)
-    resultScore = psfResult.netScore
-    severity = formatPsfSeverity(psfResult)
-  } else if (isLevel1Xc) {
-    resultScore = null
-    severity = null
-    structuredScore = calculateLevel1XcDomainScores(scoredResponses)
-  } else if (isPcPtsd5) {
-    resultScore = calculatePcPtsd5Score(scoredResponses)
-    severity = null
-  } else if (isAsrsPartA) {
-    resultScore = null
-    severity = null
-    structuredScore = calculateAsrsPartAScore(scoredResponses)
-  } else if (isAsrsPartB) {
-    resultScore = null
-    severity = null
-    structuredScore = calculateAsrsPartBRawScores(scoredResponses)
-  } else if (isDass21) {
-    resultScore = null
-    severity = null
-    structuredScore = calculateDass21SubscaleScores(scoredResponses)
-  } else if (isPhq15) {
-    resultScore = calculatePhq15Score(scoredResponses)
-    severity = resultScore === null ? null : phq15SeverityFromScore(resultScore)
-  } else if (isSubstanceUseL2) {
-    resultScore = null
-    severity = null
-    structuredScore = calculateSubstanceUseL2Scores(scoredResponses)
-  } else if (isDesB) {
-    resultScore = calculateDesBScore(scoredResponses)
-    severity = null
-  } else if (isSci) {
-    resultScore = calculateSciScore(scoredResponses)
-    severity = resultScore === null ? null : sciSeverityFromScore(resultScore)
-  } else if (isAsrm) {
-    resultScore = calculateAsrmScore(scoredResponses)
-    severity = resultScore === null ? null : asrmSeverityFromScore(resultScore)
-  } else if (isPid5Fbf) {
-    resultScore = null
-    severity = null
-    structuredScore = calculatePid5FbfScores(scoredResponses)
-  } else if (isSpecificDisorderSelector) {
-    resultScore = null
-    severity = null
-    structuredScore = calculateSpecificDisorderSelectorScores(scoredResponses)
-  } else if (isPanicDisorder) {
-    resultScore = calculatePanicDisorderScore(scoredResponses)
-    severity = resultScore === null ? null : anxietySubtypeSeverityFromScore(resultScore)
-  } else if (isAgoraphobia) {
-    resultScore = calculateAgoraphobiaScore(scoredResponses)
-    severity = resultScore === null ? null : anxietySubtypeSeverityFromScore(resultScore)
-  } else if (isSocialAnxiety) {
-    resultScore = calculateSocialAnxietyScore(scoredResponses)
-    severity = resultScore === null ? null : anxietySubtypeSeverityFromScore(resultScore)
-  } else if (isSeparationAnxiety) {
-    resultScore = calculateSeparationAnxietyScore(scoredResponses)
-    severity = resultScore === null ? null : anxietySubtypeSeverityFromScore(resultScore)
-  } else if (isSpecificPhobia) {
-    resultScore = calculateSpecificPhobiaScore(scoredResponses)
-    severity = resultScore === null ? null : anxietySubtypeSeverityFromScore(resultScore)
-  } else if (isPcl5) {
-    const totalScore = calculatePcl5TotalScore(scoredResponses)
-    const pcl5Structured = calculatePcl5StructuredScore(scoredResponses)
-    resultScore = totalScore
-    severity = pcl5SeverityLabel(totalScore, pcl5Structured)
-    structuredScore = pcl5Structured
-  } else {
-    resultScore = totalScore
-    severity = severityFromAssessmentCode(definition.assessmentCode, totalScore)
-  }
+  const resultScore = scored.score
+  const severity = scored.severity
+  const structuredScore = scored.structuredScoreJson
 
   const now = new Date()
 

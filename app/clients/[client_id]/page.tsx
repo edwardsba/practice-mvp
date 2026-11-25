@@ -15,8 +15,9 @@ import { BackButton } from "@/components/ui/back-button"
 import { EntityPageHeader } from "@/components/ui/entity-page-header"
 import { StatusBadge } from "@/components/ui/status-badge"
 import { clients } from "@/db/schema"
-import { getDefaultBatteryAssessments } from "@/lib/assessments/battery-defaults"
+import { buildSendAssessmentChips } from "@/lib/assessments/battery-defaults"
 import { loadLatestAssessmentResultForClient } from "@/lib/assessments/load"
+import { loadSendableAssessments } from "@/lib/assessments/load-sendable-assessments"
 import {
   formatAppointmentDate,
   formatAppointmentTime,
@@ -102,6 +103,7 @@ export default async function ClientDetailPage({
     latestPsf,
     background,
     medicalContacts,
+    sendableAssessments,
   ] = await Promise.all([
     loadActiveTreatmentPlanSummary(clientId, context.practiceId),
     loadActiveCrisisPlanSummary(clientId, context.practiceId),
@@ -116,6 +118,7 @@ export default async function ClientDetailPage({
     loadLatestAssessmentResultForClient(clientId, context.practiceId, "PSF"),
     loadClientBackground(clientId, context.practiceId),
     loadMedicalContactsForClient(clientId, context.practiceId),
+    loadSendableAssessments(),
   ])
 
   const stressorsLine = formatStressorsSummary(background?.stressors)
@@ -140,7 +143,8 @@ export default async function ClientDetailPage({
       })
     : null
 
-  const defaultBatteryAssessments = getDefaultBatteryAssessments(
+  const defaultBatteryAssessments = buildSendAssessmentChips(
+    sendableAssessments,
     activeTreatmentPlan?.ongoingAssessmentsJson,
     activeTreatmentPlan?.smartGoalItems ?? []
   )

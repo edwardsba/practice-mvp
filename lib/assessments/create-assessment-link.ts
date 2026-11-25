@@ -9,6 +9,7 @@ import {
   auditEvents,
   clients,
 } from "@/db/schema"
+import { canCreateClientAssessmentLink } from "@/lib/assessments/sendable-assessments"
 import { hashAssessmentToken } from "@/lib/assessments/token"
 import { db } from "@/lib/db"
 import { buildTemplateVariablesFromLinkResponse } from "@/lib/email/link-response"
@@ -98,21 +99,24 @@ export async function createAssessmentLink(
   const [definition] = await db
     .select({
       assessmentDefinitionId: assessmentDefinitions.assessmentDefinitionId,
+      isActive: assessmentDefinitions.isActive,
+      clientCompletable: assessmentDefinitions.clientCompletable,
     })
     .from(assessmentDefinitions)
-    .where(
-      and(
-        eq(assessmentDefinitions.assessmentCode, assessmentCode),
-        eq(assessmentDefinitions.isActive, true)
-      )
-    )
+    .where(eq(assessmentDefinitions.assessmentCode, assessmentCode))
     .limit(1)
 
-  if (!definition) {
+  const sendableCheck = canCreateClientAssessmentLink(definition ?? null)
+  if (!sendableCheck.ok || !definition) {
+    const status =
+      sendableCheck.ok === false &&
+      sendableCheck.error === "This assessment can't be sent to a client."
+        ? 400
+        : 404
     return {
       ok: false,
-      error: "Assessment definition not found.",
-      status: 404,
+      error: sendableCheck.ok ? "Assessment definition not found." : sendableCheck.error,
+      status,
     }
   }
 

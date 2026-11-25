@@ -4,7 +4,8 @@ import { and, eq } from "drizzle-orm"
 import { CommunicationsPageClient } from "@/app/clients/[client_id]/communications/communications-page-client"
 import { AppShell } from "@/components/app-shell"
 import { clients } from "@/db/schema"
-import { getDefaultBatteryAssessments } from "@/lib/assessments/battery-defaults"
+import { buildSendAssessmentChips } from "@/lib/assessments/battery-defaults"
+import { loadSendableAssessments } from "@/lib/assessments/load-sendable-assessments"
 import { requirePractitionerContext } from "@/lib/auth"
 import { loadCommunicationsForClient } from "@/lib/communications/load"
 import { db } from "@/lib/db"
@@ -46,14 +47,16 @@ export default async function ClientCommunicationsPage({
     notFound()
   }
 
-  const [communications, activeTreatmentPlan, emailContext] = await Promise.all([
-    loadCommunicationsForClient(clientId, context.practiceId),
-    loadActiveTreatmentPlanSummary(clientId, context.practiceId),
-    getQuestionnaireEmailContext(
-      context.practiceId,
-      context.practitionerProfileId
-    ),
-  ])
+  const [communications, activeTreatmentPlan, emailContext, sendableAssessments] =
+    await Promise.all([
+      loadCommunicationsForClient(clientId, context.practiceId),
+      loadActiveTreatmentPlanSummary(clientId, context.practiceId),
+      getQuestionnaireEmailContext(
+        context.practiceId,
+        context.practitionerProfileId
+      ),
+      loadSendableAssessments(),
+    ])
 
   const clientEmail = client.email?.trim() || null
   const estimatedExpiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
@@ -65,7 +68,8 @@ export default async function ClientCommunicationsPage({
         expiresAt: estimatedExpiry,
       })
     : null
-  const defaultBatteryAssessments = getDefaultBatteryAssessments(
+  const defaultBatteryAssessments = buildSendAssessmentChips(
+    sendableAssessments,
     activeTreatmentPlan?.ongoingAssessmentsJson,
     activeTreatmentPlan?.smartGoalItems ?? []
   )

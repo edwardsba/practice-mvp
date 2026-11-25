@@ -1,29 +1,36 @@
-export const BATTERY_ASSESSMENT_CODES = ["BTP", "PHQ9", "GAD7", "ASSIST"] as const
+/**
+ * Default pre-session battery set (BTP / PHQ-9 / GAD-7 / ASSIST).
+ * Not the list of every assessment that can be sent to a client — that comes
+ * from the database via load-sendable-assessments / sendable-assessments.
+ */
 
-export type BatteryAssessmentCode = (typeof BATTERY_ASSESSMENT_CODES)[number]
+import {
+  DEFAULT_PRE_SESSION_BATTERY_CODES,
+  PRE_SESSION_BATTERY_CODES,
+  PRE_SESSION_BATTERY_LABELS,
+  PRE_SESSION_BATTERY_SEQUENCE,
+  isPreSessionBatteryCode,
+  type PreSessionBatteryCode,
+} from "@/lib/assessments/sendable-assessments"
 
-export const BATTERY_ASSESSMENT_LABELS: Record<BatteryAssessmentCode, string> = {
-  BTP: "BTP",
-  PHQ9: "PHQ-9",
-  GAD7: "GAD-7",
-  ASSIST: "ASSIST",
-}
+/** @deprecated Prefer PRE_SESSION_BATTERY_CODES — kept as the historical name. */
+export const BATTERY_ASSESSMENT_CODES = PRE_SESSION_BATTERY_CODES
 
-export const BATTERY_SEQUENCE_ORDER: BatteryAssessmentCode[] = [
-  "BTP",
-  "PHQ9",
-  "GAD7",
-  "ASSIST",
-]
+export type BatteryAssessmentCode = PreSessionBatteryCode
 
-export const DEFAULT_BATTERY_CODES: BatteryAssessmentCode[] = ["PHQ9", "GAD7"]
+export const BATTERY_ASSESSMENT_LABELS = PRE_SESSION_BATTERY_LABELS
+
+export const BATTERY_SEQUENCE_ORDER = PRE_SESSION_BATTERY_SEQUENCE
+
+export const DEFAULT_BATTERY_CODES = DEFAULT_PRE_SESSION_BATTERY_CODES
 
 export function isBatteryAssessmentCode(
   code: string
 ): code is BatteryAssessmentCode {
-  return BATTERY_ASSESSMENT_CODES.includes(code as BatteryAssessmentCode)
+  return isPreSessionBatteryCode(code)
 }
 
+/** Keep only known pre-session battery codes (uppercased, deduped). */
 export function normalizeBatteryCodes(codes: string[]): BatteryAssessmentCode[] {
   const seen = new Set<BatteryAssessmentCode>()
   const normalized: BatteryAssessmentCode[] = []

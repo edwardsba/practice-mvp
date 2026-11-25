@@ -1,5 +1,5 @@
 import { randomBytes } from "crypto"
-import { and, eq } from "drizzle-orm"
+import { and, eq, inArray } from "drizzle-orm"
 
 import {
   assessmentAccessLinks,
@@ -9,10 +9,6 @@ import {
   batteryInstances,
   clients,
 } from "@/db/schema"
-import {
-  isBatteryAssessmentCode,
-  type BatteryAssessmentCode,
-} from "@/lib/assessments/battery-codes"
 import { createBtpInstanceElements } from "@/lib/assessments/btp"
 import { resolveBatteryChainCodes } from "@/lib/assessments/resolve-battery-chain"
 import { hashAssessmentToken } from "@/lib/assessments/token"
@@ -54,12 +50,16 @@ export async function createBatteryInstance(
     return { ok: false, error: "client_id and practitioner_profile_id are required." }
   }
 
-  const { codes: requestedCodes, smartGoals } =
-    await resolveBatteryChainCodes(
-      clientId,
-      practiceId,
-      params.assessmentCodes
-    )
+  const resolved = await resolveBatteryChainCodes(
+    clientId,
+    practiceId,
+    params.assessmentCodes
+  )
+  if (!resolved.ok) {
+    return { ok: false, error: resolved.error }
+  }
+
+  const { codes: requestedCodes, smartGoals } = resolved
 
   if (requestedCodes.length === 0) {
     return { ok: false, error: "At least one valid assessment code is required." }
@@ -99,12 +99,15 @@ export async function createBatteryInstance(
       assessmentCode: assessmentDefinitions.assessmentCode,
     })
     .from(assessmentDefinitions)
-    .where(eq(assessmentDefinitions.isActive, true))
+    .where(
+      and(
+        eq(assessmentDefinitions.isActive, true),
+        inArray(assessmentDefinitions.assessmentCode, requestedCodes)
+      )
+    )
 
   const definitionByCode = new Map(
-    definitions
-      .filter((row) => isBatteryAssessmentCode(row.assessmentCode))
-      .map((row) => [row.assessmentCode as BatteryAssessmentCode, row])
+    definitions.map((row) => [row.assessmentCode, row])
   )
 
   for (const code of requestedCodes) {
@@ -155,7 +158,7 @@ export async function createBatteryInstance(
 
         item.instanceId = instance.assessmentInstanceId
 
-        if (item.code === "BTP") {
+        if (item.code.toUpperCase() === "BTP") {
           await createBtpInstanceElements(
             instance.assessmentInstanceId,
             smartGoals,
@@ -201,10 +204,10 @@ export async function createBatteryInstance(
 
       firstAccessLinkId = chain[0].accessLinkId
 
-      const phq9 = chain.find((item) => item.code === "PHQ9")
-      const gad7 = chain.find((item) => item.code === "GAD7")
-      const btp = chain.find((item) => item.code === "BTP")
-      const assist = chain.find((item) => item.code === "ASSIST")
+      const phq9 = chain.find((item) => item.code.toUpperCase() === "PHQ9")
+      const gad7 = chain.find((item) => item.code.toUpperCase() === "GAD7")
+      const btp = chain.find((item) => item.code.toUpperCase() === "BTP")
+      const assist = chain.find((item) => item.code.toUpperCase() === "ASSIST")
 
       const firstItem = chain[0]
       const lastItem = chain[chain.length - 1]

@@ -7,8 +7,9 @@ import { AppShell } from "@/components/app-shell"
 import { BackButton } from "@/components/ui/back-button"
 import { EntityPageHeader } from "@/components/ui/entity-page-header"
 import { clients } from "@/db/schema"
-import { getDefaultBatteryAssessments } from "@/lib/assessments/battery-defaults"
+import { buildSendAssessmentChips } from "@/lib/assessments/battery-defaults"
 import { loadAssessmentResultsForClient } from "@/lib/assessments/load-results"
+import { loadSendableAssessments } from "@/lib/assessments/load-sendable-assessments"
 import { requirePractitionerContext } from "@/lib/auth"
 import { db } from "@/lib/db"
 import { buildTemplateVariablesFromLinkResponse } from "@/lib/email/link-response"
@@ -43,14 +44,16 @@ export default async function ClientAssessmentsPage({
     notFound()
   }
 
-  const [results, activeTreatmentPlan, emailContext] = await Promise.all([
-    loadAssessmentResultsForClient(clientId, context.practiceId),
-    loadActiveTreatmentPlanSummary(clientId, context.practiceId),
-    getQuestionnaireEmailContext(
-      context.practiceId,
-      context.practitionerProfileId
-    ),
-  ])
+  const [results, activeTreatmentPlan, emailContext, sendableAssessments] =
+    await Promise.all([
+      loadAssessmentResultsForClient(clientId, context.practiceId),
+      loadActiveTreatmentPlanSummary(clientId, context.practiceId),
+      getQuestionnaireEmailContext(
+        context.practiceId,
+        context.practitionerProfileId
+      ),
+      loadSendableAssessments(),
+    ])
 
   const clientName = `${client.firstName} ${client.lastName}`
   const clientEmail = client.email?.trim() || null
@@ -63,7 +66,8 @@ export default async function ClientAssessmentsPage({
         expiresAt: estimatedExpiry,
       })
     : null
-  const defaultAssessments = getDefaultBatteryAssessments(
+  const defaultAssessments = buildSendAssessmentChips(
+    sendableAssessments,
     activeTreatmentPlan?.ongoingAssessmentsJson,
     activeTreatmentPlan?.smartGoalItems ?? []
   )

@@ -7,7 +7,7 @@ import {
   assessmentResponses,
   assessmentResults,
 } from "@/db/schema"
-import { LRAMP_ELEMENTS } from "@/lib/assessments/definitions/lramp"
+import { loadFormDefinitionByCode } from "@/lib/assessments/load-form-definition"
 import { lrampShortDisposition } from "@/lib/assessments/lramp-summary"
 import { db } from "@/lib/db"
 
@@ -68,6 +68,9 @@ export async function loadAssessmentResultsForClient(
   const dispositionByInstanceId = new Map<string, string>()
 
   if (lrampInstanceIds.length > 0) {
+    // Load the LRAMP definition once from the database (not the seed file).
+    const lrampDefinition = await loadFormDefinitionByCode("LRAMP")
+
     // One query for all LRAMP F1 answers on this list — not one per row.
     const f1Rows = await db
       .select({
@@ -94,13 +97,15 @@ export async function loadAssessmentResultsForClient(
         )
       )
 
-    for (const row of f1Rows) {
-      if (!row.responseValue) continue
-      const label = lrampShortDisposition(LRAMP_ELEMENTS, {
-        lramp_f1: [row.responseValue],
-      })
-      if (label) {
-        dispositionByInstanceId.set(row.assessmentInstanceId, label)
+    if (lrampDefinition) {
+      for (const row of f1Rows) {
+        if (!row.responseValue) continue
+        const label = lrampShortDisposition(lrampDefinition.elements, {
+          lramp_f1: [row.responseValue],
+        })
+        if (label) {
+          dispositionByInstanceId.set(row.assessmentInstanceId, label)
+        }
       }
     }
   }

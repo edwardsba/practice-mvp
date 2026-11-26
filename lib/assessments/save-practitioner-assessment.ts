@@ -14,16 +14,62 @@ import {
   toResponseRows,
   validateAnswers,
   type FormAnswers,
+  type FormElement,
+  type FormResponseRow,
 } from "@/lib/assessments/form-rules"
 import { instanceHasAccessLink } from "@/lib/assessments/instance-access-link"
-import { loadFormDefinitionByCode } from "@/lib/assessments/load-form-definition"
+import {
+  loadFormDefinitionByCode,
+  type LoadedFormDefinition,
+} from "@/lib/assessments/load-form-definition"
 import { canCompleteInSharedForm } from "@/lib/assessments/practitioner-routes"
-import { scoreAssessment } from "@/lib/assessments/scoring/score-assessment"
+import {
+  scoreAssessment,
+  type ScoreAssessmentResult,
+} from "@/lib/assessments/scoring/score-assessment"
 import { requirePractitionerContext } from "@/lib/auth"
 import { practiceLocalToUtc } from "@/lib/dates/practice-time"
 import { db } from "@/lib/db"
 import { safeReturnTo } from "@/lib/navigation/safe-return-to"
 import { loadSessionNoteForPractice } from "@/lib/session-notes/load"
+
+/**
+ * Score when scoring_enabled is true, or for mse (scoring_enabled false but
+ * the shared save still writes severity + structured_score_json).
+ */
+function scorePractitionerResponses(
+  definition: Pick<
+    LoadedFormDefinition,
+    "assessmentCode" | "scoringEnabled" | "elementScoreMetaByKey" | "elements"
+  >,
+  rows: FormResponseRow[]
+): ScoreAssessmentResult | null {
+  const shouldScore =
+    definition.scoringEnabled || definition.assessmentCode === "mse"
+  if (!shouldScore) return null
+
+  const elementsByKey = new Map(
+    definition.elements.map((el: FormElement) => [el.elementKey, el])
+  )
+
+  return scoreAssessment({
+    assessmentCode: definition.assessmentCode,
+    responses: rows.map((row) => {
+      const meta = definition.elementScoreMetaByKey[row.elementKey]
+      const element = elementsByKey.get(row.elementKey)
+      const option = element?.options.find((o) => o.value === row.responseValue)
+      return {
+        elementKey: row.elementKey,
+        domainCode: meta?.domainCode ?? null,
+        dataType: meta?.dataType ?? "",
+        scoreValue: row.scoreValue,
+        responseValue: row.responseValue,
+        optionLabel: option?.label,
+        isReportingBaseline: option?.isReportingBaseline,
+      }
+    }),
+  })
+}
 
 export type SavePractitionerAssessmentState = {
   error?: string
@@ -131,21 +177,7 @@ export async function saveNewPractitionerAssessment(
     safeReturnTo(String(formData.get("return_to") ?? "")) ??
     `/clients/${clientId}/assessments`
 
-  const scored = definition.scoringEnabled
-    ? scoreAssessment({
-        assessmentCode: definition.assessmentCode,
-        responses: rows.map((row) => {
-          const meta = definition.elementScoreMetaByKey[row.elementKey]
-          return {
-            elementKey: row.elementKey,
-            domainCode: meta?.domainCode ?? null,
-            dataType: meta?.dataType ?? "",
-            scoreValue: row.scoreValue,
-            responseValue: row.responseValue,
-          }
-        }),
-      })
-    : null
+  const scored = scorePractitionerResponses(definition, rows)
 
   await db.transaction(async (tx) => {
     const [instance] = await tx
@@ -185,6 +217,7 @@ export async function saveNewPractitionerAssessment(
 
     if (scored) {
       // Same result columns + default status ("scored") as the client submit route.
+      // MSE uses this path even though scoring_enabled is false on the definition.
       const [result] = await tx
         .insert(assessmentResults)
         .values({
@@ -321,21 +354,7 @@ export async function saveEditPractitionerAssessment(
     safeReturnTo(String(formData.get("return_to") ?? "")) ??
     `/clients/${clientId}/assessments`
 
-  const scored = definition.scoringEnabled
-    ? scoreAssessment({
-        assessmentCode: definition.assessmentCode,
-        responses: rows.map((row) => {
-          const meta = definition.elementScoreMetaByKey[row.elementKey]
-          return {
-            elementKey: row.elementKey,
-            domainCode: meta?.domainCode ?? null,
-            dataType: meta?.dataType ?? "",
-            scoreValue: row.scoreValue,
-            responseValue: row.responseValue,
-          }
-        }),
-      })
-    : null
+  const scored = scorePractitionerResponses(definition, rows)
 
   await db.transaction(async (tx) => {
     await tx

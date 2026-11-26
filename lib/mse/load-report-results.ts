@@ -64,7 +64,7 @@ async function buildMseRowsFromInstances(
 
   for (const row of responseRows) {
     const fieldKey = MSE_ELEMENT_KEY_TO_FIELD[row.elementKey]
-    if (!fieldKey) continue // skips suicidality
+    if (!fieldKey) continue
 
     const fields = fieldsByInstance.get(row.assessmentInstanceId) ?? {}
     fields[fieldKey] = {

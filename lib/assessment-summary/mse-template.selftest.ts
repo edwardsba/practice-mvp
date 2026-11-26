@@ -24,8 +24,9 @@ function allNormalSession(date: string): MseReportResultRow {
       depersonalisationDerealisation: baseline("None"),
       homicidality: baseline("None"),
       delusions: baseline("None"),
-      orientation: baseline("None"),
-      memory: baseline("None"),
+      suicidality: baseline("None"),
+      orientation: baseline("Fully oriented"),
+      memory: baseline("Intact"),
       attention: baseline("Normal"),
       insight: baseline("Good"),
       judgement: baseline("Good"),
@@ -93,14 +94,14 @@ assertParagraph(
       ...allNormalSession("2026-01-08"),
       fields: {
         ...allNormalSession("2026-01-08").fields,
-        memory: abnormal("Short-Term"),
+        memory: abnormal("Short-term impaired"),
       },
     },
     {
       ...allNormalSession("2026-01-15"),
       fields: {
         ...allNormalSession("2026-01-15").fields,
-        memory: abnormal("Short-Term"),
+        memory: abnormal("Short-term impaired"),
       },
     },
     allNormalSession("2026-01-22"),
@@ -151,16 +152,29 @@ assertParagraph(
 }
 
 {
-  const withSuicidalityNoise = allNormalSession("2026-01-01")
-  // Suicidality is not part of the typed field set — injecting it must not affect output
-  ;(withSuicidalityNoise.fields as Record<string, { value: string; isBaseline: boolean }>).suicidality =
-    { value: "Ideation", isBaseline: false }
-
-  assert.equal(
-    buildMseProgressReportParagraph([withSuicidalityNoise]),
-    buildMseProgressReportParagraph([allNormalSession("2026-01-01")])
+  const sessions = [
+    allNormalSession("2026-01-01"),
+    {
+      ...allNormalSession("2026-01-08"),
+      fields: {
+        ...allNormalSession("2026-01-08").fields,
+        suicidality: abnormal("Ideation"),
+      },
+    },
+    {
+      ...allNormalSession("2026-01-15"),
+      fields: {
+        ...allNormalSession("2026-01-15").fields,
+        suicidality: abnormal("Ideation"),
+      },
+    },
+    allNormalSession("2026-01-22"),
+  ]
+  assertParagraph(
+    "letter paragraph includes suicidality",
+    sessions,
+    "Appearance, behaviour, eye contact, motor activity and affect were all consistently within expected limits. Perceptions and cognitions were consistently within expected limits. Thoughts included suicidal ideation on 2 of 4 sessions. Insight and judgement were both consistently good."
   )
-  console.log("ok — suicidality noise has zero effect")
 }
 
 console.log("\nAll MSE progress-report aggregation checks passed.")

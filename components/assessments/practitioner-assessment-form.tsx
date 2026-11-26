@@ -4,6 +4,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useEffect, useMemo, useState, useTransition } from "react"
 
+import { ConfirmPrefilledDialog } from "@/components/assessments/confirm-prefilled-dialog"
 import { AssessmentFormCore } from "@/components/assessments/form/assessment-form-core"
 import { DiscardChangesDialog } from "@/components/client-background/discard-changes-dialog"
 import { Button } from "@/components/ui/button"
@@ -14,6 +15,8 @@ import {
   writeAssessmentDraft,
 } from "@/lib/assessments/draft-storage"
 import {
+  prefilledConfirmDialogCopy,
+  prefilledElementKeys,
   sectionStatuses,
   showSectionProgressBar,
   validateAnswers,
@@ -28,18 +31,38 @@ import { cn } from "@/lib/utils"
 
 function statusPill(section: SectionStatus) {
   if (section.status === "skipped") return "Skipped"
-  if (section.status === "done") return "Complete"
-  return `${section.left} to answer`
+  if (section.status === "left") return `${section.left} to answer`
+  if (section.status === "to_confirm") {
+    return `${section.toConfirm} to confirm`
+  }
+  if (section.hasDefaults) return "Confirmed"
+  return "Complete"
 }
 
 function progressClass(section: SectionStatus) {
   if (section.status === "done") {
     return "border-emerald-600 bg-emerald-50 text-emerald-800"
   }
-  if (section.status === "left") {
+  if (section.status === "left" || section.status === "to_confirm") {
     return "border-amber-500 bg-amber-50 text-amber-900"
   }
   return "border-dashed border-muted-foreground/40 bg-muted/30 text-muted-foreground"
+}
+
+function progressChipExtra(section: SectionStatus) {
+  if (section.status === "left") {
+    return (
+      <span className="ml-1 text-xs font-normal">{section.left} left</span>
+    )
+  }
+  if (section.status === "to_confirm") {
+    return (
+      <span className="ml-1 text-xs font-normal">
+        {section.toConfirm} pre-filled
+      </span>
+    )
+  }
+  return null
 }
 
 export function PractitionerAssessmentForm({
@@ -77,27 +100,39 @@ export function PractitionerAssessmentForm({
   const router = useRouter()
   const [answers, setAnswers] = useState<FormAnswers>(initialAnswers)
   const [assessmentDate, setAssessmentDate] = useState(initialAssessmentDate)
+  // Edit mode: everything starts confirmed. New mode: empty until tapped.
+  const [confirmedKeys, setConfirmedKeys] = useState<Set<string>>(() => {
+    if (mode === "edit") {
+      return new Set(elements.map((el) => el.elementKey))
+    }
+    return new Set()
+  })
   const [errors, setErrors] = useState<FormValidationError[]>([])
   const [banner, setBanner] = useState<string | null>(null)
   const [dirty, setDirty] = useState(false)
   const [discardOpen, setDiscardOpen] = useState(false)
+  const [prefillDialogOpen, setPrefillDialogOpen] = useState(false)
   const [pendingHref, setPendingHref] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
   const [hydrated, setHydrated] = useState(false)
 
   const sections = useMemo(
-    () => sectionStatuses(elements, answers),
-    [elements, answers]
+    () => sectionStatuses(elements, answers, confirmedKeys),
+    [elements, answers, confirmedKeys]
   )
   const showProgress = useMemo(
     () => showSectionProgressBar(elements),
     [elements]
   )
+  const prefilledKeys = useMemo(
+    () => new Set(prefilledElementKeys(elements, answers, confirmedKeys)),
+    [elements, answers, confirmedKeys]
+  )
 
   const [openSections, setOpenSections] = useState<Record<string, boolean>>(
     () => {
       const initial: Record<string, boolean> = {}
-      const statuses = sectionStatuses(elements, initialAnswers)
+      const statuses = sectionStatuses(elements, initialAnswers, confirmedKeys)
       statuses.forEach((section, index) => {
         if (mode === "new") {
           initial[section.groupLabel] = index === 0
@@ -118,6 +153,9 @@ export function PractitionerAssessmentForm({
     if (draft) {
       setAnswers(draft.answers)
       setAssessmentDate(draft.assessmentDate)
+      if (Array.isArray(draft.confirmedKeys)) {
+        setConfirmedKeys(new Set(draft.confirmedKeys))
+      }
       setDirty(true)
     }
     setHydrated(true)
@@ -133,17 +171,28 @@ export function PractitionerAssessmentForm({
         answers,
         assessmentDate,
         savedAt: new Date().toISOString(),
+        confirmedKeys: [...confirmedKeys],
       },
     })
   }, [
     answers,
     assessmentDate,
+    confirmedKeys,
     hydrated,
     dirty,
     clientId,
     assessmentCode,
     instanceId,
   ])
+
+  function confirmElement(elementKey: string) {
+    setConfirmedKeys((prev) => {
+      if (prev.has(elementKey)) return prev
+      const next = new Set(prev)
+      next.add(elementKey)
+      return next
+    })
+  }
 
   function updateAnswers(next: FormAnswers) {
     setAnswers(next)
@@ -184,6 +233,33 @@ export function PractitionerAssessmentForm({
     router.push(href)
   }
 
+  function submitSave(finalAnswers: FormAnswers) {
+    setBanner(null)
+    setErrors([])
+
+    const formData = new FormData()
+    formData.set("answers_json", JSON.stringify(finalAnswers))
+    formData.set("assessment_date", assessmentDate)
+    formData.set("return_to", returnTo)
+    formData.set("assessment_code", assessmentCode)
+    if (sessionNoteId) formData.set("session_note_id", sessionNoteId)
+
+    clearAssessmentDraft({ clientId, assessmentCode, instanceId })
+    setDirty(false)
+
+    startTransition(async () => {
+      const result = await saveAction({}, formData)
+      if (result?.error) {
+        setBanner(result.error)
+        if (result.fieldErrors?.length) {
+          setErrors(result.fieldErrors)
+        }
+        setDirty(true)
+        return
+      }
+    })
+  }
+
   function handleSave() {
     const fieldErrors = validateAnswers(elements, answers)
     if (fieldErrors.length > 0) {
@@ -213,33 +289,46 @@ export function PractitionerAssessmentForm({
       return
     }
 
-    setBanner(null)
-    setErrors([])
+    const stillPrefilled = prefilledElementKeys(elements, answers, confirmedKeys)
+    if (stillPrefilled.length > 0) {
+      setPrefillDialogOpen(true)
+      return
+    }
 
-    const formData = new FormData()
-    formData.set("answers_json", JSON.stringify(answers))
-    formData.set("assessment_date", assessmentDate)
-    formData.set("return_to", returnTo)
-    formData.set("assessment_code", assessmentCode)
-    if (sessionNoteId) formData.set("session_note_id", sessionNoteId)
-
-    // Clear the local draft before the server redirect so Cancel/reload
-    // cannot resurrect answers after a successful Save.
-    clearAssessmentDraft({ clientId, assessmentCode, instanceId })
-    setDirty(false)
-
-    startTransition(async () => {
-      const result = await saveAction({}, formData)
-      if (result?.error) {
-        setBanner(result.error)
-        if (result.fieldErrors?.length) {
-          setErrors(result.fieldErrors)
-        }
-        setDirty(true)
-        return
-      }
-    })
+    submitSave(answers)
   }
+
+  function handlePrefillGoBack() {
+    setPrefillDialogOpen(false)
+    const nextOpen: Record<string, boolean> = { ...openSections }
+    for (const section of sections) {
+      if (section.status === "to_confirm") {
+        nextOpen[section.groupLabel] = true
+      }
+    }
+    setOpenSections(nextOpen)
+  }
+
+  function handlePrefillConfirmAndSave() {
+    setPrefillDialogOpen(false)
+    const allKeys = new Set(confirmedKeys)
+    for (const key of prefilledElementKeys(elements, answers, confirmedKeys)) {
+      allKeys.add(key)
+    }
+    setConfirmedKeys(allKeys)
+    submitSave(answers)
+  }
+
+  const prefillDialog = useMemo(() => {
+    const keys = prefilledElementKeys(elements, answers, confirmedKeys)
+    const badges = sections
+      .filter((section) => section.status === "to_confirm")
+      .map((section) => section.letter)
+    return prefilledConfirmDialogCopy({
+      count: keys.length,
+      sectionBadges: badges,
+    })
+  }, [elements, answers, confirmedKeys, sections])
 
   return (
     <div className="pb-28">
@@ -291,11 +380,7 @@ export function PractitionerAssessmentForm({
                 title={`${section.letter}. ${section.title} — ${statusPill(section)}`}
               >
                 {section.letter}
-                {section.status === "left" ? (
-                  <span className="ml-1 text-xs font-normal">
-                    {section.left} left
-                  </span>
-                ) : null}
+                {progressChipExtra(section)}
               </button>
             ))}
           </div>
@@ -364,6 +449,8 @@ export function PractitionerAssessmentForm({
                       }
                       answers={answers}
                       onAnswersChange={updateAnswers}
+                      onElementActivate={confirmElement}
+                      prefilledKeys={prefilledKeys}
                       errors={errors}
                       disabled={pending}
                     />
@@ -415,7 +502,14 @@ export function PractitionerAssessmentForm({
         }}
       />
 
-      {/* Keep Link available for progressive enhancement / crawlers */}
+      <ConfirmPrefilledDialog
+        open={prefillDialogOpen}
+        title={prefillDialog.title}
+        body={prefillDialog.body}
+        onGoBack={handlePrefillGoBack}
+        onConfirmAndSave={handlePrefillConfirmAndSave}
+      />
+
       <Link href={returnTo} className="sr-only">
         Back
       </Link>

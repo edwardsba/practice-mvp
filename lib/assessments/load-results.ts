@@ -19,7 +19,7 @@ export type AssessmentResultListRow = {
   acuteRiskRating: string | null
   assessmentCode: string
   assessmentName: string
-  /** Short disposition for LRAMP Score column; null for other instruments. */
+  /** Score-column text for LRAMP (disposition) and mse (severity); null otherwise. */
   scoreLabel: string | null
 }
 
@@ -65,7 +65,7 @@ export async function loadAssessmentResultsForClient(
     .filter((row) => row.assessmentCode === "LRAMP")
     .map((row) => row.assessmentInstanceId)
 
-  const dispositionByInstanceId = new Map<string, string>()
+  const scoreLabelByInstanceId = new Map<string, string>()
 
   if (lrampInstanceIds.length > 0) {
     // Load the LRAMP definition once from the database (not the seed file).
@@ -104,10 +104,17 @@ export async function loadAssessmentResultsForClient(
           lramp_f1: [row.responseValue],
         })
         if (label) {
-          dispositionByInstanceId.set(row.assessmentInstanceId, label)
+          scoreLabelByInstanceId.set(row.assessmentInstanceId, label)
         }
       }
     }
+  }
+
+  // MSE Score column shows the severity text ("Within limits" / "N noted").
+  for (const row of results) {
+    if (row.assessmentCode !== "mse") continue
+    if (!row.severity?.trim()) continue
+    scoreLabelByInstanceId.set(row.assessmentInstanceId, row.severity.trim())
   }
 
   return results.map((row) => ({
@@ -118,6 +125,6 @@ export async function loadAssessmentResultsForClient(
     acuteRiskRating: row.acuteRiskRating,
     assessmentCode: row.assessmentCode,
     assessmentName: row.assessmentName,
-    scoreLabel: dispositionByInstanceId.get(row.assessmentInstanceId) ?? null,
+    scoreLabel: scoreLabelByInstanceId.get(row.assessmentInstanceId) ?? null,
   }))
 }

@@ -1,28 +1,26 @@
 /**
  * Where each practitioner assessment opens from the Start page.
- * Keep MSE on its existing route until it moves onto the shared form —
- * then delete that line. ASQ uses the shared form.
+ * All practitioner assessments that canCompleteInSharedForm use the shared
+ * form. LEGACY_START must stay empty — legacy MSE/ASQ pages remain on disk
+ * unlinked until Round AI removes them.
  */
 
 export type PractitionerStartTarget =
   | { kind: "legacy"; pathSuffix: string }
   | { kind: "shared" }
 
-const LEGACY_START: Record<string, string> = {
-  mse: "mse/new",
-}
+/** Must remain empty. Guard self-test fails if any code is listed here. */
+const LEGACY_START: Record<string, string> = {}
 
 /**
  * Client-completable codes that must not use the shared practitioner form yet.
  * BTP: questions are built from SMART goals at send time.
  * BACKGROUND_SR: own questionnaire / results path.
- * mse: legacy practitioner page (also listed in LEGACY_START).
- * ASQ is practitioner-only and uses the shared form (not listed here).
+ * MSE and ASQ are practitioner-only and use the shared form (not listed here).
  */
 const SHARED_FORM_EXCLUDED_CLIENT_CODES = [
   "BTP",
   "BACKGROUND_SR",
-  "mse",
 ] as const
 
 export type SharedFormDefinitionGate = {
@@ -35,7 +33,7 @@ export type SharedFormDefinitionGate = {
 
 /**
  * True when the shared practitioner form (new/edit + save) may complete this
- * definition: practitioner-only non-legacy instruments (LRAMP today), and
+ * definition: practitioner-only non-legacy instruments (LRAMP, ASQ, mse), and
  * active client questionnaires that are also practitioner-completable with
  * elements — except the excluded codes above.
  */
@@ -48,7 +46,7 @@ export function canCompleteInSharedForm(
   if (def.assessmentCode in LEGACY_START) return false
 
   if (!def.clientCompletable) {
-    // Practitioner-only, non-legacy (LRAMP).
+    // Practitioner-only, non-legacy (LRAMP, ASQ, mse).
     return true
   }
 
@@ -64,7 +62,7 @@ export function canCompleteInSharedForm(
 }
 
 /**
- * True for practitioner-only, non-legacy assessments (LRAMP, ASQ).
+ * True for practitioner-only, non-legacy assessments (LRAMP, ASQ, mse).
  * Shared early Results branch (summary box + answer sections); scored
  * client questionnaires keep the default Results layout.
  */
@@ -117,4 +115,9 @@ export function buildPractitionerEditHref(params: {
   const query = new URLSearchParams()
   query.set("returnTo", params.returnTo)
   return `/clients/${params.clientId}/assessments/edit/${params.instanceId}?${query.toString()}`
+}
+
+/** Exported for the shared-form guard self-test only. */
+export function legacyStartEntriesForGuard(): Record<string, string> {
+  return { ...LEGACY_START }
 }

@@ -27,8 +27,9 @@ function allNormal(): MseSessionNoteResponses {
     depersonalisationDerealisation: baseline("None"),
     homicidality: baseline("None"),
     delusions: baseline("None"),
-    orientation: baseline("None"),
-    memory: baseline("None"),
+    suicidality: baseline("None"),
+    orientation: baseline("Fully oriented"),
+    memory: baseline("Intact"),
     attention: baseline("Normal"),
     insight: baseline("Good"),
     judgement: baseline("Good"),
@@ -82,9 +83,37 @@ assertSentence(
 )
 
 assertSentence(
-  "Mental Function group partially abnormal (only Memory)",
+  "Mental Function group partially abnormal (only Memory, new label)",
+  withOverrides({ memory: abnormal("Short-term impaired") }),
+  "Appearance, behaviour, eye contact, motor activity and affect were all within expected limits. Perceptions and thoughts were within expected limits. Cognitions included short-term memory impairment. Insight and judgement were both good."
+)
+
+assertSentence(
+  "legacy Memory Short-Term still maps",
   withOverrides({ memory: abnormal("Short-Term") }),
   "Appearance, behaviour, eye contact, motor activity and affect were all within expected limits. Perceptions and thoughts were within expected limits. Cognitions included short-term memory impairment. Insight and judgement were both good."
+)
+
+assertSentence(
+  "new Orientation label",
+  withOverrides({
+    orientation: abnormal("Disoriented to time and place"),
+  }),
+  "Appearance, behaviour, eye contact, motor activity and affect were all within expected limits. Perceptions and thoughts were within expected limits. Cognitions included disorientation to time and place. Insight and judgement were both good."
+)
+
+assertSentence(
+  "legacy Orientation Time still maps",
+  withOverrides({ orientation: abnormal("Time") }),
+  "Appearance, behaviour, eye contact, motor activity and affect were all within expected limits. Perceptions and thoughts were within expected limits. Cognitions included disorientation to time. Insight and judgement were both good."
+)
+
+assertSentence(
+  "short- and long-term memory impairment",
+  withOverrides({
+    memory: abnormal("Short- and long-term impaired"),
+  }),
+  "Appearance, behaviour, eye contact, motor activity and affect were all within expected limits. Perceptions and thoughts were within expected limits. Cognitions included short- and long-term memory impairment. Insight and judgement were both good."
 )
 
 assertSentence(
@@ -95,6 +124,30 @@ assertSentence(
     attention: abnormal("Distracted"),
   }),
   "Appearance, behaviour, eye contact, motor activity and affect were all within expected limits. Perceptions included auditory hallucinations. Thoughts included paranoid delusions. Cognitions included distracted attention. Insight and judgement were both good."
+)
+
+assertSentence(
+  "Suicidality Ideation",
+  withOverrides({ suicidality: abnormal("Ideation") }),
+  "Appearance, behaviour, eye contact, motor activity and affect were all within expected limits. Perceptions and cognitions were within expected limits. Thoughts included suicidal ideation. Insight and judgement were both good."
+)
+
+assertSentence(
+  "Suicidality Plan",
+  withOverrides({ suicidality: abnormal("Plan") }),
+  "Appearance, behaviour, eye contact, motor activity and affect were all within expected limits. Perceptions and cognitions were within expected limits. Thoughts included a suicide plan. Insight and judgement were both good."
+)
+
+assertSentence(
+  "Suicidality Intent",
+  withOverrides({ suicidality: abnormal("Intent") }),
+  "Appearance, behaviour, eye contact, motor activity and affect were all within expected limits. Perceptions and cognitions were within expected limits. Thoughts included suicidal intent. Insight and judgement were both good."
+)
+
+assertSentence(
+  "Suicidality Self-Harm",
+  withOverrides({ suicidality: abnormal("Self-Harm") }),
+  "Appearance, behaviour, eye contact, motor activity and affect were all within expected limits. Perceptions and cognitions were within expected limits. Thoughts included self-harm. Insight and judgement were both good."
 )
 
 assertSentence(
@@ -132,15 +185,5 @@ assertSentence(
   }),
   "Appearance, behaviour, eye contact, motor activity and affect were all within expected limits. Perceptions, thoughts and cognitions were all within expected limits. Insight was good. Judgement was poor."
 )
-
-const withSuicidalityIdeation = withOverrides({})
-const withoutSuicidality = withOverrides({})
-// Suicidality is not a sentence-engine field — ensuring an external suicidality
-// selection cannot be passed in via the typed responses object.
-assert.equal(
-  buildMseSessionNoteSentence(withSuicidalityIdeation),
-  buildMseSessionNoteSentence(withoutSuicidality)
-)
-console.log("ok — suicidality absent from engine (typed field excluded)")
 
 console.log("\nAll MSE session-note sentence checks passed.")

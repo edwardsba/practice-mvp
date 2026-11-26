@@ -4,6 +4,7 @@ import { notFound } from "next/navigation"
 import { PractitionerAssessmentForm } from "@/components/assessments/practitioner-assessment-form"
 import { AppShell } from "@/components/app-shell"
 import { clients, practitionerProfiles } from "@/db/schema"
+import { defaultAnswersFromElements } from "@/lib/assessments/form-rules"
 import { loadFormDefinitionByCode } from "@/lib/assessments/load-form-definition"
 import { canCompleteInSharedForm } from "@/lib/assessments/practitioner-routes"
 import { saveNewPractitionerAssessment } from "@/lib/assessments/save-practitioner-assessment"
@@ -105,7 +106,7 @@ export default async function NewPractitionerAssessmentPage({
         assessmentCode={assessmentCode}
         shortName={definition.shortName}
         elements={definition.elements}
-        initialAnswers={{}}
+        initialAnswers={defaultAnswersFromElements(definition.elements)}
         initialAssessmentDate={todayDateInput()}
         sessionNoteId={sessionNoteId}
         returnTo={returnTo}

@@ -128,6 +128,8 @@ export async function loadFormDefinitionByCode(
             optionValue: assessmentOptions.optionValue,
             scoreValue: assessmentOptions.scoreValue,
             displayOrder: assessmentOptions.displayOrder,
+            isDefaultSelection: assessmentOptions.isDefaultSelection,
+            isReportingBaseline: assessmentOptions.isReportingBaseline,
           })
           .from(assessmentOptions)
           .where(
@@ -146,6 +148,8 @@ export async function loadFormDefinitionByCode(
       value: option.optionValue,
       displayOrder: option.displayOrder,
       scoreValue: option.scoreValue,
+      isDefaultSelection: option.isDefaultSelection,
+      isReportingBaseline: option.isReportingBaseline,
     })
     optionsByElementId.set(option.assessmentElementId, list)
   }

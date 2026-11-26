@@ -11,11 +11,14 @@ export type RadioOption = {
 /**
  * Shared vertical radio list (client questionnaire style).
  * Full-width bordered rows, round radio + label, selected-row highlight.
+ * onOptionActivate fires on every row click, including re-tapping the
+ * already-selected option (Radix onValueChange does not).
  */
 export function RadioOptionList({
   options,
   value,
   onValueChange,
+  onOptionActivate,
   name,
   "aria-labelledby": ariaLabelledBy,
   required,
@@ -24,6 +27,8 @@ export function RadioOptionList({
   options: RadioOption[]
   value?: string
   onValueChange: (value: string) => void
+  /** Called when the practitioner taps any option row (including re-tap). */
+  onOptionActivate?: (value: string) => void
   name?: string
   "aria-labelledby"?: string
   required?: boolean
@@ -48,6 +53,10 @@ export function RadioOptionList({
               ? "border-primary bg-primary/5"
               : "border-transparent hover:bg-muted/60"
           )}
+          onClick={() => {
+            if (disabled) return
+            onOptionActivate?.(option.value)
+          }}
         >
           <RadioGroupItem value={option.value} className="mt-0.5" />
           <span className="text-sm leading-snug">{option.label}</span>

@@ -40,6 +40,7 @@ import {
   sciSeverityFromScore,
   severityFromAssessmentCode,
 } from "@/lib/assessments/severity"
+import { scoreMseNoted } from "@/lib/mse/noted"
 
 /**
  * Scored response row in the shape the submit route builds before writing
@@ -52,6 +53,10 @@ export type ScoreAssessmentResponse = {
   dataType: string
   responseValue?: string
   assessmentElementId?: string
+  /** Option label — required for MSE noted-count (Insight/Judgement Poor rule). */
+  optionLabel?: string
+  /** Reporting-baseline flag — required for MSE noted-count. */
+  isReportingBaseline?: boolean
 }
 
 export type ScoreAssessmentInput = {
@@ -105,6 +110,7 @@ export function scoreAssessment(
   const isSpecificPhobia = assessmentCode === "SPECIFIC_PHOBIA"
   const isPcl5 = assessmentCode === "PCL5"
   const isAsq = assessmentCode === "ASQ"
+  const isMse = assessmentCode === "mse"
 
   let totalScore = 0
   const psfResponseScores: number[] = []
@@ -232,6 +238,17 @@ export function scoreAssessment(
     resultScore = totalScore
     severity = asqScreenOutcome(asqFlagsFromResponses(responses))
     structuredScore = null
+  } else if (isMse) {
+    const noted = scoreMseNoted(
+      responses.map((row) => ({
+        elementKey: row.elementKey,
+        optionLabel: row.optionLabel ?? "",
+        isReportingBaseline: Boolean(row.isReportingBaseline),
+      }))
+    )
+    resultScore = null
+    severity = noted.severity
+    structuredScore = noted.structuredScoreJson
   } else {
     resultScore = totalScore
     severity = severityFromAssessmentCode(assessmentCode, totalScore)

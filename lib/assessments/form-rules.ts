@@ -31,6 +31,10 @@ export type FormOption = {
   value: string
   displayOrder: number
   scoreValue?: number
+  /** When true, new instances start with this option selected. */
+  isDefaultSelection?: boolean
+  /** When true, this option is the reporting baseline (not "noted"). */
+  isReportingBaseline?: boolean
 }
 
 export type FormElement = {
@@ -62,14 +66,22 @@ export type FormResponseRow = {
   scoreValue: number
 }
 
-export type SectionStatusKind = "skipped" | "left" | "done"
+export type SectionStatusKind = "skipped" | "left" | "to_confirm" | "done"
 
 export type SectionStatus = {
   groupLabel: string
   letter: string
   title: string
   status: SectionStatusKind
+  /** Unanswered required questions (or required groups) still left. */
   left: number
+  /** Pre-filled answers the practitioner has not yet confirmed. */
+  toConfirm: number
+  /**
+   * True when any element in the section has a default-selection option
+   * (used for "Confirmed" vs "Complete" done wording).
+   */
+  hasDefaults: boolean
 }
 
 export const TICK_VALUE = "ticked"
@@ -389,17 +401,97 @@ export function toResponseRows(
 }
 
 /**
+ * Pre-select every element that has an is_default_selection option.
+ * Used when opening a new instance (edit mode loads saved answers instead).
+ */
+export function defaultAnswersFromElements(
+  elements: FormElement[]
+): FormAnswers {
+  const answers: FormAnswers = {}
+  for (const element of elements) {
+    const defaultOption = element.options.find((o) => o.isDefaultSelection)
+    if (defaultOption) {
+      answers[element.elementKey] = [defaultOption.value]
+    }
+  }
+  return answers
+}
+
+/**
+ * An element is pre-filled when its current answer equals its default-selection
+ * option and the practitioner has not confirmed it yet.
+ */
+export function isElementPrefilled(
+  element: FormElement,
+  answers: FormAnswers,
+  confirmedKeys: ReadonlySet<string>
+): boolean {
+  if (confirmedKeys.has(element.elementKey)) return false
+  const defaultOption = element.options.find((o) => o.isDefaultSelection)
+  if (!defaultOption) return false
+  const values = nonBlank(answers[element.elementKey])
+  if (values.length === 0) return false
+  return values[0] === defaultOption.value
+}
+
+export function prefilledElementKeys(
+  elements: FormElement[],
+  answers: FormAnswers,
+  confirmedKeys: ReadonlySet<string>
+): string[] {
+  const visible = visibleElementKeys(elements, answers)
+  return elements
+    .filter(
+      (el) =>
+        visible.has(el.elementKey) &&
+        isElementPrefilled(el, answers, confirmedKeys)
+    )
+    .map((el) => el.elementKey)
+}
+
+/**
+ * Dialog copy when saving with unconfirmed pre-filled answers.
+ * sectionBadges are progress-bar letters/numbers (e.g. "2", "3", "5").
+ */
+export function prefilledConfirmDialogCopy(params: {
+  count: number
+  sectionBadges: string[]
+}): { title: string; body: string } {
+  const title = "Confirm pre-filled answers?"
+  const uniqueBadges = [...new Set(params.sectionBadges)]
+  const sectionList =
+    uniqueBadges.length === 0
+      ? ""
+      : uniqueBadges.length === 1
+        ? `section ${uniqueBadges[0]}`
+        : uniqueBadges.length === 2
+          ? `sections ${uniqueBadges[0]} and ${uniqueBadges[1]}`
+          : `sections ${uniqueBadges.slice(0, -1).join(", ")} and ${uniqueBadges[uniqueBadges.length - 1]}`
+
+  if (params.count === 1) {
+    return {
+      title,
+      body: `1 pre-filled answer hasn't been confirmed (${sectionList}). Confirm it and save?`,
+    }
+  }
+
+  return {
+    title,
+    body: `${params.count} pre-filled answers haven't been confirmed (${sectionList}). Confirm them and save?`,
+  }
+}
+
+/**
  * Sections are distinct non-null group_label values, in first-seen display order.
  * When every element has a null group_label, returns one ungrouped section
  * (see presentSectionLabels / UNGROUPED_SECTION_KEY).
- * - skipped: no element in the section is visible
- * - left: visible required elements still unanswered; each unanswered
- *   "at least one" group counts once
- * - done: visible and nothing left
+ * Precedence: skipped → N left (required unanswered) → N to confirm (pre-filled)
+ * → done.
  */
 export function sectionStatuses(
   elements: FormElement[],
-  answers: FormAnswers
+  answers: FormAnswers,
+  confirmedKeys: ReadonlySet<string> = new Set()
 ): SectionStatus[] {
   const visible = visibleElementKeys(elements, answers)
   const orderedLabels: string[] = []
@@ -426,6 +518,9 @@ export function sectionStatuses(
     const visibleInSection = sectionElements.filter((el) =>
       visible.has(el.elementKey)
     )
+    const hasDefaults = sectionElements.some((el) =>
+      el.options.some((o) => o.isDefaultSelection)
+    )
 
     if (visibleInSection.length === 0) {
       return {
@@ -434,6 +529,8 @@ export function sectionStatuses(
         title: presented.title,
         status: "skipped" as const,
         left: 0,
+        toConfirm: 0,
+        hasDefaults,
       }
     }
 
@@ -465,6 +562,27 @@ export function sectionStatuses(
         title: presented.title,
         status: "left" as const,
         left,
+        toConfirm: 0,
+        hasDefaults,
+      }
+    }
+
+    let toConfirm = 0
+    for (const element of visibleInSection) {
+      if (isElementPrefilled(element, answers, confirmedKeys)) {
+        toConfirm += 1
+      }
+    }
+
+    if (toConfirm > 0) {
+      return {
+        groupLabel,
+        letter: presented.badge,
+        title: presented.title,
+        status: "to_confirm" as const,
+        left: 0,
+        toConfirm,
+        hasDefaults,
       }
     }
 
@@ -474,6 +592,8 @@ export function sectionStatuses(
       title: presented.title,
       status: "done" as const,
       left: 0,
+      toConfirm: 0,
+      hasDefaults,
     }
   })
 }

@@ -40,7 +40,6 @@ import {
   buildPractitionerStartHref,
 } from "@/lib/assessments/practitioner-routes"
 import { requirePractitionerContext } from "@/lib/auth"
-import { appendReturnTo } from "@/lib/navigation/back"
 import { formatSessionNoteDate } from "@/lib/session-notes/format"
 import { PRACTICE_TIMEZONE } from "@/lib/dates/practice-time"
 import { loadSessionNoteViewContext } from "@/lib/session-notes/load-context"
@@ -138,14 +137,24 @@ export default async function SessionNoteViewPage({
                   <div className="space-y-3">
                     <div className="flex flex-wrap items-center gap-3">
                       <MseStatusBadge instance={viewContext.mseInstance} />
+                      {viewContext.mseInstance.assessmentResultId ? (
+                        <Link
+                          href={`/clients/${note.clientId}/results/${viewContext.mseInstance.assessmentResultId}?returnTo=${encodeURIComponent(sessionNoteUrl)}`}
+                          className="text-sm font-medium text-primary hover:underline"
+                        >
+                          View MSE
+                        </Link>
+                      ) : null}
                       <Link
-                        href={appendReturnTo(
-                          `/clients/${note.clientId}/mse/${viewContext.mseInstance.assessmentInstanceId}`,
-                          sessionNoteUrl
-                        )}
+                        href={buildPractitionerEditHref({
+                          clientId: note.clientId,
+                          instanceId:
+                            viewContext.mseInstance.assessmentInstanceId,
+                          returnTo: sessionNoteUrl,
+                        })}
                         className="text-sm font-medium text-primary hover:underline"
                       >
-                        View MSE
+                        Edit
                       </Link>
                     </div>
                     {viewContext.mseInstance.sentence ? (
@@ -156,7 +165,12 @@ export default async function SessionNoteViewPage({
                   </div>
                 ) : (
                   <Link
-                    href={`/clients/${note.clientId}/mse/new?session_note_id=${sessionNoteId}&returnTo=${encodeURIComponent(sessionNoteUrl)}`}
+                    href={buildPractitionerStartHref({
+                      clientId: note.clientId,
+                      assessmentCode: "mse",
+                      sessionNoteId,
+                      returnTo: sessionNoteUrl,
+                    })}
                     className="text-sm font-medium text-primary hover:underline"
                   >
                     Administer MSE

@@ -11,13 +11,18 @@ import {
 
 config({ path: ".env.local" })
 
+type MseOption = {
+  label: string
+  value: string
+}
+
 type MseField = {
   key: string
   order: number
   text: string
   groupLabel: string
   subgroupLabel: string | null
-  options: readonly string[]
+  options: readonly MseOption[]
   /** Option label pre-selected in the form UI. */
   defaultOptionLabel: string
   /** Option label that counts as "normal" for reporting sentences. */
@@ -32,6 +37,10 @@ function optionValue(label: string): string {
     .replace(/[\s-]+/g, "_")
 }
 
+function opts(labels: readonly string[]): MseOption[] {
+  return labels.map((label) => ({ label, value: optionValue(label) }))
+}
+
 const MSE_FIELDS: readonly MseField[] = [
   {
     key: "mse_appearance",
@@ -39,7 +48,7 @@ const MSE_FIELDS: readonly MseField[] = [
     text: "Appearance",
     groupLabel: "Presentation",
     subgroupLabel: null,
-    options: ["Neat", "Dishevelled", "Inappropriate", "Bizarre"],
+    options: opts(["Neat", "Dishevelled", "Inappropriate", "Bizarre"]),
     defaultOptionLabel: "Neat",
     reportingBaselineOptionLabel: "Neat",
   },
@@ -49,7 +58,7 @@ const MSE_FIELDS: readonly MseField[] = [
     text: "Behaviour",
     groupLabel: "Presentation",
     subgroupLabel: null,
-    options: [
+    options: opts([
       "Cooperative",
       "Guarded",
       "Hyperactive",
@@ -59,7 +68,7 @@ const MSE_FIELDS: readonly MseField[] = [
       "Aggressive",
       "Bizarre",
       "Withdrawn",
-    ],
+    ]),
     defaultOptionLabel: "Cooperative",
     reportingBaselineOptionLabel: "Cooperative",
   },
@@ -69,7 +78,7 @@ const MSE_FIELDS: readonly MseField[] = [
     text: "Eye Contact",
     groupLabel: "Presentation",
     subgroupLabel: null,
-    options: ["Normal", "Intense", "Avoidant"],
+    options: opts(["Normal", "Intense", "Avoidant"]),
     defaultOptionLabel: "Normal",
     reportingBaselineOptionLabel: "Normal",
   },
@@ -79,7 +88,7 @@ const MSE_FIELDS: readonly MseField[] = [
     text: "Motor Activity",
     groupLabel: "Presentation",
     subgroupLabel: null,
-    options: ["Normal", "Restless", "Tics", "Slowed"],
+    options: opts(["Normal", "Restless", "Tics", "Slowed"]),
     defaultOptionLabel: "Normal",
     reportingBaselineOptionLabel: "Normal",
   },
@@ -89,7 +98,7 @@ const MSE_FIELDS: readonly MseField[] = [
     text: "Affect",
     groupLabel: "Presentation",
     subgroupLabel: null,
-    options: ["Full", "Constricted", "Flat", "Labile"],
+    options: opts(["Full", "Constricted", "Flat", "Labile"]),
     defaultOptionLabel: "Full",
     reportingBaselineOptionLabel: "Full",
   },
@@ -97,9 +106,9 @@ const MSE_FIELDS: readonly MseField[] = [
     key: "mse_hallucination",
     order: 6,
     text: "Hallucination",
-    groupLabel: "Mental Function",
-    subgroupLabel: "Perceptions",
-    options: ["None", "Auditory", "Visual"],
+    groupLabel: "Perceptions",
+    subgroupLabel: null,
+    options: opts(["None", "Auditory", "Visual"]),
     defaultOptionLabel: "None",
     reportingBaselineOptionLabel: "None",
   },
@@ -107,9 +116,9 @@ const MSE_FIELDS: readonly MseField[] = [
     key: "mse_depersonalisation_derealisation",
     order: 7,
     text: "Depersonalisation / Derealisation",
-    groupLabel: "Mental Function",
-    subgroupLabel: "Perceptions",
-    options: ["None", "Derealisation", "Depersonalisation"],
+    groupLabel: "Perceptions",
+    subgroupLabel: null,
+    options: opts(["None", "Derealisation", "Depersonalisation"]),
     defaultOptionLabel: "None",
     reportingBaselineOptionLabel: "None",
   },
@@ -117,9 +126,9 @@ const MSE_FIELDS: readonly MseField[] = [
     key: "mse_homicidality",
     order: 8,
     text: "Homicidality",
-    groupLabel: "Mental Function",
-    subgroupLabel: "Thoughts",
-    options: ["None", "Aggressive", "Intent", "Plan"],
+    groupLabel: "Thoughts",
+    subgroupLabel: null,
+    options: opts(["None", "Aggressive", "Intent", "Plan"]),
     defaultOptionLabel: "None",
     reportingBaselineOptionLabel: "None",
   },
@@ -127,9 +136,9 @@ const MSE_FIELDS: readonly MseField[] = [
     key: "mse_delusions",
     order: 9,
     text: "Delusions",
-    groupLabel: "Mental Function",
-    subgroupLabel: "Thoughts",
-    options: ["None", "Grandiose", "Paranoid", "Religious"],
+    groupLabel: "Thoughts",
+    subgroupLabel: null,
+    options: opts(["None", "Grandiose", "Paranoid", "Religious"]),
     defaultOptionLabel: "None",
     reportingBaselineOptionLabel: "None",
   },
@@ -137,9 +146,9 @@ const MSE_FIELDS: readonly MseField[] = [
     key: "mse_suicidality",
     order: 10,
     text: "Suicidality",
-    groupLabel: "Mental Function",
-    subgroupLabel: "Thoughts",
-    options: ["None", "Ideation", "Plan", "Intent", "Self-Harm"],
+    groupLabel: "Thoughts",
+    subgroupLabel: null,
+    options: opts(["None", "Ideation", "Plan", "Intent", "Self-Harm"]),
     defaultOptionLabel: "None",
     reportingBaselineOptionLabel: "None",
   },
@@ -147,29 +156,42 @@ const MSE_FIELDS: readonly MseField[] = [
     key: "mse_orientation",
     order: 11,
     text: "Orientation",
-    groupLabel: "Mental Function",
-    subgroupLabel: "Cognitions",
-    options: ["None", "Place", "Object", "Person", "Time"],
-    defaultOptionLabel: "None",
-    reportingBaselineOptionLabel: "None",
+    groupLabel: "Cognitions",
+    subgroupLabel: null,
+    options: [
+      { label: "Fully oriented", value: "none" },
+      { label: "Disoriented to time", value: "time" },
+      { label: "Disoriented to time and place", value: "time_place" },
+      {
+        label: "Disoriented to time, place and person",
+        value: "time_place_person",
+      },
+    ],
+    defaultOptionLabel: "Fully oriented",
+    reportingBaselineOptionLabel: "Fully oriented",
   },
   {
     key: "mse_memory",
     order: 12,
     text: "Memory",
-    groupLabel: "Mental Function",
-    subgroupLabel: "Cognitions",
-    options: ["None", "Short-Term", "Long-Term"],
-    defaultOptionLabel: "None",
-    reportingBaselineOptionLabel: "None",
+    groupLabel: "Cognitions",
+    subgroupLabel: null,
+    options: [
+      { label: "Intact", value: "none" },
+      { label: "Short-term impaired", value: "short_term" },
+      { label: "Long-term impaired", value: "long_term" },
+      { label: "Short- and long-term impaired", value: "short_long_term" },
+    ],
+    defaultOptionLabel: "Intact",
+    reportingBaselineOptionLabel: "Intact",
   },
   {
     key: "mse_attention",
     order: 13,
     text: "Attention",
-    groupLabel: "Mental Function",
-    subgroupLabel: "Cognitions",
-    options: ["Normal", "Distracted"],
+    groupLabel: "Cognitions",
+    subgroupLabel: null,
+    options: opts(["Normal", "Distracted"]),
     defaultOptionLabel: "Normal",
     reportingBaselineOptionLabel: "Normal",
   },
@@ -179,7 +201,7 @@ const MSE_FIELDS: readonly MseField[] = [
     text: "Insight",
     groupLabel: "Discernment",
     subgroupLabel: null,
-    options: ["Good", "Fair", "Poor"],
+    options: opts(["Good", "Fair", "Poor"]),
     // UI convenience default — distinct from reporting baseline ("Good")
     defaultOptionLabel: "Fair",
     reportingBaselineOptionLabel: "Good",
@@ -190,7 +212,7 @@ const MSE_FIELDS: readonly MseField[] = [
     text: "Judgement",
     groupLabel: "Discernment",
     subgroupLabel: null,
-    options: ["Good", "Fair", "Poor"],
+    options: opts(["Good", "Fair", "Poor"]),
     // UI convenience default — distinct from reporting baseline ("Good")
     defaultOptionLabel: "Fair",
     reportingBaselineOptionLabel: "Good",
@@ -297,15 +319,16 @@ async function main() {
       .returning({ assessmentElementId: assessmentElements.assessmentElementId })
 
     await db.insert(assessmentOptions).values(
-      field.options.map((label, index) => ({
+      field.options.map((option, index) => ({
         assessmentElementId: element.assessmentElementId,
         assessmentDefinitionId: definition.assessmentDefinitionId,
-        optionLabel: label,
-        optionValue: optionValue(label),
+        optionLabel: option.label,
+        optionValue: option.value,
         scoreValue: 0,
         displayOrder: index + 1,
-        isDefaultSelection: label === field.defaultOptionLabel,
-        isReportingBaseline: label === field.reportingBaselineOptionLabel,
+        isDefaultSelection: option.label === field.defaultOptionLabel,
+        isReportingBaseline:
+          option.label === field.reportingBaselineOptionLabel,
       }))
     )
   }

@@ -130,6 +130,10 @@ Shared mutations that span multiple routes may live under `lib/actions/`.
 
 Assessment instruments are data-driven (definitions/elements/options). Seed via `npm run seed:*` scripts. Batteries can append modules from DB trigger rules.
 
+### Assessments: one shared form, one shared results view
+
+Every assessment, client-facing or practitioner-facing, is defined as data (definitions, elements, options) and is completed in the shared form (`components/assessments/form/`) and shown in the shared results view (`components/assessments/answers/`). Never build an assessment-specific page, form, answer control or results layout, and never lay out answer options differently. If an assessment needs something the shared form can't do, add it to the shared form as a general, data-driven rule. Each assessment may add only its own scoring rule (`lib/assessments/scoring/`) and summary box (`lib/assessments/result-summaries.ts`).
+
 Appointment automations: `lib/appointments/run-automations.ts` via daily cron (`08:00 UTC`).
 
 ## Naming

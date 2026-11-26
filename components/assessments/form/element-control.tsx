@@ -11,12 +11,15 @@ export function ElementControl({
   element,
   values,
   onChange,
+  onActivate,
   error,
   disabled,
 }: {
   element: FormElement
   values: string[]
   onChange: (next: string[]) => void
+  /** Fires when the practitioner interacts with a choice (incl. re-tap). */
+  onActivate?: () => void
   error?: boolean
   disabled?: boolean
 }) {
@@ -30,6 +33,7 @@ export function ElementControl({
           options={element.options}
           value={values[0]}
           onValueChange={(next) => onChange([next])}
+          onOptionActivate={() => onActivate?.()}
           name={id}
           aria-labelledby={`${id}-label`}
           required={element.isRequired}

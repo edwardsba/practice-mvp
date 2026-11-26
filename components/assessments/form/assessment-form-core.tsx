@@ -29,6 +29,8 @@ export function AssessmentFormCore({
   elements,
   answers,
   onAnswersChange,
+  onElementActivate,
+  prefilledKeys,
   errors = [],
   disabled,
   /** When set, only render elements in this group (visibility still uses all elements). */
@@ -37,6 +39,10 @@ export function AssessmentFormCore({
   elements: FormElement[]
   answers: FormAnswers
   onAnswersChange: (next: FormAnswers) => void
+  /** Called when the practitioner taps a control (confirms a pre-filled answer). */
+  onElementActivate?: (elementKey: string) => void
+  /** Element keys currently showing as pre-filled. */
+  prefilledKeys?: ReadonlySet<string>
   errors?: FormValidationError[]
   disabled?: boolean
   groupLabel?: string | null
@@ -60,6 +66,7 @@ export function AssessmentFormCore({
   }
 
   function setAnswer(elementKey: string, values: string[]) {
+    onElementActivate?.(elementKey)
     onAnswersChange({ ...answers, [elementKey]: values })
   }
 
@@ -140,6 +147,11 @@ export function AssessmentFormCore({
                     *
                   </span>
                 ) : null}
+                {prefilledKeys?.has(element.elementKey) ? (
+                  <span className="ml-2 align-middle text-xs font-normal text-amber-800">
+                    Pre-filled
+                  </span>
+                ) : null}
               </label>
               {isGroupFirst ? (
                 <p className="text-xs text-muted-foreground">
@@ -156,6 +168,7 @@ export function AssessmentFormCore({
             element={element}
             values={answers[element.elementKey] ?? []}
             onChange={(next) => setAnswer(element.elementKey, next)}
+            onActivate={() => onElementActivate?.(element.elementKey)}
             error={Boolean(errorMessage)}
             disabled={disabled}
           />

@@ -37,9 +37,9 @@ check(
 )
 
 check(
-  "mse → canComplete false (legacy)",
+  "mse → canComplete true (shared)",
   gate({ assessmentCode: "mse", clientCompletable: false }),
-  false
+  true
 )
 
 check(
@@ -122,6 +122,16 @@ check(
   "ASQ → usesSharedResultsLayout true",
   usesSharedResultsLayout({
     assessmentCode: "ASQ",
+    clientCompletable: false,
+    practitionerCompletable: true,
+  }),
+  true
+)
+
+check(
+  "mse → usesSharedResultsLayout true",
+  usesSharedResultsLayout({
+    assessmentCode: "mse",
     clientCompletable: false,
     practitionerCompletable: true,
   }),

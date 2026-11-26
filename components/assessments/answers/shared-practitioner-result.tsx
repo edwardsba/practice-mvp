@@ -39,7 +39,7 @@ function formatSessionDate(value: string | null): string {
 
 export function SharedPractitionerResultView({
   clientId,
-  shortName,
+  displayName,
   clientName,
   practitionerName,
   assessmentDate,
@@ -53,7 +53,8 @@ export function SharedPractitionerResultView({
   answers,
 }: {
   clientId: string
-  shortName: string
+  /** assessment_name from the definition. */
+  displayName: string
   clientName: string
   practitionerName: string
   assessmentDate: Date | string | null
@@ -84,7 +85,7 @@ export function SharedPractitionerResultView({
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="space-y-1">
               <h1 className="text-2xl font-semibold tracking-tight">
-                {shortName}
+                {displayName}
               </h1>
               <p className="text-sm text-muted-foreground">
                 {clientName} · {practitionerName} ·{" "}

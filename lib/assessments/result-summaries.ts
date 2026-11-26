@@ -11,6 +11,7 @@ import {
   lrampResultSummary,
   type ResultSummaryLine,
 } from "@/lib/assessments/lramp-summary"
+import { mseResultSummary } from "@/lib/assessments/mse-summary"
 import type { FormAnswers, FormElement } from "@/lib/assessments/form-rules"
 
 export type { ResultSummaryLine }
@@ -27,6 +28,7 @@ export type ResultSummaryBuilder = (
 const REGISTRY: Record<string, ResultSummaryBuilder> = {
   LRAMP: lrampResultSummary,
   ASQ: asqResultSummary,
+  mse: mseResultSummary,
 }
 
 export function getResultSummaryBuilder(

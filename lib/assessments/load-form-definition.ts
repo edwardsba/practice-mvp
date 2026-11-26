@@ -22,7 +22,8 @@ export type LoadedFormDefinition = {
   assessmentDefinitionId: string
   assessmentCode: string
   assessmentName: string
-  shortName: string
+  /** Display heading: assessment_name from the database. */
+  displayName: string
   scoringEnabled: boolean
   clientCompletable: boolean
   practitionerCompletable: boolean
@@ -128,6 +129,8 @@ export async function loadFormDefinitionByCode(
             optionValue: assessmentOptions.optionValue,
             scoreValue: assessmentOptions.scoreValue,
             displayOrder: assessmentOptions.displayOrder,
+            isDefaultSelection: assessmentOptions.isDefaultSelection,
+            isReportingBaseline: assessmentOptions.isReportingBaseline,
           })
           .from(assessmentOptions)
           .where(
@@ -146,6 +149,8 @@ export async function loadFormDefinitionByCode(
       value: option.optionValue,
       displayOrder: option.displayOrder,
       scoreValue: option.scoreValue,
+      isDefaultSelection: option.isDefaultSelection,
+      isReportingBaseline: option.isReportingBaseline,
     })
     optionsByElementId.set(option.assessmentElementId, list)
   }
@@ -178,7 +183,7 @@ export async function loadFormDefinitionByCode(
     assessmentDefinitionId: definition.assessmentDefinitionId,
     assessmentCode: definition.assessmentCode,
     assessmentName: definition.assessmentName,
-    shortName: definition.assessmentCode,
+    displayName: definition.assessmentName,
     scoringEnabled: definition.scoringEnabled,
     clientCompletable: definition.clientCompletable,
     practitionerCompletable: definition.practitionerCompletable,

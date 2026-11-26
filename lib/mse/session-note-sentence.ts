@@ -10,13 +10,14 @@ export type MseSentenceFieldKey =
   | "depersonalisationDerealisation"
   | "homicidality"
   | "delusions"
+  | "suicidality"
   | "orientation"
   | "memory"
   | "attention"
   | "insight"
   | "judgement"
 
-/** DB element_key → sentence-engine field key. Suicidality is intentionally absent. */
+/** DB element_key → sentence-engine field key. */
 export const MSE_ELEMENT_KEY_TO_FIELD: Record<string, MseSentenceFieldKey> = {
   mse_appearance: "appearance",
   mse_behaviour: "behaviour",
@@ -27,6 +28,7 @@ export const MSE_ELEMENT_KEY_TO_FIELD: Record<string, MseSentenceFieldKey> = {
   mse_depersonalisation_derealisation: "depersonalisationDerealisation",
   mse_homicidality: "homicidality",
   mse_delusions: "delusions",
+  mse_suicidality: "suicidality",
   mse_orientation: "orientation",
   mse_memory: "memory",
   mse_attention: "attention",
@@ -64,8 +66,7 @@ const MENTAL_FUNCTION_GROUPS: {
   },
   {
     name: "Thoughts",
-    // suicidality deliberately excluded
-    fields: ["homicidality", "delusions"],
+    fields: ["homicidality", "delusions", "suicidality"],
   },
   {
     name: "Cognitions",
@@ -235,7 +236,6 @@ function buildDiscernmentBlock(responses: MseSessionNoteResponses): string {
 
 /**
  * Build the Session Note MSE narrative paragraph from field selections.
- * Suicidality is never read — omit it from `responses`.
  */
 export function buildMseSessionNoteSentence(
   responses: MseSessionNoteResponses

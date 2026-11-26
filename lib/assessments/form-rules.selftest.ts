@@ -4,12 +4,18 @@ import { LRAMP_ELEMENTS } from "@/lib/assessments/definitions/lramp"
 import {
   answersFromResponseRows,
   cleanAnswers,
+  defaultAnswersFromElements,
+  isElementPrefilled,
+  prefilledConfirmDialogCopy,
+  prefilledElementKeys,
+  progressChipAriaLabel,
   sectionStatuses,
   toResponseRows,
   validateAnswers,
   visibleElementKeys,
   type FormAnswers,
   type FormElement,
+  type SectionStatus,
 } from "@/lib/assessments/form-rules"
 
 function check(name: string, actual: unknown, expected: unknown) {
@@ -512,6 +518,282 @@ check("element count is 98", LRAMP_ELEMENTS.length, 98)
     list: ["alpha", "beta"],
     single: ["yes"],
   })
+}
+
+// ---------------------------------------------------------------------------
+// Default pre-selection + pre-filled vs confirmed + section status precedence
+// ---------------------------------------------------------------------------
+
+{
+  const mseLike: FormElement[] = [
+    {
+      elementKey: "q1",
+      elementType: "radio",
+      questionText: "One",
+      groupLabel: "Presentation",
+      subgroupLabel: null,
+      displayOrder: 1,
+      isRequired: true,
+      parentElementKey: null,
+      showWhen: null,
+      requiredGroupKey: null,
+      helpText: null,
+      options: [
+        { label: "Neat", value: "neat", displayOrder: 1, isDefaultSelection: true },
+        { label: "Odd", value: "odd", displayOrder: 2 },
+      ],
+    },
+    {
+      elementKey: "q2",
+      elementType: "radio",
+      questionText: "Two",
+      groupLabel: "Perceptions",
+      subgroupLabel: null,
+      displayOrder: 2,
+      isRequired: true,
+      parentElementKey: null,
+      showWhen: null,
+      requiredGroupKey: null,
+      helpText: null,
+      options: [
+        { label: "None", value: "none", displayOrder: 1, isDefaultSelection: true },
+        { label: "Auditory", value: "auditory", displayOrder: 2 },
+      ],
+    },
+    {
+      elementKey: "q3",
+      elementType: "radio",
+      questionText: "Three",
+      groupLabel: "Thoughts",
+      subgroupLabel: null,
+      displayOrder: 3,
+      isRequired: true,
+      parentElementKey: null,
+      showWhen: null,
+      requiredGroupKey: null,
+      helpText: null,
+      options: [
+        { label: "None", value: "none", displayOrder: 1, isDefaultSelection: true },
+        { label: "Plan", value: "plan", displayOrder: 2 },
+      ],
+    },
+    {
+      elementKey: "q4",
+      elementType: "radio",
+      questionText: "Four",
+      groupLabel: "Cognitions",
+      subgroupLabel: null,
+      displayOrder: 4,
+      isRequired: true,
+      parentElementKey: null,
+      showWhen: null,
+      requiredGroupKey: null,
+      helpText: null,
+      options: [
+        { label: "Intact", value: "none", displayOrder: 1, isDefaultSelection: true },
+        { label: "Impaired", value: "impaired", displayOrder: 2 },
+      ],
+    },
+    {
+      elementKey: "q5",
+      elementType: "radio",
+      questionText: "Five",
+      groupLabel: "Discernment",
+      subgroupLabel: null,
+      displayOrder: 5,
+      isRequired: true,
+      parentElementKey: null,
+      showWhen: null,
+      requiredGroupKey: null,
+      helpText: null,
+      options: [
+        { label: "Fair", value: "fair", displayOrder: 2, isDefaultSelection: true },
+        { label: "Good", value: "good", displayOrder: 1 },
+        { label: "Poor", value: "poor", displayOrder: 3 },
+      ],
+    },
+  ]
+
+  const defaults = defaultAnswersFromElements(mseLike)
+  check("defaultAnswersFromElements selects defaults", defaults, {
+    q1: ["neat"],
+    q2: ["none"],
+    q3: ["none"],
+    q4: ["none"],
+    q5: ["fair"],
+  })
+
+  const noneConfirmed = new Set<string>()
+  check(
+    "all defaults are pre-filled when unconfirmed",
+    prefilledElementKeys(mseLike, defaults, noneConfirmed).sort(),
+    ["q1", "q2", "q3", "q4", "q5"]
+  )
+  checkTrue(
+    "isElementPrefilled true for untouched default",
+    isElementPrefilled(mseLike[0], defaults, noneConfirmed)
+  )
+  checkTrue(
+    "isElementPrefilled false after confirm",
+    !isElementPrefilled(mseLike[0], defaults, new Set(["q1"]))
+  )
+
+  const allPrefilledStatuses = sectionStatuses(mseLike, defaults, noneConfirmed)
+  check(
+    "section status → to_confirm when pre-filled",
+    allPrefilledStatuses.map((s) => s.status),
+    ["to_confirm", "to_confirm", "to_confirm", "to_confirm", "to_confirm"]
+  )
+  check(
+    "toConfirm counts per section",
+    allPrefilledStatuses.map((s) => s.toConfirm),
+    [1, 1, 1, 1, 1]
+  )
+
+  const missingQ2 = { ...defaults }
+  delete missingQ2.q2
+  const leftStatuses = sectionStatuses(mseLike, missingQ2, noneConfirmed)
+  check(
+    "N left takes precedence over to_confirm",
+    leftStatuses.find((s) => s.letter === "2")?.status,
+    "left"
+  )
+  check(
+    "other pre-filled sections still to_confirm",
+    leftStatuses.find((s) => s.letter === "1")?.status,
+    "to_confirm"
+  )
+
+  const allConfirmed = new Set(mseLike.map((el) => el.elementKey))
+  const doneStatuses = sectionStatuses(mseLike, defaults, allConfirmed)
+  check(
+    "all confirmed → done",
+    doneStatuses.every((s) => s.status === "done"),
+    true
+  )
+  check(
+    "hasDefaults true on sections with defaults",
+    doneStatuses.every((s) => s.hasDefaults),
+    true
+  )
+
+  check("dialog singular", prefilledConfirmDialogCopy({ count: 1, sectionBadges: ["2"] }), {
+    title: "Confirm pre-filled answers?",
+    body: "1 pre-filled answer hasn't been confirmed (section 2). Confirm it and save?",
+  })
+  check(
+    "dialog plural with and-join",
+    prefilledConfirmDialogCopy({ count: 3, sectionBadges: ["2", "3", "5"] }),
+    {
+      title: "Confirm pre-filled answers?",
+      body: "3 pre-filled answers haven't been confirmed (sections 2, 3 and 5). Confirm them and save?",
+    }
+  )
+  check(
+    "dialog two sections",
+    prefilledConfirmDialogCopy({ count: 2, sectionBadges: ["2", "5"] }),
+    {
+      title: "Confirm pre-filled answers?",
+      body: "2 pre-filled answers haven't been confirmed (sections 2 and 5). Confirm them and save?",
+    }
+  )
+
+  // Assessments with no defaults (ASQ-like) behave as before: no to_confirm.
+  const noDefaults: FormElement[] = [
+    {
+      elementKey: "asq_q1",
+      elementType: "radio",
+      questionText: "Q1",
+      groupLabel: null,
+      subgroupLabel: null,
+      displayOrder: 1,
+      isRequired: true,
+      parentElementKey: null,
+      showWhen: null,
+      requiredGroupKey: null,
+      helpText: null,
+      options: [
+        { label: "Yes", value: "yes", displayOrder: 1 },
+        { label: "No", value: "no", displayOrder: 2 },
+      ],
+    },
+  ]
+  check("no defaults → empty default answers", defaultAnswersFromElements(noDefaults), {})
+  const answered = { asq_q1: ["yes"] }
+  check(
+    "no defaults → no pre-filled keys",
+    prefilledElementKeys(noDefaults, answered, new Set()),
+    []
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Progress chip aria-label / title
+// ---------------------------------------------------------------------------
+
+{
+  const base: Omit<SectionStatus, "status" | "left" | "toConfirm"> = {
+    groupLabel: "Presentation",
+    letter: "1",
+    title: "Presentation",
+    hasDefaults: true,
+  }
+  check(
+    "aria: to_confirm",
+    progressChipAriaLabel({
+      ...base,
+      status: "to_confirm",
+      left: 0,
+      toConfirm: 5,
+    }),
+    "Section 1, Presentation: 5 to confirm"
+  )
+  check(
+    "aria: left",
+    progressChipAriaLabel({
+      ...base,
+      status: "left",
+      left: 3,
+      toConfirm: 0,
+    }),
+    "Section 1, Presentation: 3 to answer"
+  )
+  check(
+    "aria: skipped (lettered)",
+    progressChipAriaLabel({
+      groupLabel: "C. Risk factors",
+      letter: "C",
+      title: "Risk factors",
+      status: "skipped",
+      left: 0,
+      toConfirm: 0,
+      hasDefaults: false,
+    }),
+    "Section C, Risk factors: skipped"
+  )
+  check(
+    "aria: done with defaults → confirmed",
+    progressChipAriaLabel({
+      ...base,
+      status: "done",
+      left: 0,
+      toConfirm: 0,
+    }),
+    "Section 1, Presentation: confirmed"
+  )
+  check(
+    "aria: done without defaults → complete",
+    progressChipAriaLabel({
+      groupLabel: "A. Reason",
+      letter: "A",
+      title: "Reason",
+      status: "done",
+      left: 0,
+      toConfirm: 0,
+      hasDefaults: false,
+    }),
+    "Section A, Reason: complete"
+  )
 }
 
 console.log("All form-rules self-tests passed.")

@@ -4,6 +4,8 @@ export type AssessmentDraft = {
   answers: FormAnswers
   assessmentDate: string
   savedAt: string
+  /** Element keys the practitioner has confirmed (pre-filled → confirmed). */
+  confirmedKeys?: string[]
 }
 
 function draftKey(params: {

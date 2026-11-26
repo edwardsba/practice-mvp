@@ -103,7 +103,7 @@ export default async function EditPractitionerAssessmentPage({
         clientName={clientName}
         practitionerName={practitionerName}
         assessmentCode={instance.assessmentCode}
-        shortName={definition.shortName}
+        displayName={definition.displayName}
         elements={definition.elements}
         initialAnswers={instance.answers}
         initialAssessmentDate={

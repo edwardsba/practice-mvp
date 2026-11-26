@@ -58,6 +58,7 @@ export type SessionNoteAsqResult = {
 
 export type SessionNoteMseInstance = {
   assessmentInstanceId: string
+  assessmentResultId: string | null
   status: string
   submittedAt: Date | null
   sentence: string | null
@@ -318,6 +319,7 @@ async function loadMseForSession(
   const [row] = await db
     .select({
       assessmentInstanceId: assessmentInstances.assessmentInstanceId,
+      assessmentResultId: assessmentResults.assessmentResultId,
       status: assessmentInstances.status,
       submittedAt: assessmentInstances.submittedAt,
     })
@@ -327,6 +329,13 @@ async function loadMseForSession(
       eq(
         assessmentInstances.assessmentDefinitionId,
         assessmentDefinitions.assessmentDefinitionId
+      )
+    )
+    .leftJoin(
+      assessmentResults,
+      eq(
+        assessmentResults.assessmentInstanceId,
+        assessmentInstances.assessmentInstanceId
       )
     )
     .where(
@@ -343,7 +352,10 @@ async function loadMseForSession(
   const sentence = await loadMseSessionNoteSentence(row.assessmentInstanceId)
 
   return {
-    ...row,
+    assessmentInstanceId: row.assessmentInstanceId,
+    assessmentResultId: row.assessmentResultId ?? null,
+    status: row.status,
+    submittedAt: row.submittedAt,
     sentence,
   }
 }

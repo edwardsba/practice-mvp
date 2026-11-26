@@ -46,7 +46,7 @@ export async function loadMseSessionNoteSentence(
   const responses: MseSessionNoteResponses = {}
   for (const row of rows) {
     const fieldKey = MSE_ELEMENT_KEY_TO_FIELD[row.elementKey]
-    if (!fieldKey) continue // skips mse_suicidality and unknown keys
+    if (!fieldKey) continue // skips unknown keys
     responses[fieldKey] = {
       optionLabel: row.optionLabel,
       isReportingBaseline: row.isReportingBaseline,

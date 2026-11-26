@@ -290,7 +290,7 @@ export default async function AssessmentResultDetailPage({
     return (
       <SharedPractitionerResultView
         clientId={clientId}
-        shortName={definition.shortName}
+        displayName={definition.displayName}
         clientName={`${client.firstName} ${client.lastName}`.trim()}
         practitionerName={
           practitioner

@@ -12,7 +12,7 @@ export type AsqFlags = {
 
 /**
  * Derives the three ASQ screen flags from elementKey + responseValue pairs.
- * Single rule used by the shared scorer and the legacy ASQ save actions.
+ * Single rule used by the shared scorer.
  */
 export function asqFlagsFromResponses(
   responses: Array<{ elementKey: string; responseValue?: string | null }>

@@ -3,7 +3,6 @@ import type { MseSentenceFieldKey } from "@/lib/mse/session-note-sentence"
 /**
  * Canonical option displayOrder per field (matches db/seed-mse.ts).
  * Used to order distinct abnormal values deterministically in Progress Reports.
- * Old Orientation/Memory labels kept after the new ones until Round AI.
  */
 export const MSE_OPTION_DISPLAY_ORDER: Record<
   MseSentenceFieldKey,
@@ -77,22 +76,12 @@ export const MSE_OPTION_DISPLAY_ORDER: Record<
     "Disoriented to time": 2,
     "Disoriented to time and place": 3,
     "Disoriented to time, place and person": 4,
-    // Legacy labels (kept until Round AI)
-    None: 1,
-    Place: 2,
-    Object: 3,
-    Person: 4,
-    Time: 5,
   },
   memory: {
     Intact: 1,
     "Short-term impaired": 2,
     "Long-term impaired": 3,
     "Short- and long-term impaired": 4,
-    // Legacy labels (kept until Round AI)
-    None: 1,
-    "Short-Term": 2,
-    "Long-Term": 3,
   },
   attention: {
     Normal: 1,

@@ -8,8 +8,6 @@ import assert from "node:assert/strict"
 import { readdirSync, readFileSync, statSync } from "node:fs"
 import { join, relative } from "node:path"
 
-import { legacyStartEntriesForGuard } from "@/lib/assessments/practitioner-routes"
-
 const REPO_ROOT = join(import.meta.dirname, "../..")
 
 const AGENTS_HINT =
@@ -32,10 +30,6 @@ const RADIO_ALLOWLIST: Record<string, string> = {
     "Relationship panel radios (non-assessment)",
   "app/clients/[client_id]/reports/new/report-form.tsx":
     "Report form recipient radios (non-assessment)",
-  "app/clients/[client_id]/mse/new/mse-form.tsx":
-    "Legacy MSE form — remove in Round AI",
-  "app/clients/[client_id]/asq/new/asq-form.tsx":
-    "Legacy ASQ form — remove in Round AI",
   "app/q/[token]/background-questionnaire-form.tsx":
     "Held: Background self-report moves later",
 }
@@ -83,13 +77,5 @@ for (const [path, reason] of Object.entries(RADIO_ALLOWLIST)) {
   assert.ok(reason.trim().length > 0, `allow-list reason required for ${path}`)
 }
 console.log(`ok — allow-list has ${Object.keys(RADIO_ALLOWLIST).length} entries with reasons`)
-
-const legacy = legacyStartEntriesForGuard()
-assert.deepEqual(
-  Object.keys(legacy),
-  [],
-  `LEGACY_START must be empty (found: ${JSON.stringify(legacy)}). ${AGENTS_HINT}`
-)
-console.log("ok — LEGACY_START is empty")
 
 console.log("\nshared-form-guard.selftest.ts: ok")

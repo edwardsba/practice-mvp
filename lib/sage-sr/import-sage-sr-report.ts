@@ -144,7 +144,7 @@ export type SageSrImportResult =
  * in (no database connection available there). Every parser it calls was individually
  * verified against real SAGE-SR PDFs; this function itself is typechecked and written
  * to match this codebase's existing transaction/insert conventions (see
- * app/clients/[client_id]/asq/new/actions.ts for the pattern this follows) but has not
+ * lib/assessments/save-practitioner-assessment.ts for the pattern this follows) but has not
  * been run against a real database. Worth a careful first real test — a genuine
  * end-to-end import against a test client — before relying on it.
  */

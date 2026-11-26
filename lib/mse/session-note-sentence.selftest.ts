@@ -89,23 +89,11 @@ assertSentence(
 )
 
 assertSentence(
-  "legacy Memory Short-Term still maps",
-  withOverrides({ memory: abnormal("Short-Term") }),
-  "Appearance, behaviour, eye contact, motor activity and affect were all within expected limits. Perceptions and thoughts were within expected limits. Cognitions included short-term memory impairment. Insight and judgement were both good."
-)
-
-assertSentence(
   "new Orientation label",
   withOverrides({
     orientation: abnormal("Disoriented to time and place"),
   }),
   "Appearance, behaviour, eye contact, motor activity and affect were all within expected limits. Perceptions and thoughts were within expected limits. Cognitions included disorientation to time and place. Insight and judgement were both good."
-)
-
-assertSentence(
-  "legacy Orientation Time still maps",
-  withOverrides({ orientation: abnormal("Time") }),
-  "Appearance, behaviour, eye contact, motor activity and affect were all within expected limits. Perceptions and thoughts were within expected limits. Cognitions included disorientation to time. Insight and judgement were both good."
 )
 
 assertSentence(

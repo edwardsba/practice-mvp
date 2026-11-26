@@ -28,6 +28,7 @@ import {
   sanitizeScreening,
   type BackgroundInterviewAnswerSource,
 } from "@/lib/client-background/interview-history"
+import { sanitizeInterviewAnswers } from "@/lib/client-background/interview-answers"
 import { toBlockAnswers, toClientRelationshipStatus, toEvent, toHistoryIssue, toRelationship, toRelationshipBlock } from "@/lib/client-background/map"
 import {
   demographicsFromStored,
@@ -306,6 +307,7 @@ export async function loadInProgressInterview(clientId: string, practiceId: stri
     .select({
       interviewId: clientBackgroundInterviews.clientBackgroundInterviewId,
       screeningJson: clientBackgroundInterviews.screeningJson,
+      answersJson: clientBackgroundInterviews.answersJson,
     })
     .from(clientBackgroundInterviews)
     .where(
@@ -317,7 +319,11 @@ export async function loadInProgressInterview(clientId: string, practiceId: stri
     )
     .limit(1)
   if (!row) return null
-  return { interviewId: row.interviewId, screening: sanitizeScreening(row.screeningJson) }
+  return {
+    interviewId: row.interviewId,
+    screening: sanitizeScreening(row.screeningJson),
+    answers: sanitizeInterviewAnswers(row.answersJson),
+  }
 }
 
 /** The client's most recent BACKGROUND_SR result, or null when they have none. */

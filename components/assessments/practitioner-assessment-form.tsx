@@ -4,9 +4,11 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useEffect, useMemo, useState, useTransition } from "react"
 
-import { ConfirmPrefilledDialog } from "@/components/assessments/confirm-prefilled-dialog"
 import { AssessmentFormCore } from "@/components/assessments/form/assessment-form-core"
 import { DiscardChangesDialog } from "@/components/client-background/discard-changes-dialog"
+import { ConfirmPrefilledDialog } from "@/components/shared/confirm-prefilled-dialog"
+import { SectionProgressChips } from "@/components/shared/section-progress-chips"
+import { SectionNumberBadge, SectionStatusPill } from "@/components/shared/section-status-pill"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -17,7 +19,6 @@ import {
 import {
   prefilledConfirmDialogCopy,
   prefilledElementKeys,
-  progressChipAriaLabel,
   sectionStatuses,
   showSectionProgressBar,
   validateAnswers,
@@ -29,26 +30,6 @@ import {
 import type { SavePractitionerAssessmentState } from "@/lib/assessments/save-practitioner-assessment"
 import { UNGROUPED_SECTION_KEY } from "@/lib/assessments/section-presentation"
 import { cn } from "@/lib/utils"
-
-function statusPill(section: SectionStatus) {
-  if (section.status === "skipped") return "Skipped"
-  if (section.status === "left") return `${section.left} to answer`
-  if (section.status === "to_confirm") {
-    return `${section.toConfirm} to confirm`
-  }
-  if (section.hasDefaults) return "Confirmed"
-  return "Complete"
-}
-
-function progressClass(section: SectionStatus) {
-  if (section.status === "done") {
-    return "border-emerald-600 bg-emerald-50 text-emerald-800"
-  }
-  if (section.status === "left" || section.status === "to_confirm") {
-    return "border-amber-500 bg-amber-50 text-amber-900"
-  }
-  return "border-dashed border-muted-foreground/40 bg-muted/30 text-muted-foreground"
-}
 
 export function PractitionerAssessmentForm({
   mode,
@@ -353,28 +334,12 @@ export function PractitionerAssessmentForm({
 
       <div className="sticky top-0 z-20 -mx-4 border-b bg-background/95 px-4 py-3 backdrop-blur">
         {showProgress ? (
-          <div className="flex gap-2">
-            {sections.map((section) => {
-              const chipLabel = progressChipAriaLabel(section)
-              return (
-                <button
-                  key={section.groupLabel}
-                  type="button"
-                  onClick={() =>
-                    openSectionAndScroll(section.groupLabel, section.letter)
-                  }
-                  className={cn(
-                    "flex h-11 min-h-11 flex-1 items-center justify-center rounded-md border px-1 text-sm font-semibold",
-                    progressClass(section)
-                  )}
-                  aria-label={chipLabel}
-                  title={chipLabel}
-                >
-                  {section.letter}
-                </button>
-              )
-            })}
-          </div>
+          <SectionProgressChips
+            sections={sections}
+            onSelect={(section) =>
+              openSectionAndScroll(section.groupLabel, section.letter)
+            }
+          />
         ) : null}
         <p
           className={cn(
@@ -406,20 +371,11 @@ export function PractitionerAssessmentForm({
                     aria-expanded={open}
                     onClick={() => toggleSection(section.groupLabel)}
                   >
-                    <span
-                      className={cn(
-                        "inline-flex min-h-9 min-w-9 items-center justify-center rounded-md border text-sm font-semibold",
-                        progressClass(section)
-                      )}
-                    >
-                      {section.letter}
-                    </span>
+                    <SectionNumberBadge section={section} />
                     <span className="flex-1 text-sm font-semibold">
                       {section.title}
                     </span>
-                    <span className="text-xs text-muted-foreground">
-                      {statusPill(section)}
-                    </span>
+                    <SectionStatusPill section={section} />
                     <span className="text-muted-foreground" aria-hidden>
                       {open ? "▾" : "▸"}
                     </span>

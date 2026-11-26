@@ -120,6 +120,10 @@ export function HistoryTreeSection({
   onIssuesChange,
   medicationClient,
   historyClient,
+  /** When set, render only that group's tree (no section card chrome). */
+  groupFilter,
+  /** Hide Yes/No/Not asked radios; item rows own those answers in the interview shell. */
+  hideScreeningControls = false,
 }: {
   clientId: string
   /** First name (or display name) for context strip "About: Tom (client)". */
@@ -146,6 +150,8 @@ export function HistoryTreeSection({
     currentlyTaking?: { label: string }
   }
   historyClient?: Partial<Record<HistoryQuestionKey, { label: string; apply: ScreeningAnswer }>>
+  groupFilter?: "client" | "significant_other"
+  hideScreeningControls?: boolean
 }) {
   const [localEvents, setLocalEvents] = useState<EventRecord[] | null>(null)
   const [localIssues, setLocalIssues] = useState<HistoryIssue[] | null>(null)
@@ -550,15 +556,44 @@ export function HistoryTreeSection({
         },
     onTreatmentAnswer: readOnly ? undefined : (issueId: string, value: TreatmentAnswer | "") => void setTreatmentAnswer(issueId, value),
     onScreeningChange: presentation === "interview" ? onScreeningChange : undefined,
+    hideScreeningControls: presentation === "interview" ? hideScreeningControls : false,
+    applyScreeningFilter: presentation === "interview",
     screening,
     historyClient: presentation === "interview" ? historyClient : undefined,
     selectedId,
     readOnly,
   }
 
+  const clientBody = (
+    <>
+      {medicationClient && (!groupFilter || groupFilter === "client") ? (
+        <div className="mb-4 space-y-1 rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-950">
+          {medicationClient.everAdmitted ? (
+            <ClientAnswer label={`Ever admitted: ${medicationClient.everAdmitted.label}`} matches={false} />
+          ) : null}
+          {medicationClient.previousTherapy ? (
+            <ClientAnswer label={`Previous therapy: ${medicationClient.previousTherapy.label}`} matches={false} />
+          ) : null}
+          {medicationClient.everMedication ? (
+            <ClientAnswer label={`Ever taken medication: ${medicationClient.everMedication.label}`} matches={false} />
+          ) : null}
+          {medicationClient.currentlyTaking ? (
+            <ClientAnswer label={`Currently taking: ${medicationClient.currentlyTaking.label}`} matches={false} />
+          ) : null}
+        </div>
+      ) : null}
+      <SectionBody nodes={tree.client.children} about="self" {...treeProps} />
+    </>
+  )
+  const familyBody = <SectionBody nodes={tree.family.children} about="significant_other" {...treeProps} />
+
   return (
     <div className="space-y-4">
-      {presentation === "interview" ? (
+      {groupFilter === "client" ? (
+        clientBody
+      ) : groupFilter === "significant_other" ? (
+        familyBody
+      ) : presentation === "interview" ? (
         <>
           <InterviewSectionCard
             title={tree.client.title}
@@ -566,23 +601,7 @@ export function HistoryTreeSection({
             onToggle={() => onToggleSection?.(tree.client.title)}
             badge={needsBadge(sectionNeeds?.[tree.client.title] ?? 0)}
           >
-            {medicationClient ? (
-              <div className="mb-4 space-y-1 rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-950">
-                {medicationClient.everAdmitted ? (
-                  <ClientAnswer label={`Ever admitted: ${medicationClient.everAdmitted.label}`} matches={false} />
-                ) : null}
-                {medicationClient.previousTherapy ? (
-                  <ClientAnswer label={`Previous therapy: ${medicationClient.previousTherapy.label}`} matches={false} />
-                ) : null}
-                {medicationClient.everMedication ? (
-                  <ClientAnswer label={`Ever taken medication: ${medicationClient.everMedication.label}`} matches={false} />
-                ) : null}
-                {medicationClient.currentlyTaking ? (
-                  <ClientAnswer label={`Currently taking: ${medicationClient.currentlyTaking.label}`} matches={false} />
-                ) : null}
-              </div>
-            ) : null}
-            <SectionBody nodes={tree.client.children} about="self" {...treeProps} />
+            {clientBody}
           </InterviewSectionCard>
           <InterviewSectionCard
             title={tree.family.title}
@@ -590,7 +609,7 @@ export function HistoryTreeSection({
             onToggle={() => onToggleSection?.(tree.family.title)}
             badge={needsBadge(sectionNeeds?.[tree.family.title] ?? 0)}
           >
-            <SectionBody nodes={tree.family.children} about="significant_other" {...treeProps} />
+            {familyBody}
           </InterviewSectionCard>
         </>
       ) : (
@@ -930,6 +949,8 @@ type SectionBodyProps = {
   onAddCategory?: (about: "self" | "significant_other", eventType: EventType) => void
   onTreatmentAnswer?: (issueId: string, value: TreatmentAnswer | "") => void
   onScreeningChange?: (key: HistoryQuestionKey, answer: ScreeningAnswer | "") => void
+  hideScreeningControls?: boolean
+  applyScreeningFilter?: boolean
   screening: ScreeningAnswers
   historyClient?: Partial<Record<HistoryQuestionKey, { label: string; apply: ScreeningAnswer }>>
   selectedId: string | null
@@ -957,6 +978,8 @@ function CategoryBlock({
   onAddCategory,
   onTreatmentAnswer,
   onScreeningChange,
+  hideScreeningControls = false,
+  applyScreeningFilter = false,
   screening,
   historyClient,
   selectedId,
@@ -976,20 +999,22 @@ function CategoryBlock({
       ? screening[key] ?? ""
       : ""
   const suggestion = key ? historyClient?.[key] : undefined
+  const filterByScreening = applyScreeningFilter || Boolean(onScreeningChange)
   const treeChildren =
-    onScreeningChange && shown !== "yes" && shown !== ""
+    filterByScreening && shown !== "yes" && shown !== ""
       ? node.children.filter((child) => child.kind === "note")
-      : onScreeningChange && shown === "yes"
+      : filterByScreening && shown === "yes"
         ? node.children.filter((child) => child.kind !== "note")
         : node.children
   const eventType = question?.eventType
   const addLabel = historyCategoryAddLabel(node.title)
+  const showScreeningSelect = Boolean(onScreeningChange && key && !hideScreeningControls)
 
   return (
     <div id={key ? `check-history-${key}` : undefined} className="scroll-mt-28 space-y-2">
       <div className="flex flex-wrap items-center gap-2">
         <h3 className={treeLayer1ClassName}>{node.title}</h3>
-        {onScreeningChange && key ? (
+        {showScreeningSelect ? (
           <TreeInlineSelect
             id={`history_${key}`}
             aria-label={node.title}
@@ -997,7 +1022,7 @@ function CategoryBlock({
             disabled={locked}
             onChange={(next) => {
               if (locked) return
-              void onScreeningChange(key, next === "yes" || next === "no" || next === "not_asked" ? next : "")
+              void onScreeningChange!(key!, next === "yes" || next === "no" || next === "not_asked" ? next : "")
             }}
           >
             <option value="">Select…</option>
@@ -1007,7 +1032,7 @@ function CategoryBlock({
           </TreeInlineSelect>
         ) : null}
       </div>
-      {suggestion && onScreeningChange ? (
+      {suggestion && onScreeningChange && !hideScreeningControls ? (
         <ClientAnswer
           label={suggestion.label}
           matches={shown === suggestion.apply}

@@ -66,23 +66,19 @@ export type FormResponseRow = {
   scoreValue: number
 }
 
-export type SectionStatusKind = "skipped" | "left" | "to_confirm" | "done"
-
-export type SectionStatus = {
-  groupLabel: string
-  letter: string
-  title: string
-  status: SectionStatusKind
-  /** Unanswered required questions (or required groups) still left. */
-  left: number
-  /** Pre-filled answers the practitioner has not yet confirmed. */
-  toConfirm: number
-  /**
-   * True when any element in the section has a default-selection option
-   * (used for "Confirmed" vs "Complete" done wording).
-   */
-  hasDefaults: boolean
-}
+export type {
+  SectionStatus,
+  SectionStatusKind,
+} from "@/lib/section-status"
+export {
+  aggregateSectionStatus,
+  itemStatus,
+  progressChipAriaLabel,
+  sectionProgressClass,
+  statusPillLabel,
+} from "@/lib/section-status"
+import type { SectionStatus } from "@/lib/section-status"
+import { aggregateSectionStatus } from "@/lib/section-status"
 
 export const TICK_VALUE = "ticked"
 
@@ -555,44 +551,34 @@ export function sectionStatuses(
       }
     }
 
-    if (left > 0) {
+    const toConfirmItems = visibleInSection.filter((element) =>
+      isElementPrefilled(element, answers, confirmedKeys)
+    )
+    // left count already computed for required gaps; map into shared aggregate shape
+    const statusItems = [
+      ...Array.from({ length: left }, () => ({ hasValue: false, confirmed: false })),
+      ...toConfirmItems.map(() => ({ hasValue: true, confirmed: false })),
+      // remaining visible required/answered slots count as done for aggregation
+    ]
+    if (left === 0 && toConfirmItems.length === 0) {
       return {
         groupLabel,
         letter: presented.badge,
         title: presented.title,
-        status: "left" as const,
-        left,
+        status: "done" as const,
+        left: 0,
         toConfirm: 0,
         hasDefaults,
       }
     }
-
-    let toConfirm = 0
-    for (const element of visibleInSection) {
-      if (isElementPrefilled(element, answers, confirmedKeys)) {
-        toConfirm += 1
-      }
-    }
-
-    if (toConfirm > 0) {
-      return {
-        groupLabel,
-        letter: presented.badge,
-        title: presented.title,
-        status: "to_confirm" as const,
-        left: 0,
-        toConfirm,
-        hasDefaults,
-      }
-    }
-
+    const agg = aggregateSectionStatus(statusItems, { hasDefaults })
     return {
       groupLabel,
       letter: presented.badge,
       title: presented.title,
-      status: "done" as const,
-      left: 0,
-      toConfirm: 0,
+      status: agg.status,
+      left: agg.left,
+      toConfirm: agg.toConfirm,
       hasDefaults,
     }
   })
@@ -601,31 +587,6 @@ export function sectionStatuses(
 /** Whether the form should show the sticky section progress bar. */
 export function showSectionProgressBar(elements: FormElement[]): boolean {
   return elements.some((el) => Boolean(el.groupLabel))
-}
-
-/**
- * Full status string for a progress chip's aria-label / title
- * (chips themselves show only the badge).
- * e.g. "Section 1, Presentation: 5 to confirm"
- *      "Section C, Risk factors: skipped"
- */
-export function progressChipAriaLabel(section: SectionStatus): string {
-  let detail: string
-  switch (section.status) {
-    case "skipped":
-      detail = "skipped"
-      break
-    case "left":
-      detail = `${section.left} to answer`
-      break
-    case "to_confirm":
-      detail = `${section.toConfirm} to confirm`
-      break
-    case "done":
-      detail = section.hasDefaults ? "confirmed" : "complete"
-      break
-  }
-  return `Section ${section.letter}, ${section.title}: ${detail}`
 }
 
 /**

@@ -2,7 +2,7 @@ import "server-only"
 
 import { randomUUID } from "node:crypto"
 
-import { and, eq, inArray, isNull } from "drizzle-orm"
+import { and, desc, eq, inArray, isNull } from "drizzle-orm"
 
 import { auditEvents, assessmentDefinitions, assessmentInstances, assessmentResults, clientBackgroundInterviews, clientBackgrounds, clientEventRecords, clientHistoryIssues, clientRelationshipBlocks, clientRelationshipRecords, clients } from "@/db/schema"
 import { BACKGROUND_ASSESSMENT_CODE } from "@/lib/background-questionnaire/types"
@@ -20,6 +20,18 @@ import {
   type TreatmentAnswer,
 } from "@/lib/client-background/types"
 import { sanitizeHistoryIssue } from "@/lib/client-background/history-issues"
+import {
+  blockAnswersFromInterview,
+  confirmAllAnswers,
+  emptyInterviewAnswers,
+  mergeScreeningMirror,
+  prefillAnswersForReview,
+  sanitizeInterviewAnswers,
+  setItemAnswer,
+  validateItemAnswer,
+  type InterviewAnswerValue,
+  type InterviewAnswersJson,
+} from "@/lib/client-background/interview-answers"
 import {
   finalScreeningAnswers,
   sanitizeScreening,
@@ -1104,6 +1116,27 @@ async function inProgressInterview(clientId: string, practiceId: string) {
   return row ?? null
 }
 
+async function latestCompletedAnswers(
+  tx: Tx,
+  clientId: string,
+  practiceId: string
+): Promise<InterviewAnswersJson> {
+  const [row] = await tx
+    .select({ answersJson: clientBackgroundInterviews.answersJson })
+    .from(clientBackgroundInterviews)
+    .where(
+      and(
+        eq(clientBackgroundInterviews.clientId, clientId),
+        eq(clientBackgroundInterviews.practiceId, practiceId),
+        eq(clientBackgroundInterviews.status, "completed")
+      )
+    )
+    .orderBy(desc(clientBackgroundInterviews.completedAt))
+    .limit(1)
+  if (!row) return emptyInterviewAnswers()
+  return prefillAnswersForReview(sanitizeInterviewAnswers(row.answersJson))
+}
+
 export async function startBackgroundInterview(input: {
   clientId: string
   practiceId: string
@@ -1117,6 +1150,7 @@ export async function startBackgroundInterview(input: {
 
   try {
     return await db.transaction(async (tx) => {
+      const answersJson = await latestCompletedAnswers(tx, input.clientId, input.practiceId)
       const [created] = await tx
         .insert(clientBackgroundInterviews)
         .values({
@@ -1125,6 +1159,7 @@ export async function startBackgroundInterview(input: {
           practitionerProfileId: input.practitionerProfileId,
           status: "in_progress",
           screeningJson: {},
+          answersJson,
         })
         .returning({ clientBackgroundInterviewId: clientBackgroundInterviews.clientBackgroundInterviewId })
       await writeAudit(tx, {
@@ -1143,6 +1178,167 @@ export async function startBackgroundInterview(input: {
       if (raced) return { interviewId: raced.clientBackgroundInterviewId }
     }
     return { error: "Could not start the background interview." }
+  }
+}
+
+async function writeBlockAnswerMirrors(
+  clientId: string,
+  practiceId: string,
+  answers: InterviewAnswersJson
+) {
+  const mirrors = blockAnswersFromInterview(answers)
+  if (Object.keys(mirrors).length === 0) return
+  const [existing] = await db
+    .select({
+      id: clientBackgrounds.clientBackgroundId,
+      practiceId: clientBackgrounds.practiceId,
+      previousRelationships: clientBackgrounds.previousRelationships,
+      motherOtherRelationships: clientBackgrounds.motherOtherRelationships,
+      fatherOtherRelationships: clientBackgrounds.fatherOtherRelationships,
+      caregiverArrangements: clientBackgrounds.caregiverArrangements,
+    })
+    .from(clientBackgrounds)
+    .where(and(eq(clientBackgrounds.clientId, clientId), eq(clientBackgrounds.practiceId, practiceId)))
+    .limit(1)
+
+  const next = {
+    previousRelationships: existing?.previousRelationships ?? null,
+    motherOtherRelationships: existing?.motherOtherRelationships ?? null,
+    fatherOtherRelationships: existing?.fatherOtherRelationships ?? null,
+    caregiverArrangements: existing?.caregiverArrangements ?? null,
+    updatedAt: new Date(),
+  }
+  if (mirrors.previousRelationships) next.previousRelationships = mirrors.previousRelationships
+  if (mirrors.motherOtherRelationships) next.motherOtherRelationships = mirrors.motherOtherRelationships
+  if (mirrors.fatherOtherRelationships) next.fatherOtherRelationships = mirrors.fatherOtherRelationships
+  if (mirrors.caregiverArrangements) next.caregiverArrangements = mirrors.caregiverArrangements
+
+  if (!existing) {
+    await db.insert(clientBackgrounds).values({
+      clientId,
+      practiceId,
+      ...next,
+    })
+    return
+  }
+  await db.update(clientBackgrounds).set(next).where(eq(clientBackgrounds.clientBackgroundId, existing.id))
+}
+
+export async function saveInterviewItemAnswer(input: {
+  clientId: string
+  practiceId: string
+  userId: string
+  itemKey: string
+  value: InterviewAnswerValue
+}): Promise<{ error?: string; answers?: InterviewAnswersJson; screening?: ScreeningAnswers }> {
+  const client = await assertClient(input.clientId, input.practiceId)
+  if (!client) return { error: "Client was not found." }
+  const validated = validateItemAnswer(input.itemKey, input.value)
+  if (!validated.ok) return { error: validated.error }
+  try {
+    return await db.transaction(async (tx) => {
+      const [existing] = await tx
+        .select({
+          clientBackgroundInterviewId: clientBackgroundInterviews.clientBackgroundInterviewId,
+          answersJson: clientBackgroundInterviews.answersJson,
+          screeningJson: clientBackgroundInterviews.screeningJson,
+        })
+        .from(clientBackgroundInterviews)
+        .where(
+          and(
+            eq(clientBackgroundInterviews.clientId, input.clientId),
+            eq(clientBackgroundInterviews.practiceId, input.practiceId),
+            eq(clientBackgroundInterviews.status, "in_progress")
+          )
+        )
+        .limit(1)
+      if (!existing) return { error: "There is no background interview in progress." }
+      const answers = setItemAnswer(
+        sanitizeInterviewAnswers(existing.answersJson),
+        input.itemKey,
+        validated.value
+      )
+      const screening = mergeScreeningMirror(sanitizeScreening(existing.screeningJson), answers)
+      await tx
+        .update(clientBackgroundInterviews)
+        .set({
+          answersJson: answers,
+          screeningJson: screening,
+          updatedAt: new Date(),
+        })
+        .where(eq(clientBackgroundInterviews.clientBackgroundInterviewId, existing.clientBackgroundInterviewId))
+      await writeAudit(tx, {
+        practiceId: input.practiceId,
+        userId: input.userId,
+        clientId: input.clientId,
+        eventType: "client_background_interview.answers_updated",
+        entityType: "client_background_interview",
+        entityId: existing.clientBackgroundInterviewId,
+      })
+      return { answers, screening }
+    }).then(async (result) => {
+      if (result.answers) {
+        await writeBlockAnswerMirrors(input.clientId, input.practiceId, result.answers)
+      }
+      return result
+    })
+  } catch {
+    return { error: "Could not save the interview answer." }
+  }
+}
+
+export async function saveInterviewAnswersBulk(input: {
+  clientId: string
+  practiceId: string
+  userId: string
+  answers: InterviewAnswersJson
+}): Promise<{ error?: string; answers?: InterviewAnswersJson; screening?: ScreeningAnswers }> {
+  const client = await assertClient(input.clientId, input.practiceId)
+  if (!client) return { error: "Client was not found." }
+  const answers = sanitizeInterviewAnswers(input.answers)
+  try {
+    return await db.transaction(async (tx) => {
+      const [existing] = await tx
+        .select({
+          clientBackgroundInterviewId: clientBackgroundInterviews.clientBackgroundInterviewId,
+          screeningJson: clientBackgroundInterviews.screeningJson,
+        })
+        .from(clientBackgroundInterviews)
+        .where(
+          and(
+            eq(clientBackgroundInterviews.clientId, input.clientId),
+            eq(clientBackgroundInterviews.practiceId, input.practiceId),
+            eq(clientBackgroundInterviews.status, "in_progress")
+          )
+        )
+        .limit(1)
+      if (!existing) return { error: "There is no background interview in progress." }
+      const screening = mergeScreeningMirror(sanitizeScreening(existing.screeningJson), answers)
+      await tx
+        .update(clientBackgroundInterviews)
+        .set({
+          answersJson: answers,
+          screeningJson: screening,
+          updatedAt: new Date(),
+        })
+        .where(eq(clientBackgroundInterviews.clientBackgroundInterviewId, existing.clientBackgroundInterviewId))
+      await writeAudit(tx, {
+        practiceId: input.practiceId,
+        userId: input.userId,
+        clientId: input.clientId,
+        eventType: "client_background_interview.answers_updated",
+        entityType: "client_background_interview",
+        entityId: existing.clientBackgroundInterviewId,
+      })
+      return { answers, screening }
+    }).then(async (result) => {
+      if (result.answers) {
+        await writeBlockAnswerMirrors(input.clientId, input.practiceId, result.answers)
+      }
+      return result
+    })
+  } catch {
+    return { error: "Could not save the interview answers." }
   }
 }
 
@@ -1224,6 +1420,8 @@ export async function completeBackgroundInterview(input: {
   practiceId: string
   userId: string
   selfReportId: string | null
+  /** When true, mark every answers_json item confirmed before completing. */
+  confirmAllItems?: boolean
 }): Promise<{ error?: string }> {
   const client = await assertClient(input.clientId, input.practiceId)
   if (!client) return { error: "Client was not found." }
@@ -1266,7 +1464,13 @@ export async function completeBackgroundInterview(input: {
         )
       const dateOfBirth = clientRow?.dateOfBirth ?? null
       const events = eventRows.map((row) => settleEventDates(toEvent(row), dateOfBirth))
-      const screening = finalScreeningAnswers(sanitizeScreening(interview.screeningJson), events, dateOfBirth)
+      let answers = sanitizeInterviewAnswers(interview.answersJson)
+      if (input.confirmAllItems) answers = confirmAllAnswers(answers)
+      const screening = finalScreeningAnswers(
+        mergeScreeningMirror(sanitizeScreening(interview.screeningJson), answers),
+        events,
+        dateOfBirth
+      )
       const completedAt = new Date()
       const demographics = background ? demographicsFromStored(background) : emptyDemographics()
       const filled = markUnansweredStressors(sanitizeStressors(background?.stressorsJson))
@@ -1306,6 +1510,7 @@ export async function completeBackgroundInterview(input: {
         events,
         screening,
         stressors: filled.stressors,
+        answers,
       }
 
       await tx
@@ -1314,6 +1519,7 @@ export async function completeBackgroundInterview(input: {
           status: "completed",
           completedAt,
           screeningJson: screening,
+          answersJson: answers,
           snapshotJson: snapshot,
           selfReportId,
           updatedAt: completedAt,

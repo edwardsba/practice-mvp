@@ -12,6 +12,7 @@ import {
 import { requirePractitionerContext } from "@/lib/auth"
 import { loadClientBackground, loadInProgressInterview, loadLatestBackgroundSelfReport, loadReasonSupport } from "@/lib/client-background/load"
 import { ensureFamilyOfOrigin } from "@/lib/client-background/mutations"
+import { loadEmergencyContacts } from "@/lib/crisis-plans/load"
 import { todayDateString } from "@/lib/dates/practice-time"
 import { db } from "@/lib/db"
 import { buildReferralFundingQuickView } from "@/lib/funding/claims-page"
@@ -24,19 +25,27 @@ import { loadMedicalContactsForClient } from "@/lib/medical-contacts/load"
 
 export default async function BackgroundInterviewRoute({
   params,
-  searchParams,
 }: {
   params: Promise<{ client_id: string }>
   searchParams: Promise<{ page?: string }>
 }) {
   const { client_id: clientId } = await params
-  const query = await searchParams
   const context = await requirePractitionerContext()
 
   const [client] = await db
     .select({
       firstName: clients.firstName,
       lastName: clients.lastName,
+      phone: clients.phone,
+      email: clients.email,
+      address: clients.address,
+      dateOfBirth: clients.dateOfBirth,
+      commsOptOut: clients.commsOptOut,
+      reminderOptOut: clients.reminderOptOut,
+      preSessionOptOut: clients.preSessionOptOut,
+      postSessionOptOut: clients.postSessionOptOut,
+      adminCommsOptOut: clients.adminCommsOptOut,
+      onlineBookingPermitted: clients.onlineBookingPermitted,
     })
     .from(clients)
     .where(
@@ -58,13 +67,14 @@ export default async function BackgroundInterviewRoute({
   const data = await loadClientBackground(clientId, context.practiceId)
   if (!data) notFound()
 
-  const [selfReport, reasonSupport, claimsPage, referralFundingData, medicalContacts] =
+  const [selfReport, reasonSupport, claimsPage, referralFundingData, medicalContacts, emergencyContacts] =
     await Promise.all([
       loadLatestBackgroundSelfReport(clientId, context.practiceId),
       loadReasonSupport(clientId, context.practiceId, null),
       loadClaimsPageForClient(clientId),
       getReferralFundingCardData(clientId),
       loadMedicalContactsForClient(clientId, context.practiceId),
+      loadEmergencyContacts(clientId, context.practiceId),
     ])
 
   const referralCard = buildReferralFundingCardProps(
@@ -109,12 +119,36 @@ export default async function BackgroundInterviewRoute({
         clientId={clientId}
         practiceId={context.practiceId}
         clientName={`${client.firstName} ${client.lastName}`.trim()}
-        initialPage={query.page === "history" ? "history" : "background"}
         data={data}
         screening={interview.screening}
+        answers={interview.answers}
         selfReport={selfReport}
         reasonSupport={reasonSupport}
         medicalContacts={medicalContacts.map((row) => row.professional)}
+        medicalContactLines={medicalContacts.map((row) => ({
+          name: `${row.professional.firstName} ${row.professional.lastName}`.trim(),
+          professionName: row.professional.professionName,
+          isMain: row.isMain,
+        }))}
+        emergencyContacts={emergencyContacts.map((row) => ({
+          name: row.name,
+          role: row.role,
+          phone: row.phone,
+          email: row.email,
+        }))}
+        contactDetails={{
+          phone: client.phone,
+          email: client.email,
+          address: client.address,
+          comms: {
+            commsOptOut: client.commsOptOut,
+            reminderOptOut: client.reminderOptOut,
+            preSessionOptOut: client.preSessionOptOut,
+            postSessionOptOut: client.postSessionOptOut,
+            adminCommsOptOut: client.adminCommsOptOut,
+            onlineBookingPermitted: client.onlineBookingPermitted,
+          },
+        }}
         referralQuickViewLines={referralQuickViewLines}
         referralFormOptions={referralCard.formOptions}
         referralRecorded={anyReferralRecorded(referralFundingData.approvals)}

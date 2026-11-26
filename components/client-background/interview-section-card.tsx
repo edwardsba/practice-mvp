@@ -42,11 +42,13 @@ export function InterviewSectionCard({
   )
 }
 
-export function sectionOpenStorageKey(clientId: string, page: "background" | "history"): string {
+export type InterviewOpenPage = "background" | "history" | "interview"
+
+export function sectionOpenStorageKey(clientId: string, page: InterviewOpenPage): string {
   return `background-interview-sections:${clientId}:${page}`
 }
 
-export function readSectionOpenState(clientId: string, page: "background" | "history"): Record<string, boolean> {
+export function readSectionOpenState(clientId: string, page: InterviewOpenPage): Record<string, boolean> {
   try {
     const raw = sessionStorage.getItem(sectionOpenStorageKey(clientId, page))
     if (!raw) return {}
@@ -60,7 +62,7 @@ export function readSectionOpenState(clientId: string, page: "background" | "his
 
 export function writeSectionOpenState(
   clientId: string,
-  page: "background" | "history",
+  page: InterviewOpenPage,
   state: Record<string, boolean>
 ): void {
   try {

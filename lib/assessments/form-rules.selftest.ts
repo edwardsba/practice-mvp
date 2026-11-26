@@ -17,6 +17,7 @@ import {
   type FormElement,
   type SectionStatus,
 } from "@/lib/assessments/form-rules"
+import { aggregateSectionStatus, itemStatus } from "@/lib/section-status"
 
 function check(name: string, actual: unknown, expected: unknown) {
   assert.deepEqual(actual, expected, name)
@@ -793,6 +794,29 @@ check("element count is 98", LRAMP_ELEMENTS.length, 98)
       hasDefaults: false,
     }),
     "Section A, Reason: complete"
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Shared section-status helpers (split from form-rules; assessment results unchanged)
+// ---------------------------------------------------------------------------
+
+{
+  check("shared itemStatus left", itemStatus({ hasValue: false, confirmed: false }), "left")
+  check("shared itemStatus to_confirm", itemStatus({ hasValue: true, confirmed: false }), "to_confirm")
+  check("shared itemStatus done", itemStatus({ hasValue: true, confirmed: true }), "done")
+  check(
+    "shared aggregate left wins",
+    aggregateSectionStatus([
+      { hasValue: false, confirmed: false },
+      { hasValue: true, confirmed: false },
+    ]),
+    { status: "left", left: 1, toConfirm: 0, hasDefaults: false }
+  )
+  check(
+    "shared aggregate to_confirm",
+    aggregateSectionStatus([{ hasValue: true, confirmed: false }]),
+    { status: "to_confirm", left: 0, toConfirm: 1, hasDefaults: false }
   )
 }
 

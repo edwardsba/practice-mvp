@@ -104,7 +104,7 @@ export default async function NewPractitionerAssessmentPage({
         clientName={clientName}
         practitionerName={practitionerName}
         assessmentCode={assessmentCode}
-        shortName={definition.shortName}
+        displayName={definition.displayName}
         elements={definition.elements}
         initialAnswers={defaultAnswersFromElements(definition.elements)}
         initialAssessmentDate={todayDateInput()}

@@ -8,12 +8,14 @@ import {
   isElementPrefilled,
   prefilledConfirmDialogCopy,
   prefilledElementKeys,
+  progressChipAriaLabel,
   sectionStatuses,
   toResponseRows,
   validateAnswers,
   visibleElementKeys,
   type FormAnswers,
   type FormElement,
+  type SectionStatus,
 } from "@/lib/assessments/form-rules"
 
 function check(name: string, actual: unknown, expected: unknown) {
@@ -722,6 +724,75 @@ check("element count is 98", LRAMP_ELEMENTS.length, 98)
     "no defaults → no pre-filled keys",
     prefilledElementKeys(noDefaults, answered, new Set()),
     []
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Progress chip aria-label / title
+// ---------------------------------------------------------------------------
+
+{
+  const base: Omit<SectionStatus, "status" | "left" | "toConfirm"> = {
+    groupLabel: "Presentation",
+    letter: "1",
+    title: "Presentation",
+    hasDefaults: true,
+  }
+  check(
+    "aria: to_confirm",
+    progressChipAriaLabel({
+      ...base,
+      status: "to_confirm",
+      left: 0,
+      toConfirm: 5,
+    }),
+    "Section 1, Presentation: 5 to confirm"
+  )
+  check(
+    "aria: left",
+    progressChipAriaLabel({
+      ...base,
+      status: "left",
+      left: 3,
+      toConfirm: 0,
+    }),
+    "Section 1, Presentation: 3 to answer"
+  )
+  check(
+    "aria: skipped (lettered)",
+    progressChipAriaLabel({
+      groupLabel: "C. Risk factors",
+      letter: "C",
+      title: "Risk factors",
+      status: "skipped",
+      left: 0,
+      toConfirm: 0,
+      hasDefaults: false,
+    }),
+    "Section C, Risk factors: skipped"
+  )
+  check(
+    "aria: done with defaults → confirmed",
+    progressChipAriaLabel({
+      ...base,
+      status: "done",
+      left: 0,
+      toConfirm: 0,
+    }),
+    "Section 1, Presentation: confirmed"
+  )
+  check(
+    "aria: done without defaults → complete",
+    progressChipAriaLabel({
+      groupLabel: "A. Reason",
+      letter: "A",
+      title: "Reason",
+      status: "done",
+      left: 0,
+      toConfirm: 0,
+      hasDefaults: false,
+    }),
+    "Section A, Reason: complete"
   )
 }
 

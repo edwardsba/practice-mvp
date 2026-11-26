@@ -17,6 +17,7 @@ import {
 import {
   prefilledConfirmDialogCopy,
   prefilledElementKeys,
+  progressChipAriaLabel,
   sectionStatuses,
   showSectionProgressBar,
   validateAnswers,
@@ -49,29 +50,13 @@ function progressClass(section: SectionStatus) {
   return "border-dashed border-muted-foreground/40 bg-muted/30 text-muted-foreground"
 }
 
-function progressChipExtra(section: SectionStatus) {
-  if (section.status === "left") {
-    return (
-      <span className="ml-1 text-xs font-normal">{section.left} left</span>
-    )
-  }
-  if (section.status === "to_confirm") {
-    return (
-      <span className="ml-1 text-xs font-normal">
-        {section.toConfirm} pre-filled
-      </span>
-    )
-  }
-  return null
-}
-
 export function PractitionerAssessmentForm({
   mode,
   clientId,
   clientName,
   practitionerName,
   assessmentCode,
-  shortName,
+  displayName,
   elements,
   initialAnswers,
   initialAssessmentDate,
@@ -85,7 +70,8 @@ export function PractitionerAssessmentForm({
   clientName: string
   practitionerName: string
   assessmentCode: string
-  shortName: string
+  /** assessment_name from the definition (heading only; Save is plain "Save"). */
+  displayName: string
   elements: FormElement[]
   initialAnswers: FormAnswers
   initialAssessmentDate: string
@@ -341,7 +327,9 @@ export function PractitionerAssessmentForm({
           ← Back
         </button>
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">{shortName}</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">
+            {displayName}
+          </h1>
           <p className="text-sm text-muted-foreground">
             {clientName} · {practitionerName}
           </p>
@@ -365,24 +353,27 @@ export function PractitionerAssessmentForm({
 
       <div className="sticky top-0 z-20 -mx-4 border-b bg-background/95 px-4 py-3 backdrop-blur">
         {showProgress ? (
-          <div className="flex flex-wrap gap-2">
-            {sections.map((section) => (
-              <button
-                key={section.groupLabel}
-                type="button"
-                onClick={() =>
-                  openSectionAndScroll(section.groupLabel, section.letter)
-                }
-                className={cn(
-                  "min-h-11 min-w-11 rounded-md border px-3 text-sm font-semibold",
-                  progressClass(section)
-                )}
-                title={`${section.letter}. ${section.title} — ${statusPill(section)}`}
-              >
-                {section.letter}
-                {progressChipExtra(section)}
-              </button>
-            ))}
+          <div className="flex gap-2">
+            {sections.map((section) => {
+              const chipLabel = progressChipAriaLabel(section)
+              return (
+                <button
+                  key={section.groupLabel}
+                  type="button"
+                  onClick={() =>
+                    openSectionAndScroll(section.groupLabel, section.letter)
+                  }
+                  className={cn(
+                    "flex h-11 min-h-11 flex-1 items-center justify-center rounded-md border px-1 text-sm font-semibold",
+                    progressClass(section)
+                  )}
+                  aria-label={chipLabel}
+                  title={chipLabel}
+                >
+                  {section.letter}
+                </button>
+              )
+            })}
           </div>
         ) : null}
         <p
@@ -487,7 +478,7 @@ export function PractitionerAssessmentForm({
               disabled={pending}
               onClick={handleSave}
             >
-              {pending ? "Saving…" : `Save ${shortName}`}
+              {pending ? "Saving…" : "Save"}
             </Button>
           </div>
         </div>

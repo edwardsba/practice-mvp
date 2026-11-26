@@ -604,6 +604,31 @@ export function showSectionProgressBar(elements: FormElement[]): boolean {
 }
 
 /**
+ * Full status string for a progress chip's aria-label / title
+ * (chips themselves show only the badge).
+ * e.g. "Section 1, Presentation: 5 to confirm"
+ *      "Section C, Risk factors: skipped"
+ */
+export function progressChipAriaLabel(section: SectionStatus): string {
+  let detail: string
+  switch (section.status) {
+    case "skipped":
+      detail = "skipped"
+      break
+    case "left":
+      detail = `${section.left} to answer`
+      break
+    case "to_confirm":
+      detail = `${section.toConfirm} to confirm`
+      break
+    case "done":
+      detail = section.hasDefaults ? "confirmed" : "complete"
+      break
+  }
+  return `Section ${section.letter}, ${section.title}: ${detail}`
+}
+
+/**
  * Turns saved response rows back into FormAnswers, ordered by response_order.
  */
 export function answersFromResponseRows(

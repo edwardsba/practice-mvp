@@ -22,7 +22,8 @@ export type LoadedFormDefinition = {
   assessmentDefinitionId: string
   assessmentCode: string
   assessmentName: string
-  shortName: string
+  /** Display heading: assessment_name from the database. */
+  displayName: string
   scoringEnabled: boolean
   clientCompletable: boolean
   practitionerCompletable: boolean
@@ -182,7 +183,7 @@ export async function loadFormDefinitionByCode(
     assessmentDefinitionId: definition.assessmentDefinitionId,
     assessmentCode: definition.assessmentCode,
     assessmentName: definition.assessmentName,
-    shortName: definition.assessmentCode,
+    displayName: definition.assessmentName,
     scoringEnabled: definition.scoringEnabled,
     clientCompletable: definition.clientCompletable,
     practitionerCompletable: definition.practitionerCompletable,

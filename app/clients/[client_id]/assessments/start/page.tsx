@@ -1,7 +1,7 @@
-import Link from "next/link"
 import { and, asc, eq, sql } from "drizzle-orm"
 import { notFound } from "next/navigation"
 
+import { StartAssessmentRow } from "@/app/clients/[client_id]/assessments/start/start-assessment-row"
 import { AppShell } from "@/components/app-shell"
 import { BackButton } from "@/components/ui/back-button"
 import { EntityPageHeader } from "@/components/ui/entity-page-header"
@@ -21,7 +21,6 @@ import { requirePractitionerContext } from "@/lib/auth"
 import { todayDateString } from "@/lib/dates/practice-time"
 import { db } from "@/lib/db"
 import { safeReturnTo } from "@/lib/navigation/safe-return-to"
-import { cn } from "@/lib/utils"
 
 export default async function StartAssessmentPage({
   params,
@@ -125,32 +124,18 @@ export default async function StartAssessmentPage({
           Practitioner assessments
         </h2>
         <ul className="divide-y rounded-lg border">
-          {practitioner.map((row) => {
-            const href = buildPractitionerStartHref({
-              clientId,
-              assessmentCode: row.assessmentCode,
-              sessionNoteId: todaysNote?.sessionNoteId ?? null,
-              returnTo: startReturnTo,
-            })
-            return (
-              <li key={row.assessmentCode}>
-                <Link
-                  href={href}
-                  className="flex min-h-14 items-center justify-between gap-3 px-4 py-3 hover:bg-muted/40"
-                >
-                  <span>
-                    <span className="block font-medium">
-                      {row.assessmentCode}
-                    </span>
-                    <span className="block text-sm text-muted-foreground">
-                      {row.assessmentName}
-                    </span>
-                  </span>
-                  <span className="text-sm text-primary">Start</span>
-                </Link>
-              </li>
-            )
-          })}
+          {practitioner.map((row) => (
+            <StartAssessmentRow
+              key={row.assessmentCode}
+              name={row.assessmentName}
+              href={buildPractitionerStartHref({
+                clientId,
+                assessmentCode: row.assessmentCode,
+                sessionNoteId: todaysNote?.sessionNoteId ?? null,
+                returnTo: startReturnTo,
+              })}
+            />
+          ))}
         </ul>
       </section>
 
@@ -159,54 +144,26 @@ export default async function StartAssessmentPage({
           Client questionnaires (completed with the client)
         </h2>
         <ul className="divide-y rounded-lg border">
-          {clientRows.map((row) => {
-            if (row.enabled) {
-              const href = buildPractitionerStartHref({
-                clientId,
-                assessmentCode: row.assessmentCode,
-                sessionNoteId: todaysNote?.sessionNoteId ?? null,
-                returnTo: startReturnTo,
-              })
-              return (
-                <li key={row.assessmentCode}>
-                  <Link
-                    href={href}
-                    className="flex min-h-14 items-center justify-between gap-3 px-4 py-3 hover:bg-muted/40"
-                  >
-                    <span>
-                      <span className="block font-medium">
-                        {row.assessmentCode}
-                      </span>
-                      <span className="block text-sm text-muted-foreground">
-                        {row.assessmentName}
-                      </span>
-                    </span>
-                    <span className="text-sm text-primary">Start</span>
-                  </Link>
-                </li>
-              )
-            }
-
-            return (
-              <li
+          {clientRows.map((row) =>
+            row.enabled ? (
+              <StartAssessmentRow
                 key={row.assessmentCode}
-                className={cn(
-                  "flex min-h-14 items-center justify-between gap-3 px-4 py-3 opacity-60"
-                )}
-                aria-disabled
-              >
-                <span>
-                  <span className="block font-medium">{row.assessmentCode}</span>
-                  <span className="block text-sm text-muted-foreground">
-                    {row.assessmentName}
-                  </span>
-                </span>
-                <span className="rounded-md border px-2 py-0.5 text-xs">
-                  {row.disabledNote ?? "Coming soon"}
-                </span>
-              </li>
+                name={row.assessmentName}
+                href={buildPractitionerStartHref({
+                  clientId,
+                  assessmentCode: row.assessmentCode,
+                  sessionNoteId: todaysNote?.sessionNoteId ?? null,
+                  returnTo: startReturnTo,
+                })}
+              />
+            ) : (
+              <StartAssessmentRow
+                key={row.assessmentCode}
+                name={row.assessmentName}
+                badge={row.disabledNote ?? "Coming soon"}
+              />
             )
-          })}
+          )}
         </ul>
       </section>
 

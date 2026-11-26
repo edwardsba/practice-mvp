@@ -309,6 +309,12 @@ export function RelationshipBlocksSection({
   sectionOpen,
   onToggleSection,
   sectionBadge,
+  /** Which relationship sections to render (default both). */
+  visibleSections = ["intimate", "caregivers"],
+  /** Skip InterviewSectionCard chrome when embedded under numbered interview sections. */
+  embedWithoutChrome = false,
+  /** Hide top-level Yes/None/Not asked radios owned by interview item rows. */
+  hideTopLevelAnswers = false,
 }: {
   clientId: string
   relationships: RelationshipRecord[]
@@ -327,6 +333,9 @@ export function RelationshipBlocksSection({
   sectionOpen?: { intimate: boolean; caregivers: boolean }
   onToggleSection?: (id: "intimate" | "caregivers") => void
   sectionBadge?: { intimate: string; caregivers: string }
+  visibleSections?: Array<"intimate" | "caregivers">
+  embedWithoutChrome?: boolean
+  hideTopLevelAnswers?: boolean
 }) {
   const initialBlocks = blocks ?? []
   const initialAnswers = blockAnswers ?? emptyBlockAnswers()
@@ -361,11 +370,6 @@ export function RelationshipBlocksSection({
     setBaselineStatus(relationshipStatus)
   }, [relationships, blocks, blockAnswers, relationshipStatus])
 
-  useEffect(() => {
-    if (!registerFlush) return
-    return registerFlush(() => inflight.current ?? Promise.resolve())
-  }, [registerFlush])
-
   const intimateDraft = intimateSnapshot(blockList, answers, status)
   const intimateBaseline = intimateSnapshot(baselineBlocks, baselineAnswers, baselineStatus)
   const caregiversDraft = caregiversSnapshot(blockList, answers)
@@ -373,6 +377,26 @@ export function RelationshipBlocksSection({
   const intimateUnsaved = countUnsavedRelationshipChanges(intimateBaseline, intimateDraft)
   const caregiversUnsaved = countUnsavedRelationshipChanges(caregiversBaseline, caregiversDraft)
   const sectionDirty = intimateUnsaved > 0 || caregiversUnsaved > 0
+
+  const intimateUnsavedRef = useRef(intimateUnsaved)
+  const caregiversUnsavedRef = useRef(caregiversUnsaved)
+  const saveIntimateRef = useRef<() => Promise<void>>(async () => {})
+  const saveCaregiversRef = useRef<() => Promise<void>>(async () => {})
+
+  useEffect(() => {
+    intimateUnsavedRef.current = intimateUnsaved
+    caregiversUnsavedRef.current = caregiversUnsaved
+  }, [intimateUnsaved, caregiversUnsaved])
+
+  useEffect(() => {
+    if (!registerFlush) return
+    return registerFlush(async () => {
+      if (inflight.current) await inflight.current
+      // Save and leave must persist unsaved section drafts, not only in-flight panel saves.
+      if (intimateUnsavedRef.current > 0) await saveIntimateRef.current()
+      if (caregiversUnsavedRef.current > 0) await saveCaregiversRef.current()
+    })
+  }, [registerFlush])
 
   useEffect(() => {
     if (!sectionDirty) return
@@ -830,6 +854,14 @@ export function RelationshipBlocksSection({
     setError(null)
   }
 
+  useEffect(() => {
+    saveIntimateRef.current = () => saveIntimateSection()
+    saveCaregiversRef.current = () => saveCaregiversSection()
+  })
+
+  const showIntimate = visibleSections.includes("intimate")
+  const showCaregivers = visibleSections.includes("caregivers")
+
   const motherName =
     biological &&
     membersOf(biological, people, "parent").find(
@@ -847,275 +879,302 @@ export function RelationshipBlocksSection({
         ? selection.blockId
         : null
 
-  return (
-    <div data-entry-point={NEW_RELATIONSHIP_ENTRY_POINTS.interview}>
-      <InterviewSectionCard
-        id="check-relationships-intimate"
-        title="Intimate relationships and children"
-        open={intimateOpen}
-        onToggle={() =>
-          onToggleSection ? onToggleSection("intimate") : setIntimateOpenLocal((open) => !open)
-        }
-        badge={intimateBadge}
-      >
-        <div id="check-relationships" className="space-y-6">
-          {error && !selection ? <p className="text-sm text-destructive">{error}</p> : null}
-          <section className="space-y-3">
-            <h3 className={treeLayer1ClassName}>Current intimate relationship and children</h3>
-            {childrenPrompt ? (
-              <p className="text-sm text-blue-800">
-                Client: {childrenPrompt} · {recordedChildren} recorded
-              </p>
-            ) : null}
-            {currentBlocks.length === 0 ? (
-              <div className={layer2BandClassName}>
-                <ClientStatusSelect
-                  status={status}
-                  relationshipClient={relationshipClient}
-                  onChange={setStatus}
-                />
-              </div>
-            ) : (
-              currentBlocks.map((block, index) => (
-                <CurrentBlockTree
-                  key={block.relationshipBlockId}
-                  block={block}
-                  people={people}
-                  locked={block.relationshipBlockId === lockedId}
-                  statusSource={index === 0}
-                  clientStatus={status}
-                  relationshipClient={relationshipClient}
-                  selectedId={selectedId}
-                  onClientStatus={setStatus}
-                  onBlockStatus={(nextStatus) => patchBlock(block.relationshipBlockId, { status: nextStatus })}
-                  onOpenBlock={() => openBlock(block.relationshipBlockId)}
-                  onOpenPerson={openPerson}
-                  onAddToRelationship={(role) => openNewPerson(block.relationshipBlockId, role)}
-                  onAddPartner={() => openNewPerson(block.relationshipBlockId, "partner")}
-                  onAddChild={() => openNewPerson(block.relationshipBlockId, "child")}
-                  onChildrenAnswer={(childrenAnswer) =>
-                    patchBlock(block.relationshipBlockId, { childrenAnswer })
-                  }
-                />
-              ))
-            )}
-            {currentBlocks.length === 0 ? (
-              <button type="button" className={linkClass} onClick={() => openNewRelationship("client_current")}>
-                + Add current relationship
-              </button>
-            ) : null}
-          </section>
-
-          <section className="space-y-3">
-            <AnswerSelect
-              id="previous_relationships_answer"
-              label="Previous significant relationships"
-              value={previous.length > 0 ? "yes" : answers.previousRelationships || ""}
-              locked={previous.length > 0}
-              onChange={(value) => setAnswer("previousRelationships", value)}
+  const intimateBody = (
+    <div id="check-relationships" className="space-y-6">
+      {error && !selection ? <p className="text-sm text-destructive">{error}</p> : null}
+      <section className="space-y-3">
+        <h3 className={treeLayer1ClassName}>Current intimate relationship and children</h3>
+        {childrenPrompt ? (
+          <p className="text-sm text-blue-800">
+            Client: {childrenPrompt} · {recordedChildren} recorded
+          </p>
+        ) : null}
+        {currentBlocks.length === 0 ? (
+          <div className={layer2BandClassName}>
+            <ClientStatusSelect
+              status={status}
+              relationshipClient={relationshipClient}
+              onChange={setStatus}
             />
-            {(previous.length > 0 || answers.previousRelationships === "yes") &&
-              previous.map((block) => (
-                <PreviousBlockTree
-                  key={block.relationshipBlockId}
-                  block={block}
-                  people={people}
-                  selectedId={selectedId}
-                  onOpenBlock={() => openBlock(block.relationshipBlockId)}
-                  onOpenPerson={openPerson}
-                  onStatus={(statusValue) => patchBlock(block.relationshipBlockId, { status: statusValue })}
-                  onAddToRelationship={(role) => openNewPerson(block.relationshipBlockId, role)}
-                  onAddPartner={() => openNewPerson(block.relationshipBlockId, "partner")}
-                  onAddChild={() => openNewPerson(block.relationshipBlockId, "child")}
-                  onChildrenAnswer={(childrenAnswer) =>
-                    patchBlock(block.relationshipBlockId, { childrenAnswer })
-                  }
-                />
-              ))}
-            {answers.previousRelationships !== "none" ? (
-              <button type="button" className={linkClass} onClick={() => openNewRelationship("client_previous")}>
-                + Add previous relationship
-              </button>
-            ) : null}
-          </section>
-
-          <section className="space-y-3">
-            <AnswerSelect
-              id="other_children_answer"
-              label="Other children"
-              value={otherChildren.length > 0 ? "yes" : answers.otherChildren || ""}
-              locked={otherChildren.length > 0}
-              onChange={(value) => setAnswer("otherChildren", value)}
+          </div>
+        ) : (
+          currentBlocks.map((block, index) => (
+            <CurrentBlockTree
+              key={block.relationshipBlockId}
+              block={block}
+              people={people}
+              locked={block.relationshipBlockId === lockedId}
+              statusSource={index === 0}
+              clientStatus={status}
+              relationshipClient={relationshipClient}
+              selectedId={selectedId}
+              onClientStatus={setStatus}
+              onBlockStatus={(nextStatus) => patchBlock(block.relationshipBlockId, { status: nextStatus })}
+              onOpenBlock={() => openBlock(block.relationshipBlockId)}
+              onOpenPerson={openPerson}
+              onAddToRelationship={(role) => openNewPerson(block.relationshipBlockId, role)}
+              onAddPartner={() => openNewPerson(block.relationshipBlockId, "partner")}
+              onAddChild={() => openNewPerson(block.relationshipBlockId, "child")}
+              onChildrenAnswer={(childrenAnswer) =>
+                patchBlock(block.relationshipBlockId, { childrenAnswer })
+              }
             />
-            {(otherChildren.length > 0 || answers.otherChildren === "yes") &&
-              otherChildren.map((block) => (
-                <OtherChildrenTree
-                  key={block.relationshipBlockId}
-                  block={block}
-                  people={people}
-                  selectedId={selectedId}
-                  onOpenPerson={openPerson}
-                  onStatusDetail={(statusDetail) => patchBlock(block.relationshipBlockId, { statusDetail })}
-                  onAddChild={() => openNewPerson(block.relationshipBlockId, "child")}
-                />
-              ))}
-            {answers.otherChildren === "yes" || otherChildren.length > 0 ? (
-              <button
-                type="button"
-                className={linkClass}
-                onClick={() => openNewRelationship("client_other_children")}
-              >
-                + Add relationship
-              </button>
-            ) : null}
-          </section>
+          ))
+        )}
+        {currentBlocks.length === 0 ? (
+          <button type="button" className={linkClass} onClick={() => openNewRelationship("client_current")}>
+            + Add current relationship
+          </button>
+        ) : null}
+      </section>
 
-          {unplacedIntimate.length > 0 ? (
-            <UnplacedGroup people={unplacedIntimate} onOpenPerson={openPerson} onMove={(id) => setSelection({ type: "move", id })} />
-          ) : null}
-
-          <RelationshipSectionFooter
-            unsavedCount={intimateUnsaved}
-            saving={intimateSaving}
-            onDiscard={discardIntimateSection}
-            onSave={() => void saveIntimateSection()}
+      <section className="space-y-3">
+        {hideTopLevelAnswers ? (
+          <h3 className={treeLayer1ClassName}>Previous significant relationships</h3>
+        ) : (
+          <AnswerSelect
+            id="previous_relationships_answer"
+            label="Previous significant relationships"
+            value={previous.length > 0 ? "yes" : answers.previousRelationships || ""}
+            locked={previous.length > 0}
+            onChange={(value) => setAnswer("previousRelationships", value)}
           />
-        </div>
-      </InterviewSectionCard>
-
-      <InterviewSectionCard
-        id="check-relationships-caregivers"
-        title="Primary caregivers and siblings"
-        open={caregiversOpen}
-        onToggle={() =>
-          onToggleSection ? onToggleSection("caregivers") : setCaregiversOpenLocal((open) => !open)
-        }
-        badge={caregiversBadge}
-      >
-        <div className="space-y-6">
-          {biological ? (
-            <ParentsBlockTree
-              block={biological}
+        )}
+        {(previous.length > 0 || answers.previousRelationships === "yes") &&
+          previous.map((block) => (
+            <PreviousBlockTree
+              key={block.relationshipBlockId}
+              block={block}
               people={people}
               selectedId={selectedId}
-              onOpenBlock={() => openBlock(biological.relationshipBlockId)}
+              onOpenBlock={() => openBlock(block.relationshipBlockId)}
               onOpenPerson={openPerson}
-              onStatus={(statusValue) =>
-                patchBlock(biological.relationshipBlockId, { status: statusValue })
-              }
-              onAddSibling={() => openNewPerson(biological.relationshipBlockId, "sibling")}
-              onSiblingsAnswer={(siblingsAnswer) =>
-                patchBlock(biological.relationshipBlockId, { siblingsAnswer })
+              onStatus={(statusValue) => patchBlock(block.relationshipBlockId, { status: statusValue })}
+              onAddToRelationship={(role) => openNewPerson(block.relationshipBlockId, role)}
+              onAddPartner={() => openNewPerson(block.relationshipBlockId, "partner")}
+              onAddChild={() => openNewPerson(block.relationshipBlockId, "child")}
+              onChildrenAnswer={(childrenAnswer) =>
+                patchBlock(block.relationshipBlockId, { childrenAnswer })
               }
             />
-          ) : null}
+          ))}
+        {answers.previousRelationships !== "none" ? (
+          <button type="button" className={linkClass} onClick={() => openNewRelationship("client_previous")}>
+            + Add previous relationship
+          </button>
+        ) : null}
+      </section>
 
-          <AnsweredSideSection
-            id="mother_other_answer"
-            label={motherName ? `Mother (${motherName}) · other relationships` : "Mother · other relationships"}
-            answer={motherOther.length > 0 ? "yes" : answers.motherOtherRelationships || ""}
-            locked={motherOther.length > 0}
-            onAnswer={(value) => setAnswer("motherOtherRelationships", value)}
-            onAdd={() => openNewRelationship("parent_other", { parentSide: "mother" })}
-            addLabel="+ Add relationship"
-            hideAdd={answers.motherOtherRelationships === "none"}
-          >
-            {motherOther.map((block) => (
-              <ParentOtherTree
-                key={block.relationshipBlockId}
-                block={block}
-                people={people}
-                selectedId={selectedId}
-                onOpenBlock={() => openBlock(block.relationshipBlockId)}
-                onOpenPerson={openPerson}
-                onStatus={(statusValue) => patchBlock(block.relationshipBlockId, { status: statusValue })}
-                onAddToRelationship={(role) => openNewPerson(block.relationshipBlockId, role)}
-                onAddPartner={() => openNewPerson(block.relationshipBlockId, "partner")}
-                onAddSibling={() => openNewPerson(block.relationshipBlockId, "sibling")}
-                onSiblingsAnswer={(siblingsAnswer) =>
-                  patchBlock(block.relationshipBlockId, { siblingsAnswer })
-                }
-              />
-            ))}
-          </AnsweredSideSection>
-
-          <AnsweredSideSection
-            id="father_other_answer"
-            label={fatherName ? `Father (${fatherName}) · other relationships` : "Father · other relationships"}
-            answer={fatherOther.length > 0 ? "yes" : answers.fatherOtherRelationships || ""}
-            locked={fatherOther.length > 0}
-            onAnswer={(value) => setAnswer("fatherOtherRelationships", value)}
-            onAdd={() => openNewRelationship("parent_other", { parentSide: "father" })}
-            addLabel="+ Add relationship"
-            hideAdd={answers.fatherOtherRelationships === "none"}
-          >
-            {fatherOther.map((block) => (
-              <ParentOtherTree
-                key={block.relationshipBlockId}
-                block={block}
-                people={people}
-                selectedId={selectedId}
-                onOpenBlock={() => openBlock(block.relationshipBlockId)}
-                onOpenPerson={openPerson}
-                onStatus={(statusValue) => patchBlock(block.relationshipBlockId, { status: statusValue })}
-                onAddToRelationship={(role) => openNewPerson(block.relationshipBlockId, role)}
-                onAddPartner={() => openNewPerson(block.relationshipBlockId, "partner")}
-                onAddSibling={() => openNewPerson(block.relationshipBlockId, "sibling")}
-                onSiblingsAnswer={(siblingsAnswer) =>
-                  patchBlock(block.relationshipBlockId, { siblingsAnswer })
-                }
-              />
-            ))}
-          </AnsweredSideSection>
-
-          <AnsweredSideSection
-            id="caregiver_arrangements_answer"
-            label="Other caregiver arrangements"
-            answer={caregivers.length > 0 ? "yes" : answers.caregiverArrangements || ""}
-            locked={caregivers.length > 0}
-            onAnswer={(value) => setAnswer("caregiverArrangements", value)}
-            onAdd={() => openNewRelationship("caregiver_arrangement")}
-            addLabel="+ Add arrangement"
-            hideAdd={answers.caregiverArrangements === "none"}
-          >
-            {caregivers.map((block) => (
-              <CaregiverTree
-                key={block.relationshipBlockId}
-                block={block}
-                people={people}
-                selectedId={selectedId}
-                onOpenBlock={() => openBlock(block.relationshipBlockId)}
-                onOpenPerson={openPerson}
-                onArrangement={(arrangementType) =>
-                  patchBlock(block.relationshipBlockId, {
-                    arrangementType: arrangementType as RelationshipBlock["arrangementType"],
-                  })
-                }
-                onAddCaregiver={() => openNewPerson(block.relationshipBlockId, "caregiver")}
-                onAddSibling={() => openNewPerson(block.relationshipBlockId, "sibling")}
-                onSiblingsAnswer={(siblingsAnswer) =>
-                  patchBlock(block.relationshipBlockId, { siblingsAnswer })
-                }
-              />
-            ))}
-          </AnsweredSideSection>
-
-          {unplacedCaregivers.length > 0 ? (
-            <UnplacedGroup
-              people={unplacedCaregivers}
+      <section className="space-y-3">
+        <AnswerSelect
+          id="other_children_answer"
+          label="Other children"
+          value={otherChildren.length > 0 ? "yes" : answers.otherChildren || ""}
+          locked={otherChildren.length > 0}
+          onChange={(value) => setAnswer("otherChildren", value)}
+        />
+        {(otherChildren.length > 0 || answers.otherChildren === "yes") &&
+          otherChildren.map((block) => (
+            <OtherChildrenTree
+              key={block.relationshipBlockId}
+              block={block}
+              people={people}
+              selectedId={selectedId}
               onOpenPerson={openPerson}
-              onMove={(id) => setSelection({ type: "move", id })}
+              onStatusDetail={(statusDetail) => patchBlock(block.relationshipBlockId, { statusDetail })}
+              onAddChild={() => openNewPerson(block.relationshipBlockId, "child")}
             />
-          ) : null}
+          ))}
+        {answers.otherChildren === "yes" || otherChildren.length > 0 ? (
+          <button
+            type="button"
+            className={linkClass}
+            onClick={() => openNewRelationship("client_other_children")}
+          >
+            + Add relationship
+          </button>
+        ) : null}
+      </section>
 
-          <RelationshipSectionFooter
-            unsavedCount={caregiversUnsaved}
-            saving={caregiversSaving}
-            onDiscard={discardCaregiversSection}
-            onSave={() => void saveCaregiversSection()}
+      {unplacedIntimate.length > 0 ? (
+        <UnplacedGroup people={unplacedIntimate} onOpenPerson={openPerson} onMove={(id) => setSelection({ type: "move", id })} />
+      ) : null}
+
+      <RelationshipSectionFooter
+        unsavedCount={intimateUnsaved}
+        saving={intimateSaving}
+        onDiscard={discardIntimateSection}
+        onSave={() => void saveIntimateSection()}
+      />
+    </div>
+  )
+
+  const caregiversBody = (
+    <div className="space-y-6">
+      {biological ? (
+        <ParentsBlockTree
+          block={biological}
+          people={people}
+          selectedId={selectedId}
+          onOpenBlock={() => openBlock(biological.relationshipBlockId)}
+          onOpenPerson={openPerson}
+          onStatus={(statusValue) =>
+            patchBlock(biological.relationshipBlockId, { status: statusValue })
+          }
+          onAddSibling={() => openNewPerson(biological.relationshipBlockId, "sibling")}
+          onSiblingsAnswer={(siblingsAnswer) =>
+            patchBlock(biological.relationshipBlockId, { siblingsAnswer })
+          }
+        />
+      ) : null}
+
+      <AnsweredSideSection
+        id="mother_other_answer"
+        label={motherName ? `Mother (${motherName}) · other relationships` : "Mother · other relationships"}
+        answer={motherOther.length > 0 ? "yes" : answers.motherOtherRelationships || ""}
+        locked={motherOther.length > 0}
+        onAnswer={(value) => setAnswer("motherOtherRelationships", value)}
+        onAdd={() => openNewRelationship("parent_other", { parentSide: "mother" })}
+        addLabel="+ Add relationship"
+        hideAdd={answers.motherOtherRelationships === "none"}
+        hideAnswer={hideTopLevelAnswers}
+      >
+        {motherOther.map((block) => (
+          <ParentOtherTree
+            key={block.relationshipBlockId}
+            block={block}
+            people={people}
+            selectedId={selectedId}
+            onOpenBlock={() => openBlock(block.relationshipBlockId)}
+            onOpenPerson={openPerson}
+            onStatus={(statusValue) => patchBlock(block.relationshipBlockId, { status: statusValue })}
+            onAddToRelationship={(role) => openNewPerson(block.relationshipBlockId, role)}
+            onAddPartner={() => openNewPerson(block.relationshipBlockId, "partner")}
+            onAddSibling={() => openNewPerson(block.relationshipBlockId, "sibling")}
+            onSiblingsAnswer={(siblingsAnswer) =>
+              patchBlock(block.relationshipBlockId, { siblingsAnswer })
+            }
           />
-        </div>
-      </InterviewSectionCard>
+        ))}
+      </AnsweredSideSection>
+
+      <AnsweredSideSection
+        id="father_other_answer"
+        label={fatherName ? `Father (${fatherName}) · other relationships` : "Father · other relationships"}
+        answer={fatherOther.length > 0 ? "yes" : answers.fatherOtherRelationships || ""}
+        locked={fatherOther.length > 0}
+        onAnswer={(value) => setAnswer("fatherOtherRelationships", value)}
+        onAdd={() => openNewRelationship("parent_other", { parentSide: "father" })}
+        addLabel="+ Add relationship"
+        hideAdd={answers.fatherOtherRelationships === "none"}
+        hideAnswer={hideTopLevelAnswers}
+      >
+        {fatherOther.map((block) => (
+          <ParentOtherTree
+            key={block.relationshipBlockId}
+            block={block}
+            people={people}
+            selectedId={selectedId}
+            onOpenBlock={() => openBlock(block.relationshipBlockId)}
+            onOpenPerson={openPerson}
+            onStatus={(statusValue) => patchBlock(block.relationshipBlockId, { status: statusValue })}
+            onAddToRelationship={(role) => openNewPerson(block.relationshipBlockId, role)}
+            onAddPartner={() => openNewPerson(block.relationshipBlockId, "partner")}
+            onAddSibling={() => openNewPerson(block.relationshipBlockId, "sibling")}
+            onSiblingsAnswer={(siblingsAnswer) =>
+              patchBlock(block.relationshipBlockId, { siblingsAnswer })
+            }
+          />
+        ))}
+      </AnsweredSideSection>
+
+      <AnsweredSideSection
+        id="caregiver_arrangements_answer"
+        label="Other caregiver arrangements"
+        answer={caregivers.length > 0 ? "yes" : answers.caregiverArrangements || ""}
+        locked={caregivers.length > 0}
+        onAnswer={(value) => setAnswer("caregiverArrangements", value)}
+        onAdd={() => openNewRelationship("caregiver_arrangement")}
+        addLabel="+ Add arrangement"
+        hideAdd={answers.caregiverArrangements === "none"}
+        hideAnswer={hideTopLevelAnswers}
+      >
+        {caregivers.map((block) => (
+          <CaregiverTree
+            key={block.relationshipBlockId}
+            block={block}
+            people={people}
+            selectedId={selectedId}
+            onOpenBlock={() => openBlock(block.relationshipBlockId)}
+            onOpenPerson={openPerson}
+            onArrangement={(arrangementType) =>
+              patchBlock(block.relationshipBlockId, {
+                arrangementType: arrangementType as RelationshipBlock["arrangementType"],
+              })
+            }
+            onAddCaregiver={() => openNewPerson(block.relationshipBlockId, "caregiver")}
+            onAddSibling={() => openNewPerson(block.relationshipBlockId, "sibling")}
+            onSiblingsAnswer={(siblingsAnswer) =>
+              patchBlock(block.relationshipBlockId, { siblingsAnswer })
+            }
+          />
+        ))}
+      </AnsweredSideSection>
+
+      {unplacedCaregivers.length > 0 ? (
+        <UnplacedGroup
+          people={unplacedCaregivers}
+          onOpenPerson={openPerson}
+          onMove={(id) => setSelection({ type: "move", id })}
+        />
+      ) : null}
+
+      <RelationshipSectionFooter
+        unsavedCount={caregiversUnsaved}
+        saving={caregiversSaving}
+        onDiscard={discardCaregiversSection}
+        onSave={() => void saveCaregiversSection()}
+      />
+    </div>
+  )
+
+  return (
+    <div data-entry-point={NEW_RELATIONSHIP_ENTRY_POINTS.interview}>
+      {showIntimate ? (
+        embedWithoutChrome ? (
+          intimateBody
+        ) : (
+          <InterviewSectionCard
+            id="check-relationships-intimate"
+            title="Intimate relationships and children"
+            open={intimateOpen}
+            onToggle={() =>
+              onToggleSection ? onToggleSection("intimate") : setIntimateOpenLocal((open) => !open)
+            }
+            badge={intimateBadge}
+          >
+            {intimateBody}
+          </InterviewSectionCard>
+        )
+      ) : null}
+
+      {showCaregivers ? (
+        embedWithoutChrome ? (
+          caregiversBody
+        ) : (
+          <InterviewSectionCard
+            id="check-relationships-caregivers"
+            title="Primary caregivers and siblings"
+            open={caregiversOpen}
+            onToggle={() =>
+              onToggleSection ? onToggleSection("caregivers") : setCaregiversOpenLocal((open) => !open)
+            }
+            badge={caregiversBadge}
+          >
+            {caregiversBody}
+          </InterviewSectionCard>
+        )
+      ) : null}
 
       {portalReady && selection
         ? createPortal(
@@ -2147,6 +2206,7 @@ function AnsweredSideSection({
   onAdd,
   addLabel,
   hideAdd,
+  hideAnswer = false,
   children,
 }: {
   id: string
@@ -2157,11 +2217,16 @@ function AnsweredSideSection({
   onAdd: () => void
   addLabel: string
   hideAdd: boolean
+  hideAnswer?: boolean
   children: import("react").ReactNode
 }) {
   return (
     <section className="space-y-3">
-      <AnswerSelect id={id} label={label} value={answer} locked={locked} onChange={onAnswer} />
+      {hideAnswer ? (
+        <h3 className={treeLayer1ClassName}>{label}</h3>
+      ) : (
+        <AnswerSelect id={id} label={label} value={answer} locked={locked} onChange={onAnswer} />
+      )}
       {children}
       {!hideAdd ? (
         <button type="button" className={linkClass} onClick={onAdd}>

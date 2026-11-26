@@ -3,6 +3,7 @@
 import type { ReactNode } from "react"
 
 import { ElementControl } from "@/components/assessments/form/element-control"
+import { PrefilledTag } from "@/components/shared/prefilled-tag"
 import {
   questionDisplayLabel,
   visibleElementKeys,
@@ -147,11 +148,7 @@ export function AssessmentFormCore({
                     *
                   </span>
                 ) : null}
-                {prefilledKeys?.has(element.elementKey) ? (
-                  <span className="ml-2 align-middle text-xs font-normal text-amber-800">
-                    Pre-filled
-                  </span>
-                ) : null}
+                {prefilledKeys?.has(element.elementKey) ? <PrefilledTag /> : null}
               </label>
               {isGroupFirst ? (
                 <p className="text-xs text-muted-foreground">

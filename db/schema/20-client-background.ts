@@ -232,6 +232,8 @@ export const clientBackgroundInterviews = pgTable(
     startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
     completedAt: timestamp("completed_at", { withTimezone: true }),
     screeningJson: jsonb("screening_json").notNull().default({}),
+    /** Per-item Yes/No/N/A (and variants) for the nine interview sections on this date. */
+    answersJson: jsonb("answers_json").notNull().default({}),
     snapshotJson: jsonb("snapshot_json"),
     selfReportId: uuid("self_report_id"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

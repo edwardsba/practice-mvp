@@ -27,6 +27,8 @@ import {
   saveDemographics,
   saveEducation,
   saveIdentity,
+  saveInterviewAnswersBulk,
+  saveInterviewItemAnswer,
   saveLivingSituation,
   saveOccupation,
   saveRisk,
@@ -37,6 +39,7 @@ import {
   updateHistoryIssue,
   updateHistoryIssueTreatmentAnswer,
 } from "@/lib/client-background/mutations"
+import type { InterviewAnswerValue, InterviewAnswersJson } from "@/lib/client-background/interview-answers"
 import type { BlockKind, BlockRole, RelationshipBlockAnswers, TreatmentAnswer } from "@/lib/client-background/types"
 import { ensureMedicalContact } from "@/lib/medical-contacts/mutations"
 
@@ -216,13 +219,47 @@ export async function saveInterviewScreeningAction(clientId: string, screening: 
   return result
 }
 
-export async function completeBackgroundInterviewAction(clientId: string, selfReportId: string | null) {
+export async function saveInterviewItemAnswerAction(
+  clientId: string,
+  itemKey: string,
+  value: InterviewAnswerValue
+) {
+  const context = await requirePractitionerContext()
+  const result = await saveInterviewItemAnswer({
+    clientId,
+    practiceId: context.practiceId,
+    userId: context.userId,
+    itemKey,
+    value,
+  })
+  if (!result.error) refresh(clientId)
+  return result
+}
+
+export async function saveInterviewAnswersBulkAction(clientId: string, answers: InterviewAnswersJson) {
+  const context = await requirePractitionerContext()
+  const result = await saveInterviewAnswersBulk({
+    clientId,
+    practiceId: context.practiceId,
+    userId: context.userId,
+    answers,
+  })
+  if (!result.error) refresh(clientId)
+  return result
+}
+
+export async function completeBackgroundInterviewAction(
+  clientId: string,
+  selfReportId: string | null,
+  options?: { confirmAllItems?: boolean }
+) {
   const context = await requirePractitionerContext()
   const result = await completeBackgroundInterview({
     clientId,
     practiceId: context.practiceId,
     userId: context.userId,
     selfReportId,
+    confirmAllItems: options?.confirmAllItems,
   })
   if (!result.error) refresh(clientId)
   return result

@@ -7,11 +7,12 @@ Test client IDs referenced by the redesign brief (not queried this round): Tom E
 
 ## Commit
 
-- This commit — Round AJ audit report only (on `test/intake-interview` at `84cabd9` + report)
+- `d0357e8` — Round AJ audit report only (on `test/intake-interview` at `84cabd9` + report)
+- Follow-up commit on the same branch — corrections from deeper path audit (report file only; still no app/migration/seed changes, no PR)
 
 ## Files changed
 
-- `docs/cursor-reports/round-aj-audit-report.md` (this file only)
+- `docs/cursor-reports/round-aj-audit-report.md` (this file only; both commits)
 
 ## Command results
 
@@ -102,7 +103,8 @@ Path existence: every path named below was checked with `test -f` on this branch
 | `db/schema/20-client-background.ts` | `client_backgrounds`, relationship/event/issue tables, `client_background_interviews`. |
 | `lib/background-questionnaire/to-client-background.ts` | Maps BACKGROUND_SR answers → interview "Client: …" suggestions. |
 | `lib/reports/load-background-report-source.ts` | Loads living background + chosen interview `screening_json` for Background report. |
-| `lib/reports/generate-background-report.ts` (+ prose helpers / Tom fixture selftests) | Background report wording; depends on living demographics + relationship status, not on interview UI. |
+| `lib/reports/generate-background-report.ts` (+ prose helpers / Tom fixture selftests) | Background report wording; depends on living demographics + relationships, not on interview UI. |
+| `lib/reports/relationship-block-report.ts` | Partner/children/parents prose from relationship **blocks** (uses `client_current.status` for partnered openings; falls back to `client_backgrounds.relationship_status` when there is no current block). |
 
 ### 1.2 How saving works today
 
@@ -196,21 +198,23 @@ Allowed values: `yes` \| `none` \| `not_asked` (`BLOCK_ANSWERS`). Empty string i
 
 ### 2.1 Relationship status
 
+Domains overlap only for partnered codes. Copy A uses `CLIENT_RELATIONSHIP_STATUSES` (includes `single` / `separated` / `divorced` / `widowed`). Copy B on `client_current` uses `CURRENT_BLOCK_STATUSES` (partnered only). Previous blocks use `PREVIOUS_BLOCK_STATUSES` (endings) — those are not a double-up of A.
+
 **Copy A — `client_backgrounds.relationship_status` (+ `relationship_status_other`)**
 
-- **Writes:** `saveClientRelationshipStatus` / `saveRelationshipStatusWithCurrentBlock` (`lib/client-background/mutations.ts`, `block-mutations.ts`); interview Intimate Save; Client Background relationship UI.
-- **Reads:** `toClientRelationshipStatus` / load; `backgroundChecks`; relationship tree labels; Background report (`generate-background-report.ts` uses `source.data.relationshipStatus`).
-- **Tom's report:** **Yes** — depends on this copy (e.g. married → partner noun / living prose).
+- **Writes:** `saveClientRelationshipStatus` / `saveRelationshipStatusWithCurrentBlock` (`lib/client-background/mutations.ts`, `lib/client-background/block-mutations.ts`); interview Intimate Save via `saveRelationshipStatusBlockAction`. `saveClientRelationshipStatusAction` exists but is **unused by UI** (column-only; no block sync).
+- **Reads:** load/`toClientRelationshipStatus`; `backgroundChecks`; relationship tree; Background report non-partnered fallback and partner noun in housing (`generate-background-report.ts` `livingItem`).
+- **Tom's report:** **Yes** — needed when there is no current block / for housing partner noun; partnered prose primarily comes from B.
 
 **Copy B — `client_relationship_blocks.status` on `kind = client_current`**
 
-- **Writes:** synced from client status when partnered via `saveRelationshipStatusWithCurrentBlock`; also editable on the current block and saved with section Save / `updateRelationshipBlock`.
-- **Reads:** block UI; Worth checking ended-status matching for **previous** blocks; needs-for-block.
-- **Tom's report:** does **not** read block status for the demographics relationship line; previous-block statuses matter only indirectly via people/history, not as the client's status field.
+- **Writes:** created/updated from A when partnered via `saveRelationshipStatusWithCurrentBlock`; also editable on the block and saved via `updateRelationshipBlock` / section Save. **Sync hole:** editing B through `updateRelationshipBlock` does **not** write back to A → drift risk.
+- **Reads:** block UI; Worth checking; **report** `lib/reports/relationship-block-report.ts` (`currentOpening` / `partnersFromBlocks`) for partnered sentences.
+- **Tom's report:** **Yes** — partnered openings use B (`client_current.status`). Previous-block statuses also drive previous-relationship prose (not a double-up of A).
 
-**Recommend keep:** Copy A (`client_backgrounds.relationship_status`) as the client's overall status. Keep **previous** block `status` values (they are endings, not a duplicate of A). Treat `client_current.status` as derived: write from A when partnered; stop presenting it as a second independent source.
+**Recommend keep:** A as canonical **client** status (required for non-partnered). Keep previous-block statuses as relationship-unit endings. Treat `client_current.status` as a derived mirror of A for partnered codes (or always sync B → A on edit). Do not drop A.
 
-**Safe removal order:** (1) Make interview/UI always write A then sync current block from A. (2) Stop editing current-block status separately. (3) Regression-test Tom report + Worth checking. (4) Optionally stop persisting redundant current-block status later (additive first; column drop last).
+**Safe removal order:** (1) Close the sync hole (current-block status edits always update A, or remove non-`statusSource` editing). (2) Delete unused `saveClientRelationshipStatusAction`. (3) Tom report + Worth checking regression. (4) Optionally stop dual-editing B as independent; column drop only if B becomes fully derived (last).
 
 ### 2.2 Sexual orientation
 
@@ -235,18 +239,30 @@ Allowed values: `yes` \| `none` \| `not_asked` (`BLOCK_ANSWERS`). Empty string i
 **Copy A — `living_situation_json.livesWith` (+ `livesWithOther`)**
 
 - **Writes:** `saveLivingSituation` (interview Living autosave).
-- **Reads:** Living editor pick-list; Worth checking `lives-with` rule; **Background report housing paragraph** (`livingItem` in `generate-background-report.ts`).
+- **Reads:** Living editor pick-list; Worth checking `lives-with` rule; **Background report housing paragraph** (`livingItem` in `lib/reports/generate-background-report.ts` — **A only**).
 - **Tom's report:** **Yes** — housing sentence is driven by this pick-list (Tom fixture: `with_partner_and_children`).
 
 **Copy B — `client_relationship_records.living_situation` (+ `dependency`)**
 
 - **Writes:** person Save on relationship panels (`livingSituation`, `dependency`).
-- **Reads:** person UI; Worth checking (whether someone is marked living with client when pick-list expects kin); **not** used by current housing report prose.
-- **Tom's report:** people are seeded with `lives_with_client_full_time`, but report wording today comes from Copy A, not from ticking people.
+- **Reads:** person UI; Worth checking (`markedLivingWith`); client panel summary via `lib/clients/background-summary.ts` (primary “lives with …” from people; A only for alone fallback). **`dependency` is not used by the Background report.**
+- **Tom's report:** people are seeded with `lives_with_client_full_time`, but **letter housing prose ignores B** today.
 
-**Recommend keep (redesign):** person-level living ticks (+ new "Others in the home") as household composition source of truth; keep `housingType` / `housingStability` on living_situation_json. **Retire** `livesWith` pick-list.
+**Recommend keep (redesign):** person-level living ticks (+ new "Others in the home") as household composition source of truth; keep `housingType` / `housingStability` on living_situation_json (and A only for alone / no fixed address / other until report catches up). **Retire** categorical `livesWith` as authoritative “who”.
 
-**Safe removal order (Tom-safe):** (1) Additive: others-in-home + interview tick UI; keep writing `livesWith` for now. (2) Change report generator to derive housing-from-people **only when** it still produces identical Tom fixture text (extend `tom-example` / generate-background-report selftests first). (3) Stop writing/showing pick-list. (4) Drop `livesWith` keys from JSON shape in a later round.
+**Safe removal order (Tom-safe):** (1) Additive: others-in-home + interview tick UI; keep writing `livesWith` for now. (2) Point report `livingItem` at people (like `background-summary`) **only when** Tom fixture text stays identical. (3) Stop writing/showing pick-list. (4) Drop `livesWith` keys from JSON shape in a later round.
+
+### 2.4 Tom Background report — dependency matrix (double-ups)
+
+| Fact | Report uses? | Where |
+|------|--------------|--------|
+| `relationship_status` columns | **Yes** | Non-partnered fallback in `partnersFromBlocks`; partner noun in `livingItem` |
+| `client_current.status` | **Yes** | `currentOpening` / partnered prose in `lib/reports/relationship-block-report.ts` |
+| Orientation (merged identity) | **Yes** | `orientationPhrase` |
+| Orientation columns alone | Indirect (preferred on load today) | `demographicsFromStored` |
+| `livesWith` JSON | **Yes** | `livingItem` |
+| Person `living_situation` | **No** (fixture only) | — |
+| Person `dependency` | **No** | — |
 
 ---
 
@@ -256,22 +272,25 @@ Allowed values: `yes` \| `none` \| `not_asked` (`BLOCK_ANSWERS`). Empty string i
 
 | Kind | References |
 |------|------------|
-| UI | `components/client-background/risk-section.tsx` — **not imported anywhere** (orphan). Client Background page shows a stub: "The read-only Risk view is not part of this release yet." (`client-background-page.tsx` accordion id `risk`). |
-| Actions | `saveRiskAction` in `app/clients/[client_id]/background/actions.ts`; `saveRisk` in `mutations.ts`. |
-| Schema / load | `client_backgrounds.risk_json`; `lib/client-background/load.ts` → `sanitizeRisk` / `emptyRisk`; `lib/client-background/sanitize.ts`; `lib/client-background/types.ts` (`RISK_FACTORS`, `PROTECTIVE_FACTORS`, …). |
+| UI | `components/client-background/risk-section.tsx` — **not imported anywhere** (orphan). Client Background page shows a stub: "The read-only Risk view is not part of this release yet." (`components/client-background/client-background-page.tsx` accordion id `risk`). |
+| Actions | `saveRiskAction` in `app/clients/[client_id]/background/actions.ts`; `saveRisk` in `lib/client-background/mutations.ts`. |
+| Schema / load | `client_backgrounds.risk_json` (created in `db/migrations/0057_client_background.sql`); `lib/client-background/load.ts` → `sanitizeRisk` / `emptyRisk`; `lib/client-background/sanitize.ts`; `lib/client-background/types.ts` (`RISK_FACTORS`, `PROTECTIVE_FACTORS`, …). |
 | Tests / fixtures | `lib/client-background/checks.selftest.ts`, `lib/reports/tom-example-fixture.ts`, `lib/reports/generate-background-report.selftest.ts`, `lib/clients/background-summary.selftest.ts` use `emptyRisk()`. |
 | Background report | **Does not** emit risk/protective prose (PROJECT_MAP: risk not in the letter). |
 | Note | LRAMP assessment files also say "risk" / `fillRiskSection` — those are **LRAMP**, not `risk_json`. Do not delete with this section. |
 
 ### 3.2 "Other treatment not linked to an issue" (`other_treatment`)
 
+Two related but distinct things: the **screening question** (to remove from the interview) and the **`other_treatment` event type** (still used as a treatment/nested event under issues — do not conflate).
+
 | Kind | References |
 |------|------------|
-| Screening key / UI | `lib/client-background/interview-history.ts` (`HISTORY_QUESTION_GROUPS`, `HISTORY_QUESTIONS.other_treatment`); history tree interview presentation. |
-| Routing of unlinked admissions/therapy/meds | `historyQuestionKeyForEvent`, `eventsForQuestion`, `answeredCategoryKeys` in `lib/client-background/interview-history.ts`. |
+| Screening key / UI | `lib/client-background/interview-history.ts` (`HISTORY_QUESTION_GROUPS`, `HISTORY_QUESTIONS.other_treatment`); `lib/client-background/history-tree.ts` section title; history tree interview presentation / add button. |
+| Routing of unlinked admissions/therapy/meds | `historyQuestionKeyForEvent`, `eventsForQuestion`, `answeredCategoryKeys` in `lib/client-background/interview-history.ts`; `otherTreatmentYes` in `lib/client-background/history-issues.ts`. |
+| Event type (keep unless separately retired) | `EVENT_TYPES` / smart forms (`lib/client-background/smart-event-fields.ts`); migrations `db/migrations/0076_history_issues.sql`, `db/migrations/0077_history_events.sql`. |
 | Checks | `backgroundChecks` in `lib/client-background/checks.ts` — history Yes-with-no-entries for `other_treatment`. |
-| Selftests | `lib/client-background/interview-history.selftest.ts` and related history tests. |
-| Report | Unlinked treatments can still appear via event prose (`lib/reports/background-report-prose.ts` / `lib/reports/background-family-paragraphs.ts`) when events exist — removing the **screening question** is separate from deleting treatment event types. |
+| Selftests | `lib/client-background/interview-history.selftest.ts`, `history-tree.selftest.ts`, `history-issues.selftest.ts`, `smart-event-fields.selftest.ts`. |
+| Report | Omission label via `HISTORY_QUESTION_GROUPS` in `lib/reports/generate-background-report.ts`; unlinked treatment prose in `lib/reports/background-report-prose.ts`. |
 | Self-report | No direct `other_treatment` Client line in `lib/background-questionnaire/to-client-background.ts` (medication prompts are separate). |
 
 ### 3.3 Retired screening keys still in data
@@ -280,8 +299,11 @@ Allowed values: `yes` \| `none` \| `not_asked` (`BLOCK_ANSWERS`). Empty string i
 
 Documented / migrated historically:
 
+- `abuse`, `childhood_events` — folded into `traumatic_events` / `other_significant_events` in `db/migrations/0065_history_restructure.sql`.
 - `medication_history` — written in migration `db/migrations/0067_background_relationships_history.sql` from old `medication_json`.
-- `psychiatric_admission`, `previous_therapy`, `medication_history`, `family_psychiatric_admission` — read in migration `db/migrations/0076_history_issues.sql` and still in **backfill planner** `planHistoryIssueBackfill` (`lib/client-background/history-issues.ts` + `lib/client-background/history-issues.selftest.ts`) for deriving issue `treatmentAnswer` from old interviews.
+- `psychiatric_admission`, `previous_therapy`, `medication_history`, `family_psychiatric_admission` — removed from live `HISTORY_QUESTION_GROUPS` (Round O); still read in migration `db/migrations/0076_history_issues.sql` and in **backfill planner** `planHistoryIssueBackfill` (`lib/client-background/history-issues.ts` + `lib/client-background/history-issues.selftest.ts`) for deriving issue `treatmentAnswer` from old interviews.
+
+`sanitizeScreening` keeps only current `HISTORY_QUESTION_KEYS` (comment: retired hospital/therapy/medication keys ignored on read). Keys may remain in stored JSON until rewritten. Event types `psychiatric_admission` / `previous_therapy` / `medication` remain live **treatment** types — not the same as retired screening keys.
 
 They are not in the live interview UI. Cleanup = stop reading in backfill helpers once unused, then optional JSON scrub migration (removal round).
 
@@ -325,8 +347,9 @@ Redesign replaces this with one page and numbered sections 1–9.
 **To auto-create Medicare with every new client**, change at least:
 
 - `createClient` (and any other client-create path) to resolve the practice's Medicare `claim_types` row and `insert` into `claims`.
-- Likely a small helper in `lib/funding/` (find Medicare type by stable code — see 4.2).
+- Mirror the `findOrCreatePrivateClaim` pattern in `lib/actions/funding.ts` (find active claim for type; else insert) — but keyed by stable Medicare **code** (see 4.2), not name.
 - Tom/Ben seeds become idempotent no-ops if claim already exists.
+- Client-delete guards already count active claims (`lib/delete/delete-utils.ts`).
 - UI that assumed "no claim yet" empty states.
 
 ### 4.2 Telling Medicare apart by name
@@ -340,11 +363,13 @@ Name checks today:
 | `components/funding/funding-approval-form.tsx` | Medicare referrer rules / field visibility |
 | `app/funding/claims/[claim_id]/page.tsx` | Display branches |
 | `app/funding/approvals/[approval_id]/page.tsx` | Display branches |
-| `lib/actions/funding.ts` | Referrer required when Medicare |
+| `lib/actions/funding.ts` | Referrer required when Medicare; `findOrCreatePrivateClaim` matches Private by name |
+| `lib/delete/delete-utils.ts` | Active Medicare approvals for a professional: SQL `lower(trim(claim_type_name)) = 'medicare'` |
+| `lib/funding/referral.ts` / appointment-type helpers | `"Private"` name constant / lookups |
 
 There is **no** `isNdisClaimType`; NDIS is only a seeded name (`db/seed-funding.ts`).
 
-**Sturdier approach:** add a stable `code` (or `system_key`) on `claim_types` — e.g. `medicare`, `ndis`, `insurer`, `workcover`, `private` — set in seed/migration; resolve by code, not display name. Touch: schema `12-funding.ts` + migration; seed; `format.ts` helpers; claim/approval forms and pages; `upsertClaim` / approval validation; appointment-type claim pickers if they special-case names; selftests.
+**Sturdier approach:** add a stable `code` (or `system_key`) on `claim_types` — e.g. `medicare`, `ndis`, `insurer`, `workcover`, `private` — set in seed/migration; resolve by code, not display name. Touch: `db/schema/12-funding.ts` + migration; seeds; `lib/funding/format.ts` helpers; claim/approval forms and pages; `upsertClaim` / approval validation / `findOrCreatePrivateClaim`; `lib/delete/delete-utils.ts`; appointment-type claim pickers; selftests. Keep `claim_type_name` for display labels.
 
 ### 4.3 One Medicare and one NDIS claim per client (`is_active` soft-delete)
 
@@ -377,8 +402,9 @@ Inactive rows remain for audit; recreating after soft-delete inserts a new activ
 - Natural store: **`identity_json`** (demographics identity) — e.g. `countryOfBirth`, `yearOfArrival` — unless a census-style report needs first-class columns later.
 - **Existing age ↔ date helper to reuse:**
   - `yearFromTypedAge` / `assessAge` / `typedAgeMatches` in `lib/client-background/age.ts`
-  - UI: `PartialDatePicker` in `components/client-background/fields.tsx` (modes `person` and `client-at-event`: typing age fills year; date derives age).
+  - UI: `PartialDatePicker` in `components/client-background/fields.tsx` (modes `person` and `client-at-event`: typing age fills year; date derives age; age is never stored).
   - Arrival: age-at-arrival ↔ year-of-arrival from client's DOB mirrors `client-at-event` / `since-birth` (`yearFromTypedAge(..., { kind: "since-birth", birthDate })`).
+  - Note: relationship **age at death** stores `age_at_death` but the panel edits death with `PartialDatePicker` `mode="date-only"` — there is no live age↔date mutual UI for death today; do not assume death is the template — use the person / client-at-event modes instead.
 
 ### 5.3 "Others in the home" + dependant tick
 
@@ -475,7 +501,7 @@ Throughout: do not change Tom's Background report letter text; any report genera
 5. **Auto Medicare claim** — create bare claim only vs claim + empty approval; start/end dates defaults.
 6. **Claim type codes** — exact code set (`medicare` / `ndis` / `insurer` / `workcover` / …) and whether insurer/WorkCover share one code.
 7. **NDIS uniqueness** — confirm NDIS is always a single claim_type row per practice (name today) before DB unique index.
-8. **Relationship `client_current.status`** — keep as derived column vs stop storing and always read client status.
+8. **Relationship `client_current.status`** — keep as derived mirror of A vs bidirectional sync on every block edit (must close the `updateRelationshipBlock` → A hole before any removal).
 9. **Complete rules** — redesign Done-per-section vs today's "complete with Not asked"; whether Worth checking still soft-warns.
 10. **Unsaved relationship drafts on leave** — flush should save sections automatically, warn, or keep current "only Save section persists" behaviour.
 11. **`snapshot_json` consumers** — none for live report today; whether review/rebuild should read snapshot or living tables.

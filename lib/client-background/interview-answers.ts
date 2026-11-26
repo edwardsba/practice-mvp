@@ -70,6 +70,21 @@ const HISTORY_LABELS: Record<string, string> = {
   family_significant_events: "Significant events",
 }
 
+/** Allowed answer values for each item kind — single source of truth for save + sanitize. */
+export function allowedValuesForKind(kind: InterviewAnswerKind): readonly InterviewAnswerValue[] {
+  if (kind === "yna") return ["yes", "no", "not_applicable"]
+  if (kind === "cna") return ["confirmed", "not_applicable"]
+  if (kind === "ya") return ["yes", "not_applicable"]
+  return ["lives_with_others", "lives_alone"]
+}
+
+export function isValueAllowedForKind(
+  kind: InterviewAnswerKind,
+  value: unknown
+): value is InterviewAnswerValue {
+  return (allowedValuesForKind(kind) as readonly string[]).includes(value as string)
+}
+
 export const INTERVIEW_SECTIONS: InterviewSectionDef[] = [
   {
     number: 1,
@@ -138,7 +153,8 @@ export const INTERVIEW_SECTIONS: InterviewSectionDef[] = [
     nothingToRecord: true,
     items: [
       { key: "s6_biological_parents", label: "Biological parents", kind: "cna" },
-      { key: "s6_parents_other", label: "Parents' other relationships", kind: "yna" },
+      { key: "s6_mother_other", label: "Mother's other relationships", kind: "yna" },
+      { key: "s6_father_other", label: "Father's other relationships", kind: "yna" },
       { key: "s6_caregiver", label: "Other caregiver arrangements", kind: "yna" },
       { key: "s6_siblings", label: "Siblings", kind: "yna" },
     ],
@@ -186,19 +202,28 @@ const ITEM_BY_KEY = new Map(
   INTERVIEW_SECTIONS.flatMap((section) => section.items.map((item) => [item.key, item] as const))
 )
 
+export function interviewItemDef(key: string): InterviewItemDef | undefined {
+  return ITEM_BY_KEY.get(key)
+}
+
 export function emptyInterviewAnswers(): InterviewAnswersJson {
   return { version: 1, items: {} }
 }
 
-function isAnswerValue(value: unknown): value is InterviewAnswerValue {
-  return (
-    value === "yes" ||
-    value === "no" ||
-    value === "not_applicable" ||
-    value === "confirmed" ||
-    value === "lives_with_others" ||
-    value === "lives_alone"
-  )
+/**
+ * Validate an item key + value for save.
+ * Unknown keys and values that don't suit the item's kind are refused.
+ */
+export function validateItemAnswer(
+  itemKey: string,
+  value: unknown
+): { ok: true; value: InterviewAnswerValue } | { ok: false; error: string } {
+  const def = ITEM_BY_KEY.get(itemKey)
+  if (!def) return { ok: false, error: "Unknown interview item." }
+  if (!isValueAllowedForKind(def.kind, value)) {
+    return { ok: false, error: "That answer is not allowed for this item." }
+  }
+  return { ok: true, value }
 }
 
 export function sanitizeInterviewAnswers(value: unknown): InterviewAnswersJson {
@@ -209,10 +234,12 @@ export function sanitizeInterviewAnswers(value: unknown): InterviewAnswersJson {
       : {}
   const items: Record<string, InterviewItemAnswer> = {}
   for (const key of ALL_INTERVIEW_ITEM_KEYS) {
+    const def = ITEM_BY_KEY.get(key)
+    if (!def) continue
     const entry = itemsRaw[key]
     if (!entry || typeof entry !== "object" || Array.isArray(entry)) continue
     const row = entry as Record<string, unknown>
-    if (!isAnswerValue(row.value)) continue
+    if (!isValueAllowedForKind(def.kind, row.value)) continue
     items[key] = { value: row.value, confirmed: row.confirmed === true }
   }
   return { version: 1, items }
@@ -222,7 +249,9 @@ export function sanitizeInterviewAnswers(value: unknown): InterviewAnswersJson {
 export function prefillAnswersForReview(source: InterviewAnswersJson): InterviewAnswersJson {
   const items: Record<string, InterviewItemAnswer> = {}
   for (const [key, answer] of Object.entries(source.items)) {
-    if (!ITEM_BY_KEY.has(key)) continue
+    const def = ITEM_BY_KEY.get(key)
+    if (!def) continue
+    if (!isValueAllowedForKind(def.kind, answer.value)) continue
     items[key] = { value: answer.value, confirmed: false }
   }
   return { version: 1, items }
@@ -264,6 +293,7 @@ export function applyNothingToRecord(
   const items = { ...answers.items }
   for (const item of section.items) {
     if (items[item.key]) continue
+    if (!isValueAllowedForKind(item.kind, "not_applicable")) continue
     items[item.key] = { value: "not_applicable", confirmed: true }
   }
   return { version: 1, items }
@@ -274,12 +304,13 @@ export function setItemAnswer(
   key: string,
   value: InterviewAnswerValue
 ): InterviewAnswersJson {
-  if (!ITEM_BY_KEY.has(key)) return answers
+  const validated = validateItemAnswer(key, value)
+  if (!validated.ok) return answers
   return {
     version: 1,
     items: {
       ...answers.items,
-      [key]: { value, confirmed: true },
+      [key]: { value: validated.value, confirmed: true },
     },
   }
 }
@@ -351,8 +382,8 @@ export type BlockAnswerMirrorKey = keyof Pick<
 /** Keys in answers_json that mirror a top-level block answer column. */
 export const BLOCK_ANSWER_MIRRORS: { itemKey: string; blockKey: BlockAnswerMirrorKey }[] = [
   { itemKey: "s5_previous", blockKey: "previousRelationships" },
-  { itemKey: "s6_parents_other", blockKey: "motherOtherRelationships" },
-  { itemKey: "s6_parents_other", blockKey: "fatherOtherRelationships" },
+  { itemKey: "s6_mother_other", blockKey: "motherOtherRelationships" },
+  { itemKey: "s6_father_other", blockKey: "fatherOtherRelationships" },
   { itemKey: "s6_caregiver", blockKey: "caregiverArrangements" },
 ]
 
@@ -370,29 +401,21 @@ export function blockAnswersFromInterview(
 }
 
 export function optionsForKind(kind: InterviewAnswerKind): { value: InterviewAnswerValue; label: string }[] {
-  if (kind === "yna") {
-    return [
-      { value: "yes", label: "Yes" },
-      { value: "no", label: "No" },
-      { value: "not_applicable", label: "Not applicable" },
-    ]
-  }
-  if (kind === "cna") {
-    return [
-      { value: "confirmed", label: "Confirmed" },
-      { value: "not_applicable", label: "Not applicable" },
-    ]
-  }
-  if (kind === "ya") {
-    return [
-      { value: "yes", label: "Yes" },
-      { value: "not_applicable", label: "Not applicable" },
-    ]
-  }
-  return [
-    { value: "lives_with_others", label: "Lives with others" },
-    { value: "lives_alone", label: "Lives alone" },
-  ]
+  return allowedValuesForKind(kind).map((value) => ({
+    value,
+    label:
+      value === "yes"
+        ? "Yes"
+        : value === "no"
+          ? "No"
+          : value === "not_applicable"
+            ? "Not applicable"
+            : value === "confirmed"
+              ? "Confirmed"
+              : value === "lives_with_others"
+                ? "Lives with others"
+                : "Lives alone",
+  }))
 }
 
 export function historyScreeningKeyFromItemKey(itemKey: string): HistoryQuestionKey | null {

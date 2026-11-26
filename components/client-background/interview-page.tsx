@@ -14,6 +14,7 @@ import {
   saveOccupationAction,
   saveStressorsAction,
 } from "@/app/clients/[client_id]/background/actions"
+import { InterviewEditorPanel } from "@/components/client-background/interview-editor-panel"
 import { InterviewItemRow } from "@/components/client-background/interview-item-row"
 import { InterviewNumberedSection } from "@/components/client-background/interview-numbered-section"
 import {
@@ -56,7 +57,7 @@ import {
 } from "@/lib/client-background/checks"
 import type { ReasonSupport } from "@/lib/client-background/load"
 import { parsePartialDate } from "@/lib/client-background/partial-date"
-import type { ScreeningAnswers } from "@/lib/client-background/interview-history"
+import type { HistoryQuestionKey, ScreeningAnswers } from "@/lib/client-background/interview-history"
 import {
   applyNothingToRecord,
   blockAnswersFromInterview,
@@ -68,9 +69,27 @@ import {
   type InterviewAnswerValue,
   type InterviewAnswersJson,
 } from "@/lib/client-background/interview-answers"
+import {
+  factLinesOrFallback,
+  formatBiologicalParentsFacts,
+  formatCaregiverFacts,
+  formatChildrenFacts,
+  formatCurrentRelationshipFacts,
+  formatHistoryCategoryFacts,
+  formatLivingSecurityLine,
+  formatLivingTypeLine,
+  formatLivingWhoLine,
+  formatParentOtherFacts,
+  formatPreviousRelationshipFacts,
+  formatSection3FactLines,
+  formatSiblingFacts,
+} from "@/lib/client-background/interview-facts"
 import type {
   ClientBackgroundData,
+  Demographics,
   EventRecord,
+  HistoryIssue,
+  RelationshipBlock,
   RelationshipBlockAnswers,
   RelationshipRecord,
   StressorsRecord,
@@ -81,9 +100,33 @@ import { formatEmergencyContactSummary } from "@/lib/clients/emergency-details-s
 import { todayDateString } from "@/lib/dates/practice-time"
 import type { SectionStatus } from "@/lib/section-status"
 
+type EditorKey =
+  | "funding"
+  | "identity"
+  | "education"
+  | "occupation"
+  | "intimate"
+  | "caregivers"
+  | "living"
+  | "history-client"
+  | "history-family"
+
 function clientAge(dateOfBirth: string | null) {
   if (!dateOfBirth) return ""
   return displayedAge(assessAge(parsePartialDate(dateOfBirth), parsePartialDate(todayDateString()), "person"))
+}
+
+function editorForItem(itemKey: string): EditorKey | null {
+  if (itemKey.startsWith("s2_")) return "funding"
+  if (itemKey === "s3_identity" || itemKey === "s3_disability") return "identity"
+  if (itemKey === "s3_education") return "education"
+  if (itemKey === "s3_occupation" || itemKey === "s3_financial") return "occupation"
+  if (itemKey.startsWith("s5_")) return "intimate"
+  if (itemKey.startsWith("s6_")) return "caregivers"
+  if (itemKey.startsWith("s7_")) return "living"
+  if (itemKey.startsWith("s8_")) return "history-client"
+  if (itemKey.startsWith("s9_")) return "history-family"
+  return null
 }
 
 export type InterviewContactDetails = {
@@ -151,6 +194,7 @@ export function InterviewPage({
   const router = useRouter()
   const [fundingAddOpen, setFundingAddOpen] = useState(false)
   const identityRef = useRef(data.demographics.identity)
+  const educationRef = useRef(data.demographics.education)
   const occupationRef = useRef(data.demographics.occupation)
   const livingRef = useRef(data.demographics.livingSituation)
   const relationshipsRef = useRef(data.relationships)
@@ -159,17 +203,22 @@ export function InterviewPage({
   const [relationships, setRelationships] = useState(data.relationships)
   const professionals = reasonSupport.professionals
   const blocksRef = useRef(data.relationshipBlocks ?? [])
+  const [blocks, setBlocks] = useState<RelationshipBlock[]>(data.relationshipBlocks ?? [])
   const answersRef = useRef(data.blockAnswers ?? emptyBlockAnswers())
   const [blockAnswers, setBlockAnswers] = useState<RelationshipBlockAnswers>(
     data.blockAnswers ?? emptyBlockAnswers()
   )
+  const [relationshipStatus, setRelationshipStatus] = useState(data.relationshipStatus)
+  const [demographics, setDemographics] = useState<Demographics>(data.demographics)
   const [scrollNonce, setScrollNonce] = useState(0)
   const [phases, setPhases] = useState<Record<string, { phase: SavePhase; retry: (() => void) | null }>>({})
   const flushers = useRef(new Set<() => Promise<void>>())
   const [sectionOpen, setSectionOpen] = useState<Record<string, boolean>>({})
+  const [openEditor, setOpenEditor] = useState<EditorKey | null>(null)
   const [interviewAnswers, setInterviewAnswers] = useState(initialAnswers)
   const [screening, setScreening] = useState(initialScreening)
   const [events, setEvents] = useState(data.events)
+  const [issues, setIssues] = useState<HistoryIssue[]>(data.issues ?? [])
   const stressorsRef = useRef(data.stressors)
   const [notFinishedOpen, setNotFinishedOpen] = useState(false)
   const [notFinishedSections, setNotFinishedSections] = useState<number[]>([])
@@ -222,15 +271,26 @@ export function InterviewPage({
 
   const onRelationshipStatus = useCallback((next: ClientBackgroundData["relationshipStatus"]) => {
     statusRef.current = next
+    setRelationshipStatus(next)
   }, [])
 
-  const onBlocks = useCallback((next: NonNullable<ClientBackgroundData["relationshipBlocks"]>) => {
+  const onBlocks = useCallback((next: RelationshipBlock[]) => {
     blocksRef.current = next
+    setBlocks(next)
   }, [])
 
   const onBlockAnswers = useCallback((next: RelationshipBlockAnswers) => {
     answersRef.current = next
     setBlockAnswers(next)
+  }, [])
+
+  const syncDemographicsFromRefs = useCallback(() => {
+    setDemographics({
+      identity: identityRef.current,
+      education: educationRef.current,
+      occupation: occupationRef.current,
+      livingSituation: livingRef.current,
+    })
   }, [])
 
   const getChecks = useCallback(
@@ -247,8 +307,8 @@ export function InterviewPage({
           relationshipBlocks: blocksRef.current,
           blockAnswers: answersRef.current,
           demographics: {
-            ...data.demographics,
             identity: identityRef.current,
+            education: educationRef.current,
             livingSituation: livingRef.current,
             occupation: occupationRef.current,
           },
@@ -276,6 +336,13 @@ export function InterviewPage({
 
   async function flushAll() {
     await Promise.all([...flushers.current].map((flush) => flush()))
+    syncDemographicsFromRefs()
+  }
+
+  async function closeEditor() {
+    await flushAll()
+    setOpenEditor(null)
+    setFundingAddOpen(false)
   }
 
   function openSections(numbers: number[]) {
@@ -410,16 +477,339 @@ export function InterviewPage({
     [interviewAnswers]
   )
 
-  const summaries = itemSummaries({
-    clientName,
-    dateOfBirth: data.dateOfBirth,
-    contactDetails,
-    data,
-    emergencyContacts,
-    medicalContactLines,
-    blockAnswers,
-    relationships,
-  })
+  const section3Facts = useMemo(() => formatSection3FactLines(demographics), [demographics])
+  const contactSummaries = useMemo(
+    () => contactItemSummaries({ clientName, dateOfBirth: data.dateOfBirth, contactDetails, emergencyContacts, medicalContactLines }),
+    [clientName, contactDetails, data.dateOfBirth, emergencyContacts, medicalContactLines]
+  )
+
+  function factLinesForItem(itemKey: string): string[] | null {
+    if (itemKey.startsWith("s1_") || itemKey.startsWith("s2_") || itemKey.startsWith("s4_")) {
+      return null
+    }
+    if (itemKey.startsWith("s3_")) {
+      return factLinesOrFallback(section3Facts[itemKey] ?? [], "Not recorded")
+    }
+    if (itemKey === "s7_who") return [formatLivingWhoLine(demographics.livingSituation)]
+    if (itemKey === "s7_housing_type") return [formatLivingTypeLine(demographics.livingSituation)]
+    if (itemKey === "s7_housing_security") return [formatLivingSecurityLine(demographics.livingSituation)]
+
+    const yesAnswer = interviewAnswers.items[itemKey]?.value === "yes"
+    if (!yesAnswer && !itemKey.startsWith("s6_biological")) {
+      // Still show recorded facts for CNA biological parents; for YNA only when Yes.
+      if (itemKey !== "s6_biological_parents") return null
+    }
+
+    if (itemKey === "s5_current") {
+      return factLinesOrFallback(
+        formatCurrentRelationshipFacts(relationshipStatus, blocks, relationships),
+        "Nothing recorded yet"
+      )
+    }
+    if (itemKey === "s5_previous") {
+      return yesAnswer
+        ? factLinesOrFallback(formatPreviousRelationshipFacts(blocks, relationships), "Nothing recorded yet")
+        : null
+    }
+    if (itemKey === "s5_children") {
+      return yesAnswer
+        ? factLinesOrFallback(
+            formatChildrenFacts(blocks, relationships, data.dateOfBirth),
+            "Nothing recorded yet"
+          )
+        : null
+    }
+    if (itemKey === "s6_biological_parents") {
+      return factLinesOrFallback(formatBiologicalParentsFacts(blocks, relationships), "Not recorded")
+    }
+    if (itemKey === "s6_mother_other") {
+      return yesAnswer
+        ? factLinesOrFallback(formatParentOtherFacts("mother", blocks, relationships), "Nothing recorded yet")
+        : null
+    }
+    if (itemKey === "s6_father_other") {
+      return yesAnswer
+        ? factLinesOrFallback(formatParentOtherFacts("father", blocks, relationships), "Nothing recorded yet")
+        : null
+    }
+    if (itemKey === "s6_caregiver") {
+      return yesAnswer
+        ? factLinesOrFallback(formatCaregiverFacts(blocks, relationships), "Nothing recorded yet")
+        : null
+    }
+    if (itemKey === "s6_siblings") {
+      return yesAnswer
+        ? factLinesOrFallback(formatSiblingFacts(blocks, relationships), "Nothing recorded yet")
+        : null
+    }
+    if (itemKey.startsWith("s8_")) {
+      const key = itemKey.slice(3) as HistoryQuestionKey
+      return yesAnswer
+        ? factLinesOrFallback(formatHistoryCategoryFacts(key, issues, events, "self"), "Nothing recorded yet")
+        : null
+    }
+    if (itemKey.startsWith("s9_")) {
+      const key = itemKey.slice(3) as HistoryQuestionKey
+      return yesAnswer
+        ? factLinesOrFallback(
+            formatHistoryCategoryFacts(key, issues, events, "significant_other"),
+            "Nothing recorded yet"
+          )
+        : null
+    }
+    return null
+  }
+
+  function renderEditor(sectionNumber: number) {
+    if (sectionNumber === 2 && openEditor === "funding") {
+      return (
+        <InterviewEditorPanel onDone={() => void closeEditor()}>
+          <ReferralFundingQuickView
+            clientId={clientId}
+            lines={referralQuickViewLines}
+            returnTo={`/clients/${clientId}/background/interview`}
+            footer={
+              <button
+                type="button"
+                className="inline-flex min-h-11 items-center text-sm font-medium text-primary hover:underline"
+                onClick={() => setFundingAddOpen(true)}
+              >
+                + Add referral or funding approval
+              </button>
+            }
+          />
+          <InterviewFundingAddPanel
+            clientId={clientId}
+            practiceId={practiceId}
+            formOptions={referralFormOptions}
+            open={fundingAddOpen}
+            onOpenChange={setFundingAddOpen}
+          />
+        </InterviewEditorPanel>
+      )
+    }
+    if (sectionNumber === 3 && openEditor === "identity") {
+      return (
+        <InterviewEditorPanel onDone={() => void closeEditor()}>
+          <AutosaveFields
+            saved={demographics.identity}
+            save={async (value) => {
+              identityRef.current = value
+              const result = await saveIdentityAction(clientId, value)
+              if ("error" in result && result.error) return { error: result.error }
+              if (!("identity" in result) || !result.identity) return { error: "Could not save." }
+              identityRef.current = result.identity
+              return { value: result.identity }
+            }}
+            onPhase={(phase, retry) => onPhase("identity", phase, retry)}
+            registerFlush={registerFlush}
+          >
+            {(value, onChange, commit) => {
+              identityRef.current = value
+              return (
+                <IdentityFieldsEditor
+                  value={value}
+                  onChange={onChange}
+                  onCommit={commit}
+                  client={suggestions?.identity}
+                />
+              )
+            }}
+          </AutosaveFields>
+        </InterviewEditorPanel>
+      )
+    }
+    if (sectionNumber === 3 && openEditor === "education") {
+      return (
+        <InterviewEditorPanel onDone={() => void closeEditor()}>
+          <AutosaveFields
+            saved={demographics.education}
+            save={async (value) => {
+              educationRef.current = value
+              const result = await saveEducationAction(clientId, value)
+              if ("error" in result && result.error) return { error: result.error }
+              if (!("education" in result) || !result.education) return { error: "Could not save." }
+              educationRef.current = result.education
+              return { value: result.education }
+            }}
+            onPhase={(phase, retry) => onPhase("education", phase, retry)}
+            registerFlush={registerFlush}
+          >
+            {(value, onChange, commit) => {
+              educationRef.current = value
+              return (
+                <EducationFieldsEditor
+                  value={value}
+                  onChange={onChange}
+                  onCommit={commit}
+                  client={suggestions?.education}
+                />
+              )
+            }}
+          </AutosaveFields>
+        </InterviewEditorPanel>
+      )
+    }
+    if (sectionNumber === 3 && openEditor === "occupation") {
+      return (
+        <InterviewEditorPanel onDone={() => void closeEditor()}>
+          <AutosaveFields
+            saved={demographics.occupation}
+            save={async (value) => {
+              occupationRef.current = value
+              const result = await saveOccupationAction(clientId, value)
+              if ("error" in result && result.error) return { error: result.error }
+              if (!("occupation" in result) || !result.occupation) return { error: "Could not save." }
+              occupationRef.current = result.occupation
+              return { value: result.occupation }
+            }}
+            onPhase={(phase, retry) => onPhase("occupation", phase, retry)}
+            registerFlush={registerFlush}
+          >
+            {(value, onChange, commit) => {
+              occupationRef.current = value
+              return (
+                <OccupationFieldsEditor
+                  value={value}
+                  onChange={onChange}
+                  onCommit={commit}
+                  client={suggestions?.occupation}
+                />
+              )
+            }}
+          </AutosaveFields>
+        </InterviewEditorPanel>
+      )
+    }
+    if (sectionNumber === 5 && openEditor === "intimate") {
+      return (
+        <InterviewEditorPanel onDone={() => void closeEditor()}>
+          <RelationshipBlocksSection
+            clientId={clientId}
+            relationships={relationships}
+            blocks={blocks}
+            blockAnswers={blockAnswers}
+            relationshipStatus={relationshipStatus}
+            onRelationships={onRelationships}
+            onBlocks={onBlocks}
+            onBlockAnswers={onBlockAnswers}
+            onRelationshipStatus={onRelationshipStatus}
+            onPhase={onPhase}
+            registerFlush={registerFlush}
+            relationshipClient={suggestions?.relationshipStatus}
+            childrenPrompt={suggestions?.numberOfChildren?.label ?? null}
+            visibleSections={["intimate"]}
+            embedWithoutChrome
+            hideTopLevelAnswers
+          />
+        </InterviewEditorPanel>
+      )
+    }
+    if (sectionNumber === 6 && openEditor === "caregivers") {
+      return (
+        <InterviewEditorPanel onDone={() => void closeEditor()}>
+          <RelationshipBlocksSection
+            clientId={clientId}
+            relationships={relationships}
+            blocks={blocks}
+            blockAnswers={blockAnswers}
+            relationshipStatus={relationshipStatus}
+            onRelationships={onRelationships}
+            onBlocks={onBlocks}
+            onBlockAnswers={onBlockAnswers}
+            onRelationshipStatus={onRelationshipStatus}
+            onPhase={onPhase}
+            registerFlush={registerFlush}
+            visibleSections={["caregivers"]}
+            embedWithoutChrome
+            hideTopLevelAnswers
+          />
+        </InterviewEditorPanel>
+      )
+    }
+    if (sectionNumber === 7 && openEditor === "living") {
+      return (
+        <InterviewEditorPanel onDone={() => void closeEditor()}>
+          <AutosaveFields
+            saved={demographics.livingSituation}
+            save={async (value) => {
+              livingRef.current = value
+              const result = await saveLivingSituationAction(clientId, value)
+              if ("error" in result && result.error) return { error: result.error }
+              if (!("livingSituation" in result) || !result.livingSituation) {
+                return { error: "Could not save." }
+              }
+              livingRef.current = result.livingSituation
+              return { value: result.livingSituation }
+            }}
+            onPhase={(phase, retry) => onPhase("living", phase, retry)}
+            registerFlush={registerFlush}
+          >
+            {(value, onChange, commit) => {
+              livingRef.current = value
+              return (
+                <LivingFieldsEditor
+                  value={value}
+                  relationships={relationships}
+                  onChange={onChange}
+                  onCommit={commit}
+                  client={suggestions?.living}
+                />
+              )
+            }}
+          </AutosaveFields>
+        </InterviewEditorPanel>
+      )
+    }
+    if (sectionNumber === 8 && openEditor === "history-client") {
+      return (
+        <InterviewEditorPanel onDone={() => void closeEditor()}>
+          <HistoryTreeSection
+            clientId={clientId}
+            clientName={clientName.split(/\s+/)[0] || clientName}
+            dateOfBirth={data.dateOfBirth}
+            events={events}
+            relationships={relationships}
+            screening={screening}
+            medicalContacts={medicalContacts}
+            professionals={professionals}
+            issues={issues}
+            presentation="interview"
+            groupFilter="client"
+            hideScreeningControls
+            onEventsChange={setEvents}
+            onIssuesChange={setIssues}
+            medicationClient={suggestions?.medication}
+            historyClient={suggestions?.history}
+          />
+        </InterviewEditorPanel>
+      )
+    }
+    if (sectionNumber === 9 && openEditor === "history-family") {
+      return (
+        <InterviewEditorPanel onDone={() => void closeEditor()}>
+          <HistoryTreeSection
+            clientId={clientId}
+            clientName={clientName.split(/\s+/)[0] || clientName}
+            dateOfBirth={data.dateOfBirth}
+            events={events}
+            relationships={relationships}
+            screening={screening}
+            medicalContacts={medicalContacts}
+            professionals={professionals}
+            issues={issues}
+            presentation="interview"
+            groupFilter="significant_other"
+            hideScreeningControls
+            onEventsChange={setEvents}
+            onIssuesChange={setIssues}
+            historyClient={suggestions?.history}
+          />
+        </InterviewEditorPanel>
+      )
+    }
+    return null
+  }
 
   return (
     <div className="mx-auto min-w-0 max-w-2xl">
@@ -484,6 +874,7 @@ export function InterviewPage({
         {INTERVIEW_SECTIONS.map((section) => {
           const status = interviewSectionStatus(section, interviewAnswers)
           const unanswered = section.items.some((item) => !interviewAnswers.items[item.key])
+          const sectionEditor = renderEditor(section.number)
           return (
             <InterviewNumberedSection
               key={section.id}
@@ -502,269 +893,49 @@ export function InterviewPage({
               ) : null}
 
               <div className="space-y-3">
-                {section.items.map((item) => (
-                  <InterviewItemRow
-                    key={item.key}
-                    label={item.label}
-                    kind={item.kind}
-                    answer={interviewAnswers.items[item.key]}
-                    summary={summaries[item.key] ?? null}
-                    onSelect={(value) => void selectAnswer(item.key, value)}
-                  />
-                ))}
+                {section.items.map((item) => {
+                  const editor = editorForItem(item.key)
+                  const showEdit = Boolean(editor) || section.number === 1 || section.number === 4
+                  return (
+                    <InterviewItemRow
+                      key={item.key}
+                      label={item.label}
+                      kind={item.kind}
+                      answer={interviewAnswers.items[item.key]}
+                      summary={
+                        item.key.startsWith("s1_") || item.key.startsWith("s2_") || item.key.startsWith("s4_")
+                          ? contactSummaries[item.key] ?? null
+                          : null
+                      }
+                      factLines={factLinesForItem(item.key)}
+                      showEdit={showEdit}
+                      editing={editor != null && openEditor === editor}
+                      onEdit={() => {
+                        if (section.number === 1) {
+                          router.push(`/clients/${clientId}/edit`)
+                          return
+                        }
+                        if (section.number === 4) {
+                          router.push(`/clients/${clientId}/edit?open=emergency`)
+                          return
+                        }
+                        if (editor) setOpenEditor(editor)
+                      }}
+                      onSelect={(value) => void selectAnswer(item.key, value)}
+                    />
+                  )
+                })}
               </div>
 
-              {section.number === 1 ? (
-                <p className="text-sm">
-                  <Link href={`/clients/${clientId}/edit`} className="font-medium text-primary underline">
-                    Edit details
-                  </Link>
-                </p>
-              ) : null}
-
-              {section.number === 2 ? (
-                <>
-                  <ReferralFundingQuickView
-                    clientId={clientId}
-                    lines={referralQuickViewLines}
-                    returnTo={`/clients/${clientId}/background/interview`}
-                    footer={
-                      <button
-                        type="button"
-                        className="inline-flex min-h-11 items-center text-sm font-medium text-primary hover:underline"
-                        onClick={() => setFundingAddOpen(true)}
-                      >
-                        + Add referral or funding approval
-                      </button>
-                    }
-                  />
-                  <InterviewFundingAddPanel
-                    clientId={clientId}
-                    practiceId={practiceId}
-                    formOptions={referralFormOptions}
-                    open={fundingAddOpen}
-                    onOpenChange={setFundingAddOpen}
-                  />
-                </>
-              ) : null}
-
-              {section.number === 3 ? (
-                <div className="space-y-6">
-                  <AutosaveFields
-                    saved={data.demographics.identity}
-                    save={async (value) => {
-                      identityRef.current = value
-                      const result = await saveIdentityAction(clientId, value)
-                      if ("error" in result && result.error) return { error: result.error }
-                      if (!("identity" in result) || !result.identity) return { error: "Could not save." }
-                      identityRef.current = result.identity
-                      return { value: result.identity }
-                    }}
-                    onPhase={(phase, retry) => onPhase("identity", phase, retry)}
-                    registerFlush={registerFlush}
-                  >
-                    {(value, onChange, commit) => {
-                      identityRef.current = value
-                      return (
-                        <IdentityFieldsEditor
-                          value={value}
-                          onChange={onChange}
-                          onCommit={commit}
-                          client={suggestions?.identity}
-                        />
-                      )
-                    }}
-                  </AutosaveFields>
-                  <AutosaveFields
-                    saved={data.demographics.education}
-                    save={async (value) => {
-                      const result = await saveEducationAction(clientId, value)
-                      if ("error" in result && result.error) return { error: result.error }
-                      if (!("education" in result) || !result.education) return { error: "Could not save." }
-                      return { value: result.education }
-                    }}
-                    onPhase={(phase, retry) => onPhase("education", phase, retry)}
-                    registerFlush={registerFlush}
-                  >
-                    {(value, onChange, commit) => (
-                      <EducationFieldsEditor
-                        value={value}
-                        onChange={onChange}
-                        onCommit={commit}
-                        client={suggestions?.education}
-                      />
-                    )}
-                  </AutosaveFields>
-                  <AutosaveFields
-                    saved={data.demographics.occupation}
-                    save={async (value) => {
-                      occupationRef.current = value
-                      const result = await saveOccupationAction(clientId, value)
-                      if ("error" in result && result.error) return { error: result.error }
-                      if (!("occupation" in result) || !result.occupation) return { error: "Could not save." }
-                      occupationRef.current = result.occupation
-                      return { value: result.occupation }
-                    }}
-                    onPhase={(phase, retry) => onPhase("occupation", phase, retry)}
-                    registerFlush={registerFlush}
-                  >
-                    {(value, onChange, commit) => {
-                      occupationRef.current = value
-                      return (
-                        <OccupationFieldsEditor
-                          value={value}
-                          onChange={onChange}
-                          onCommit={commit}
-                          client={suggestions?.occupation}
-                        />
-                      )
-                    }}
-                  </AutosaveFields>
-                </div>
-              ) : null}
-
-              {section.number === 4 ? (
-                <div className="space-y-3 text-sm">
-                  <div>
-                    <p className="font-medium">Emergency contacts</p>
-                    <p className="whitespace-pre-line text-muted-foreground">
-                      {formatEmergencyContactSummary(emergencyContacts)}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="font-medium">Medical contacts</p>
-                    {medicalContactLines.length === 0 ? (
-                      <p className="text-muted-foreground">None recorded</p>
-                    ) : (
-                      <ul className="list-inside list-disc text-muted-foreground">
-                        {medicalContactLines.map((line) => (
-                          <li key={`${line.name}-${line.professionName}`}>
-                            {line.name}
-                            {line.professionName ? ` · ${line.professionName}` : ""}
-                            {line.isMain ? " (main)" : ""}
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                  <Link
-                    href={`/clients/${clientId}/edit?open=emergency`}
-                    className="inline-flex min-h-11 items-center font-medium text-primary underline"
-                  >
-                    Edit contacts
-                  </Link>
-                </div>
-              ) : null}
-
-              {section.number === 5 ? (
-                <RelationshipBlocksSection
+              {section.number === 2 && openEditor !== "funding" ? (
+                <ReferralFundingQuickView
                   clientId={clientId}
-                  relationships={relationships}
-                  blocks={data.relationshipBlocks}
-                  blockAnswers={blockAnswers}
-                  relationshipStatus={data.relationshipStatus}
-                  onRelationships={onRelationships}
-                  onBlocks={onBlocks}
-                  onBlockAnswers={onBlockAnswers}
-                  onRelationshipStatus={onRelationshipStatus}
-                  onPhase={onPhase}
-                  registerFlush={registerFlush}
-                  relationshipClient={suggestions?.relationshipStatus}
-                  childrenPrompt={suggestions?.numberOfChildren?.label ?? null}
-                  visibleSections={["intimate"]}
-                  embedWithoutChrome
-                  hideTopLevelAnswers
+                  lines={referralQuickViewLines}
+                  returnTo={`/clients/${clientId}/background/interview`}
                 />
               ) : null}
 
-              {section.number === 6 ? (
-                <RelationshipBlocksSection
-                  clientId={clientId}
-                  relationships={relationships}
-                  blocks={data.relationshipBlocks}
-                  blockAnswers={blockAnswers}
-                  relationshipStatus={data.relationshipStatus}
-                  onRelationships={onRelationships}
-                  onBlocks={onBlocks}
-                  onBlockAnswers={onBlockAnswers}
-                  onRelationshipStatus={onRelationshipStatus}
-                  onPhase={onPhase}
-                  registerFlush={registerFlush}
-                  visibleSections={["caregivers"]}
-                  embedWithoutChrome
-                  hideTopLevelAnswers
-                />
-              ) : null}
-
-              {section.number === 7 ? (
-                <AutosaveFields
-                  saved={data.demographics.livingSituation}
-                  save={async (value) => {
-                    livingRef.current = value
-                    const result = await saveLivingSituationAction(clientId, value)
-                    if ("error" in result && result.error) return { error: result.error }
-                    if (!("livingSituation" in result) || !result.livingSituation) {
-                      return { error: "Could not save." }
-                    }
-                    livingRef.current = result.livingSituation
-                    return { value: result.livingSituation }
-                  }}
-                  onPhase={(phase, retry) => onPhase("living", phase, retry)}
-                  registerFlush={registerFlush}
-                >
-                  {(value, onChange, commit) => {
-                    livingRef.current = value
-                    return (
-                      <LivingFieldsEditor
-                        value={value}
-                        relationships={relationships}
-                        onChange={onChange}
-                        onCommit={commit}
-                        client={suggestions?.living}
-                      />
-                    )
-                  }}
-                </AutosaveFields>
-              ) : null}
-
-              {section.number === 8 ? (
-                <HistoryTreeSection
-                  clientId={clientId}
-                  clientName={clientName.split(/\s+/)[0] || clientName}
-                  dateOfBirth={data.dateOfBirth}
-                  events={events}
-                  relationships={relationships}
-                  screening={screening}
-                  medicalContacts={medicalContacts}
-                  professionals={professionals}
-                  issues={data.issues}
-                  presentation="interview"
-                  groupFilter="client"
-                  hideScreeningControls
-                  onEventsChange={setEvents}
-                  medicationClient={suggestions?.medication}
-                  historyClient={suggestions?.history}
-                />
-              ) : null}
-
-              {section.number === 9 ? (
-                <HistoryTreeSection
-                  clientId={clientId}
-                  clientName={clientName.split(/\s+/)[0] || clientName}
-                  dateOfBirth={data.dateOfBirth}
-                  events={events}
-                  relationships={relationships}
-                  screening={screening}
-                  medicalContacts={medicalContacts}
-                  professionals={professionals}
-                  issues={data.issues}
-                  presentation="interview"
-                  groupFilter="significant_other"
-                  hideScreeningControls
-                  onEventsChange={setEvents}
-                  historyClient={suggestions?.history}
-                />
-              ) : null}
+              {sectionEditor}
             </InterviewNumberedSection>
           )
         })}
@@ -900,20 +1071,13 @@ function formatReceived(iso: string) {
   })
 }
 
-function itemSummaries(input: {
+function contactItemSummaries(input: {
   clientName: string
   dateOfBirth: string | null
   contactDetails: InterviewContactDetails
-  data: ClientBackgroundData
   emergencyContacts: InterviewEmergencyContact[]
   medicalContactLines: InterviewMedicalContactLine[]
-  blockAnswers: RelationshipBlockAnswers
-  relationships: RelationshipRecord[]
 }): Record<string, string> {
-  const identity = input.data.demographics.identity
-  const education = input.data.demographics.education
-  const occupation = input.data.demographics.occupation
-  const living = input.data.demographics.livingSituation
   const gps = input.medicalContactLines.filter(
     (line) => line.isMain || (line.professionName ?? "").toLowerCase().includes("general")
   )
@@ -925,15 +1089,11 @@ function itemSummaries(input: {
     s1_email: input.contactDetails.email?.trim() || "Not recorded",
     s1_address: input.contactDetails.address?.trim() || "Not recorded",
     s1_comms: formatCommunicationSummary(input.contactDetails.comms),
-    s3_identity:
-      [identity.sex, identity.genderIdentity, identity.sexualOrientation].filter(Boolean).join(" · ") ||
-      "Not recorded",
-    s3_education: education.level?.trim() || "Not recorded",
-    s3_occupation: occupation.role?.trim() || occupation.workStatus?.trim() || "Not recorded",
+    s2_medicare: "See funding details",
+    s2_ndis: "See funding details",
+    s2_insurance: "See funding details",
     s4_emergency: formatEmergencyContactSummary(input.emergencyContacts),
     s4_gp: gps.map((line) => line.name).join(", ") || "Not recorded",
     s4_other_professionals: others.map((line) => line.name).join(", ") || "Not recorded",
-    s7_housing_type: living.housingType?.trim() || "Not recorded",
-    s7_housing_security: living.housingStability?.trim() || "Not recorded",
   }
 }

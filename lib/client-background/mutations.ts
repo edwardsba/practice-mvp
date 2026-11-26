@@ -28,6 +28,7 @@ import {
   prefillAnswersForReview,
   sanitizeInterviewAnswers,
   setItemAnswer,
+  validateItemAnswer,
   type InterviewAnswerValue,
   type InterviewAnswersJson,
 } from "@/lib/client-background/interview-answers"
@@ -1232,6 +1233,8 @@ export async function saveInterviewItemAnswer(input: {
 }): Promise<{ error?: string; answers?: InterviewAnswersJson; screening?: ScreeningAnswers }> {
   const client = await assertClient(input.clientId, input.practiceId)
   if (!client) return { error: "Client was not found." }
+  const validated = validateItemAnswer(input.itemKey, input.value)
+  if (!validated.ok) return { error: validated.error }
   try {
     return await db.transaction(async (tx) => {
       const [existing] = await tx
@@ -1250,7 +1253,11 @@ export async function saveInterviewItemAnswer(input: {
         )
         .limit(1)
       if (!existing) return { error: "There is no background interview in progress." }
-      const answers = setItemAnswer(sanitizeInterviewAnswers(existing.answersJson), input.itemKey, input.value)
+      const answers = setItemAnswer(
+        sanitizeInterviewAnswers(existing.answersJson),
+        input.itemKey,
+        validated.value
+      )
       const screening = mergeScreeningMirror(sanitizeScreening(existing.screeningJson), answers)
       await tx
         .update(clientBackgroundInterviews)

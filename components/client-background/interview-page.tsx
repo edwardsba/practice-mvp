@@ -823,14 +823,17 @@ export function InterviewPage({
 
   function renderDetailRow(item: InterviewItemDef) {
     const editor = editorForItem(item.key)
+    const label = detailLabel(item)
+    const perRecord = item.key.startsWith(S4_EC_PREFIX) || item.key.startsWith(S4_MC_PREFIX)
     return (
       <div key={item.key} id={`check-contradiction-${item.key}`} className="scroll-mt-36">
         <InterviewDetailRow
-          label={detailLabel(item)}
+          label={label}
           answer={interviewAnswers.items[item.key]}
           factLines={factLinesForItem(item.key)}
           contradictionNote={contradictionByKey[item.key] ?? null}
           onEdit={editor ? () => setOpenEditor(editor) : undefined}
+          editLabel={perRecord ? `Edit ${label}: ${item.label}` : undefined}
         />
       </div>
     )

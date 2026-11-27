@@ -17,6 +17,7 @@ export function InterviewDetailRow({
   factLines,
   contradictionNote,
   onEdit,
+  editLabel,
 }: {
   label: string
   answer: InterviewItemAnswer | undefined
@@ -24,6 +25,8 @@ export function InterviewDetailRow({
   /** Attention note when the answer contradicts records on file. */
   contradictionNote?: string | null
   onEdit?: () => void
+  /** Accessible name for Edit when several rows share a label (e.g. one per contact). */
+  editLabel?: string
 }) {
   const lines = (factLines ?? []).filter((line) => line.trim())
   return (
@@ -52,7 +55,7 @@ export function InterviewDetailRow({
         <button
           type="button"
           className="min-h-10 shrink-0 text-sm font-medium text-primary underline"
-          aria-label={`Edit ${label}`}
+          aria-label={editLabel ?? `Edit ${label}`}
           onClick={onEdit}
         >
           Edit

@@ -130,6 +130,11 @@ if (confirmedS4.ok) {
     value: "yes",
     confirmed: true,
   })
+  check(
+    "section 4 with per-record rows → done",
+    interviewSectionStatus(section4, confirmedS4.answers, extras).status,
+    "done"
+  )
 }
 
 const confirmedS1 = confirmSectionAnswers(

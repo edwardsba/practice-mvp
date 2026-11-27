@@ -41,7 +41,7 @@ import {
 } from "@/lib/client-background/mutations"
 import type { InterviewAnswerValue, InterviewAnswersJson } from "@/lib/client-background/interview-answers"
 import type { BlockKind, BlockRole, RelationshipBlockAnswers, TreatmentAnswer } from "@/lib/client-background/types"
-import { parseMedicareExpiryFromForm } from "@/lib/actions/funding"
+import { parseMedicareExpiryFromForm } from "@/lib/funding/format"
 import { saveMedicareClaimDetails } from "@/lib/funding/save-medicare-claim"
 import { ensureMedicalContact } from "@/lib/medical-contacts/mutations"
 

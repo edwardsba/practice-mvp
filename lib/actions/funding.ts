@@ -36,6 +36,7 @@ import {
   findConflictingActiveMedicareOrNdisClaim,
   formatApprovalDropdownLabel,
   isMedicareClaim,
+  parseMedicareExpiryFromForm,
 } from "@/lib/funding/format"
 import {
   CREATE_PRIVATE_CLAIM,
@@ -348,14 +349,6 @@ export async function upsertFundingApprovalType(
   revalidatePath("/funding/approval-types")
   revalidatePath(`/funding/approval-types/${savedTypeId}`)
   return { success: true, fundingApprovalTypeId: savedTypeId }
-}
-
-export function parseMedicareExpiryFromForm(formData: FormData): string | null {
-  const month = String(formData.get("medicare_expiry_month") ?? "").trim()
-  const year = String(formData.get("medicare_expiry_year") ?? "").trim()
-  if (!month && !year) return null
-  if (!month || !year) return null
-  return `${year}-${month.padStart(2, "0")}`
 }
 
 export async function getClaims(practiceId: string) {

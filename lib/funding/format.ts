@@ -49,6 +49,15 @@ export function formatMedicareIdentifier(
   return `${card}/${irnValue}`
 }
 
+/** Parse MedicareFields month/year selects into YYYY-MM (or null). */
+export function parseMedicareExpiryFromForm(formData: FormData): string | null {
+  const month = String(formData.get("medicare_expiry_month") ?? "").trim()
+  const year = String(formData.get("medicare_expiry_year") ?? "").trim()
+  if (!month && !year) return null
+  if (!month || !year) return null
+  return `${year}-${month.padStart(2, "0")}`
+}
+
 /** Format medicare_expiry YYYY-MM for display (e.g. "Mar 2027"). */
 export function formatMedicareExpiry(value: string | null | undefined) {
   const raw = value?.trim()

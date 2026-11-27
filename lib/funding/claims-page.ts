@@ -13,12 +13,14 @@ import type { ReportingRequirementStatus } from "@/lib/funding/reporting-status"
 export type ClaimsPageClaimInput = {
   claimId: string
   claimTypeName: string
+  claimTypeCode?: string | null
   isActive: boolean
   startDate: string | null
   endDate: string | null
   createdAt?: string | Date | null
   medicareCardNumber?: string | null
   medicareIrn?: string | null
+  medicareExpiry?: string | null
   insuranceOrganisationName?: string | null
   insuranceReferenceNumber?: string | null
 }

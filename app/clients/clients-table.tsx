@@ -18,6 +18,7 @@ import {
   formatAppointmentDate,
   formatAppointmentTime,
 } from "@/lib/appointments/format"
+import { formatAustralianPhone } from "@/lib/format/phone"
 
 export type ClientRow = {
   clientId: string
@@ -127,7 +128,9 @@ export function ClientsTable({ clients }: { clients: ClientRow[] }) {
                     </TableCell>
                     <TableCell>
                       <Link href={clientHref} className="block">
-                        {client.phone ?? "—"}
+                        {client.phone?.trim()
+                          ? formatAustralianPhone(client.phone)
+                          : "—"}
                       </Link>
                     </TableCell>
                     <TableCell>

@@ -198,7 +198,7 @@ export async function countActiveFundingApprovalsForProfessional(
           eq(fundingApprovals.practiceId, practiceId),
           eq(fundingApprovals.isActive, true),
           eq(fundingApprovals.approvalStatus, ACTIVE_APPROVAL_STATUS),
-          sql`lower(trim(${claimTypes.claimTypeName})) = 'medicare'`
+          eq(claimTypes.code, "medicare")
         )
       )
 

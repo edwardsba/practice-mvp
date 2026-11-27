@@ -30,8 +30,8 @@ import {
   formatApprovalProgress,
   formatDisplayDate,
   formatMedicareIdentifier,
-  isInsuranceClaimType,
-  isMedicareClaimType,
+  isInsurerClaim,
+  isMedicareClaim,
 } from "@/lib/funding/format"
 import {
   REPORTING_REQUIREMENT_STATUS_CONFIG,
@@ -88,8 +88,8 @@ export default async function FundingApprovalDetailPage({
         )
       : 0
 
-  const showMedicare = isMedicareClaimType(approval.claimTypeName)
-  const showInsurance = isInsuranceClaimType(approval.claimTypeName)
+  const showMedicare = isMedicareClaim(approval.claimTypeCode)
+  const showInsurance = isInsurerClaim(approval.claimTypeCode)
 
   const reportingRequirements = await getReportingRequirementsForApproval(
     approval.fundingApprovalId,

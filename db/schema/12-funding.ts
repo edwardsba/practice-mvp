@@ -7,6 +7,8 @@ export const claimTypes = pgTable('claim_types', {
   claimTypeId: uuid('claim_type_id').primaryKey().defaultRandom(),
   practiceId: uuid('practice_id').notNull().references(() => practices.practiceId),
   claimTypeName: text('claim_type_name').notNull(),
+  /** Stable code: medicare | ndis | insurer (display name stays on claimTypeName). */
+  code: text('code'),
   isActive: boolean('is_active').notNull().default(true),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
@@ -43,6 +45,8 @@ export const claims = pgTable('claims', {
   claimTypeId: uuid('claim_type_id').notNull().references(() => claimTypes.claimTypeId),
   medicareCardNumber: text('medicare_card_number'),
   medicareIrn: text('medicare_irn'),
+  /** YYYY-MM when known. */
+  medicareExpiry: text('medicare_expiry'),
   insuranceOrganisationId: uuid('insurance_organisation_id')
     .references(() => professionalOrganisations.organisationId),
   insuranceReferenceNumber: text('insurance_reference_number'),

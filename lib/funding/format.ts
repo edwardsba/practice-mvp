@@ -14,8 +14,43 @@ export const APPROVAL_STATUS_LABELS: Record<ApprovalStatus, string> = {
   cancelled: "Cancelled",
 }
 
+export type ClaimTypeCode = "medicare" | "ndis" | "insurer"
+
+export function normalizeClaimTypeCode(
+  code: string | null | undefined
+): ClaimTypeCode | null {
+  const value = code?.trim().toLowerCase()
+  if (value === "medicare" || value === "ndis" || value === "insurer") return value
+  return null
+}
+
+/** Code-based helpers — prefer these over display-name checks. */
+export function isMedicareClaim(code: string | null | undefined) {
+  return normalizeClaimTypeCode(code) === "medicare"
+}
+
+export function isNdisClaim(code: string | null | undefined) {
+  return normalizeClaimTypeCode(code) === "ndis"
+}
+
+export function isInsurerClaim(code: string | null | undefined) {
+  return normalizeClaimTypeCode(code) === "insurer"
+}
+
+/**
+ * @deprecated Prefer `isMedicareClaim(code)`. Kept only for transitional call sites
+ * that still receive a display name; new code must pass claim_types.code.
+ */
 export function isMedicareClaimType(claimTypeName: string | null | undefined) {
   return claimTypeName?.trim().toLowerCase() === "medicare"
+}
+
+/**
+ * @deprecated Prefer `isInsurerClaim(code)` (or !medicare && !ndis).
+ */
+export function isInsuranceClaimType(claimTypeName: string | null | undefined) {
+  if (!claimTypeName?.trim()) return false
+  return !isMedicareClaimType(claimTypeName)
 }
 
 export function formatMedicareIdentifier(
@@ -30,9 +65,51 @@ export function formatMedicareIdentifier(
   return `${card}/${irnValue}`
 }
 
-export function isInsuranceClaimType(claimTypeName: string | null | undefined) {
-  if (!claimTypeName?.trim()) return false
-  return !isMedicareClaimType(claimTypeName)
+/** Format medicare_expiry YYYY-MM for display (e.g. "Mar 2027"). */
+export function formatMedicareExpiry(value: string | null | undefined) {
+  const raw = value?.trim()
+  if (!raw) return null
+  const match = /^(\d{4})-(\d{2})$/.exec(raw)
+  if (!match) return raw
+  const year = Number(match[1])
+  const month = Number(match[2])
+  if (month < 1 || month > 12) return raw
+  const date = new Date(Date.UTC(year, month - 1, 1))
+  return date.toLocaleDateString("en-AU", { month: "short", year: "numeric", timeZone: "UTC" })
+}
+
+/**
+ * Pure uniqueness check: another active claim with the same medicare/ndis code
+ * for this client (inactive claims ignored; insurers may repeat).
+ */
+export function findConflictingActiveMedicareOrNdisClaim(input: {
+  clientId: string
+  claimId?: string | null
+  claimTypeCode: string | null | undefined
+  existingActiveClaims: Array<{
+    claimId: string
+    clientId: string
+    isActive: boolean
+    claimTypeCode: string | null | undefined
+  }>
+}): { conflict: true; message: string } | { conflict: false } {
+  const code = normalizeClaimTypeCode(input.claimTypeCode)
+  if (code !== "medicare" && code !== "ndis") return { conflict: false }
+  const other = input.existingActiveClaims.find(
+    (claim) =>
+      claim.isActive &&
+      claim.clientId === input.clientId &&
+      claim.claimId !== input.claimId &&
+      normalizeClaimTypeCode(claim.claimTypeCode) === code
+  )
+  if (!other) return { conflict: false }
+  return {
+    conflict: true,
+    message:
+      code === "medicare"
+        ? "This client already has a Medicare claim."
+        : "This client already has an NDIS claim.",
+  }
 }
 
 export function formatApprovalProgress(attended: number, approved: number | null) {

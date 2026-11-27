@@ -5,6 +5,7 @@ import { useActionState, useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 
 import { upsertClaim, type FundingFormState } from "@/lib/actions/funding"
+import { MedicareFields } from "@/components/funding/medicare-fields"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -15,8 +16,8 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
-  isInsuranceClaimType,
-  isMedicareClaimType,
+  isInsurerClaim,
+  isMedicareClaim,
 } from "@/lib/funding/format"
 import { safeReturnTo } from "@/lib/navigation/safe-return-to"
 import { cn } from "@/lib/utils"
@@ -34,6 +35,7 @@ type ClientOption = {
 type ClaimTypeOption = {
   claimTypeId: string
   claimTypeName: string
+  code: string | null
 }
 
 type OrganisationOption = {
@@ -47,6 +49,7 @@ type ClaimInitialValues = {
   claimTypeId?: string
   medicareCardNumber?: string | null
   medicareIrn?: string | null
+  medicareExpiry?: string | null
   insuranceOrganisationId?: string | null
   insuranceReferenceNumber?: string | null
   startDate?: string | null
@@ -88,8 +91,8 @@ export function ClaimForm({
     [claimTypes, selectedClaimTypeId]
   )
 
-  const showMedicare = isMedicareClaimType(selectedClaimType?.claimTypeName)
-  const showInsurance = isInsuranceClaimType(selectedClaimType?.claimTypeName)
+  const showMedicare = isMedicareClaim(selectedClaimType?.code)
+  const showInsurance = isInsurerClaim(selectedClaimType?.code)
 
   useEffect(() => {
     if (state.success && state.claimId) {
@@ -168,29 +171,11 @@ export function ClaimForm({
           </div>
 
           {showMedicare ? (
-            <div className="grid gap-4 sm:grid-cols-[1fr_auto]">
-              <div className="space-y-2">
-                <Label htmlFor="medicare_card_number">Medicare card no.</Label>
-                <Input
-                  id="medicare_card_number"
-                  name="medicare_card_number"
-                  inputMode="numeric"
-                  maxLength={10}
-                  placeholder="10 digits"
-                  defaultValue={initialValues?.medicareCardNumber ?? ""}
-                />
-              </div>
-              <div className="space-y-2 sm:w-24">
-                <Label htmlFor="medicare_irn">IRN</Label>
-                <Input
-                  id="medicare_irn"
-                  name="medicare_irn"
-                  maxLength={2}
-                  placeholder="1"
-                  defaultValue={initialValues?.medicareIrn ?? ""}
-                />
-              </div>
-            </div>
+            <MedicareFields
+              medicareCardNumber={initialValues?.medicareCardNumber}
+              medicareIrn={initialValues?.medicareIrn}
+              medicareExpiry={initialValues?.medicareExpiry}
+            />
           ) : null}
 
           {showInsurance ? (

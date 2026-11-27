@@ -96,6 +96,7 @@ export default async function EditFundingApprovalPage({
           clientId: approval.clientId,
           claimTypeId: claim.claimTypeId,
           claimTypeName: claim.claimTypeName,
+          claimTypeCode: claim.claimTypeCode,
           startDate: claim.startDate,
         }))}
         referrers={referrers}

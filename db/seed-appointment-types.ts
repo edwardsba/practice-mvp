@@ -99,7 +99,14 @@ async function main() {
 
   const practiceId = practice.practiceId
 
+  const CLAIM_TYPE_CODES: Record<string, "medicare" | "ndis" | null> = {
+    Medicare: "medicare",
+    NDIS: "ndis",
+    Private: null,
+  }
+
   async function upsertClaimType(name: string) {
+    const code = CLAIM_TYPE_CODES[name] ?? null
     const [existing] = await db
       .select()
       .from(claimTypes)
@@ -112,6 +119,14 @@ async function main() {
       .limit(1)
 
     if (existing) {
+      if (code && existing.code !== code) {
+        const [updated] = await db
+          .update(claimTypes)
+          .set({ code, updatedAt: now })
+          .where(eq(claimTypes.claimTypeId, existing.claimTypeId))
+          .returning()
+        return updated ?? existing
+      }
       return existing
     }
 
@@ -120,6 +135,7 @@ async function main() {
       .values({
         practiceId,
         claimTypeName: name,
+        code,
         updatedAt: now,
       })
       .returning()

@@ -4,6 +4,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import { formatAustralianPhone } from "@/lib/format/phone"
 import {
   Table,
   TableBody,
@@ -116,7 +117,11 @@ export function CrisisPlanView({
                     <TableRow key={contact.contactId}>
                       <TableCell>{contact.role ?? "—"}</TableCell>
                       <TableCell>{contact.name}</TableCell>
-                      <TableCell>{contact.phone ?? "—"}</TableCell>
+                      <TableCell>
+                        {contact.phone?.trim()
+                          ? formatAustralianPhone(contact.phone)
+                          : "—"}
+                      </TableCell>
                       <TableCell>{contact.email ?? "—"}</TableCell>
                     </TableRow>
                   ))}

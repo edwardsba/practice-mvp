@@ -34,3 +34,24 @@ export function formatCommunicationSummary(
 
   return `${emailsPart} · ${booking}`
 }
+
+/**
+ * One line per communication preference for the interview fact list.
+ * If All contact is opted out, only that line plus "(all other emails off)".
+ */
+export function formatCommunicationPreferenceLines(
+  prefs: CommunicationPreferencesInput
+): string[] {
+  if (prefs.commsOptOut) {
+    return ["All contact: Opted out", "(all other emails off)"]
+  }
+
+  return [
+    "All contact: On",
+    `Reminder emails: ${prefs.reminderOptOut ? "Off" : "On"}`,
+    `Pre-session emails: ${prefs.preSessionOptOut ? "Off" : "On"}`,
+    `Post-session emails: ${prefs.postSessionOptOut ? "Off" : "On"}`,
+    `Admin emails: ${prefs.adminCommsOptOut ? "Off" : "On"}`,
+    `Online booking: ${prefs.onlineBookingPermitted ? "Allowed" : "Not allowed"}`,
+  ]
+}

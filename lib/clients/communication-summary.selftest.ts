@@ -1,6 +1,9 @@
 import assert from "node:assert/strict"
 
-import { formatCommunicationSummary } from "@/lib/clients/communication-summary"
+import {
+  formatCommunicationPreferenceLines,
+  formatCommunicationSummary,
+} from "@/lib/clients/communication-summary"
 
 const allOn = formatCommunicationSummary({
   commsOptOut: false,
@@ -56,6 +59,37 @@ const preAndPost = formatCommunicationSummary({
 assert.equal(
   preAndPost,
   "Opted out: pre-session emails, post-session emails · Online booking permitted"
+)
+
+assert.deepEqual(
+  formatCommunicationPreferenceLines({
+    commsOptOut: false,
+    reminderOptOut: false,
+    preSessionOptOut: true,
+    postSessionOptOut: false,
+    adminCommsOptOut: false,
+    onlineBookingPermitted: true,
+  }),
+  [
+    "All contact: On",
+    "Reminder emails: On",
+    "Pre-session emails: Off",
+    "Post-session emails: On",
+    "Admin emails: On",
+    "Online booking: Allowed",
+  ]
+)
+
+assert.deepEqual(
+  formatCommunicationPreferenceLines({
+    commsOptOut: true,
+    reminderOptOut: true,
+    preSessionOptOut: true,
+    postSessionOptOut: true,
+    adminCommsOptOut: true,
+    onlineBookingPermitted: false,
+  }),
+  ["All contact: Opted out", "(all other emails off)"]
 )
 
 console.log("communication-summary.selftest.ts: ok")

@@ -35,6 +35,7 @@ export default async function NewClaimPage({
         claimTypes={claimTypes.map((type) => ({
           claimTypeId: type.claimTypeId,
           claimTypeName: type.claimTypeName,
+          code: type.code,
         }))}
         organisations={organisations.map((org) => ({
           organisationId: org.organisationId,

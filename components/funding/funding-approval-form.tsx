@@ -56,7 +56,7 @@ import {
   addMonthsToDateString,
   APPROVAL_STATUS_LABELS,
   APPROVAL_STATUSES,
-  isMedicareClaimType,
+  isMedicareClaim,
 } from "@/lib/funding/format"
 import { cn } from "@/lib/utils"
 
@@ -84,6 +84,7 @@ type ClaimOption = {
   clientId?: string
   claimTypeId: string | null
   claimTypeName: string
+  claimTypeCode?: string | null
   startDate?: string | null
 }
 
@@ -282,12 +283,13 @@ export function FundingApprovalForm({
         claimId: CREATE_PRIVATE_CLAIM,
         claimTypeId: privateClaimTypeId,
         claimTypeName: "Private",
+        claimTypeCode: null,
       }
     }
     return clientClaims.find((claim) => claim.claimId === claimId) ?? null
   }, [claimId, clientClaims, privateClaimTypeId])
 
-  const isMedicare = isMedicareClaimType(selectedClaimMeta?.claimTypeName)
+  const isMedicare = isMedicareClaim(selectedClaimMeta?.claimTypeCode)
   const isPrivate = isPrivateClaimSelection(claimId, clientClaims)
 
   const filteredApprovalTypes = useMemo(() => {

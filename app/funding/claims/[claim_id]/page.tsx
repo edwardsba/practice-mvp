@@ -27,9 +27,10 @@ import {
   APPROVAL_STATUS_LABELS,
   formatApprovalProgress,
   formatDisplayDate,
+  formatMedicareExpiry,
   formatMedicareIdentifier,
-  isInsuranceClaimType,
-  isMedicareClaimType,
+  isInsurerClaim,
+  isMedicareClaim,
 } from "@/lib/funding/format"
 import { formatReportType } from "@/lib/reports/snapshot"
 import { BackButton } from "@/components/ui/back-button"
@@ -63,8 +64,8 @@ export default async function ClaimDetailPage({
     ? `/funding/claims/${claimId}/edit?returnTo=${encodeURIComponent(returnTo)}`
     : `/funding/claims/${claimId}/edit`
 
-  const showMedicare = isMedicareClaimType(claim.claimTypeName)
-  const showInsurance = isInsuranceClaimType(claim.claimTypeName)
+  const showMedicare = isMedicareClaim(claim.claimTypeCode)
+  const showInsurance = isInsurerClaim(claim.claimTypeCode)
   const approvalNameById = new Map(
     claim.fundingApprovals.map((approval) => [
       approval.fundingApprovalId,
@@ -110,17 +111,25 @@ export default async function ClaimDetailPage({
               <dd className="font-medium">{claim.claimTypeName}</dd>
             </div>
             {showMedicare ? (
-              <div>
-                <dt className="text-sm text-muted-foreground">Medicare card no.</dt>
-                <dd className="font-medium">
-                  {displayValue(
-                    formatMedicareIdentifier(
-                      claim.medicareCardNumber,
-                      claim.medicareIrn
-                    )
-                  )}
-                </dd>
-              </div>
+              <>
+                <div>
+                  <dt className="text-sm text-muted-foreground">Medicare card no.</dt>
+                  <dd className="font-medium">
+                    {displayValue(
+                      formatMedicareIdentifier(
+                        claim.medicareCardNumber,
+                        claim.medicareIrn
+                      )
+                    )}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-sm text-muted-foreground">Expiry</dt>
+                  <dd className="font-medium">
+                    {displayValue(formatMedicareExpiry(claim.medicareExpiry))}
+                  </dd>
+                </div>
+              </>
             ) : null}
             {showInsurance ? (
               <>

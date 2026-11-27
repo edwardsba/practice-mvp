@@ -160,7 +160,10 @@ export function HistoryTreeSection({
   onHeadingAdd?: (key: HistoryQuestionKey) => void
 }) {
   const [localEvents, setLocalEvents] = useState<EventRecord[] | null>(null)
-  const [localIssues, setLocalIssues] = useState<HistoryIssue[] | null>(null)
+  // The local copy only stands while the issues prop is the one it was made from: the
+  // interview mounts the client and family trees side by side, sharing one issues list.
+  const [localIssues, setLocalIssues] = useState<{ basis: string; issues: HistoryIssue[] } | null>(null)
+  const incomingIssues = JSON.stringify(storedIssues ?? [])
   const [localPeople, setLocalPeople] = useState<RelationshipRecord[] | null>(null)
   const incoming = JSON.stringify(
     events.map((event) => [
@@ -179,7 +182,10 @@ export function HistoryTreeSection({
   }, [incoming])
   const shown = localEvents ?? events
   const people = localPeople ?? relationships
-  const issues = resolveHistoryIssues(shown, localIssues ?? storedIssues)
+  const issues = resolveHistoryIssues(
+    shown,
+    localIssues?.basis === incomingIssues ? localIssues.issues : storedIssues
+  )
   const tree = buildHistoryTree({
     events: shown,
     relationships: people,
@@ -210,7 +216,7 @@ export function HistoryTreeSection({
   }
 
   function publishIssues(next: HistoryIssue[]) {
-    setLocalIssues(next)
+    setLocalIssues({ basis: incomingIssues, issues: next })
     onIssuesChange?.(next)
   }
 

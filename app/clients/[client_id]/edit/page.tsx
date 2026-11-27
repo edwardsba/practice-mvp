@@ -253,7 +253,7 @@ export default async function EditClientPage({
           }
         >
           <p className="text-sm text-muted-foreground">
-            Client history · Family and significant others
+            Client history · Significant other history
           </p>
         </ClientPanel>
 

@@ -69,10 +69,6 @@ export function backgroundSectionForCheck(
   return "demographics"
 }
 
-export function interviewPageForCheck(target: BackgroundCheckTarget): "background" | "history" {
-  return target === "history" ? "history" : "background"
-}
-
 /** Specific anchor first, then the section anchor. */
 export function checkElementIds(check: BackgroundCheck): string[] {
   const specific = `check-${check.id}`

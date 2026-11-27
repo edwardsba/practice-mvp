@@ -7,7 +7,6 @@ import {
   mixedIssueEvents,
   resolveHistoryIssues,
   subEventsFor,
-  unlinkedTreatments,
 } from "@/lib/client-background/history-issues"
 import {
   isConditionEvent,
@@ -15,7 +14,13 @@ import {
   isOtherEvent,
   isTreatmentEvent,
 } from "@/lib/client-background/history-links"
-import { resolvedAbout, type ScreeningAnswers } from "@/lib/client-background/interview-history"
+import {
+  HISTORY_QUESTION_GROUPS,
+  HISTORY_QUESTIONS,
+  resolvedAbout,
+  type HistoryQuestionKey,
+  type ScreeningAnswers,
+} from "@/lib/client-background/interview-history"
 import { professionalSummary, type ProfessionalOption } from "@/lib/client-background/professionals"
 import {
   ADMISSION_TYPE_LABELS,
@@ -71,32 +76,30 @@ type Input = {
   interactive?: boolean
 }
 
-const CLIENT_SECTIONS: {
+type HistorySectionDef = {
   title: string
-  screening: keyof ScreeningAnswers
+  screening: HistoryQuestionKey
   eventType: EventType
   mode: "condition" | "event"
-}[] = [
-  { title: "Mental health", screening: "emotional_problems", eventType: "emotional_problems", mode: "condition" },
-  { title: "Substance use", screening: "substance_use", eventType: "substance_use", mode: "condition" },
-  { title: "Physical health", screening: "illness_injury", eventType: "illness_injury", mode: "condition" },
-  { title: "Self-harm", screening: "self_harm", eventType: "self_harm", mode: "event" },
-  { title: "Traumatic events", screening: "traumatic_events", eventType: "traumatic_event", mode: "event" },
-  { title: "Other significant events", screening: "other_significant_events", eventType: "significant_history", mode: "event" },
-]
+}
 
-const FAMILY_SECTIONS: {
-  title: string
-  screening: keyof ScreeningAnswers
-  eventType: EventType
-  mode: "condition" | "event"
-}[] = [
-  { title: "Mental health", screening: "family_emotional_problems", eventType: "emotional_problems", mode: "condition" },
-  { title: "Substance use", screening: "family_substance_use", eventType: "substance_use", mode: "condition" },
-  { title: "Physical health", screening: "family_illness", eventType: "illness_injury", mode: "condition" },
-  { title: "Self-harm", screening: "family_self_harm", eventType: "self_harm", mode: "event" },
-  { title: "Significant events", screening: "family_significant_events", eventType: "significant_history", mode: "event" },
-]
+function sectionsFromGroup(groupIndex: 0 | 1): HistorySectionDef[] {
+  return HISTORY_QUESTION_GROUPS[groupIndex].keys.map((key) => {
+    const question = HISTORY_QUESTIONS[key]
+    if (!question.eventType) {
+      throw new Error(`History question ${key} has no event type`)
+    }
+    return {
+      title: question.label,
+      screening: key,
+      eventType: question.eventType,
+      mode: question.mode,
+    }
+  })
+}
+
+const CLIENT_SECTIONS = sectionsFromGroup(0)
+const FAMILY_SECTIONS = sectionsFromGroup(1)
 
 /**
  * Singular "+ Add …" labels for each history category title (board AC / Round R).
@@ -110,7 +113,6 @@ export const HISTORY_CATEGORY_ADD_LABELS: Record<string, string> = {
   "Traumatic events": "+ Add traumatic event",
   "Other significant events": "+ Add significant event",
   "Significant events": "+ Add significant event",
-  "Other treatment not linked to an issue": "+ Add treatment",
 }
 
 export function historyCategoryAddLabel(title: string): string {
@@ -160,28 +162,9 @@ export function buildHistoryTree(input: Input): HistoryTree {
     }
   })
 
-  const unlinked = unlinkedTreatments(self, "self").sort((a, b) => comparePartialStarts(a, b, input.dateOfBirth))
-  const otherAnswer = input.screening.other_treatment
-  const otherChildren: HistoryTreeNode[] =
-    unlinked.length > 0
-      ? unlinked.map((event) => eventRow(event, input, "Treatment"))
-      : otherAnswer === "no"
-        ? [{ kind: "note", text: "None" }]
-        : otherAnswer === "not_asked" || otherAnswer == null
-          ? [{ kind: "note", text: "Not asked" }]
-          : []
-  if (unlinked.length > 0 || otherAnswer != null) {
-    sections.push({
-      kind: "section",
-      title: "Other treatment not linked to an issue",
-      screeningKey: "other_treatment",
-      children: otherChildren,
-    })
-  }
-
   return {
-    client: { title: "Client history", children: sections },
-    family: { title: "Family and significant others", children: familySections(input, issues) },
+    client: { title: HISTORY_QUESTION_GROUPS[0].title, children: sections },
+    family: { title: HISTORY_QUESTION_GROUPS[1].title, children: familySections(input, issues) },
   }
 }
 

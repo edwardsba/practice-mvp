@@ -31,7 +31,6 @@ import {
   saveInterviewItemAnswer,
   saveLivingSituation,
   saveOccupation,
-  saveRisk,
   saveStressors,
   saveInterviewScreening,
   startBackgroundInterview,
@@ -160,18 +159,6 @@ export async function saveClientRelationshipStatusAction(clientId: string, relat
     practiceId: context.practiceId,
     userId: context.userId,
     relationshipStatus,
-  })
-  if (!result.error) refresh(clientId)
-  return result
-}
-
-export async function saveRiskAction(clientId: string, risk: unknown) {
-  const context = await requirePractitionerContext()
-  const result = await saveRisk({
-    clientId,
-    practiceId: context.practiceId,
-    userId: context.userId,
-    risk,
   })
   if (!result.error) refresh(clientId)
   return result

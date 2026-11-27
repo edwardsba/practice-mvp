@@ -2,13 +2,36 @@ import { assessAge, compareEventsChronologically } from "@/lib/client-background
 import { backgroundChecks, type BackgroundCheckTarget } from "@/lib/client-background/checks"
 import type { ProfessionalOption } from "@/lib/client-background/professionals"
 import {
-  HISTORY_QUESTION_GROUPS,
   HISTORY_QUESTIONS,
   eventsForQuestion,
   historyQuestionCheckLabel,
   type HistoryQuestionKey,
   type ScreeningAnswers,
 } from "@/lib/client-background/interview-history"
+
+/**
+ * Report history paragraph order — pinned to the pre-Round-AN interview order
+ * (without the retired other_treatment screening key). Display order for the
+ * interview/UI lives in HISTORY_QUESTION_GROUPS and may differ.
+ */
+/** Exported for self-tests — keep in sync with historyItems(). */
+export const REPORT_CLIENT_HISTORY_KEYS = [
+  "emotional_problems",
+  "substance_use",
+  "illness_injury",
+  "self_harm",
+  "traumatic_events",
+  "other_significant_events",
+] as const satisfies readonly HistoryQuestionKey[]
+
+/** Exported for self-tests — keep in sync with historyItems(). */
+export const REPORT_FAMILY_HISTORY_KEYS = [
+  "family_emotional_problems",
+  "family_substance_use",
+  "family_illness",
+  "family_self_harm",
+  "family_significant_events",
+] as const satisfies readonly HistoryQuestionKey[]
 import { parsePartialDate } from "@/lib/client-background/partial-date"
 import { personRoleLabel } from "@/lib/client-background/tree"
 import {
@@ -372,10 +395,10 @@ function historyItems(
   family: boolean,
   named: { value: boolean }
 ): string[] {
-  const group = HISTORY_QUESTION_GROUPS[family ? 1 : 0]
+  const keys = family ? REPORT_FAMILY_HISTORY_KEYS : REPORT_CLIENT_HISTORY_KEYS
   const items: string[] = []
   let answered = false
-  for (const key of group.keys) {
+  for (const key of keys) {
     const entries = eventsForQuestion(source.data.events, key, source.data.dateOfBirth)
     const recorded = answerFor(source, key)
     const answer = entries.length > 0 ? "yes" : recorded
@@ -399,7 +422,7 @@ function historyItems(
     }
   }
   if (family && !answered) {
-    for (const key of group.keys) {
+    for (const key of keys) {
       const index = omitted.findIndex((row) => row.id === `history-${key}`)
       if (index >= 0) omitted.splice(index, 1)
     }

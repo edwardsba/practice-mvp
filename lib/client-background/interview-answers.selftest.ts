@@ -351,4 +351,45 @@ check("section3 financial", facts.s3_financial, [
 const blankFacts = formatSection3FactLines(emptyDemographics())
 check("section3 empty identity → []", blankFacts.s3_identity, [])
 
+const section8 = INTERVIEW_SECTIONS.find((s) => s.number === 8)!
+const section9 = INTERVIEW_SECTIONS.find((s) => s.number === 9)!
+check(
+  "section 8 order and labels",
+  section8.items.map((item) => ({ key: item.key, label: item.label })),
+  [
+    { key: "s8_illness_injury", label: "1. Physical health" },
+    { key: "s8_substance_use", label: "2. Substance use" },
+    { key: "s8_emotional_problems", label: "3. Mental health" },
+    { key: "s8_self_harm", label: "4. Self-harm" },
+    { key: "s8_traumatic_events", label: "5. Traumatic events" },
+    { key: "s8_other_significant_events", label: "6. Other significant events" },
+  ]
+)
+check(
+  "section 9 order and labels",
+  section9.items.map((item) => ({ key: item.key, label: item.label })),
+  [
+    { key: "s9_family_illness", label: "1. Physical health" },
+    { key: "s9_family_substance_use", label: "2. Substance use" },
+    { key: "s9_family_emotional_problems", label: "3. Mental health" },
+    { key: "s9_family_self_harm", label: "4. Self-harm" },
+    { key: "s9_family_significant_events", label: "5. Significant events" },
+  ]
+)
+check("section 9 title", section9.title, "Significant other history")
+
+const droppedOtherTreatment = sanitizeInterviewAnswers({
+  version: 1,
+  items: {
+    s8_other_treatment: { value: "no", confirmed: true },
+    s8_illness_injury: { value: "yes", confirmed: true },
+  },
+})
+check("sanitize drops s8_other_treatment", droppedOtherTreatment, {
+  version: 1,
+  items: {
+    s8_illness_injury: { value: "yes", confirmed: true },
+  },
+})
+
 console.log("\ninterview-answers.selftest.ts: ok")

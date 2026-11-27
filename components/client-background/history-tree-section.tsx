@@ -675,7 +675,7 @@ export function HistoryTreeSection({
                                 }}
                               >
                                 <option value="self">Self</option>
-                                <option value="significant_other">Family and significant others</option>
+                                <option value="significant_other">Significant other history</option>
                               </SelectField>
                             ),
                             category:
@@ -1058,15 +1058,6 @@ function CategoryBlock({
           type="button"
           className="px-1 text-sm text-primary underline-offset-2 hover:underline"
           onClick={() => onAddCategory(about, eventType)}
-        >
-          {addLabel}
-        </button>
-      ) : null}
-      {!readOnly && onAddCategory && question?.mode === "other_treatment" && shown === "yes" ? (
-        <button
-          type="button"
-          className="px-1 text-sm text-primary underline-offset-2 hover:underline"
-          onClick={() => onAddCategory(about, "psychiatric_admission")}
         >
           {addLabel}
         </button>

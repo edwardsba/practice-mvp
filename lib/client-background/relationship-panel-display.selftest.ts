@@ -153,8 +153,8 @@ for (const role of ["child", "partner", "sibling", "parent", "caregiver"] as con
 }
 assert.equal(PERSON_FORM_GROUP_LABELS.details, "Person's details")
 assert.equal(PERSON_FORM_GROUP_LABELS.health, "Health")
-assert.equal(PERSON_FORM_GROUP_LABELS.living, "Living situation")
-assert.equal(PERSON_FORM_GROUP_LABELS.quality, "Quality of relationship")
+assert.equal(PERSON_FORM_GROUP_LABELS.living, "Home")
+assert.equal(PERSON_FORM_GROUP_LABELS.quality, "Relationship with client")
 
 assert.deepEqual(
   relationshipViewGroups("client_current").map((g) => g.label),

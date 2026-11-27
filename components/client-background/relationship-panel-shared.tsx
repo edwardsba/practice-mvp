@@ -3,7 +3,14 @@
 import { useState, type ReactNode } from "react"
 import { ChevronRight, X } from "lucide-react"
 
-import { PartialDatePicker, SelectField, TextAreaField, TextField } from "@/components/client-background/fields"
+import {
+  ChoiceButtons,
+  PartialDatePicker,
+  SelectField,
+  TextAreaField,
+  TextField,
+} from "@/components/client-background/fields"
+import { SidePanel } from "@/components/shared/side-panel"
 import {
   childTypesForBlock,
   rolesForBlock,
@@ -151,42 +158,66 @@ export function typesForRole(kind: BlockKind | null, role: BlockRole, arrangemen
   return []
 }
 
+/** Avatar circle for person info headers (passed as SidePanel `leading`). */
+export function PersonAvatar({
+  initial,
+  deceased,
+  size = "md",
+}: {
+  initial: string
+  deceased: boolean
+  size?: "md" | "sm"
+}) {
+  return (
+    <span
+      className={cn(
+        "flex shrink-0 items-center justify-center rounded-full text-sm font-medium",
+        size === "md" ? "size-10" : "size-8 text-xs",
+        deceased ? "border-2 border-dashed border-[#a1a1aa]" : "bg-muted"
+      )}
+      aria-hidden
+    >
+      {initial}
+    </span>
+  )
+}
+
+/**
+ * @deprecated Prefer SidePanel `leading` + `title` + `summary`. Kept for rare
+ * standalone headers outside the shared panel shell.
+ */
 export function PanelHeader({
   initial,
   deceased,
   title,
   subtitle,
   onClose,
+  showTitle = true,
 }: {
   initial: string
   deceased: boolean
   title: string
   subtitle: string
-  onClose: () => void
+  onClose?: () => void
+  showTitle?: boolean
 }) {
   return (
-    <header className="flex items-start gap-3 border-b p-4">
-      <span
-        className={cn(
-          "flex size-10 shrink-0 items-center justify-center rounded-full text-sm font-medium",
-          deceased ? "border-2 border-dashed border-[#a1a1aa]" : "bg-muted"
-        )}
-        aria-hidden
-      >
-        {initial}
-      </span>
+    <header className={cn("flex items-start gap-3", showTitle || onClose ? "border-b px-4 py-4" : "mb-3")}>
+      <PersonAvatar initial={initial} deceased={deceased} />
       <div className="min-w-0 flex-1">
-        <h2 className="truncate text-base font-medium">{title}</h2>
-        <p className="truncate text-sm text-muted-foreground">{subtitle}</p>
+        {showTitle ? <h2 className="text-lg font-semibold leading-snug break-words">{title}</h2> : null}
+        {subtitle ? <p className="mt-0.5 text-sm text-muted-foreground break-words">{subtitle}</p> : null}
       </div>
-      <button
-        type="button"
-        className="inline-flex size-10 items-center justify-center rounded-md hover:bg-muted"
-        aria-label="Close"
-        onClick={onClose}
-      >
-        <X className="size-4" />
-      </button>
+      {onClose ? (
+        <button
+          type="button"
+          className="inline-flex size-10 shrink-0 items-center justify-center rounded-md hover:bg-muted"
+          aria-label="Close"
+          onClick={onClose}
+        >
+          <X className="size-4" />
+        </button>
+      ) : null}
     </header>
   )
 }
@@ -294,49 +325,79 @@ export function PersonFields({
   const kind = block?.kind
   const childTypes = kind ? childTypesForBlock(kind) : []
   const siblingTypes = kind ? siblingTypesForBlock(kind) : []
-  const showType = role === "child" || role === "sibling"
+  /** Prompt example lists four Sex choices as tap buttons; SEX_OPTIONS is four. */
+  const sexOptions = SEX_OPTIONS.map((option) => ({ value: option, label: option }))
+
+  const childTypeOptions = childTypes.map((type) => ({
+    value: type,
+    label: childTypeLabel ? childTypeLabel(type) : CHILD_TYPE_LABELS[type],
+  }))
+  const siblingTypeOptions = siblingTypes.map((type) => ({
+    value: type,
+    label: SIBLING_BLOCK_TYPE_LABELS[type],
+  }))
+  // Prompt example: Full | Half | Step | Adoptive — when the block offers ≤4 types, use taps.
   const typeField =
     role === "child" && childTypes.length > 0 ? (
-      <SelectField
-        id={`${idPrefix}-child-type`}
-        label="Type"
-        value={draft.blockRoleType}
-        onChange={(blockRoleType) => patch({ blockRoleType })}
-      >
-        <option value="">Not recorded</option>
-        {childTypes.map((type) => (
-          <option key={type} value={type}>
-            {childTypeLabel ? childTypeLabel(type) : CHILD_TYPE_LABELS[type]}
-          </option>
-        ))}
-      </SelectField>
+      childTypeOptions.length <= 4 ? (
+        <ChoiceButtons
+          id={`${idPrefix}-child-type`}
+          label="Type"
+          value={draft.blockRoleType}
+          onChange={(blockRoleType) => patch({ blockRoleType })}
+          options={[...childTypeOptions, { value: "", label: "Not recorded" }].slice(0, 4)}
+        />
+      ) : (
+        <SelectField
+          id={`${idPrefix}-child-type`}
+          label="Type"
+          value={draft.blockRoleType}
+          onChange={(blockRoleType) => patch({ blockRoleType })}
+        >
+          <option value="">Not recorded</option>
+          {childTypes.map((type) => (
+            <option key={type} value={type}>
+              {childTypeLabel ? childTypeLabel(type) : CHILD_TYPE_LABELS[type]}
+            </option>
+          ))}
+        </SelectField>
+      )
     ) : role === "sibling" && siblingTypes.length > 0 ? (
-      <SelectField
-        id={`${idPrefix}-sibling-type`}
-        label="Type"
-        value={draft.blockRoleType}
-        onChange={(blockRoleType) => patch({ blockRoleType })}
-      >
-        {siblingTypes.map((type) => (
-          <option key={type} value={type}>
-            {SIBLING_BLOCK_TYPE_LABELS[type]}
-          </option>
-        ))}
-      </SelectField>
+      siblingTypeOptions.length <= 4 ? (
+        <ChoiceButtons
+          id={`${idPrefix}-sibling-type`}
+          label="Type"
+          value={draft.blockRoleType}
+          onChange={(blockRoleType) => patch({ blockRoleType })}
+          options={siblingTypeOptions}
+        />
+      ) : (
+        <SelectField
+          id={`${idPrefix}-sibling-type`}
+          label="Type"
+          value={draft.blockRoleType}
+          onChange={(blockRoleType) => patch({ blockRoleType })}
+        >
+          {siblingTypes.map((type) => (
+            <option key={type} value={type}>
+              {SIBLING_BLOCK_TYPE_LABELS[type]}
+            </option>
+          ))}
+        </SelectField>
+      )
     ) : null
 
   if (basicsOnly) {
     return (
       <div className="space-y-3">
         <TextField id={`${idPrefix}-name`} label="Name" value={draft.givenName} onChange={(givenName) => patch({ givenName })} />
-        <SelectField id={`${idPrefix}-sex`} label="Sex" value={draft.sex} onChange={(sex) => patch({ sex })}>
-          <option value="">Not recorded</option>
-          {SEX_OPTIONS.map((option) => (
-            <option key={option} value={option}>
-              {option}
-            </option>
-          ))}
-        </SelectField>
+        <ChoiceButtons
+          id={`${idPrefix}-sex`}
+          label="Sex"
+          value={draft.sex}
+          onChange={(sex) => patch({ sex })}
+          options={sexOptions}
+        />
         <PartialDatePicker
           id={`${idPrefix}-dob`}
           dateLabel="Date of birth or age"
@@ -368,43 +429,41 @@ export function PersonFields({
       <PanelGroup title="Person's details" index={groupIndexOffset}>
         <div className="space-y-3">
           <TextField id={`${idPrefix}-name`} label="Name" value={draft.givenName} onChange={(givenName) => patch({ givenName })} />
-          <div className={cn("grid gap-3", showType || role === "parent" || role === "caregiver" ? "grid-cols-2" : "grid-cols-1")}>
-            <SelectField id={`${idPrefix}-sex`} label="Sex" value={draft.sex} onChange={(sex) => patch({ sex })}>
+          <ChoiceButtons
+            id={`${idPrefix}-sex`}
+            label="Sex"
+            value={draft.sex}
+            onChange={(sex) => patch({ sex })}
+            options={sexOptions}
+          />
+          {typeField}
+          {role === "parent" ? (
+            <ChoiceButtons
+              id={`${idPrefix}-parent`}
+              label="Parent"
+              value={draft.blockRoleType || "mother"}
+              onChange={(blockRoleType) => patch({ blockRoleType })}
+              options={[
+                { value: "mother", label: "Mother" },
+                { value: "father", label: "Father" },
+              ]}
+            />
+          ) : null}
+          {role === "caregiver" && block?.arrangementType !== "adoption" ? (
+            <SelectField
+              id={`${idPrefix}-caregiver`}
+              label="Relationship"
+              value={draft.blockRoleType}
+              onChange={(blockRoleType) => patch({ blockRoleType })}
+            >
               <option value="">Not recorded</option>
-              {SEX_OPTIONS.map((option) => (
-                <option key={option} value={option}>
-                  {option}
+              {CAREGIVER_RELATIONSHIPS.map((type) => (
+                <option key={type} value={type}>
+                  {CAREGIVER_RELATIONSHIP_LABELS[type]}
                 </option>
               ))}
             </SelectField>
-            {typeField}
-            {role === "parent" ? (
-              <SelectField
-                id={`${idPrefix}-parent`}
-                label="Parent"
-                value={draft.blockRoleType || "mother"}
-                onChange={(blockRoleType) => patch({ blockRoleType })}
-              >
-                <option value="mother">Mother</option>
-                <option value="father">Father</option>
-              </SelectField>
-            ) : null}
-            {role === "caregiver" && block?.arrangementType !== "adoption" ? (
-              <SelectField
-                id={`${idPrefix}-caregiver`}
-                label="Relationship"
-                value={draft.blockRoleType}
-                onChange={(blockRoleType) => patch({ blockRoleType })}
-              >
-                <option value="">Not recorded</option>
-                {CAREGIVER_RELATIONSHIPS.map((type) => (
-                  <option key={type} value={type}>
-                    {CAREGIVER_RELATIONSHIP_LABELS[type]}
-                  </option>
-                ))}
-              </SelectField>
-            ) : null}
-          </div>
+          ) : null}
           {role === "parent" ? (
             <label className="flex min-h-10 items-center gap-2 text-sm">
               <input type="checkbox" checked={draft.notKnown} onChange={(event) => patch({ notKnown: event.target.checked })} />
@@ -453,7 +512,7 @@ export function PersonFields({
         </div>
       </PanelGroup>
 
-      <PanelGroup title="Living situation" index={groupIndexOffset + 2}>
+      <PanelGroup title="Home" index={groupIndexOffset + 2}>
         <div className="space-y-3">
           <SelectField
             id={`${idPrefix}-living`}
@@ -484,36 +543,34 @@ export function PersonFields({
         </div>
       </PanelGroup>
 
-      <PanelGroup title="Quality of relationship" index={groupIndexOffset + 3}>
+      <PanelGroup title="Relationship with client" index={groupIndexOffset + 3}>
         <div className="space-y-3">
-          <div className="grid grid-cols-2 gap-3">
-            <SelectField
-              id={`${idPrefix}-support`}
-              label="Supportive"
-              value={draft.supportive}
-              onChange={(supportive) => patch({ supportive: supportive as PersonDraft["supportive"] })}
-            >
-              <option value="">Not recorded</option>
-              {RELATIONSHIP_RATING_VALUES.map((option) => (
-                <option key={option} value={option}>
-                  {RELATIONSHIP_RATING_LABELS[option]}
-                </option>
-              ))}
-            </SelectField>
-            <SelectField
-              id={`${idPrefix}-conflict`}
-              label="Conflict or strain"
-              value={draft.conflict}
-              onChange={(conflict) => patch({ conflict: conflict as PersonDraft["conflict"] })}
-            >
-              <option value="">Not recorded</option>
-              {RELATIONSHIP_RATING_VALUES.map((option) => (
-                <option key={option} value={option}>
-                  {RELATIONSHIP_RATING_LABELS[option]}
-                </option>
-              ))}
-            </SelectField>
-          </div>
+          <ChoiceButtons
+            id={`${idPrefix}-support`}
+            label="Supportive"
+            value={draft.supportive}
+            onChange={(supportive) => patch({ supportive: supportive as PersonDraft["supportive"] })}
+            options={[
+              ...RELATIONSHIP_RATING_VALUES.map((option) => ({
+                value: option,
+                label: RELATIONSHIP_RATING_LABELS[option],
+              })),
+              { value: "", label: "Not recorded" },
+            ]}
+          />
+          <ChoiceButtons
+            id={`${idPrefix}-conflict`}
+            label="Conflict or strain"
+            value={draft.conflict}
+            onChange={(conflict) => patch({ conflict: conflict as PersonDraft["conflict"] })}
+            options={[
+              ...RELATIONSHIP_RATING_VALUES.map((option) => ({
+                value: option,
+                label: RELATIONSHIP_RATING_LABELS[option],
+              })),
+              { value: "", label: "Not recorded" },
+            ]}
+          />
           <TextAreaField
             id={`${idPrefix}-comment`}
             label="Comment"
@@ -774,24 +831,33 @@ export function MoveStep({
 export function RelationshipPanelShell({
   ariaLabel,
   onDismiss,
+  title,
+  summary,
+  leading,
+  context,
+  footer,
   children,
 }: {
   ariaLabel: string
   onDismiss: () => void
+  title?: string
+  summary?: string
+  leading?: ReactNode
+  context?: ReactNode
+  footer?: ReactNode
   children: ReactNode
 }) {
   return (
-    <div className="fixed inset-0 z-50">
-      <button type="button" className="absolute inset-0 bg-black/20" aria-label="Dismiss" onClick={onDismiss} />
-      <aside
-        role="dialog"
-        aria-modal="true"
-        aria-label={ariaLabel}
-        className="absolute inset-y-0 right-0 flex w-full animate-[relationship-panel_200ms_ease-out] flex-col bg-background shadow-xl sm:w-[440px]"
-      >
-        <style>{`@keyframes relationship-panel { from { transform: translateX(100%); } to { transform: translateX(0); } }`}</style>
-        {children}
-      </aside>
-    </div>
+    <SidePanel
+      title={title ?? ariaLabel}
+      summary={summary}
+      leading={leading}
+      ariaLabel={ariaLabel}
+      onDismiss={onDismiss}
+      context={context}
+      footer={footer}
+    >
+      {children}
+    </SidePanel>
   )
 }

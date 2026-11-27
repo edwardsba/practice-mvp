@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, type ReactNode } from "react"
 import { createPortal } from "react-dom"
 
 import {
@@ -11,8 +11,8 @@ import {
   updateBlockMemberAction,
   updateRelationshipBlockAction,
 } from "@/app/clients/[client_id]/background/actions"
-import { AddToRelationshipMenu } from "@/components/client-background/add-to-relationship-menu"
 import { DiscardChangesDialog } from "@/components/client-background/discard-changes-dialog"
+import { TreeAddControl, TreeLineRow } from "@/components/client-background/tree-add-control"
 import {
   NewRelationshipPanel,
   NEW_RELATIONSHIP_ENTRY_POINTS,
@@ -22,51 +22,49 @@ import { NewPersonDraftForm } from "@/components/client-background/new-person-dr
 import { RelationshipEditFooter } from "@/components/client-background/relationship-edit-footer"
 import {
   BlockFields,
-  Facts,
   MoveStep,
   PanelGroup,
-  PanelHeader,
+  PersonAvatar,
   PersonCard,
   PersonFields,
   RelationshipPanelShell,
   draftFromPerson,
   personFromDraft,
-  typeOptionLabel,
   type PersonDraft,
 } from "@/components/client-background/relationship-panel-shared"
 import {
+  PanelConnectedGroup,
+  PanelInfoFields,
+  SidePanelInfoFooter,
+} from "@/components/client-background/panel-info-view"
+import { personInfoGroups, relationshipInfoGroups } from "@/lib/client-background/panel-info"
+import {
   TreeBranch,
-  treeItemStateClassName,
   treeLayer1ClassName,
   treeLayer2MetaClassName,
-  treeLayer2ShellClassName,
   treeLayer2TitleClassName,
   treeLayer3AvatarClassName,
   treeLayer3MetaClassName,
-  treeLayer3ShellClassName,
   treeLayer3TitleClassName,
   treeLayer4AvatarClassName,
   treeLayer4MetaClassName,
-  treeLayer4ShellClassName,
   treeLayer4TitleClassName,
   treeSelectedTitleClassName,
 } from "@/components/client-background/tree-levels"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { relationshipLineSupportsAddMenu } from "@/lib/client-background/add-to-relationship"
+import {
+  addChoicesForBlockKind,
+  relationshipTreeAddChoices,
+} from "@/lib/client-background/tree-add"
 import { isPartneredClientStatus } from "@/lib/client-background/relationship-blocks"
 import {
-  blockStatusDisplayLabel,
-  childrenAnswerLabel,
-  dateWithDuration,
-  existingPersonContextLine,
   partOfLine,
   personRoleLabel,
   relationshipPanelSubtitle,
   relationshipPanelTitle,
   relationshipViewGroups,
-  yearOf,
 } from "@/lib/client-background/relationship-panel-display"
-import { relationshipDuration } from "@/lib/reports/relationship-block-report"
 import {
   buildRelationshipTree,
   relationshipSectionAddSpec,
@@ -76,13 +74,7 @@ import {
 } from "@/lib/client-background/relationship-tree"
 import { todayDateString } from "@/lib/dates/practice-time"
 import {
-  ARRANGEMENT_TYPE_LABELS,
-  DEPENDENCY_LABELS,
   EVENT_TYPE_LABELS,
-  HEALTH_STATUS_LABELS,
-  RELATIONSHIP_LIVING_SITUATION_LABELS,
-  RELATIONSHIP_RATING_LABELS,
-  type ArrangementType,
   type BlockKind,
   type BlockRole,
   type ClientRelationshipStatusValue,
@@ -92,9 +84,7 @@ import {
   type RelationshipBlockAnswers,
   type RelationshipRecord,
 } from "@/lib/client-background/types"
-import { personAge } from "@/lib/reports/background-report-prose"
 import { cn } from "@/lib/utils"
-import { ChevronRight } from "lucide-react"
 
 type EditorState = {
   relationships?: RelationshipRecord[]
@@ -300,6 +290,63 @@ export function RelationshipTreeSection({
     if (result) close()
   }
 
+  const personBlock =
+    person != null
+      ? shownBlocks.find((item) => item.relationshipBlockId === person.relationshipBlockId) ?? null
+      : null
+  const personDisplayName =
+    person == null
+      ? ""
+      : person.notKnown && person.blockRole === "parent"
+        ? person.blockRoleType === "father"
+          ? "Father"
+          : "Mother"
+        : person.givenName.trim() || "Person"
+  const panelShell = (() => {
+    if (!selection) {
+      return { ariaLabel: "Panel", title: "Panel", summary: undefined as string | undefined, leading: undefined as ReactNode }
+    }
+    if (selection.type === "new_relationship_draft") {
+      const title = selection.kind === "caregiver_arrangement" ? "New arrangement" : "New relationship"
+      return { ariaLabel: title, title, summary: undefined, leading: undefined }
+    }
+    if (selection.type === "new_person_draft") {
+      const title =
+        selection.role === "child" ? "New child" : selection.role === "sibling" ? "New sibling" : "New partner"
+      return { ariaLabel: title, title, summary: undefined, leading: undefined }
+    }
+    if (selection.type === "person" && person) {
+      const role = personRoleLabel(person, personBlock)
+      const context = personBlock ? relationshipPanelTitle(personBlock) : "Not placed"
+      return {
+        ariaLabel: personDisplayName,
+        title: personDisplayName,
+        summary: `${role} · ${context}`,
+        leading: (
+          <PersonAvatar
+            initial={personDisplayName.slice(0, 1).toUpperCase() || "?"}
+            deceased={person.deceased || person.healthStatus === "deceased"}
+          />
+        ),
+      }
+    }
+    if (selection.type === "block" && block) {
+      const title = relationshipPanelTitle(block)
+      return {
+        ariaLabel: title,
+        title,
+        summary: relationshipPanelSubtitle(block),
+        leading: undefined,
+      }
+    }
+    return {
+      ariaLabel: "Relationship",
+      title: "Relationship",
+      summary: undefined,
+      leading: undefined,
+    }
+  })()
+
   return (
     <div className="space-y-4" data-entry-point={NEW_RELATIONSHIP_ENTRY_POINTS.clientBackground}>
       <TreeCard
@@ -325,19 +372,10 @@ export function RelationshipTreeSection({
       {ready && selection
         ? createPortal(
             <RelationshipPanelShell
-              ariaLabel={
-                selection.type === "new_relationship_draft"
-                  ? selection.kind === "caregiver_arrangement"
-                    ? "New arrangement"
-                    : "New relationship"
-                  : selection.type === "new_person_draft"
-                    ? selection.role === "child"
-                      ? "New child"
-                      : selection.role === "sibling"
-                        ? "New sibling"
-                        : "New partner"
-                    : person?.givenName || block?.relationshipBlockId || "Relationship"
-              }
+              ariaLabel={panelShell.ariaLabel}
+              title={panelShell.title}
+              summary={mode === "view" ? panelShell.summary : undefined}
+              leading={mode === "view" ? panelShell.leading : undefined}
               onDismiss={requestClose}
             >
               {selection.type === "new_relationship_draft" ? (
@@ -475,7 +513,30 @@ function TreeCard({
             {nodes.map((node, index) =>
               node.kind === "section" ? (
                 <div key={node.title} className="space-y-2">
-                  <h3 className={treeLayer1ClassName}>{node.title}</h3>
+                  <div className="flex items-center gap-2">
+                    <h3 className={cn(treeLayer1ClassName, "min-w-0 flex-1")}>{node.title}</h3>
+                    {(() => {
+                      const spec = relationshipSectionAddSpec(node.title)
+                      if (!spec || !relationshipSectionAllowsAdd(node.children, { kind: spec.kind })) {
+                        return null
+                      }
+                      const section =
+                        spec.kind === "caregiver_arrangement"
+                          ? "arrangement"
+                          : spec.kind === "client_other_children"
+                            ? "other_children"
+                            : "relationship"
+                      const choices = relationshipTreeAddChoices({ type: "heading", section })
+                      if (!choices) return null
+                      return (
+                        <TreeAddControl
+                          choices={choices}
+                          aria-label={`Add under ${node.title}`}
+                          onSelect={() => onAddSection(spec)}
+                        />
+                      )
+                    })()}
+                  </div>
                   {node.children.length > 0 ? (
                     <ConnectedList
                       nodes={node.children}
@@ -487,19 +548,6 @@ function TreeCard({
                       selectedId={selectedId}
                     />
                   ) : null}
-                  {(() => {
-                    const spec = relationshipSectionAddSpec(node.title)
-                    if (!spec || !relationshipSectionAllowsAdd(node.children, { kind: spec.kind })) return null
-                    return (
-                      <button
-                        type="button"
-                        className="text-sm text-primary underline-offset-2 hover:underline"
-                        onClick={() => onAddSection(spec)}
-                      >
-                        {spec.label}
-                      </button>
-                    )
-                  })()}
                 </div>
               ) : (
                 <ConnectedList
@@ -662,17 +710,10 @@ function TreeNode({
     const [name, ...rest] = node.line.split(" · ")
     const selected = selectedId === node.id
     const layer4 = personLayer === 4
+    const layer: 3 | 4 = layer4 ? 4 : 3
     return (
       <>
-        <button
-          type="button"
-          aria-current={selected ? "true" : undefined}
-          className={cn(
-            layer4 ? treeLayer4ShellClassName : treeLayer3ShellClassName,
-            treeItemStateClassName({ selected })
-          )}
-          onClick={() => onPerson(node.id)}
-        >
+        <TreeLineRow layer={layer} selected={selected} onOpen={() => onPerson(node.id)}>
           <span className="flex min-w-0 items-center gap-2">
             <span
               className={cn(
@@ -697,14 +738,14 @@ function TreeNode({
             <span
               className={cn(
                 layer4 ? treeLayer4MetaClassName : treeLayer3MetaClassName,
-                selected && "text-[#1e3a8a]",
+                treeSelectedTitleClassName(selected),
                 "w-full"
               )}
             >
               {rest.join(" · ")}
             </span>
           ) : null}
-        </button>
+        </TreeLineRow>
         {node.children.length > 0 ? (
           <ConnectedList
             nodes={node.children}
@@ -725,38 +766,32 @@ function TreeNode({
     const realBlock = node.id ? blocks.find((item) => item.relationshipBlockId === node.id) : undefined
     const blockKind = realBlock?.kind ?? node.blockKind
     const showAdd = Boolean(node.id && blockKind && relationshipLineSupportsAddMenu(blockKind))
-    const band = (
-      <>
-        <span className={cn(treeLayer2TitleClassName, treeSelectedTitleClassName(selected))}>{node.heading}</span>
-        {node.meta ? (
-          <span className={cn(treeLayer2MetaClassName, selected && "text-[#1e3a8a]")}>{node.meta}</span>
-        ) : null}
-      </>
-    )
-    const addMenu =
-      showAdd && node.id && realBlock ? (
-        <AddToRelationshipMenu block={realBlock} onSelect={(role) => onAddToRelationship(node.id, role)} />
-      ) : null
+    const addChoices =
+      showAdd && blockKind ? addChoicesForBlockKind(blockKind) : null
     return (
       <>
-        {node.interactive === false || !node.id ? (
-          <div className={cn("flex items-start gap-2", treeLayer2ShellClassName, treeItemStateClassName({ interactive: false, square: true }))}>
-            <div className="min-w-0 flex-1">{band}</div>
-            {addMenu}
-          </div>
-        ) : (
-          <div className="flex items-start gap-2">
-            <button
-              type="button"
-              aria-current={selected ? "true" : undefined}
-              className={cn("min-w-0 flex-1", treeLayer2ShellClassName, treeItemStateClassName({ selected, square: true }))}
-              onClick={() => onBlock(node.id)}
-            >
-              {band}
-            </button>
-            {addMenu}
-          </div>
-        )}
+        <TreeLineRow
+          layer={2}
+          selected={selected}
+          interactive={node.interactive !== false && Boolean(node.id)}
+          onOpen={node.id ? () => onBlock(node.id) : undefined}
+          addChoices={addChoices}
+          addAriaLabel="Add to this relationship"
+          onAdd={
+            node.id
+              ? (choiceId) => onAddToRelationship(node.id, choiceId as BlockRole)
+              : undefined
+          }
+        >
+          <span className={cn(treeLayer2TitleClassName, treeSelectedTitleClassName(selected))}>
+            {node.heading}
+          </span>
+          {node.meta ? (
+            <span className={cn(treeLayer2MetaClassName, treeSelectedTitleClassName(selected))}>
+              {node.meta}
+            </span>
+          ) : null}
+        </TreeLineRow>
         {node.children.length > 0 ? (
           <BranchList
             nodes={node.children}
@@ -837,22 +872,18 @@ function PersonPanel({
         ? "Father"
         : "Mother"
       : person.givenName.trim() || "Person"
-  const title = personRoleLabel(person, block)
-  const context = block ? relationshipPanelTitle(block) : "Not placed"
   const history = events.filter(
     (event) => event.relationshipRecordId === person.relationshipRecordId && event.about === "significant_other"
   )
   const partOf = partOfLine(person, block, people, clientName)
   void dateOfBirth
+  void onClose
+  const infoGroups = personInfoGroups(person, { asOf: todayDateString() })
+  const connectedLinks = block
+    ? [{ id: `part-of-${block.relationshipBlockId}`, label: `Part of: ${partOf}`, onOpen: () => onOpenBlock(block.relationshipBlockId) }]
+    : []
   return (
-    <>
-      <PanelHeader
-        initial={nodeName.slice(0, 1).toUpperCase() || "?"}
-        deceased={person.deceased || person.healthStatus === "deceased"}
-        title={nodeName}
-        subtitle={`${title} · ${context}`}
-        onClose={onClose}
-      />
+    <div className="flex min-h-0 flex-1 flex-col">
       {mode === "move" ? (
         <MoveStep name={nodeName} person={person} blocks={blocks} people={people} saving={saving} error={error} onCancel={onCancel} onMove={onMove} />
       ) : (
@@ -860,23 +891,14 @@ function PersonPanel({
           <div className="min-h-0 flex-1 overflow-y-auto p-4">
             {mode === "view" ? (
               <div>
-                <PersonViewGroups person={person} />
-                <PanelGroup title="Part of" index={4}>
-                  {block ? (
-                    <button
-                      type="button"
-                      className="flex min-h-11 w-full items-center gap-2 rounded-md border border-border px-3 py-2 text-left text-sm hover:bg-muted/50"
-                      onClick={() => onOpenBlock(block.relationshipBlockId)}
-                    >
-                      <span className="min-w-0 flex-1">{partOf}</span>
-                      <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-                    </button>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">Not placed</p>
-                  )}
-                </PanelGroup>
+                <PanelInfoFields groups={infoGroups} />
+                <PanelConnectedGroup
+                  index={infoGroups.length}
+                  links={connectedLinks}
+                  empty={block ? undefined : "Not placed"}
+                />
                 {history.length > 0 ? (
-                  <PanelGroup title={`History about ${nodeName}`} index={5}>
+                  <PanelGroup title={`History about ${nodeName}`} index={infoGroups.length + 1}>
                     <ul className="space-y-1 text-sm">
                       {history.map((event) => (
                         <li key={event.eventRecordId}>
@@ -892,117 +914,40 @@ function PersonPanel({
                 ) : null}
               </div>
             ) : (
-              <div className="space-y-4">
-                <p className="rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground">
-                  {existingPersonContextLine(person, block, people, clientName)}
-                </p>
-                <PersonFields
-                  idPrefix={person.relationshipRecordId}
-                  person={person}
-                  block={block}
-                  draft={draft}
-                  onChange={setDraft}
-                />
-              </div>
+              <PersonFields
+                idPrefix={person.relationshipRecordId}
+                person={person}
+                block={block}
+                draft={draft}
+                onChange={setDraft}
+              />
             )}
             {error ? <p className="mt-3 text-sm text-destructive">{error}</p> : null}
           </div>
           {mode === "view" ? (
-            <footer className="flex items-center justify-end gap-2 border-t p-4">
-              <button type="button" className="inline-flex min-h-10 items-center rounded-md border px-3 text-sm" onClick={onStartMove}>
-                Move to…
-              </button>
-              <button
-                type="button"
-                className="inline-flex min-h-10 items-center rounded-md bg-primary px-3 text-sm text-primary-foreground"
-                onClick={onEdit}
-              >
-                Edit
-              </button>
-            </footer>
+            <div className="border-t">
+              <SidePanelInfoFooter
+                onEdit={onEdit}
+                extra={
+                  <button type="button" className="inline-flex min-h-10 items-center rounded-md border px-3 text-sm" onClick={onStartMove}>
+                    Move to…
+                  </button>
+                }
+              />
+            </div>
           ) : (
-            <RelationshipEditFooter
-              saving={saving}
-              onRemove={() => void onRemove()}
-              onCancel={onCancel}
-              onSave={() => void onSave(draft)}
-            />
+            <div className="border-t">
+              <RelationshipEditFooter
+                saving={saving}
+                onRemove={() => void onRemove()}
+                onCancel={onCancel}
+                onSave={() => void onSave(draft)}
+              />
+            </div>
           )}
         </>
       )}
-    </>
-  )
-}
-
-function PersonViewGroups({ person }: { person: RelationshipRecord }) {
-  const asOf = todayDateString()
-  const age = person.dateOfBirth.trim() ? personAge(person.dateOfBirth, asOf) : null
-  const born = yearOf(person.dateOfBirth)
-  const details: { label: string; value: string }[] = [
-    { label: "Sex", value: person.sex.trim() || "Not recorded" },
-  ]
-  if (person.blockRole === "child" || person.blockRole === "sibling") {
-    details.push({
-      label: "Type",
-      value: typeOptionLabel(person.blockRole, person.blockRoleType ?? "") || "Not recorded",
-    })
-  }
-  if (person.blockRole === "parent") {
-    details.push({
-      label: "Parent",
-      value: person.blockRoleType === "father" ? "Father" : "Mother",
-    })
-  }
-  if (person.blockRole === "caregiver" && person.blockRoleType) {
-    details.push({
-      label: "Relationship",
-      value: typeOptionLabel("caregiver", person.blockRoleType) || "Not recorded",
-    })
-  }
-  details.push({
-    label: "Age",
-    value: age != null ? (born ? `${age} (born ${born})` : String(age)) : "Not recorded",
-  })
-
-  const health: { label: string; value: string }[] = [
-    { label: "Health", value: person.healthStatus ? HEALTH_STATUS_LABELS[person.healthStatus] : "Not recorded" },
-  ]
-  if (person.deceased || person.healthStatus === "deceased" || person.dateOfDeath.trim()) {
-    health.push({
-      label: "Year of death",
-      value: yearOf(person.dateOfDeath) || person.dateOfDeath || "Not recorded",
-    })
-  }
-
-  const living: { label: string; value: string }[] = [
-    {
-      label: "Living situation",
-      value: person.livingSituation ? RELATIONSHIP_LIVING_SITUATION_LABELS[person.livingSituation] : "Not recorded",
-    },
-    { label: "Dependency", value: person.dependency ? DEPENDENCY_LABELS[person.dependency] : "Not recorded" },
-  ]
-
-  const quality: { label: string; value: string }[] = [
-    { label: "Supportive", value: person.supportive ? RELATIONSHIP_RATING_LABELS[person.supportive] : "Not recorded" },
-    { label: "Conflict or strain", value: person.conflict ? RELATIONSHIP_RATING_LABELS[person.conflict] : "Not recorded" },
-    { label: "Comment", value: person.qualityOfRelationship.trim() || "Not recorded" },
-  ]
-
-  return (
-    <>
-      <PanelGroup title="Person's details" index={0}>
-        <Facts rows={details} />
-      </PanelGroup>
-      <PanelGroup title="Health" index={1}>
-        <Facts rows={health} />
-      </PanelGroup>
-      <PanelGroup title="Living situation" index={2}>
-        <Facts rows={living} />
-      </PanelGroup>
-      <PanelGroup title="Quality of relationship" index={3}>
-        <Facts rows={quality} />
-      </PanelGroup>
-    </>
+    </div>
   )
 }
 
@@ -1036,9 +981,9 @@ function BlockPanel({
   const [draft, setDraft] = useState(block)
   useEffect(() => setDraft(block), [block])
   const removable = block.kind !== "biological_parents" && block.kind !== "client_other_children"
-  const title = relationshipPanelTitle(block)
   const groups = relationshipViewGroups(block.kind)
-  const asOf = todayDateString()
+  const infoGroups = relationshipInfoGroups(block)
+  void onClose
 
   function peopleForRole(role: BlockRole) {
     return people
@@ -1046,52 +991,31 @@ function BlockPanel({
       .sort((a, b) => a.displayOrder - b.displayOrder)
   }
 
+  const connectedPeople = people
+    .slice()
+    .sort((a, b) => a.displayOrder - b.displayOrder)
+    .map((person) => {
+      const name =
+        person.notKnown && person.blockRole === "parent"
+          ? person.blockRoleType === "father"
+            ? "Father"
+            : "Mother"
+          : person.givenName.trim() || "Unnamed"
+      const role = personRoleLabel(person, block)
+      return {
+        id: person.relationshipRecordId,
+        label: `${role}: ${name}`,
+        onOpen: () => onOpenPerson(person.relationshipRecordId),
+      }
+    })
+
   return (
-    <>
-      <PanelHeader
-        initial={title.slice(0, 1).toUpperCase() || "R"}
-        deceased={false}
-        title={title}
-        subtitle={relationshipPanelSubtitle(block)}
-        onClose={onClose}
-      />
+    <div className="flex min-h-0 flex-1 flex-col">
       <div className="min-h-0 flex-1 overflow-y-auto p-4">
         {mode === "view" ? (
           <div>
-            {groups.map((group, index) => {
-              if (group.role == null) {
-                return (
-                  <PanelGroup key={group.id} title={group.label} index={index}>
-                    <Facts rows={blockRelationshipFacts(block, asOf)} />
-                  </PanelGroup>
-                )
-              }
-              const members = peopleForRole(group.role)
-              const countLabel =
-                group.role === "child" && members.length > 0 ? `${group.label} (${members.length})` : group.label
-              return (
-                <PanelGroup
-                  key={group.id}
-                  title={countLabel}
-                  index={index}
-                  empty={members.length === 0 ? "None recorded" : undefined}
-                >
-                  {members.length > 0 ? (
-                    <ul className="space-y-2">
-                      {members.map((person) => (
-                        <li key={person.relationshipRecordId}>
-                          <PersonCard
-                            person={person}
-                            block={block}
-                            onOpen={() => onOpenPerson(person.relationshipRecordId)}
-                          />
-                        </li>
-                      ))}
-                    </ul>
-                  ) : null}
-                </PanelGroup>
-              )
-            })}
+            <PanelInfoFields groups={infoGroups} />
+            <PanelConnectedGroup index={infoGroups.length} links={connectedPeople} empty="None recorded" />
           </div>
         ) : (
           <div>
@@ -1166,81 +1090,21 @@ function BlockPanel({
         {error ? <p className="mt-3 text-sm text-destructive">{error}</p> : null}
       </div>
       {mode === "view" ? (
-        <footer className="flex justify-end border-t p-4">
-          <button
-            type="button"
-            className="inline-flex min-h-10 items-center rounded-md bg-primary px-3 text-sm text-primary-foreground"
-            onClick={onEdit}
-          >
-            Edit
-          </button>
-        </footer>
+        <div className="border-t">
+          <SidePanelInfoFooter onEdit={onEdit} />
+        </div>
       ) : (
-        <RelationshipEditFooter
-          saving={saving}
-          onRemove={removable ? () => void onRemove() : undefined}
-          onCancel={onCancel}
-          onSave={() => void onSave(draft)}
-        />
+        <div className="border-t">
+          <RelationshipEditFooter
+            saving={saving}
+            onRemove={removable ? () => void onRemove() : undefined}
+            onCancel={onCancel}
+            onSave={() => void onSave(draft)}
+          />
+        </div>
       )}
-    </>
+    </div>
   )
-}
-
-function blockRelationshipFacts(block: RelationshipBlock, asOf: string): { label: string; value: string }[] {
-  const rows: { label: string; value: string }[] = []
-
-  if (block.kind === "caregiver_arrangement") {
-    rows.push({
-      label: "Arrangement",
-      value: block.arrangementType
-        ? ARRANGEMENT_TYPE_LABELS[block.arrangementType as ArrangementType] ?? block.arrangementType
-        : "Not recorded",
-    })
-    if (block.arrangementType === "other") {
-      rows.push({ label: "Other arrangement", value: block.arrangementDetail.trim() || "Not recorded" })
-    }
-  } else if (block.kind === "client_other_children") {
-    rows.push({ label: "Relationship", value: block.statusDetail.trim() || "Not recorded" })
-  } else {
-    rows.push({
-      label: "Relationship status",
-      value: block.status
-        ? block.status === "other"
-          ? "Other"
-          : blockStatusDisplayLabel(block.status) || "Not recorded"
-        : "Not recorded",
-    })
-    if (block.status === "other") {
-      rows.push({ label: "Other status", value: block.statusDetail.trim() || "Not recorded" })
-    }
-  }
-
-  if (block.kind !== "client_other_children") {
-    const startedEnd = block.kind === "client_current" ? "" : block.endedOn
-    rows.push({
-      label: "Started",
-      value: dateWithDuration(block.startedOn, startedEnd, asOf) || "Not recorded",
-    })
-    if (block.kind !== "client_current") {
-      const endedYear = yearOf(block.endedOn)
-      if (!block.endedOn.trim()) {
-        rows.push({ label: "Ended", value: "Not recorded" })
-      } else {
-        const duration = relationshipDuration(block.startedOn, block.endedOn, asOf)
-        rows.push({
-          label: "Ended",
-          value: endedYear ? (duration ? `${endedYear} · ${duration}` : endedYear) : block.endedOn,
-        })
-      }
-    }
-  }
-
-  if (block.kind === "client_current" || block.kind === "client_previous") {
-    rows.push({ label: "Children", value: childrenAnswerLabel(block.childrenAnswer) })
-  }
-
-  return rows
 }
 
 function nodeKey(node: RelationshipTreeNode, index: number): string {

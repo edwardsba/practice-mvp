@@ -33,8 +33,8 @@ export type PersonFormGroupId = (typeof PERSON_FORM_GROUP_IDS)[number]
 export const PERSON_FORM_GROUP_LABELS: Record<PersonFormGroupId, string> = {
   details: "Person's details",
   health: "Health",
-  living: "Living situation",
-  quality: "Quality of relationship",
+  living: "Home",
+  quality: "Relationship with client",
 }
 
 /** Same four groups, in the same order, for every person role. */

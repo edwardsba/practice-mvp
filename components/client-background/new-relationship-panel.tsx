@@ -9,7 +9,6 @@ import { RelationshipEditFooter } from "@/components/client-background/relations
 import {
   BlockFields,
   PanelGroup,
-  PanelHeader,
   emptyPersonDraft,
   type PersonDraft,
 } from "@/components/client-background/relationship-panel-shared"
@@ -143,13 +142,6 @@ export function NewRelationshipPanel({
 
   return (
     <div data-form-id={NEW_RELATIONSHIP_FORM_ID} className="flex min-h-0 flex-1 flex-col">
-      <PanelHeader
-        initial="+"
-        deceased={false}
-        title={isArrangement ? "New arrangement" : "New relationship"}
-        subtitle=""
-        onClose={requestClose}
-      />
       <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
         <ContextStrip lines={context.lines} readOnly />
         <PanelGroup title={isArrangement ? "Arrangement" : "Relationship"} index={0}>

@@ -662,7 +662,8 @@ export function relationshipSectionAddSpec(sectionTitle: string): RelationshipSe
 }
 
 /**
- * Hide add when the section only shows a none / not-asked note.
+ * Hide add when the section only shows a firm "none" note.
+ * "Not asked" still gets ⊕ — adding sets Yes (board AP.1).
  * For Current intimate relationship: hide while a current block already exists
  * (one current relationship only — use + on the line for another partner).
  */
@@ -674,16 +675,25 @@ export function relationshipSectionAllowsAdd(
     return false
   }
   if (children.length === 1 && children[0]?.kind === "note") {
-    const text = children[0].text.toLowerCase()
+    const text = children[0].text.toLowerCase().trim()
+    // "Not asked" keeps ⊕. Only hide for an explicit none / empty answer note.
     return !(
       text === "none" ||
-      text === "not asked" ||
       text === "no children" ||
       text === "no siblings" ||
-      text.includes("not asked")
+      text === "no"
     )
   }
   return true
+}
+
+/**
+ * Headings that can hold a relationship / arrangement always get ⊕ when the
+ * answer is not an explicit "none", even with no person name on the label
+ * (e.g. "Father · other relationships" while Not asked).
+ */
+export function relationshipHeadingAllowsAdd(answer: string | null | undefined): boolean {
+  return answer !== "none"
 }
 
 export function addTargetKind(id: string): { kind: BlockKind; parentSide: "" | "mother" | "father" } | null {

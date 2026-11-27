@@ -9,10 +9,10 @@ import {
   createUnplacedPersonAction,
   deleteEventAction,
   updateEventAction,
-  updateHistoryIssueTreatmentAnswerAction,
 } from "@/app/clients/[client_id]/background/actions"
 import { ContextStrip } from "@/components/client-background/context-strip"
-import { ClientAnswer, ReadOnlyField, SaveRow, SelectField } from "@/components/client-background/fields"
+import { DiscardChangesDialog } from "@/components/client-background/discard-changes-dialog"
+import { ClientAnswer, SelectField } from "@/components/client-background/fields"
 import { NewPersonDraftForm } from "@/components/client-background/new-person-draft-form"
 import {
   RelationshipPanelShell,
@@ -25,41 +25,43 @@ import {
   blankEpisodeForIssue,
   blankIssueDraft,
   eventTypeForSmartKind,
-  treatmentTypeChoiceForEventType,
 } from "@/components/client-background/smart-history-forms"
 import {
   InterviewSectionCard,
   needsBadge,
 } from "@/components/client-background/interview-section-card"
+import { TreeAddControl, TreeLineRow } from "@/components/client-background/tree-add-control"
 import {
   TreeBranch,
   TreeInlineSelect,
-  treeItemStateClassName,
+  treeEventTagClassName,
   treeLayer1ClassName,
   treeLayer2MetaClassName,
-  treeLayer2ShellClassName,
   treeLayer2TitleClassName,
   treeLayer3MetaClassName,
-  treeLayer3ShellClassName,
   treeLayer3TitleClassName,
   treeLayer4MetaClassName,
-  treeLayer4ShellClassName,
   treeLayer4TitleClassName,
   treeSelectedTitleClassName,
 } from "@/components/client-background/tree-levels"
-import { Button } from "@/components/ui/button"
+import {
+  PanelConnectedGroup,
+  PanelInfoFields,
+  SidePanelInfoFooter,
+} from "@/components/client-background/panel-info-view"
+import { SidePanel, SidePanelFooter } from "@/components/shared/side-panel"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { eventInfoGroups, issueInfoGroups } from "@/lib/client-background/panel-info"
 import { clientAgeAtStart, formatPartialWhen } from "@/lib/client-background/age"
-import { formatContextStrip, resolveFormContext } from "@/lib/client-background/form-context"
+import { resolveFormContext } from "@/lib/client-background/form-context"
 import { resolveHistoryIssues } from "@/lib/client-background/history-issues"
 import {
   buildHistoryTree,
-  historyCategoryAddLabel,
   historyVisualLayer,
   type HistoryTreeNode,
 } from "@/lib/client-background/history-tree"
-import { isConditionEvent, isSingleEventType } from "@/lib/client-background/history-links"
-import { smartKindForEventType } from "@/lib/client-background/smart-event-fields"
+import { historyTreeAddChoices } from "@/lib/client-background/tree-add"
+import { isConditionEvent } from "@/lib/client-background/history-links"
 import type { ScreeningAnswer, ScreeningAnswers } from "@/lib/client-background/interview-history"
 import {
   HISTORY_QUESTIONS,
@@ -71,8 +73,6 @@ import {
   CONDITION_EVENT_TYPES,
   emptyEvent,
   EVENT_TYPE_LABELS,
-  TREATMENT_ANSWER_LABELS,
-  TREATMENT_ANSWERS,
   type ConditionEventType,
   type EventRecord,
   type EventType,
@@ -80,7 +80,6 @@ import {
   type RelationshipRecord,
   type SmartEventKind,
   type StartPrecision,
-  type TreatmentAnswer,
   type TreatmentTypeChoice,
 } from "@/lib/client-background/types"
 import { statusColours } from "@/lib/ui/status-colours"
@@ -196,22 +195,8 @@ export function HistoryTreeSection({
   const [unplacedDraftOpen, setUnplacedDraftOpen] = useState(false)
   const [unplacedDraftSaving, setUnplacedDraftSaving] = useState(false)
   const [unplacedDraftError, setUnplacedDraftError] = useState<string | null>(null)
+  const [confirmDiscard, setConfirmDiscard] = useState(false)
   useEffect(() => setReady(true), [])
-  useEffect(() => {
-    if (!selection && !unplacedDraftOpen) return
-    function onKey(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        if (unplacedDraftOpen) {
-          setUnplacedDraftOpen(false)
-          setUnplacedDraftError(null)
-          return
-        }
-        close()
-      }
-    }
-    window.addEventListener("keydown", onKey)
-    return () => window.removeEventListener("keydown", onKey)
-  }, [selection])
 
   function publishEvents(next: EventRecord[]) {
     setLocalEvents(next)
@@ -232,6 +217,15 @@ export function HistoryTreeSection({
     setError(null)
     setSmartKind("episode")
     setTreatmentType("")
+    setConfirmDiscard(false)
+  }
+
+  function requestClose() {
+    if (mode === "edit") {
+      setConfirmDiscard(true)
+      return
+    }
+    close()
   }
 
   function openEntry(id: string) {
@@ -266,6 +260,8 @@ export function HistoryTreeSection({
     issueId?: string
     parentEventId?: string
     category?: EventType
+    /** Pre-select from ⊕ Episode / Treatment / Other event. */
+    initialKind?: SmartEventKind
   }) {
     const issue = options.issueId ? issues.find((item) => item.issueId === options.issueId) : undefined
     const parent = options.parentEventId
@@ -277,6 +273,9 @@ export function HistoryTreeSection({
       parent?.eventType ??
       ("emotional_problems" as EventType)
     const about = issue?.about ?? parent?.about ?? options.about
+    const kind = options.initialKind ?? "episode"
+    const treatment =
+      kind === "treatment" ? ("hospital_admission" as TreatmentTypeChoice) : ("" as TreatmentTypeChoice | "")
     setSelection({
       kind: "new_event",
       about,
@@ -284,11 +283,14 @@ export function HistoryTreeSection({
       parentEventId: options.parentEventId,
       category,
     })
-    setSmartKind("episode")
-    setTreatmentType("")
+    setSmartKind(kind)
+    setTreatmentType(treatment)
     setDraft({
       ...emptyEvent(
-        eventTypeForSmartKind("episode", { category }),
+        eventTypeForSmartKind(kind, {
+          category,
+          treatmentType: treatment,
+        }),
         0
       ),
       eventRecordId: "",
@@ -362,17 +364,6 @@ export function HistoryTreeSection({
     publishEvents(
       isNew ? [...shown, result.event] : shown.map((event) => (event.eventRecordId === result.event!.eventRecordId ? result.event! : event))
     )
-    if (isNew && isConditionEvent(result.event.eventType) === false) {
-      // Adding a treatment sets the issue Treatment answer to Yes (server syncs).
-      const issueId = result.event.conditionGroupId
-      if (issueId) {
-        publishIssues(
-          issues.map((item) =>
-            item.issueId === issueId ? { ...item, treatmentAnswer: "yes" as TreatmentAnswer } : item
-          )
-        )
-      }
-    }
     setDraft(result.event)
     setSelection({ kind: "entry", id: result.event.eventRecordId })
     setIsNew(false)
@@ -461,11 +452,6 @@ export function HistoryTreeSection({
         : selection?.kind === "new_issue"
           ? issueDraft
           : undefined
-  const entry = selection?.kind === "entry" ? shown.find((event) => event.eventRecordId === selection.id) : undefined
-  const showAddStep =
-    !readOnly &&
-    ((entry != null && (mode === "view" || mode === "edit") && !isNew) ||
-      (selection?.kind === "new_event" && mode === "edit" && draft?.eventRecordId))
   const selectedId =
     selection?.kind === "entry" || selection?.kind === "issue"
       ? selection.id
@@ -474,15 +460,6 @@ export function HistoryTreeSection({
         : selection?.kind === "step"
           ? selection.parentId
           : null
-
-  async function setTreatmentAnswer(issueId: string, value: TreatmentAnswer | "") {
-    const result = await updateHistoryIssueTreatmentAnswerAction(clientId, issueId, value)
-    if (result.error || !result.issue) {
-      setError(result.error ?? "Could not save the treatment answer.")
-      return
-    }
-    publishIssues(issues.map((item) => (item.issueId === result.issue!.issueId ? result.issue! : item)))
-  }
 
   const contextForPanel = (() => {
     if (!selection) return null
@@ -528,23 +505,26 @@ export function HistoryTreeSection({
     onOpen: openEntry,
     onAddEvent: readOnly
       ? undefined
-      : (issueId: string, about: "self" | "significant_other") => {
+      : (issueId: string, about: "self" | "significant_other", initialKind?: SmartEventKind) => {
           const found = issues.find((item) => item.issueId === issueId)
           startNewEvent({
             about,
             issueId,
             category: found?.category,
+            initialKind,
           })
         },
     onAddNestedEvent: readOnly
       ? undefined
       : (parentEventId: string, about: "self" | "significant_other") => {
+          void about
           const parent = shown.find((event) => event.eventRecordId === parentEventId)
-          startNewEvent({
-            about,
-            parentEventId,
-            category: parent?.eventType,
-          })
+          if (parent) {
+            // ⊕ Step under Episode / Treatment / Other (and nested events).
+            startStep(parent)
+            return
+          }
+          startNewEvent({ about, parentEventId })
         },
     onAddCategory: readOnly
       ? undefined
@@ -555,7 +535,6 @@ export function HistoryTreeSection({
           }
           startNewEvent({ about, category: eventType })
         },
-    onTreatmentAnswer: readOnly ? undefined : (issueId: string, value: TreatmentAnswer | "") => void setTreatmentAnswer(issueId, value),
     onScreeningChange: presentation === "interview" ? onScreeningChange : undefined,
     hideScreeningControls: presentation === "interview" ? hideScreeningControls : false,
     applyScreeningFilter: presentation === "interview",
@@ -564,6 +543,68 @@ export function HistoryTreeSection({
     selectedId,
     readOnly,
   }
+
+  // While editing, keep a stable header — do not bind to draft.title (each
+  // keystroke would rewrite the panel heading on mobile).
+  const panelTitle =
+    selection?.kind === "new_issue"
+      ? "New issue"
+      : selection?.kind === "new_event"
+        ? "New event"
+        : selection?.kind === "step" || draft?.parentEventId
+          ? mode === "edit"
+            ? "Step"
+            : draft?.title.trim() || "Step"
+          : mode === "edit"
+            ? draft
+              ? EVENT_TYPE_LABELS[draft.eventType]
+              : issueDraft
+                ? CONDITION_CATEGORY_LABELS[issueDraft.category as ConditionEventType] ?? "Issue"
+                : "History"
+            : draft?.title.trim() ||
+              issueDraft?.title.trim() ||
+              (draft ? EVENT_TYPE_LABELS[draft.eventType] : "History")
+  const panelSummary =
+    mode !== "view"
+      ? undefined
+      : selection?.kind === "issue" && selectedIssue
+        ? [
+            CONDITION_CATEGORY_LABELS[selectedIssue.category as ConditionEventType] ?? selectedIssue.category,
+            draft
+              ? [
+                  dated(draft.startPrecision, draft.startValue, dateOfBirth),
+                  draft.resolvedOrOngoing === "ongoing" || draft.endOngoing
+                    ? "ongoing"
+                    : dated(draft.endPrecision, draft.endValue, dateOfBirth),
+                ]
+                  .filter(Boolean)
+                  .join("–")
+              : "",
+          ]
+            .filter(Boolean)
+            .join(" · ")
+        : draft
+          ? [
+              draft.parentEventId ? "Step" : EVENT_TYPE_LABELS[draft.eventType] ?? draft.eventType,
+              dated(draft.startPrecision, draft.startValue, dateOfBirth),
+            ]
+              .filter(Boolean)
+              .join(" · ")
+          : undefined
+  const panelLeading =
+    mode === "view" && draft && selection?.kind !== "issue" ? (
+      <Tag
+        label={
+          draft.parentEventId
+            ? "Step"
+            : isConditionEvent(draft.eventType)
+              ? "Episode"
+              : draft.eventType === "other_event"
+                ? "Other"
+                : "Treatment"
+        }
+      />
+    ) : undefined
 
   const clientBody = (
     <>
@@ -625,41 +666,17 @@ export function HistoryTreeSection({
       )}
       {ready && selection && (draft || issueDraft)
         ? createPortal(
-            <div className="fixed inset-0 z-50">
-              <button type="button" className="absolute inset-0 bg-black/20" aria-label="Dismiss" onClick={close} />
-              <aside
-                role="dialog"
-                aria-modal="true"
-                aria-label={
-                  selection.kind === "new_issue"
-                    ? "New issue"
-                    : selection.kind === "new_event"
-                      ? "New event"
-                      : draft?.title.trim() || issueDraft?.title.trim() || "History"
-                }
-                className="absolute inset-y-0 right-0 flex w-full animate-[relationship-panel_200ms_ease-out] flex-col overflow-y-auto bg-background p-4 shadow-xl sm:w-[440px]"
-              >
-                <style>{`@keyframes relationship-panel { from { transform: translateX(100%); } to { transform: translateX(0); } }`}</style>
-                <div className="mb-2 flex items-start justify-between gap-3">
-                  <h2 className="text-base font-semibold">
-                    {selection.kind === "new_issue"
-                      ? "New issue"
-                      : selection.kind === "new_event"
-                        ? "New event"
-                        : selection.kind === "step" || draft?.parentEventId
-                          ? "Step"
-                          : draft?.title.trim() ||
-                            issueDraft?.title.trim() ||
-                            (draft ? EVENT_TYPE_LABELS[draft.eventType] : "History")}
-                  </h2>
-                  <Button type="button" variant="ghost" size="sm" onClick={close}>
-                    Close
-                  </Button>
-                </div>
-                {contextForPanel ? (
+            <SidePanel
+              title={panelTitle}
+              summary={panelSummary}
+              leading={panelLeading}
+              ariaLabel={panelTitle}
+              onDismiss={requestClose}
+              context={
+                isNew && contextForPanel ? (
                   <ContextStrip
                     lines={contextForPanel.lines}
-                    readOnly={mode === "view" || readOnly}
+                    readOnly={readOnly}
                     editors={
                       mode === "edit"
                         ? {
@@ -667,7 +684,12 @@ export function HistoryTreeSection({
                               <SelectField
                                 id="context_about"
                                 label="About"
-                                value={draft?.about === "significant_other" || issueDraft?.about === "significant_other" ? "significant_other" : "self"}
+                                value={
+                                  draft?.about === "significant_other" ||
+                                  issueDraft?.about === "significant_other"
+                                    ? "significant_other"
+                                    : "self"
+                                }
                                 onChange={(about) => {
                                   const next = about === "significant_other" ? "significant_other" : "self"
                                   if (issueDraft) setIssueDraft({ ...issueDraft, about: next })
@@ -686,8 +708,13 @@ export function HistoryTreeSection({
                                   value={issueDraft.category}
                                   onChange={(category) => {
                                     if ((CONDITION_EVENT_TYPES as readonly string[]).includes(category)) {
-                                      setIssueDraft({ ...issueDraft, category: category as ConditionEventType })
-                                      if (draft) setDraft({ ...draft, eventType: category as ConditionEventType })
+                                      setIssueDraft({
+                                        ...issueDraft,
+                                        category: category as ConditionEventType,
+                                      })
+                                      if (draft) {
+                                        setDraft({ ...draft, eventType: category as ConditionEventType })
+                                      }
                                     }
                                   }}
                                 >
@@ -702,120 +729,89 @@ export function HistoryTreeSection({
                         : undefined
                     }
                   />
-                ) : null}
-                {mode === "edit" ? (
-                  <>
-                    {selection.kind === "new_issue" && issueDraft && draft ? (
-                      <NewIssueForm
-                        draft={issueDraft}
-                        firstEpisode={draft}
-                        dateOfBirth={dateOfBirth}
-                        relationships={people}
-                        onIssueChange={setIssueDraft}
-                        onEpisodeChange={setDraft}
-                        onAddPerson={startUnplacedPersonDraft}
-                      />
-                    ) : selection.kind === "new_event" && draft ? (
-                      <NewEventForm
-                        draft={draft}
-                        kind={smartKind}
-                        treatmentType={treatmentType}
-                        category={selection.category ?? null}
-                        dateOfBirth={dateOfBirth}
-                        clientId={clientId}
-                        medicalContacts={medicalContacts}
-                        professionals={professionals}
-                        onKindChange={setSmartKind}
-                        onTreatmentTypeChange={setTreatmentType}
-                        onChange={setDraft}
-                      />
-                    ) : selection.kind === "step" && draft ? (
-                      <StepEditor draft={draft} dateOfBirth={dateOfBirth} onChange={setDraft} />
-                    ) : draft ? (
-                      <EventEditor
-                        draft={draft}
-                        dateOfBirth={dateOfBirth}
-                        relationships={people}
-                        events={shown}
-                        clientId={clientId}
-                        medicalContacts={medicalContacts}
-                        professionals={professionals}
-                        onChange={setDraft}
-                        lockContext
-                      />
-                    ) : null}
-                    <div className="mt-4 space-y-3">
-                      {selection.kind === "new_event" && draft ? (
-                        <div className="flex flex-wrap gap-2">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              void save().then(() => {
-                                /* after save, selection becomes entry — add step from there */
-                              })
-                            }}
-                          >
-                            Add step
-                          </Button>
-                          <Button type="button" size="sm" disabled={pending} onClick={() => void save()}>
-                            Done
-                          </Button>
-                        </div>
-                      ) : null}
-                      {showAddStep && entry && selection.kind !== "new_event" ? (
-                        <Button type="button" variant="outline" size="sm" onClick={() => startStep(entry)}>
-                          Add step
-                        </Button>
-                      ) : null}
-                      {selection.kind === "new_event" ? null : (
-                        <SaveRow
-                          pending={pending}
-                          error={error}
-                          onSave={() => void save()}
-                          extra={
-                            <>
-                              <Button type="button" variant="ghost" size="sm" disabled={pending} onClick={cancel}>
-                                Cancel
-                              </Button>
-                              {isNew ? null : (
-                                <Button type="button" variant="ghost" size="sm" disabled={pending} onClick={() => void remove()}>
-                                  Remove
-                                </Button>
-                              )}
-                            </>
-                          }
-                        />
-                      )}
-                      {selection.kind === "new_event" && error ? (
-                        <p className="text-sm text-destructive">{error}</p>
-                      ) : null}
-                    </div>
-                  </>
+                ) : null
+              }
+              footer={
+                mode === "edit" ? (
+                  <SidePanelFooter
+                    saving={pending}
+                    onCancel={cancel}
+                    onSave={() => void save()}
+                    saveLabel="Save"
+                    onRemove={isNew ? undefined : () => void remove()}
+                  />
                 ) : (
-                  <>
-                    {draft ? <EntryDetails entry={draft} dateOfBirth={dateOfBirth} /> : null}
-                    {selectedIssue ? (
-                      <p className="mt-2 text-sm text-muted-foreground">
-                        Treatment: {treatmentAnswerText(selectedIssue.treatmentAnswer)}
-                      </p>
-                    ) : null}
-                    <div className="mt-6 flex flex-wrap gap-2">
-                      {showAddStep && entry ? (
-                        <Button type="button" variant="outline" size="sm" onClick={() => startStep(entry)}>
-                          Add step
-                        </Button>
-                      ) : null}
-                      <Button type="button" size="sm" onClick={() => setMode("edit")}>
-                        Edit
-                      </Button>
-                    </div>
-                    {error ? <p className="mt-2 text-sm text-destructive">{error}</p> : null}
-                  </>
-                )}
-              </aside>
-            </div>,
+                  <SidePanelInfoFooter onEdit={() => setMode("edit")} />
+                )
+              }
+            >
+              {mode === "edit" ? (
+                <>
+                  {selection.kind === "new_issue" && issueDraft && draft ? (
+                    <NewIssueForm
+                      draft={issueDraft}
+                      firstEpisode={draft}
+                      dateOfBirth={dateOfBirth}
+                      relationships={people}
+                      onIssueChange={setIssueDraft}
+                      onEpisodeChange={setDraft}
+                      onAddPerson={startUnplacedPersonDraft}
+                    />
+                  ) : selection.kind === "new_event" && draft ? (
+                    <NewEventForm
+                      draft={draft}
+                      kind={smartKind}
+                      treatmentType={treatmentType}
+                      category={selection.category ?? null}
+                      dateOfBirth={dateOfBirth}
+                      clientId={clientId}
+                      medicalContacts={medicalContacts}
+                      professionals={professionals}
+                      onKindChange={setSmartKind}
+                      onTreatmentTypeChange={setTreatmentType}
+                      onChange={setDraft}
+                    />
+                  ) : selection.kind === "step" && draft ? (
+                    <StepEditor draft={draft} dateOfBirth={dateOfBirth} onChange={setDraft} />
+                  ) : draft ? (
+                    <EventEditor
+                      draft={draft}
+                      dateOfBirth={dateOfBirth}
+                      relationships={people}
+                      events={shown}
+                      clientId={clientId}
+                      medicalContacts={medicalContacts}
+                      professionals={professionals}
+                      onChange={setDraft}
+                      lockContext
+                    />
+                  ) : null}
+                  {error ? <p className="mt-2 text-sm text-destructive">{error}</p> : null}
+                </>
+              ) : (
+                <>
+                  {selection.kind === "issue" && selectedIssue ? (
+                    <>
+                      <PanelInfoFields groups={issueInfoGroups(selectedIssue, draft)} />
+                      <PanelConnectedGroup
+                        index={2}
+                        links={shown
+                          .filter((event) => event.conditionGroupId === selectedIssue.issueId && !event.parentEventId)
+                          .map((event) => ({
+                            id: event.eventRecordId,
+                            label: `${EVENT_TYPE_LABELS[event.eventType] ?? event.eventType} · ${dated(event.startPrecision, event.startValue, dateOfBirth) || "No date"}`,
+                            onOpen: () => openEntry(event.eventRecordId),
+                          }))}
+                        empty="No events"
+                      />
+                    </>
+                  ) : draft ? (
+                    <PanelInfoFields groups={eventInfoGroups(draft)} />
+                  ) : null}
+                  {error ? <p className="mt-2 text-sm text-destructive">{error}</p> : null}
+                </>
+              )}
+            </SidePanel>,
             document.body
           )
         : null}
@@ -823,6 +819,7 @@ export function HistoryTreeSection({
         ? createPortal(
             <RelationshipPanelShell
               ariaLabel="New person"
+              title="New person"
               onDismiss={() => {
                 setUnplacedDraftOpen(false)
                 setUnplacedDraftError(null)
@@ -846,15 +843,13 @@ export function HistoryTreeSection({
             document.body
           )
         : null}
+      <DiscardChangesDialog
+        open={confirmDiscard}
+        onKeepEditing={() => setConfirmDiscard(false)}
+        onDiscard={close}
+      />
     </div>
   )
-}
-
-function treatmentAnswerText(answer: TreatmentAnswer | ""): string {
-  if (answer === "none") return "None"
-  if (answer === "not_asked") return "not asked"
-  if (answer === "yes") return "Yes"
-  return ""
 }
 
 function StepEditor({
@@ -903,31 +898,10 @@ function StepEditor({
   )
 }
 
-function EntryDetails({ entry, dateOfBirth }: { entry: EventRecord; dateOfBirth: string | null }) {
-  const endOngoing = entry.endOngoing || entry.resolvedOrOngoing === "ongoing"
-  return (
-    <div className="space-y-4">
-      <ReadOnlyField label="Type" value={EVENT_TYPE_LABELS[entry.eventType]} />
-      <ReadOnlyField label="Title" value={entry.title} />
-      <ReadOnlyField label="Start" value={dated(entry.startPrecision, entry.startValue, dateOfBirth)} />
-      <ReadOnlyField
-        label="End"
-        value={endOngoing ? ongoingEnd(entry, dateOfBirth) : dated(entry.endPrecision, entry.endValue, dateOfBirth)}
-      />
-      <ReadOnlyField label="Description" value={entry.description} />
-    </div>
-  )
-}
-
 function dated(precision: StartPrecision | "", value: string, dateOfBirth: string | null): string {
   const when = formatPartialWhen(precision, value)
   const age = clientAgeAtStart(dateOfBirth, precision, value)
   return [when, age != null ? `age ${age}` : ""].filter(Boolean).join(" · ")
-}
-
-function ongoingEnd(entry: EventRecord, dateOfBirth: string | null): string {
-  const age = clientAgeAtStart(dateOfBirth, entry.startPrecision, entry.startValue)
-  return age != null ? `Ongoing · from age ${age}` : "Ongoing"
 }
 
 function TreeCard({ title, children }: { title: string; children: ReactNode }) {
@@ -945,10 +919,9 @@ type SectionBodyProps = {
   nodes: HistoryTreeNode[]
   about: "self" | "significant_other"
   onOpen: (id: string) => void
-  onAddEvent?: (issueId: string, about: "self" | "significant_other") => void
+  onAddEvent?: (issueId: string, about: "self" | "significant_other", initialKind?: SmartEventKind) => void
   onAddNestedEvent?: (parentEventId: string, about: "self" | "significant_other") => void
   onAddCategory?: (about: "self" | "significant_other", eventType: EventType) => void
-  onTreatmentAnswer?: (issueId: string, value: TreatmentAnswer | "") => void
   onScreeningChange?: (key: HistoryQuestionKey, answer: ScreeningAnswer | "") => void
   hideScreeningControls?: boolean
   applyScreeningFilter?: boolean
@@ -977,7 +950,6 @@ function CategoryBlock({
   onAddEvent,
   onAddNestedEvent,
   onAddCategory,
-  onTreatmentAnswer,
   onScreeningChange,
   hideScreeningControls = false,
   applyScreeningFilter = false,
@@ -1008,13 +980,17 @@ function CategoryBlock({
         ? node.children.filter((child) => child.kind !== "note")
         : node.children
   const eventType = question?.eventType
-  const addLabel = historyCategoryAddLabel(node.title)
   const showScreeningSelect = Boolean(onScreeningChange && key && !hideScreeningControls)
+  const categoryMode = question?.mode === "event" ? "event" : "condition"
+  const headingAdd =
+    !readOnly && onAddCategory && eventType && (shown === "yes" || !onScreeningChange)
+      ? historyTreeAddChoices({ type: "heading", mode: categoryMode })
+      : null
 
   return (
     <div id={key ? `check-history-${key}` : undefined} className="scroll-mt-28 space-y-2">
       <div className="flex flex-wrap items-center gap-2">
-        <h3 className={treeLayer1ClassName}>{node.title}</h3>
+        <h3 className={cn(treeLayer1ClassName, "min-w-0 flex-1")}>{node.title}</h3>
         {showScreeningSelect ? (
           <TreeInlineSelect
             id={`history_${key}`}
@@ -1032,6 +1008,13 @@ function CategoryBlock({
             <option value="not_asked">Not asked</option>
           </TreeInlineSelect>
         ) : null}
+        {headingAdd && eventType ? (
+          <TreeAddControl
+            choices={headingAdd}
+            aria-label={`Add under ${node.title}`}
+            onSelect={() => onAddCategory!(about, eventType)}
+          />
+        ) : null}
       </div>
       {suggestion && onScreeningChange && !hideScreeningControls ? (
         <ClientAnswer
@@ -1048,19 +1031,9 @@ function CategoryBlock({
           onOpen={onOpen}
           onAddEvent={onAddEvent}
           onAddNestedEvent={onAddNestedEvent}
-          onTreatmentAnswer={onTreatmentAnswer}
           selectedId={selectedId}
           readOnly={readOnly}
         />
-      ) : null}
-      {!readOnly && onAddCategory && eventType && (shown === "yes" || !onScreeningChange) ? (
-        <button
-          type="button"
-          className="px-1 text-sm text-primary underline-offset-2 hover:underline"
-          onClick={() => onAddCategory(about, eventType)}
-        >
-          {addLabel}
-        </button>
       ) : null}
     </div>
   )
@@ -1073,7 +1046,6 @@ function ConnectedList({
   onOpen,
   onAddEvent,
   onAddNestedEvent,
-  onTreatmentAnswer,
   selectedId,
   readOnly,
 }: {
@@ -1082,14 +1054,13 @@ function ConnectedList({
   /** Visual layer for bands/rows in this list (2 under a category, 3 under an item). */
   itemLayer: 2 | 3 | 4
   onOpen: (id: string) => void
-  onAddEvent?: (issueId: string, about: "self" | "significant_other") => void
+  onAddEvent?: (issueId: string, about: "self" | "significant_other", initialKind?: SmartEventKind) => void
   onAddNestedEvent?: (parentEventId: string, about: "self" | "significant_other") => void
-  onTreatmentAnswer?: (issueId: string, value: TreatmentAnswer | "") => void
   selectedId: string | null
   readOnly?: boolean
 }) {
   return (
-    <ul>
+    <ul className="space-y-0.5">
       {nodes.map((node, index) => {
         const isLast = index === nodes.length - 1
         if (node.kind === "note") {
@@ -1102,57 +1073,33 @@ function ConnectedList({
         if (node.kind === "band") {
           const layer = historyVisualLayer("band", { parentLayer: 1 })
           const selected = selectedId === node.id
+          const issueAdd = !readOnly && onAddEvent ? historyTreeAddChoices({ type: "issue" }) : null
           return (
             <TreeBranch key={nodeKey(node, index)} intoLayer={layer} isLast={isLast}>
-              <button
-                type="button"
-                aria-current={selected ? "true" : undefined}
-                className={cn(treeLayer2ShellClassName, treeItemStateClassName({ selected, square: true }))}
-                onClick={() => onOpen(node.id)}
+              <TreeLineRow
+                layer={2}
+                selected={selected}
+                onOpen={() => onOpen(node.id)}
+                addChoices={issueAdd}
+                addAriaLabel={`Add under ${node.heading}`}
+                onAdd={(choiceId) => {
+                  const kind =
+                    choiceId === "treatment" ? "treatment" : choiceId === "other" ? "other" : "episode"
+                  onAddEvent?.(node.id, about, kind)
+                }}
               >
-                <span className={cn(treeLayer2TitleClassName, treeSelectedTitleClassName(selected))}>{node.heading}</span>
+                <span className={cn(treeLayer2TitleClassName, treeSelectedTitleClassName(selected))}>
+                  {node.heading}
+                </span>
                 {node.meta ? (
-                  <span className={cn(treeLayer2MetaClassName, selected && "text-[#1e3a8a]")}>{node.meta}</span>
-                ) : null}
-                {node.needsWho ? (
-                  <span className={cn("mt-1 w-fit", statusColours.attention.pill)}>
-                    Needs who
+                  <span className={cn(treeLayer2MetaClassName, treeSelectedTitleClassName(selected))}>
+                    {node.meta}
                   </span>
                 ) : null}
-              </button>
-              {readOnly && node.treatmentAnswer ? (
-                <p className="px-1 py-1 text-xs text-muted-foreground">
-                  Treatment: {treatmentAnswerText(node.treatmentAnswer)}
-                </p>
-              ) : null}
-              {!readOnly && onTreatmentAnswer ? (
-                <div className="py-1 pl-1">
-                  <TreeInlineSelect
-                    id={`treatment_${node.id}`}
-                    label="Treatment"
-                    value={node.treatmentAnswer || ""}
-                    disabled={Boolean(node.children.some((child) => child.kind === "row" && child.tag === "Treatment"))}
-                    onChange={(next) => {
-                      const value = next === "yes" || next === "none" || next === "not_asked" ? next : ""
-                      onTreatmentAnswer(node.id, value)
-                    }}
-                  >
-                    <option value="">Select…</option>
-                    {TREATMENT_ANSWERS.map((option) => (
-                      <option
-                        key={option}
-                        value={option}
-                        disabled={
-                          node.children.some((child) => child.kind === "row" && child.tag === "Treatment") &&
-                          option !== "yes"
-                        }
-                      >
-                        {TREATMENT_ANSWER_LABELS[option]}
-                      </option>
-                    ))}
-                  </TreeInlineSelect>
-                </div>
-              ) : null}
+                {node.needsWho ? (
+                  <span className={cn("mt-1 w-fit", statusColours.attention.pill)}>Needs who</span>
+                ) : null}
+              </TreeLineRow>
               {node.children.length > 0 ? (
                 <ConnectedList
                   nodes={node.children}
@@ -1161,40 +1108,20 @@ function ConnectedList({
                   onOpen={onOpen}
                   onAddEvent={onAddEvent}
                   onAddNestedEvent={onAddNestedEvent}
-                  onTreatmentAnswer={onTreatmentAnswer}
                   selectedId={selectedId}
                   readOnly={readOnly}
                 />
-              ) : null}
-              {!readOnly && onAddEvent ? (
-                <div className="flex flex-wrap gap-3 px-1 py-1 text-sm">
-                  <button
-                    type="button"
-                    className="text-primary underline-offset-2 hover:underline"
-                    onClick={() => onAddEvent(node.id, about)}
-                  >
-                    + Add event
-                  </button>
-                </div>
               ) : null}
             </TreeBranch>
           )
         }
         if (node.kind === "row") {
           const isStep = node.tag === "Step"
-          const layer = historyVisualLayer("row", { parentLayer: itemLayer === 2 ? 1 : 2, tag: node.tag })
-          // When this list is already under an item (itemLayer 3+), rows stay at that layer
-          // unless they are steps (always 4). Category-level rows use layer 2.
+          void historyVisualLayer("row", { parentLayer: itemLayer === 2 ? 1 : 2, tag: node.tag })
           const visualLayer: 2 | 3 | 4 = isStep ? 4 : itemLayer === 2 ? 2 : itemLayer === 3 ? 3 : 4
           const selected = selectedId === node.id
           const { title, meta } = splitLine(node.line)
           const rowChildren = node.children.filter((child) => child.kind !== "actions")
-          const shell =
-            visualLayer === 2
-              ? treeLayer2ShellClassName
-              : visualLayer === 4
-                ? treeLayer4ShellClassName
-                : treeLayer3ShellClassName
           const titleClass =
             visualLayer === 2
               ? treeLayer2TitleClassName
@@ -1207,31 +1134,47 @@ function ConnectedList({
               : visualLayer === 4
                 ? treeLayer4MetaClassName
                 : treeLayer3MetaClassName
-          void layer
+          const nestable =
+            !readOnly &&
+            !isStep &&
+            onAddNestedEvent &&
+            node.tag !== "Episode" &&
+            node.tag !== "Treatment" &&
+            node.tag !== "Other"
+          const stepAdd =
+            !readOnly &&
+            !isStep &&
+            (node.tag === "Episode" || node.tag === "Treatment" || node.tag === "Other")
+              ? historyTreeAddChoices({ type: "event_with_steps" })
+              : null
+          const nestAdd = nestable ? historyTreeAddChoices({ type: "nestable_event" }) : null
+          const rowAdd = stepAdd ?? nestAdd
           return (
-            <TreeBranch
-              key={nodeKey(node, index)}
-              intoLayer={visualLayer}
-              isLast={isLast}
-              dashed={isStep}
-            >
-              <button
-                type="button"
-                aria-current={selected ? "true" : undefined}
-                className={cn(
-                  shell,
-                  treeItemStateClassName({ selected, square: visualLayer === 2 })
-                )}
-                onClick={() => onOpen(node.id)}
+            <TreeBranch key={nodeKey(node, index)} intoLayer={visualLayer} isLast={isLast}>
+              <TreeLineRow
+                layer={visualLayer}
+                selected={selected}
+                onOpen={() => onOpen(node.id)}
+                addChoices={rowAdd}
+                addAriaLabel={`Add under ${title}`}
+                onAdd={(choiceId) => {
+                  if (stepAdd && (choiceId === "step" || !choiceId)) {
+                    onAddNestedEvent?.(node.id, about)
+                    return
+                  }
+                  onAddNestedEvent?.(node.id, about)
+                }}
               >
                 <span className="flex min-w-0 items-center gap-2">
                   {node.tag ? <Tag label={node.tag} /> : null}
-                  <span className={cn(titleClass, treeSelectedTitleClassName(selected), "min-w-0")}>{title}</span>
+                  <span className={cn(titleClass, treeSelectedTitleClassName(selected), "min-w-0")}>
+                    {title}
+                  </span>
                 </span>
                 {meta ? (
-                  <span className={cn(metaClass, selected && "text-[#1e3a8a]", "w-full")}>{meta}</span>
+                  <span className={cn(metaClass, treeSelectedTitleClassName(selected), "w-full")}>{meta}</span>
                 ) : null}
-              </button>
+              </TreeLineRow>
               {rowChildren.length > 0 ? (
                 <ConnectedList
                   nodes={rowChildren}
@@ -1240,26 +1183,9 @@ function ConnectedList({
                   onOpen={onOpen}
                   onAddEvent={onAddEvent}
                   onAddNestedEvent={onAddNestedEvent}
-                  onTreatmentAnswer={onTreatmentAnswer}
                   selectedId={selectedId}
                   readOnly={readOnly}
                 />
-              ) : null}
-              {!readOnly &&
-              !isStep &&
-              onAddNestedEvent &&
-              node.tag !== "Episode" &&
-              node.tag !== "Treatment" &&
-              node.tag !== "Other" ? (
-                <div className="flex flex-wrap gap-3 px-1 py-1 text-sm">
-                  <button
-                    type="button"
-                    className="text-primary underline-offset-2 hover:underline"
-                    onClick={() => onAddNestedEvent(node.id, about)}
-                  >
-                    + Add event
-                  </button>
-                </div>
               ) : null}
             </TreeBranch>
           )
@@ -1276,19 +1202,7 @@ function splitLine(line: string): { title: string; meta: string } {
 }
 
 function Tag({ label }: { label: "Episode" | "Treatment" | "Other" | "Step" }) {
-  return (
-    <span
-      className={cn(
-        "shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
-        label === "Episode" && "bg-secondary text-secondary-foreground",
-        label === "Treatment" && "bg-muted text-muted-foreground",
-        label === "Other" && "bg-zinc-200 text-zinc-700",
-        label === "Step" && "bg-zinc-100 text-zinc-700"
-      )}
-    >
-      {label}
-    </span>
-  )
+  return <span className={treeEventTagClassName}>{label}</span>
 }
 
 function nodeKey(node: HistoryTreeNode, index: number): string {

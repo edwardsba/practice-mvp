@@ -46,8 +46,16 @@ assert.deepEqual(addToRelationshipMenuOptions("parent_other"), [
   { role: "partner", label: "Partner" },
   { role: "sibling", label: "Sibling" },
 ])
-assert.deepEqual(addToRelationshipMenuOptions("caregiver_arrangement"), [])
-assert.deepEqual(addToRelationshipMenuOptions("biological_parents"), [])
+assert.deepEqual(addToRelationshipMenuOptions("caregiver_arrangement"), [
+  { role: "caregiver", label: "Caregiver" },
+  { role: "sibling", label: "Sibling" },
+])
+assert.deepEqual(addToRelationshipMenuOptions("biological_parents"), [
+  { role: "sibling", label: "Sibling" },
+])
+assert.deepEqual(addToRelationshipMenuOptions("client_other_children"), [
+  { role: "child", label: "Child" },
+])
 
 assert.equal(
   addToRelationshipMenuHeading({

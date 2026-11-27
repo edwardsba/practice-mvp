@@ -1,5 +1,7 @@
 "use client"
 
+import { SidePanelFooter } from "@/components/shared/side-panel"
+
 /**
  * Shared Cancel / Save footer for relationship person and draft forms.
  * Remove stays on the left for existing people only.
@@ -20,35 +22,15 @@ export function RelationshipEditFooter({
   onSave: () => void
 }) {
   return (
-    <footer className="flex items-center gap-2 border-t p-4">
-      {onRemove ? (
-        <button
-          type="button"
-          className="inline-flex min-h-10 items-center text-sm text-destructive underline-offset-2 hover:underline"
-          disabled={saving}
-          onClick={onRemove}
-        >
-          Remove
-        </button>
-      ) : null}
-      <span className="flex-1" />
-      <button
-        type="button"
-        className="inline-flex min-h-10 items-center rounded-md border px-3 text-sm"
-        disabled={saving}
-        onClick={onCancel}
-      >
-        Cancel
-      </button>
-      <button
-        type="button"
-        className="inline-flex min-h-10 items-center rounded-md bg-primary px-3 text-sm text-primary-foreground disabled:opacity-60"
-        disabled={saving || saveDisabled}
-        onClick={onSave}
-      >
-        {saveLabel}
-      </button>
-    </footer>
+    <SidePanelFooter
+      saving={saving}
+      saveDisabled={saveDisabled}
+      saveLabel={saveLabel}
+      onRemove={onRemove}
+      onCancel={onCancel}
+      onSave={onSave}
+      className="border-t-0"
+    />
   )
 }
 

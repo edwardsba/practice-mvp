@@ -22,8 +22,6 @@ import {
   SMART_EVENT_KINDS,
   SUBSTANCE_STATUSES,
   SUBSTANCE_STATUS_LABELS,
-  TREATMENT_ANSWERS,
-  TREATMENT_ANSWER_LABELS,
   TREATMENT_TYPE_CHOICE_LABELS,
   TREATMENT_TYPE_CHOICES,
   emptyEvent,
@@ -33,7 +31,6 @@ import {
   type HistoryIssue,
   type RelationshipRecord,
   type SmartEventKind,
-  type TreatmentAnswer,
   type TreatmentTypeChoice,
 } from "@/lib/client-background/types"
 import { PrescriberField } from "@/components/medical-contacts/prescriber-field"
@@ -163,24 +160,6 @@ export function NewIssueForm({
           <option value="ongoing">Ongoing</option>
         </SelectField>
       </div>
-      <SelectField
-        id="new_issue_treatment"
-        label="Treatment"
-        value={draft.treatmentAnswer || ""}
-        onChange={(value) =>
-          onIssueChange({
-            ...draft,
-            treatmentAnswer: value === "yes" || value === "none" || value === "not_asked" ? value : "",
-          })
-        }
-      >
-        <option value="">Select…</option>
-        {TREATMENT_ANSWERS.map((option) => (
-          <option key={option} value={option}>
-            {TREATMENT_ANSWER_LABELS[option]}
-          </option>
-        ))}
-      </SelectField>
     </div>
   )
 }

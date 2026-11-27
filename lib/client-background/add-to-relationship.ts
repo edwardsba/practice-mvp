@@ -1,3 +1,4 @@
+import { addChoicesForBlockKind } from "@/lib/client-background/tree-add"
 import {
   ARRANGEMENT_TYPE_LABELS,
   CURRENT_BLOCK_STATUS_LABELS,
@@ -16,23 +17,22 @@ export type AddToRelationshipOption = {
 }
 
 /**
- * Menu options for the round + on a relationship line.
+ * Menu options for ⊕ on a relationship line.
  * Intimate: Partner + Child. Parents' other: Partner + Sibling.
+ * Biological: Sibling. Caregiver: Caregiver + Sibling. Other children: Child.
  */
 export function addToRelationshipMenuOptions(kind: BlockKind): AddToRelationshipOption[] {
-  if (kind === "client_current" || kind === "client_previous") {
-    return [
-      { role: "partner", label: "Partner" },
-      { role: "child", label: "Child" },
-    ]
-  }
-  if (kind === "parent_other") {
-    return [
-      { role: "partner", label: "Partner" },
-      { role: "sibling", label: "Sibling" },
-    ]
-  }
-  return []
+  const choices = addChoicesForBlockKind(kind)
+  if (!choices) return []
+  return choices
+    .filter((choice) =>
+      choice.id === "partner" ||
+      choice.id === "child" ||
+      choice.id === "sibling" ||
+      choice.id === "caregiver" ||
+      choice.id === "parent"
+    )
+    .map((choice) => ({ role: choice.id as BlockRole, label: choice.label }))
 }
 
 export function relationshipLineSupportsAddMenu(kind: BlockKind): boolean {

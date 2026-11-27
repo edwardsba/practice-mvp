@@ -44,7 +44,35 @@ function shape(node: HistoryTreeNode): unknown {
   return { title: node.title, children: node.children.map(shape) }
 }
 
+assert.equal(tree.client.title, "Client history")
+assert.equal(tree.family.title, "Significant other history")
+
 assert.deepEqual(tree.client.children.map(shape), [
+  {
+    title: "Physical health",
+    children: [
+      {
+        heading: "Broken leg",
+        meta: "1982",
+        treatmentAnswer: "not_asked",
+        children: [{ line: "Episode 1 · 1982 · age 12", tag: "Episode" }],
+      },
+    ],
+  },
+  {
+    title: "Substance use",
+    children: [
+      {
+        heading: "Alcohol",
+        meta: "1988 – 2000",
+        treatmentAnswer: "yes",
+        children: [
+          { line: "Episode 1 · 1988–2000 · age 18 to 30", tag: "Episode" },
+          { line: "Residential rehab · 2000", tag: "Treatment" },
+        ],
+      },
+    ],
+  },
   {
     title: "Mental health",
     children: [
@@ -66,31 +94,6 @@ assert.deepEqual(tree.client.children.map(shape), [
     ],
   },
   {
-    title: "Substance use",
-    children: [
-      {
-        heading: "Alcohol",
-        meta: "1988 – 2000",
-        treatmentAnswer: "yes",
-        children: [
-          { line: "Episode 1 · 1988–2000 · age 18 to 30", tag: "Episode" },
-          { line: "Residential rehab · 2000", tag: "Treatment" },
-        ],
-      },
-    ],
-  },
-  {
-    title: "Physical health",
-    children: [
-      {
-        heading: "Broken leg",
-        meta: "1982",
-        treatmentAnswer: "not_asked",
-        children: [{ line: "Episode 1 · 1982 · age 12", tag: "Episode" }],
-      },
-    ],
-  },
-  {
     title: "Self-harm",
     children: [{ line: "Cutting · 1984–1986 · age 14 to 16", tag: undefined }],
   },
@@ -102,24 +105,10 @@ assert.deepEqual(tree.client.children.map(shape), [
     title: "Other significant events",
     children: [{ line: "Moved interstate · 1985 · age 15", tag: undefined }],
   },
-  {
-    title: "Other treatment not linked to an issue",
-    children: ["None"],
-  },
 ])
 
 assert.deepEqual(tree.family.children.map(shape), [
-  {
-    title: "Mental health",
-    children: [
-      {
-        heading: "Depression · Sally (mother)",
-        meta: "",
-        treatmentAnswer: "not_asked",
-        children: [{ line: "Episode 1", tag: "Episode" }],
-      },
-    ],
-  },
+  { title: "Physical health", children: ["None"] },
   {
     title: "Substance use",
     children: [
@@ -137,7 +126,17 @@ assert.deepEqual(tree.family.children.map(shape), [
       },
     ],
   },
-  { title: "Physical health", children: ["None"] },
+  {
+    title: "Mental health",
+    children: [
+      {
+        heading: "Depression · Sally (mother)",
+        meta: "",
+        treatmentAnswer: "not_asked",
+        children: [{ line: "Episode 1", tag: "Episode" }],
+      },
+    ],
+  },
   { title: "Self-harm", children: ["None"] },
   { title: "Significant events", children: ["None"] },
 ])

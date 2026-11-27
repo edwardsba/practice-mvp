@@ -13,7 +13,6 @@ import {
   saveLivingSituationAction,
   saveMedicareInterviewAction,
   saveOccupationAction,
-  saveStressorsAction,
   updateBlockMemberAction,
   type SaveMedicareInterviewState,
 } from "@/app/clients/[client_id]/background/actions"
@@ -28,12 +27,10 @@ import {
 } from "@/components/client-background/demographics-section"
 import { AutosaveFields, type SavePhase } from "@/components/client-background/interview-autosave"
 import {
-  InterviewSectionCard,
   readSectionOpenState,
   writeSectionOpenState,
 } from "@/components/client-background/interview-section-card"
 import { HistoryTreeSection } from "@/components/client-background/history-tree-section"
-import { StressorsFields } from "@/components/client-background/medication-stressors"
 import { RelationshipBlocksSection } from "@/components/client-background/relationship-blocks-section"
 import { scrollToBackgroundCheck, WorthCheckingLinks } from "@/components/client-background/worth-checking"
 import {
@@ -125,7 +122,6 @@ import type {
   RelationshipBlock,
   RelationshipBlockAnswers,
   RelationshipRecord,
-  StressorsRecord,
 } from "@/lib/client-background/types"
 import { emptyBlockAnswers } from "@/lib/client-background/types"
 import type { EmergencyContactRow } from "@/lib/crisis-plans/types"
@@ -262,7 +258,6 @@ export function InterviewPage({
   const [screening, setScreening] = useState(initialScreening)
   const [events, setEvents] = useState(data.events)
   const [issues, setIssues] = useState<HistoryIssue[]>(data.issues ?? [])
-  const stressorsRef = useRef(data.stressors)
   const [notFinishedOpen, setNotFinishedOpen] = useState(false)
   const [notFinishedSections, setNotFinishedSections] = useState<number[]>([])
   const [confirmPrefilledOpen, setConfirmPrefilledOpen] = useState(false)
@@ -339,7 +334,6 @@ export function InterviewPage({
     (current: {
       screening: ScreeningAnswers
       events: EventRecord[]
-      stressors: StressorsRecord
     }) =>
       backgroundChecks({
         data: {
@@ -354,7 +348,6 @@ export function InterviewPage({
             livingSituation: livingRef.current,
             occupation: occupationRef.current,
           },
-          stressors: current.stressors,
           events: current.events,
         },
         numberOfChildren: selfReport?.answers.familyHome.numberOfChildren ?? null,
@@ -531,7 +524,6 @@ export function InterviewPage({
     const base = getChecks({
       screening,
       events,
-      stressors: stressorsRef.current,
     })
     const contradictionChecks = contradictionNotes.map((note) => {
       const target: BackgroundCheck["target"] =
@@ -1196,39 +1188,6 @@ export function InterviewPage({
           )
         })}
 
-        <InterviewSectionCard
-          title="Stressors"
-          open={Boolean(sectionOpen.Stressors)}
-          onToggle={() => toggleSection("Stressors")}
-        >
-          <AutosaveFields
-            saved={data.stressors}
-            save={async (value) => {
-              stressorsRef.current = value
-              const result = await saveStressorsAction(clientId, value)
-              if (result.error || !("stressors" in result) || !result.stressors) {
-                return { error: result.error ?? "Could not save stressors." }
-              }
-              stressorsRef.current = result.stressors
-              return { value: result.stressors }
-            }}
-            onPhase={(phase, retry) => onPhase("stressors", phase, retry)}
-            registerFlush={registerFlush}
-          >
-            {(value, onChange, commit) => {
-              stressorsRef.current = value
-              return (
-                <StressorsFields
-                  idPrefix="interview_stressors"
-                  value={value}
-                  onChange={onChange}
-                  onCommit={commit}
-                  client={suggestions?.stressors}
-                />
-              )
-            }}
-          </AutosaveFields>
-        </InterviewSectionCard>
       </div>
 
       <Dialog

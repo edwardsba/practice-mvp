@@ -24,7 +24,6 @@ const SECTIONS = [
   { id: "living", label: "Living situation" },
   { id: "history", label: "History" },
   { id: "stressors", label: "Stressors" },
-  { id: "risk", label: "Risk" },
 ] as const
 
 type SectionId = (typeof SECTIONS)[number]["id"]
@@ -62,8 +61,7 @@ export function ClientBackgroundPage({
       target === "stressors" ||
       target === "relationships" ||
       target === "living" ||
-      target === "history" ||
-      target === "risk"
+      target === "history"
         ? target
         : target.startsWith("history")
           ? "history"
@@ -155,11 +153,6 @@ export function ClientBackgroundPage({
           ) : null}
           {item.id === "stressors" ? (
             <BackgroundStressorsSection clientId={clientId} stressors={data.stressors} />
-          ) : null}
-          {item.id === "risk" ? (
-            <p className="text-sm text-muted-foreground">
-              The read-only Risk view is not part of this release yet.
-            </p>
           ) : null}
         </SectionCard>
       ))}

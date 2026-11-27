@@ -83,7 +83,7 @@ const newIssueCtx = resolveFormContext({
 })
 assert.equal(
   formatContextStrip(newIssueCtx.lines),
-  "About: Family and significant others · Category: Mental health"
+  "About: Significant other history · Category: Mental health"
 )
 assert.equal(newIssueCtx.about, "significant_other")
 

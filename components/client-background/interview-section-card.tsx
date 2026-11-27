@@ -42,7 +42,7 @@ export function InterviewSectionCard({
   )
 }
 
-export type InterviewOpenPage = "background" | "history" | "interview"
+export type InterviewOpenPage = "interview"
 
 export function sectionOpenStorageKey(clientId: string, page: InterviewOpenPage): string {
   return `background-interview-sections:${clientId}:${page}`

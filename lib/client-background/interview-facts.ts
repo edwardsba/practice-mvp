@@ -420,21 +420,7 @@ export function formatHistoryCategoryFacts(
       lines.push(bits.join(", "))
     }
   }
-  if (question.mode === "other_treatment") {
-    for (const event of events.filter(
-      (item) =>
-        item.about === about &&
-        (item.eventType === "other_treatment" ||
-          item.eventType === "previous_therapy" ||
-          item.eventType === "medication" ||
-          item.eventType === "psychiatric_admission") &&
-        !item.conditionGroupId
-    )) {
-      const title = event.title.trim() || EVENT_TYPE_LABELS[event.eventType]
-      const when = event.startValue.trim()
-      lines.push(when ? `${title} (${when})` : title)
-    }
-  } else if (eventType) {
+  if (eventType) {
     for (const event of events.filter(
       (item) => item.about === about && !item.conditionGroupId && item.eventType === eventType
     )) {

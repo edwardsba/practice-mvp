@@ -140,7 +140,7 @@ export function resolveFormContext(
     } else if (aboutOther) {
       lines.push({ key: "about", label: "About", text: aboutOther })
     } else {
-      lines.push({ key: "about", label: "About", text: "Family and significant others" })
+      lines.push({ key: "about", label: "About", text: "Significant other history" })
     }
 
     if (issue && category) {

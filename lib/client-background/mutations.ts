@@ -58,13 +58,11 @@ import {
 import {
   demographicsFromStored,
   sanitizeClientRelationshipStatus,
-  markUnansweredStressors,
   sanitizeEducation,
   sanitizeEvent,
   sanitizeIdentity,
   sanitizeLivingSituation,
   sanitizeOccupation,
-  sanitizeRisk,
   sanitizeStressors,
 } from "@/lib/client-background/sanitize"
 import {
@@ -75,8 +73,8 @@ import {
   type IdentityFields,
   type LivingSituationFields,
   type OccupationFields,
-  type StressorsRecord,
   type RiskRatings,
+  type StressorsRecord,
 } from "@/lib/client-background/types"
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0]
@@ -523,20 +521,6 @@ export async function saveClientRelationshipStatus(input: {
     return { error: undefined, ...saved }
   } catch {
     return { error: "Could not save relationship status." }
-  }
-}
-
-export async function saveRisk(
-  input: { clientId: string; practiceId: string; userId: string; risk: unknown }
-) {
-  const risk = sanitizeRisk(input.risk)
-  try {
-    const result = await upsertBackgroundColumn(input.clientId, input.practiceId, input.userId, {
-      riskJson: risk,
-    })
-    return { ...result, risk }
-  } catch {
-    return { error: "Could not save risk ratings." }
   }
 }
 
@@ -1538,30 +1522,7 @@ export async function completeBackgroundInterview(input: {
       )
       const completedAt = new Date()
       const demographics = background ? demographicsFromStored(background) : emptyDemographics()
-      const filled = markUnansweredStressors(sanitizeStressors(background?.stressorsJson))
-      if (filled.changed) {
-        if (background) {
-          await tx
-            .update(clientBackgrounds)
-            .set({
-              stressorsJson: filled.stressors,
-              updatedAt: completedAt,
-            })
-            .where(
-              and(
-                eq(clientBackgrounds.clientBackgroundId, background.clientBackgroundId),
-                eq(clientBackgrounds.practiceId, input.practiceId)
-              )
-            )
-        } else {
-          await tx.insert(clientBackgrounds).values({
-            clientId: input.clientId,
-            practiceId: input.practiceId,
-            stressorsJson: filled.stressors,
-            updatedAt: completedAt,
-          })
-        }
-      }
+      const stressors = sanitizeStressors(background?.stressorsJson)
       const selfReportId = await verifiedSelfReportId(
         tx,
         input.clientId,
@@ -1574,7 +1535,7 @@ export async function completeBackgroundInterview(input: {
         relationships: family.people,
         events,
         screening,
-        stressors: filled.stressors,
+        stressors,
         answers,
       }
 

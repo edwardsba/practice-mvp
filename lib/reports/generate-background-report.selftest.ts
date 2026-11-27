@@ -17,9 +17,12 @@ import {
   lowerKeepingTypedCase,
   numberedLetterOutline,
   chooseReportInterviews,
+  REPORT_CLIENT_HISTORY_KEYS,
+  REPORT_FAMILY_HISTORY_KEYS,
   type BackgroundReportReferralInfo,
   type BackgroundReportSource,
 } from "@/lib/reports/generate-background-report"
+import { HISTORY_QUESTION_GROUPS } from "@/lib/client-background/interview-history"
 import type { LetterBodyNode } from "@/lib/reports/letter-body-types"
 
 function person(
@@ -237,7 +240,6 @@ function benSource(): BackgroundReportSource {
     substance_use: "no",
     self_harm: "yes",
     other_significant_events: "no",
-    other_treatment: "no",
     family_illness: "no",
     family_emotional_problems: "yes",
     family_substance_use: "no",
@@ -1389,5 +1391,25 @@ assert.equal(
   generateBackgroundReport(namedReferrer).omitted.some((item) => item.message === "Referral: who referred the client not recorded"),
   false
 )
+
+// Round AN: report history order stays pinned (pre-reorder), not interview UI order.
+assert.deepEqual([...REPORT_CLIENT_HISTORY_KEYS], [
+  "emotional_problems",
+  "substance_use",
+  "illness_injury",
+  "self_harm",
+  "traumatic_events",
+  "other_significant_events",
+])
+assert.deepEqual([...REPORT_FAMILY_HISTORY_KEYS], [
+  "family_emotional_problems",
+  "family_substance_use",
+  "family_illness",
+  "family_self_harm",
+  "family_significant_events",
+])
+assert.notDeepEqual([...REPORT_CLIENT_HISTORY_KEYS], [...HISTORY_QUESTION_GROUPS[0].keys])
+assert.notDeepEqual([...REPORT_FAMILY_HISTORY_KEYS], [...HISTORY_QUESTION_GROUPS[1].keys])
+assert.equal(REPORT_CLIENT_HISTORY_KEYS.includes("other_treatment" as never), false)
 
 console.log("generate-background-report self-test passed")

@@ -11,7 +11,10 @@ import {
   type StatusItem,
 } from "@/lib/section-status"
 import type { HistoryQuestionKey } from "@/lib/client-background/interview-history"
-import { HISTORY_QUESTION_GROUPS } from "@/lib/client-background/interview-history"
+import {
+  HISTORY_QUESTION_GROUPS,
+  HISTORY_QUESTIONS,
+} from "@/lib/client-background/interview-history"
 import type { BlockAnswer, RelationshipBlockAnswers } from "@/lib/client-background/types"
 import type { ScreeningAnswer, ScreeningAnswers } from "@/lib/client-background/interview-history"
 
@@ -55,19 +58,15 @@ export type InterviewItemDef = {
 const CLIENT_HISTORY_KEYS = HISTORY_QUESTION_GROUPS[0].keys
 const FAMILY_HISTORY_KEYS = HISTORY_QUESTION_GROUPS[1].keys
 
-const HISTORY_LABELS: Record<string, string> = {
-  emotional_problems: "Mental health",
-  substance_use: "Substance use",
-  illness_injury: "Physical health",
-  self_harm: "Self-harm",
-  traumatic_events: "Traumatic events",
-  other_significant_events: "Other significant events",
-  other_treatment: "Other treatment not linked to an issue",
-  family_emotional_problems: "Mental health",
-  family_substance_use: "Substance use",
-  family_illness: "Physical health",
-  family_self_harm: "Self-harm",
-  family_significant_events: "Significant events",
+function numberedHistoryItems(
+  prefix: "s8" | "s9",
+  keys: readonly HistoryQuestionKey[]
+): InterviewItemDef[] {
+  return keys.map((key, index) => ({
+    key: `${prefix}_${key}`,
+    label: `${index + 1}. ${HISTORY_QUESTIONS[key].label}`,
+    kind: "yna" as const,
+  }))
 }
 
 /** Allowed answer values for each item kind — single source of truth for save + sanitize. */
@@ -176,22 +175,14 @@ export const INTERVIEW_SECTIONS: InterviewSectionDef[] = [
     id: "client-history",
     title: "Client history",
     nothingToRecord: true,
-    items: CLIENT_HISTORY_KEYS.map((key) => ({
-      key: `s8_${key}`,
-      label: HISTORY_LABELS[key] ?? key,
-      kind: "yna" as const,
-    })),
+    items: numberedHistoryItems("s8", CLIENT_HISTORY_KEYS),
   },
   {
     number: 9,
     id: "significant-other-history",
-    title: "Significant other history",
+    title: HISTORY_QUESTION_GROUPS[1].title,
     nothingToRecord: true,
-    items: FAMILY_HISTORY_KEYS.map((key) => ({
-      key: `s9_${key}`,
-      label: HISTORY_LABELS[key] ?? key,
-      kind: "yna" as const,
-    })),
+    items: numberedHistoryItems("s9", FAMILY_HISTORY_KEYS),
   },
 ]
 

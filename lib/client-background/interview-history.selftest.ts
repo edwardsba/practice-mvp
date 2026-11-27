@@ -3,6 +3,7 @@ import assert from "node:assert/strict"
 import {
   HISTORY_QUESTION_GROUPS,
   HISTORY_QUESTION_KEYS,
+  HISTORY_QUESTIONS,
   answeredInterviewCount,
   backgroundInterviewSourceLine,
   historyQuestionKeyForEvent,
@@ -38,8 +39,9 @@ const expected: { key: HistoryQuestionKey; event: ReturnType<typeof entry> }[] =
     key: "other_significant_events",
     event: entry("significant_history", { about: "self", startPrecision: "date", startValue: "2018-06-14" }),
   },
+  // Unlinked treatments are not a screening category — they fall to significant events.
   {
-    key: "other_treatment",
+    key: "other_significant_events",
     event: entry("psychiatric_admission", { about: "self" }),
   },
   {
@@ -53,35 +55,32 @@ const expected: { key: HistoryQuestionKey; event: ReturnType<typeof entry> }[] =
   { key: "family_significant_events", event: entry("significant_history", { about: "significant_other" }) },
 ]
 
-const seen = new Set<HistoryQuestionKey>()
 for (const item of expected) {
   const key = historyQuestionKeyForEvent(item.event, BIRTH)
-  assert.equal(key, item.key)
-  seen.add(key)
+  assert.equal(key, item.key, `${item.event.eventType} → ${item.key}`)
 }
 
-assert.equal(seen.has("other_treatment"), true)
+assert.equal("other_treatment" in HISTORY_QUESTIONS, false)
 assert.deepEqual(
   HISTORY_QUESTION_GROUPS.map((group) => ({ title: group.title, keys: [...group.keys] })),
   [
     {
       title: "Client history",
       keys: [
-        "emotional_problems",
-        "substance_use",
         "illness_injury",
+        "substance_use",
+        "emotional_problems",
         "self_harm",
         "traumatic_events",
         "other_significant_events",
-        "other_treatment",
       ],
     },
     {
-      title: "Family and significant others",
+      title: "Significant other history",
       keys: [
-        "family_emotional_problems",
-        "family_substance_use",
         "family_illness",
+        "family_substance_use",
+        "family_emotional_problems",
         "family_self_harm",
         "family_significant_events",
       ],
@@ -103,8 +102,8 @@ const issues: HistoryIssue[] = [
 ]
 
 const gaps = unansweredInterviewLabels({}, [], null, emptyStressors(), issues)
-assert.deepEqual(gaps.slice(0, 2), ["Mental health", "Substance use"])
-assert.ok(gaps.includes("Other treatment not linked to an issue"))
+assert.deepEqual(gaps.slice(0, 3), ["Physical health", "Substance use", "Mental health"])
+assert.equal(gaps.includes("Other treatment not linked to an issue"), false)
 assert.ok(gaps.includes("Treatment (Depression)"))
 assert.ok(gaps.includes("Significant events"))
 assert.equal(gaps.includes("Hospital admission"), false)
@@ -115,7 +114,7 @@ assert.equal(gaps.length, HISTORY_QUESTION_KEYS.length + 1 + 9)
 
 const answeredStressors: StressorsRecord = { ...emptyStressors(), family: "yes", financial: "no" }
 const remaining = unansweredInterviewLabels({}, [], null, answeredStressors, [])
-assert.equal(remaining[0], "Mental health")
+assert.equal(remaining[0], "Physical health")
 assert.equal(remaining.includes("Family"), false)
 assert.equal(remaining.includes("Financial"), false)
 assert.ok(remaining.includes("Social life"))

@@ -249,8 +249,10 @@ export function InterviewPage({
     }),
     [emergencyContactRows, medicalContactItems]
   )
-  const [interviewAnswers, setInterviewAnswers] = useState(() =>
-    dropMissingPerRecordAnswers(initialAnswers, livingContactIds)
+  const [interviewAnswersRaw, setInterviewAnswers] = useState(initialAnswers)
+  const interviewAnswers = useMemo(
+    () => dropMissingPerRecordAnswers(interviewAnswersRaw, livingContactIds),
+    [interviewAnswersRaw, livingContactIds]
   )
   const [screening, setScreening] = useState(initialScreening)
   const [events, setEvents] = useState(data.events)
@@ -276,11 +278,6 @@ export function InterviewPage({
     // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional hydrate from sessionStorage
     setSectionOpen(readSectionOpenState(clientId, "interview"))
   }, [clientId])
-
-  useEffect(() => {
-    setInterviewAnswers((current) => dropMissingPerRecordAnswers(current, livingContactIds))
-  }, [livingContactIds])
-
   function setSection(id: string, open: boolean) {
     setSectionOpen((current) => {
       const next = { ...current, [id]: open }

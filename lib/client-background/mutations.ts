@@ -1274,12 +1274,13 @@ export async function saveInterviewAnswersBulk(input: {
 }): Promise<{ error?: string; answers?: InterviewAnswersJson; screening?: ScreeningAnswers }> {
   const client = await assertClient(input.clientId, input.practiceId)
   if (!client) return { error: "Client was not found." }
-  const answers = sanitizeInterviewAnswers(input.answers)
+  const supplied = sanitizeInterviewAnswers(input.answers)
   try {
     return await db.transaction(async (tx) => {
       const [existing] = await tx
         .select({
           clientBackgroundInterviewId: clientBackgroundInterviews.clientBackgroundInterviewId,
+          answersJson: clientBackgroundInterviews.answersJson,
           screeningJson: clientBackgroundInterviews.screeningJson,
         })
         .from(clientBackgroundInterviews)
@@ -1292,6 +1293,11 @@ export async function saveInterviewAnswersBulk(input: {
         )
         .limit(1)
       if (!existing) return { error: "There is no background interview in progress." }
+      // Section sign-off only comes from confirmInterviewSection, which checks the questions.
+      const answers: InterviewAnswersJson = {
+        ...supplied,
+        sections: sanitizeInterviewAnswers(existing.answersJson).sections,
+      }
       const screening = mergeScreeningMirror(sanitizeScreening(existing.screeningJson), answers)
       await tx
         .update(clientBackgroundInterviews)
@@ -1394,6 +1400,34 @@ async function verifiedSelfReportId(
   return row?.id ?? null
 }
 
+/**
+ * Extra items arrive from the browser. Only section 4's per-record contact rows may be
+ * added, always as details items, and only for this client's own contacts.
+ */
+async function ownedSection4ExtraItems(input: {
+  clientId: string
+  practiceId: string
+  sectionNumber: number
+  extraItems: unknown
+}): Promise<InterviewItemDef[]> {
+  if (input.sectionNumber !== 4 || !Array.isArray(input.extraItems)) return []
+  const keys = new Set<string>()
+  for (const item of input.extraItems) {
+    const key = item && typeof item === "object" ? (item as { key?: unknown }).key : null
+    if (typeof key === "string" && isPerRecordContactKey(key) && perRecordContactId(key)) keys.add(key)
+  }
+  const owned: InterviewItemDef[] = []
+  for (const key of keys) {
+    const ownership = await assertPerRecordContactBelongsToClient({
+      clientId: input.clientId,
+      practiceId: input.practiceId,
+      itemKey: key,
+    })
+    if (ownership.ok) owned.push({ key, label: key, kind: "cna" })
+  }
+  return owned
+}
+
 export async function confirmInterviewSection(input: {
   clientId: string
   practiceId: string
@@ -1404,6 +1438,12 @@ export async function confirmInterviewSection(input: {
 }): Promise<{ error?: string; answers?: InterviewAnswersJson; screening?: ScreeningAnswers }> {
   const client = await assertClient(input.clientId, input.practiceId)
   if (!client) return { error: "Client was not found." }
+  const extraItems = await ownedSection4ExtraItems({
+    clientId: input.clientId,
+    practiceId: input.practiceId,
+    sectionNumber: input.sectionNumber,
+    extraItems: input.extraItems,
+  })
   try {
     return await db.transaction(async (tx) => {
       const [existing] = await tx
@@ -1427,7 +1467,7 @@ export async function confirmInterviewSection(input: {
         current,
         input.sectionNumber,
         input.detailHasValue,
-        input.extraItems ?? [],
+        extraItems,
         new Date().toISOString()
       )
       if (!confirmed.ok) return { error: confirmed.error }

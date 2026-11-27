@@ -26,6 +26,9 @@ function person(
   partial: Partial<RelationshipRecord> & Pick<RelationshipRecord, "relationshipRecordId" | "relationshipToClient">
 ): RelationshipRecord {
   return {
+    relationshipBlockId: null,
+    blockRole: "",
+    blockRoleType: "",
     sex: "",
     givenName: "",
     displayOrder: 0,
@@ -72,6 +75,7 @@ function benSource(): BackgroundReportSource {
   demographics.occupation.role = "carpenter"
   demographics.occupation.necessities.food = true
   demographics.occupation.necessities.transport = true
+  demographics.livingSituation.household = "with_others"
   demographics.livingSituation.livesWith = "with_partner_and_children"
   demographics.livingSituation.housingType = "Private rental"
   demographics.livingSituation.housingStability = "Stable"
@@ -100,6 +104,8 @@ function benSource(): BackgroundReportSource {
         relationshipToClient: "current_partner",
         sex: "Female",
         givenName: "Should Not Appear",
+        blockRole: "partner",
+        livingSituation: "lives_with_client_full_time",
       }),
       person({ relationshipRecordId: "prior-1", relationshipToClient: "prior_partner", givenName: "Pat" }),
       person({ relationshipRecordId: "prior-2", relationshipToClient: "prior_partner", givenName: "Jo" }),
@@ -108,18 +114,27 @@ function benSource(): BackgroundReportSource {
         relationshipToClient: "child_biological",
         givenName: "Child One",
         dateOfBirth: "2017-05-01",
+        blockRole: "child",
+        blockRoleType: "biological",
+        livingSituation: "lives_with_client_full_time",
       }),
       person({
         relationshipRecordId: "child-2",
         relationshipToClient: "child_biological",
         givenName: "Child Two",
         dateOfBirth: "2019-03-01",
+        blockRole: "child",
+        blockRoleType: "biological",
+        livingSituation: "lives_with_client_full_time",
       }),
       person({
         relationshipRecordId: "child-3",
         relationshipToClient: "child_biological",
         givenName: "Child Three",
         dateOfBirth: "2020-04-01",
+        blockRole: "child",
+        blockRoleType: "biological",
+        livingSituation: "lives_with_client_full_time",
       }),
       person({
         relationshipRecordId: "mother",
@@ -686,9 +701,30 @@ wording.data.demographics.identity.disability = true
 wording.data.demographics.identity.disabilityDetail = "Hearing loss, left ear."
 wording.data.demographics.education.level = "Trade apprenticeship"
 wording.data.demographics.education.fieldOfStudy = "Electrical"
+wording.data.demographics.livingSituation.household = "with_others"
 wording.data.demographics.livingSituation.livesWith = "with_partner_and_children"
 wording.data.demographics.livingSituation.housingType = "Private rental"
 wording.data.demographics.livingSituation.housingStability = "Stable"
+wording.data.relationships = [
+  person({
+    relationshipRecordId: "p1",
+    relationshipToClient: "current_partner",
+    blockRole: "partner",
+    livingSituation: "lives_with_client_full_time",
+  }),
+  person({
+    relationshipRecordId: "c1",
+    relationshipToClient: "child_biological",
+    blockRole: "child",
+    livingSituation: "lives_with_client_full_time",
+  }),
+  person({
+    relationshipRecordId: "c2",
+    relationshipToClient: "child_biological",
+    blockRole: "child",
+    livingSituation: "lives_with_client_full_time",
+  }),
+]
 wording.data.demographics.occupation.workStatus = "self_employed"
 wording.data.demographics.occupation.role = "electrician"
 const wordingText = numberedLetterOutline(generateBackgroundReport(wording).document).join("\n")
@@ -720,8 +756,17 @@ function ownHomeText(pronouns: string, sex: string, firstName: string): string {
       relationshipRecordId: "partner",
       relationshipToClient: "current_partner",
       sex: sex === "Female" ? "Male" : "Female",
+      blockRole: "partner",
+      livingSituation: "lives_with_client_full_time",
+    }),
+    person({
+      relationshipRecordId: "child",
+      relationshipToClient: "child_biological",
+      blockRole: "child",
+      livingSituation: "lives_with_client_full_time",
     }),
   ]
+  source.data.demographics.livingSituation.household = "with_others"
   source.data.demographics.livingSituation.livesWith = "with_partner_and_children"
   source.data.demographics.livingSituation.housingType = "Own home"
   source.data.demographics.livingSituation.housingStability = "Stable"
@@ -740,9 +785,20 @@ const namedHome = emptySource()
 namedHome.clientFirstName = "Ben01"
 namedHome.data.demographics.identity.sex = ""
 namedHome.data.demographics.identity.pronouns = ""
+namedHome.data.demographics.livingSituation.household = "with_others"
 namedHome.data.demographics.livingSituation.livesWith = "with_partner_and_children"
 namedHome.data.demographics.livingSituation.housingType = "Own home"
 namedHome.data.demographics.livingSituation.housingStability = "Stable"
+namedHome.data.relationshipStatus.relationshipStatus = "married"
+namedHome.data.relationships = [
+  person({
+    relationshipRecordId: "partner",
+    relationshipToClient: "current_partner",
+    sex: "Female",
+    blockRole: "partner",
+    livingSituation: "lives_with_client_full_time",
+  }),
+]
 assert.match(
   numberedLetterOutline(generateBackgroundReport(namedHome).document).join("\n"),
   /in Ben01's own home/

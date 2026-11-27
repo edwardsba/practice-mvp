@@ -280,7 +280,22 @@ const wrongSanitized = sanitizeInterviewAnswers({
 check("sanitize drops wrong-typed values", wrongSanitized, {
   version: 1,
   items: {
+    s7_who: { value: "not_applicable", confirmed: true },
     s3_identity: { value: "confirmed", confirmed: false },
+  },
+})
+
+const droppedLivingWho = sanitizeInterviewAnswers({
+  version: 1,
+  items: {
+    s7_who: { value: "lives_with_others", confirmed: true },
+    s7_housing_type: { value: "confirmed", confirmed: false },
+  },
+})
+check("sanitize drops legacy living answers on s7_who", droppedLivingWho, {
+  version: 1,
+  items: {
+    s7_housing_type: { value: "confirmed", confirmed: false },
   },
 })
 

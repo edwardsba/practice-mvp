@@ -166,7 +166,7 @@ export const INTERVIEW_SECTIONS: InterviewSectionDef[] = [
     title: "Living situation",
     nothingToRecord: false,
     items: [
-      { key: "s7_who", label: "Who lives in the home", kind: "living" },
+      { key: "s7_who", label: "Who lives in the home", kind: "cna" },
       { key: "s7_housing_type", label: "Housing type", kind: "cna" },
       { key: "s7_housing_security", label: "Housing security", kind: "cna" },
     ],

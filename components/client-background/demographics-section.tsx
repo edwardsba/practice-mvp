@@ -2,19 +2,33 @@
 
 import { useState, type ReactNode } from "react"
 
-import { saveDemographicsAction, saveLivingSituationAction } from "@/app/clients/[client_id]/background/actions"
+import {
+  saveDemographicsAction,
+  saveLivingSituationAction,
+  updateBlockMemberAction,
+} from "@/app/clients/[client_id]/background/actions"
 import { AddButton, ClientAnswer, PartialDatePicker, ReadOnlyField, SaveRow, SelectField, TextField, YesNoDetail } from "@/components/client-background/fields"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
-import { livingWithClientLines } from "@/lib/client-background/tree"
+import {
+  dependantTickFromDependency,
+  dependencyAfterDependantTick,
+  emptyOtherInHome,
+  householdFromLivesWith,
+  householdPeopleFromRelationships,
+  livingChoiceFromSituation,
+  livingSituationFromChoice,
+  type HouseholdLivingChoice,
+} from "@/lib/client-background/household"
+import { formatLivingWhoFactLines } from "@/lib/client-background/interview-facts"
 import {
   EDUCATION_LEVEL_OPTIONS,
   EMPLOYED_WORK_STATUSES,
   HOUSING_STABILITY_OPTIONS,
   HOUSING_TYPE_OPTIONS,
-  LIVES_WITH_LABELS,
-  LIVES_WITH_OPTIONS,
+  HOUSEHOLD_LABELS,
+  HOUSEHOLD_OPTIONS,
   NECESSITY_KEYS,
   NECESSITY_LABELS,
   SEX_OPTIONS,
@@ -24,8 +38,8 @@ import {
   WORK_STATUSES,
   type Demographics,
   type EducationFields,
+  type Household,
   type IdentityFields,
-  type LivesWith,
   type LivingSituationFields,
   type OccupationFields,
   type PreviousJob,
@@ -39,11 +53,9 @@ import { cn } from "@/lib/utils"
 export function DemographicsSection({
   clientId,
   demographics,
-  relationships,
 }: {
   clientId: string
   demographics: Demographics
-  relationships: RelationshipRecord[]
 }) {
   const [saved, setSaved] = useState(demographics)
   const [draft, setDraft] = useState(demographics)
@@ -137,7 +149,7 @@ export function DemographicsSection({
 export function LivingSituationSection({
   clientId,
   livingSituation,
-  relationships,
+  relationships: initialRelationships,
 }: {
   clientId: string
   livingSituation: LivingSituationFields
@@ -145,6 +157,7 @@ export function LivingSituationSection({
 }) {
   const [saved, setSaved] = useState(livingSituation)
   const [draft, setDraft] = useState(livingSituation)
+  const [relationships, setRelationships] = useState(initialRelationships)
   const [editing, setEditing] = useState(false)
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -204,14 +217,36 @@ export function LivingSituationSection({
             void save()
           }}
         >
-          <LivingFieldsEditor value={draft} relationships={relationships} onChange={setDraft} />
+          <LivingFieldsEditor
+            value={draft}
+            relationships={relationships}
+            onChange={setDraft}
+            onPersonChange={async (person) => {
+              setRelationships((current) =>
+                current.map((row) =>
+                  row.relationshipRecordId === person.relationshipRecordId ? person : row
+                )
+              )
+              await updateBlockMemberAction(clientId, person)
+            }}
+          />
           <SaveRow pending={pending} error={error} onSave={() => void save()} />
         </form>
       ) : (
         <div className="space-y-3">
           <ReadOnlyField label="Housing type" value={saved.housingType} />
-          <ReadOnlyField label="Who the client lives with" value={livesWithText(saved)} />
-          <PeopleLivingWithClient relationships={relationships} />
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground">Who lives in the home</p>
+            {formatLivingWhoFactLines(saved, relationships).length === 0 ? (
+              <p className="text-sm">Not recorded</p>
+            ) : (
+              formatLivingWhoFactLines(saved, relationships).map((line) => (
+                <p key={line} className="text-sm whitespace-pre-line">
+                  {line}
+                </p>
+              ))
+            )}
+          </div>
           <ReadOnlyField label="Housing stability" value={saved.housingStability} />
         </div>
       )}
@@ -331,15 +366,6 @@ function workStatusText(occupation: OccupationFields) {
   return WORK_STATUS_LABELS[occupation.workStatus]
 }
 
-function livesWithText(living: LivingSituationFields) {
-  if (!living.livesWith) return ""
-  if (living.livesWith === "other") {
-    const other = living.livesWithOther.trim()
-    return other ? `Other — ${other}` : "Other"
-  }
-  return LIVES_WITH_LABELS[living.livesWith]
-}
-
 function employedWorkStatus(status: WorkStatus | "") {
   return status !== "" && (EMPLOYED_WORK_STATUSES as readonly string[]).includes(status)
 }
@@ -353,24 +379,6 @@ function withWorkStatus(value: OccupationFields, workStatus: WorkStatus | ""): O
     employer: employed ? value.employer : "",
     workStatusOther: workStatus === "other" ? value.workStatusOther : "",
   }
-}
-
-function PeopleLivingWithClient({ relationships }: { relationships: RelationshipRecord[] }) {
-  const lines = livingWithClientLines(relationships)
-  return (
-    <div className="space-y-1">
-      <p className="text-xs text-muted-foreground">People living with the client</p>
-      {lines.length === 0 ? (
-        <p className="text-sm">No family members recorded as living with the client</p>
-      ) : (
-        lines.map((line, index) => (
-          <p key={`${line}-${index}`} className="text-sm">
-            {line}
-          </p>
-        ))
-      )}
-    </div>
-  )
 }
 
 export function IdentityFieldsEditor({
@@ -575,12 +583,14 @@ export function LivingFieldsEditor({
   relationships,
   onChange,
   onCommit,
+  onPersonChange,
   client,
 }: {
   value: LivingSituationFields
   relationships: RelationshipRecord[]
   onChange: (value: LivingSituationFields) => void
   onCommit?: () => void
+  onPersonChange?: (person: RelationshipRecord) => void | Promise<void>
   client?: ClientBackgroundSuggestions["living"]
 }) {
   function apply(next: LivingSituationFields) {
@@ -590,8 +600,179 @@ export function LivingFieldsEditor({
   const housingType = client?.housingType
   const livesWith = client?.livesWith
   const housingStability = client?.housingStability
+  const householdPeople = householdPeopleFromRelationships(relationships)
+  const showPeople = value.household === "with_others"
+
+  function setHousehold(household: Household | "") {
+    apply({ ...value, household })
+  }
+
+  function patchPerson(
+    person: RelationshipRecord,
+    patch: Partial<Pick<RelationshipRecord, "livingSituation" | "dependency">>
+  ) {
+    void onPersonChange?.({ ...person, ...patch })
+  }
+
+  function setLivingChoice(person: RelationshipRecord, choice: HouseholdLivingChoice | "") {
+    if (!choice) {
+      patchPerson(person, { livingSituation: "" })
+      return
+    }
+    patchPerson(person, { livingSituation: livingSituationFromChoice(choice) })
+  }
+
+  function setDependant(person: RelationshipRecord, ticked: boolean) {
+    patchPerson(person, {
+      dependency: dependencyAfterDependantTick(person.dependency, ticked),
+    })
+  }
+
   return (
     <>
+      <SelectField
+        id="household"
+        label="Who lives in the home"
+        value={value.household}
+        client={
+          livesWith ? (
+            <ClientAnswer
+              label={livesWith.label}
+              matches={
+                value.household === householdFromLivesWith(livesWith.apply.livesWith)
+              }
+              onUse={() =>
+                apply({
+                  ...value,
+                  household: householdFromLivesWith(livesWith.apply.livesWith),
+                })
+              }
+            />
+          ) : undefined
+        }
+        onChange={(next) => setHousehold(next as Household | "")}
+      >
+        <option value="">Not recorded</option>
+        {HOUSEHOLD_OPTIONS.map((option) => (
+          <option key={option} value={option}>
+            {HOUSEHOLD_LABELS[option]}
+          </option>
+        ))}
+      </SelectField>
+
+      {showPeople ? (
+        <div className="space-y-3">
+          <p className="text-xs font-medium text-muted-foreground">People from relationships</p>
+          {householdPeople.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              No partners, children, parents, caregivers or siblings recorded.
+            </p>
+          ) : (
+            householdPeople.map((person) => {
+              const choice = livingChoiceFromSituation(person.livingSituation)
+              const name = person.givenName.trim() || "Unnamed"
+              const role =
+                person.blockRole === "partner"
+                  ? "partner"
+                  : person.blockRole === "child"
+                    ? person.blockRoleType === "step_child"
+                      ? "step-child"
+                      : "child"
+                    : person.blockRole || "person"
+              return (
+                <div
+                  key={person.relationshipRecordId}
+                  className="space-y-2 rounded-md border px-3 py-3"
+                >
+                  <p className="text-sm font-medium">
+                    {name}, {role}
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {(
+                      [
+                        ["full_time", "Full-time"],
+                        ["part_time", "Part-time"],
+                        ["no", "No"],
+                      ] as const
+                    ).map(([valueKey, label]) => (
+                      <button
+                        key={valueKey}
+                        type="button"
+                        className={cn(
+                          "min-h-10 rounded-md border px-3 text-sm",
+                          choice === valueKey ? "border-foreground bg-muted" : "border-border"
+                        )}
+                        aria-pressed={choice === valueKey}
+                        onClick={() => setLivingChoice(person, valueKey)}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                  <label className="flex min-h-10 items-center gap-2 text-sm">
+                    <Checkbox
+                      checked={dependantTickFromDependency(person.dependency)}
+                      onCheckedChange={(checked) => setDependant(person, checked === true)}
+                    />
+                    Dependant
+                  </label>
+                </div>
+              )
+            })
+          )}
+
+          <div className="space-y-2">
+            <p className="text-xs font-medium text-muted-foreground">Others in the home</p>
+            {(value.othersInHome ?? []).map((row, index) => (
+              <div key={row.id} className="space-y-2 rounded-md border px-3 py-3">
+                <TextField
+                  id={`other_in_home_${row.id}`}
+                  label="Who"
+                  value={row.who}
+                  onChange={(who) => {
+                    const othersInHome = [...(value.othersInHome ?? [])]
+                    othersInHome[index] = { ...row, who }
+                    onChange({ ...value, othersInHome })
+                  }}
+                />
+                <label className="flex min-h-10 items-center gap-2 text-sm">
+                  <Checkbox
+                    checked={row.dependant}
+                    onCheckedChange={(checked) => {
+                      const othersInHome = [...(value.othersInHome ?? [])]
+                      othersInHome[index] = { ...row, dependant: checked === true }
+                      onChange({ ...value, othersInHome })
+                    }}
+                  />
+                  Dependant
+                </label>
+                <button
+                  type="button"
+                  className="min-h-10 text-sm text-destructive underline"
+                  onClick={() => {
+                    const othersInHome = (value.othersInHome ?? []).filter(
+                      (item) => item.id !== row.id
+                    )
+                    apply({ ...value, othersInHome })
+                  }}
+                >
+                  Remove
+                </button>
+              </div>
+            ))}
+            <AddButton
+              label="Add someone"
+              onClick={() =>
+                apply({
+                  ...value,
+                  othersInHome: [...(value.othersInHome ?? []), emptyOtherInHome()],
+                })
+              }
+            />
+          </div>
+        </div>
+      ) : null}
+
       <SelectField
         id="housing_type"
         label="Housing type"
@@ -614,52 +795,7 @@ export function LivingFieldsEditor({
           </option>
         ))}
       </SelectField>
-      <SelectField
-        id="lives_with"
-        label="Who the client lives with"
-        value={value.livesWith}
-        client={
-          livesWith ? (
-            <ClientAnswer
-              label={livesWith.label}
-              matches={
-                value.livesWith === livesWith.apply.livesWith &&
-                (livesWith.apply.livesWith !== "other" || value.livesWithOther === livesWith.apply.livesWithOther)
-              }
-              onUse={() =>
-                apply({
-                  ...value,
-                  livesWith: livesWith.apply.livesWith,
-                  livesWithOther: livesWith.apply.livesWithOther,
-                })
-              }
-            />
-          ) : undefined
-        }
-        onChange={(next) =>
-          onChange({
-            ...value,
-            livesWith: next as LivesWith | "",
-            livesWithOther: next === "other" ? value.livesWithOther : "",
-          })
-        }
-      >
-        <option value="">Not recorded</option>
-        {LIVES_WITH_OPTIONS.map((option) => (
-          <option key={option} value={option}>
-            {LIVES_WITH_LABELS[option]}
-          </option>
-        ))}
-      </SelectField>
-      {value.livesWith === "other" ? (
-        <TextField
-          id="lives_with_other"
-          label="Other living arrangement"
-          value={value.livesWithOther}
-          onChange={(livesWithOther) => onChange({ ...value, livesWithOther })}
-        />
-      ) : null}
-      <PeopleLivingWithClient relationships={relationships} />
+
       <SelectField
         id="housing_stability"
         label="Housing stability"

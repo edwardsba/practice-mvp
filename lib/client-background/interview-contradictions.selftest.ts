@@ -127,4 +127,27 @@ check(
   []
 )
 
+check(
+  "section 7 household alone contradiction",
+  interviewContradictionNotes({
+    ...base,
+    householdAloneWithSomeoneLiving: true,
+  }).map((n) => ({ key: n.itemKey, message: n.message })),
+  [
+    {
+      key: "s7_who",
+      message: "Someone is recorded as living with the client.",
+    },
+  ]
+)
+
+check(
+  "section 7 no contradiction flag",
+  interviewContradictionNotes({
+    ...base,
+    householdAloneWithSomeoneLiving: false,
+  }),
+  []
+)
+
 console.log("interview-contradictions.selftest.ts: ok")

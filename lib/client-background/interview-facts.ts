@@ -10,7 +10,7 @@ import {
   CLIENT_RELATIONSHIP_STATUS_LABELS,
   CONDITION_CATEGORY_LABELS,
   EVENT_TYPE_LABELS,
-  LIVES_WITH_LABELS,
+  HOUSEHOLD_LABELS,
   NECESSITY_KEYS,
   NECESSITY_LABELS,
   SEXUAL_ORIENTATION_LABELS,
@@ -23,7 +23,29 @@ import {
   type RelationshipBlock,
   type RelationshipRecord,
 } from "@/lib/client-background/types"
+import {
+  dependantTickFromDependency,
+  householdPeopleFromRelationships,
+  livingChoiceFromSituation,
+  livingChoiceLabel,
+  personLivesWithClient,
+} from "@/lib/client-background/household"
 import { todayDateString } from "@/lib/dates/practice-time"
+
+function householdPersonRole(person: RelationshipRecord): string {
+  if (person.blockRole === "partner") return "partner"
+  if (person.blockRole === "child") {
+    return person.blockRoleType === "step_child" ? "step-child" : "child"
+  }
+  if (person.blockRole === "parent") {
+    if (person.blockRoleType === "mother") return "mother"
+    if (person.blockRoleType === "father") return "father"
+    return "parent"
+  }
+  if (person.blockRole === "caregiver") return "caregiver"
+  if (person.blockRole === "sibling") return "sibling"
+  return "person"
+}
 
 function line(label: string, value: string | null | undefined): string | null {
   const trimmed = value?.trim()
@@ -141,11 +163,37 @@ export function formatSection3FactLines(demographics: Demographics): Record<stri
 }
 
 export function formatLivingWhoLine(living: LivingSituationFields): string {
-  if (!living.livesWith) return "Not recorded"
-  if (living.livesWith === "other") {
-    return living.livesWithOther.trim() || LIVES_WITH_LABELS.other
+  if (living.household) return HOUSEHOLD_LABELS[living.household]
+  if (living.livesWith === "alone") return HOUSEHOLD_LABELS.alone
+  if (living.livesWith === "no_fixed_address") return HOUSEHOLD_LABELS.no_fixed_address
+  if (living.livesWith) return HOUSEHOLD_LABELS.with_others
+  return ""
+}
+
+/** Fact lines for interview s7_who — household label, then people, then others. */
+export function formatLivingWhoFactLines(
+  living: LivingSituationFields,
+  relationships: RelationshipRecord[]
+): string[] {
+  const lines: string[] = []
+  const label = formatLivingWhoLine(living)
+  if (label) lines.push(label)
+
+  for (const person of householdPeopleFromRelationships(relationships).filter(personLivesWithClient)) {
+    const name = person.givenName.trim() || "Unnamed"
+    const role = householdPersonRole(person)
+    const choice = livingChoiceFromSituation(person.livingSituation)
+    const livingBit = choice ? livingChoiceLabel(choice) : ""
+    const dependant = dependantTickFromDependency(person.dependency) ? "yes" : "no"
+    const mid = livingBit ? `${livingBit} · ` : ""
+    lines.push(`${name} (${role}), ${mid}dependant: ${dependant}`)
   }
-  return LIVES_WITH_LABELS[living.livesWith]
+  for (const other of living.othersInHome ?? []) {
+    const who = other.who.trim()
+    if (!who) continue
+    lines.push(`${who} · dependant: ${other.dependant ? "yes" : "no"}`)
+  }
+  return lines
 }
 
 export function formatLivingTypeLine(living: LivingSituationFields): string {
@@ -160,7 +208,7 @@ function personName(person: RelationshipRecord): string {
   return person.givenName.trim() || "Unnamed"
 }
 
-function personAgeLabel(person: RelationshipRecord, clientDob: string | null): string | null {
+function personAgeLabel(person: RelationshipRecord, _clientDob: string | null): string | null {
   if (!person.dateOfBirth.trim()) return null
   const age = displayedAge(
     assessAge(parsePartialDate(person.dateOfBirth), parsePartialDate(todayDateString()), "person")

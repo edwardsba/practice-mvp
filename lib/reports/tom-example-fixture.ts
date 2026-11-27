@@ -409,6 +409,7 @@ export function tomExampleSource(): BackgroundReportSource {
     { id: "job-2", role: "Site supervisor", employer: "", started: "2004", ended: "2010" },
   ]
   demographics.livingSituation.housingType = "Own home"
+  demographics.livingSituation.household = "with_others"
   demographics.livingSituation.livesWith = "with_partner_and_children"
   demographics.livingSituation.housingStability = "Stable"
   const stressors = emptyStressors()

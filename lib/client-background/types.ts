@@ -642,10 +642,30 @@ export type IdentityFields = {
   accessibilityNeeds: string
 }
 
+/** Household choice — who lives in the home (replaces the livesWith pick-list for writing). */
+export const HOUSEHOLD_OPTIONS = ["with_others", "alone", "no_fixed_address"] as const
+export type Household = (typeof HOUSEHOLD_OPTIONS)[number]
+
+export const HOUSEHOLD_LABELS: Record<Household, string> = {
+  with_others: "Lives with others",
+  alone: "Lives alone",
+  no_fixed_address: "No fixed address",
+}
+
+/** People not in sections 5–6 (flatmates, other relatives). */
+export type OtherInHome = {
+  id: string
+  who: string
+  dependant: boolean
+}
+
 export type LivingSituationFields = {
   housingType: string
+  /** Legacy pick-list — still read; app no longer writes it. */
   livesWith: LivesWith | ""
   livesWithOther: string
+  household: Household | ""
+  othersInHome: OtherInHome[]
   housingStability: string
 }
 
@@ -835,6 +855,8 @@ export function emptyLivingSituation(): LivingSituationFields {
     housingType: "",
     livesWith: "",
     livesWithOther: "",
+    household: "",
+    othersInHome: [],
     housingStability: "",
   }
 }

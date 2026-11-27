@@ -14,6 +14,7 @@ import {
   saveMedicareInterviewAction,
   saveOccupationAction,
   saveStressorsAction,
+  updateBlockMemberAction,
   type SaveMedicareInterviewState,
 } from "@/app/clients/[client_id]/background/actions"
 import { InterviewEditorPanel } from "@/components/client-background/interview-editor-panel"
@@ -86,7 +87,11 @@ import {
   type InterviewAnswersJson,
   type InterviewItemDef,
 } from "@/lib/client-background/interview-answers"
-import { interviewContradictionNotes } from "@/lib/client-background/interview-contradictions"
+import {
+  householdAloneContradiction,
+  interviewContradictionNotes,
+} from "@/lib/client-background/interview-contradictions"
+import { personLivesWithClient } from "@/lib/client-background/household"
 import {
   claimGroupFactLines,
   emergencyContactFactLines,
@@ -106,7 +111,7 @@ import {
   formatHistoryCategoryFacts,
   formatLivingSecurityLine,
   formatLivingTypeLine,
-  formatLivingWhoLine,
+  formatLivingWhoFactLines,
   formatParentOtherFacts,
   formatPreviousRelationshipFacts,
   formatSection3FactLines,
@@ -699,7 +704,9 @@ export function InterviewPage({
     if (itemKey.startsWith("s3_")) {
       return factLinesOrFallback(section3Facts[itemKey] ?? [], "Not recorded")
     }
-    if (itemKey === "s7_who") return [formatLivingWhoLine(demographics.livingSituation)]
+    if (itemKey === "s7_who") {
+      return factsIfAny(formatLivingWhoFactLines(demographics.livingSituation, relationships))
+    }
     if (itemKey === "s7_housing_type") return [formatLivingTypeLine(demographics.livingSituation)]
     if (itemKey === "s7_housing_security") return [formatLivingSecurityLine(demographics.livingSituation)]
 
@@ -768,6 +775,13 @@ export function InterviewPage({
     otherProfessionalCount,
     historyHasEntries,
     relationshipHasEntries,
+    householdAloneWithSomeoneLiving: householdAloneContradiction({
+      household: demographics.livingSituation.household,
+      someoneLivesWithClient: relationships.some(personLivesWithClient),
+      othersInHomeCount: (demographics.livingSituation.othersInHome ?? []).filter((row) =>
+        row.who.trim()
+      ).length,
+    }),
   })
   const contradictionByKey: Record<string, string> = {}
   for (const note of contradictionNotes) contradictionByKey[note.itemKey] = note.message
@@ -997,6 +1011,14 @@ export function InterviewPage({
                   relationships={relationships}
                   onChange={onChange}
                   onCommit={commit}
+                  onPersonChange={async (person) => {
+                    onRelationships(
+                      relationships.map((row) =>
+                        row.relationshipRecordId === person.relationshipRecordId ? person : row
+                      )
+                    )
+                    await updateBlockMemberAction(clientId, person)
+                  }}
                   client={suggestions?.living}
                 />
               )

@@ -26,6 +26,8 @@ export type ContradictionInput = {
   /** Item key → true when that history/relationship category has recorded entries. */
   historyHasEntries: Record<string, boolean>
   relationshipHasEntries: Record<string, boolean>
+  /** Section 7: household alone while people/others are marked living with the client. */
+  householdAloneWithSomeoneLiving?: boolean
 }
 
 function isNegative(value: string | undefined): boolean {
@@ -133,5 +135,23 @@ export function interviewContradictionNotes(input: ContradictionInput): Contradi
     })
   }
 
+  if (input.householdAloneWithSomeoneLiving) {
+    notes.push({
+      itemKey: "s7_who",
+      message: "Someone is recorded as living with the client.",
+      target: "interview",
+    })
+  }
+
   return notes
+}
+
+/** True when household is alone but someone lives with the client (people or othersInHome). */
+export function householdAloneContradiction(input: {
+  household: string | null | undefined
+  someoneLivesWithClient: boolean
+  othersInHomeCount: number
+}): boolean {
+  if (input.household !== "alone") return false
+  return input.someoneLivesWithClient || input.othersInHomeCount > 0
 }

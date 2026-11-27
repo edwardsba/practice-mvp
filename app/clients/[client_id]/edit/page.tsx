@@ -193,7 +193,6 @@ export default async function EditClientPage({
               <DemographicsSection
                 clientId={clientId}
                 demographics={background.demographics}
-                relationships={background.relationships}
               />
               <LivingSituationSection
                 clientId={clientId}

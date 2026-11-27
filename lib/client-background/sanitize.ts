@@ -23,6 +23,7 @@ import {
   CLIENT_RELATIONSHIP_STATUSES,
   EMPLOYED_WORK_STATUSES,
   HOUSING_TYPE_OPTIONS,
+  HOUSEHOLD_OPTIONS,
   LIVES_WITH_OPTIONS,
   RELATIONSHIP_RATING_VALUES,
   WORK_STATUSES,
@@ -47,9 +48,11 @@ import {
   type EventType,
   type HealthStatus,
   type IdentityFields,
+  type Household,
   type LivesWith,
   type LivingSituationFields,
   type OccupationFields,
+  type OtherInHome,
   type StressorsRecord,
   type TriStateAnswer,
   type RelationshipRating,
@@ -168,13 +171,35 @@ function housingTypeFrom(raw: Record<string, unknown>): string {
   return ""
 }
 
+function sanitizeOthersInHome(value: unknown): OtherInHome[] {
+  if (!Array.isArray(value)) return []
+  const rows: OtherInHome[] = []
+  for (const entry of value) {
+    if (!isRecord(entry)) continue
+    const id = str(entry.id)
+    const who = str(entry.who)
+    if (!id) continue
+    rows.push({ id, who, dependant: entry.dependant === true })
+  }
+  return rows
+}
+
 export function sanitizeLivingSituation(value: unknown): LivingSituationFields {
   const raw = isRecord(value) ? value : {}
   const livesWith = oneOf<LivesWith>(raw.livesWith, LIVES_WITH_OPTIONS)
+  let household = oneOf<Household>(raw.household, HOUSEHOLD_OPTIONS)
+  // Derive household from legacy pick-list when JSON has not been backfilled yet.
+  if (!household && livesWith) {
+    if (livesWith === "alone") household = "alone"
+    else if (livesWith === "no_fixed_address") household = "no_fixed_address"
+    else household = "with_others"
+  }
   return {
     housingType: housingTypeFrom(raw),
     livesWith,
     livesWithOther: livesWith === "other" ? str(raw.livesWithOther) : "",
+    household,
+    othersInHome: sanitizeOthersInHome(raw.othersInHome),
     housingStability: str(raw.housingStability),
   }
 }

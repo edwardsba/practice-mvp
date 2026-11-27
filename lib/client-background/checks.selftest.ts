@@ -173,49 +173,38 @@ const livesWith = backgroundChecks(
     data: data({
       demographics: {
         ...emptyDemographics(),
-        livingSituation: { ...emptyDemographics().livingSituation, livesWith: "with_partner" },
-      },
-      relationships: [
-        person({
-          relationshipRecordId: "partner",
-          relationshipToClient: "current_partner",
-          livingSituation: "does_not_live_with_client",
-        }),
-      ],
-    }),
-  })
-)
-assert.equal(livesWith[0]?.message, "Lives with partner, but no one is marked as living with the client.")
-assert.equal(livesWith[0]?.target, "living")
-for (const [livesWithOption, message] of [
-  ["with_partner_and_children", "Lives with partner and children, but no one is marked as living with the client."],
-  ["with_children_sole_parent", "Lives with children (sole parent), but no one is marked as living with the client."],
-  ["with_parents", "Lives with parents, but no one is marked as living with the client."],
-] as const) {
-  const found = backgroundChecks(
-    input({
-      data: data({
-        demographics: {
-          ...emptyDemographics(),
-          livingSituation: { ...emptyDemographics().livingSituation, livesWith: livesWithOption },
+        livingSituation: {
+          ...emptyDemographics().livingSituation,
+          household: "alone",
         },
-      }),
-    })
-  )
-  assert.equal(found[0]?.message, message)
-}
-assert.deepEqual(
-  ids({
-    data: data({
-      demographics: {
-        ...emptyDemographics(),
-        livingSituation: { ...emptyDemographics().livingSituation, livesWith: "with_partner" },
       },
       relationships: [
         person({
           relationshipRecordId: "partner",
           relationshipToClient: "current_partner",
           livingSituation: "lives_with_client_full_time",
+        }),
+      ],
+    }),
+  })
+)
+assert.equal(livesWith[0]?.message, "Someone is recorded as living with the client.")
+assert.equal(livesWith[0]?.target, "living")
+assert.deepEqual(
+  ids({
+    data: data({
+      demographics: {
+        ...emptyDemographics(),
+        livingSituation: {
+          ...emptyDemographics().livingSituation,
+          household: "alone",
+        },
+      },
+      relationships: [
+        person({
+          relationshipRecordId: "partner",
+          relationshipToClient: "current_partner",
+          livingSituation: "does_not_live_with_client",
         }),
       ],
     }),

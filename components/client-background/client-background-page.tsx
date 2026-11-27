@@ -119,7 +119,6 @@ export function ClientBackgroundPage({
             <DemographicsSection
               clientId={clientId}
               demographics={data.demographics}
-              relationships={data.relationships}
             />
           ) : null}
           {item.id === "relationships" ? (

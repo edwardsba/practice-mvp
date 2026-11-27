@@ -12,16 +12,15 @@ import {
 import { parsePartialDate } from "@/lib/client-background/partial-date"
 import { personRoleLabel } from "@/lib/client-background/tree"
 import {
-  LIVES_WITH_LABELS,
   NECESSITY_KEYS,
   NECESSITY_LABELS,
   STRESSOR_ITEMS,
   type ClientBackgroundData,
-  type ClientRelationshipStatus,
   type EventRecord,
   type RelationshipRecord,
   type RelationshipToClient,
 } from "@/lib/client-background/types"
+import { formatReportLivesWithClause } from "@/lib/clients/background-summary"
 import { significantOtherParagraphs } from "@/lib/reports/background-family-paragraphs"
 import {
   childrenFromBlocks,
@@ -577,17 +576,6 @@ function people(records: RelationshipRecord[], roles: readonly RelationshipToCli
   return records.filter((row) => roles.includes(row.relationshipToClient))
 }
 
-function partnerNoun(status: ClientRelationshipStatus | "", sex: string): string {
-  const value = sex.trim().toLowerCase()
-  if (status === "married") {
-    if (value === "female") return "wife"
-    if (value === "male") return "husband"
-  }
-  if (value === "female") return "female partner"
-  if (value === "male") return "male partner"
-  return "partner"
-}
-
 function cultureItem(source: BackgroundReportSource, voice: Voice): string | null {
   const identity = source.data.demographics.identity
   const culture = identity.raceEthnicity.trim()
@@ -635,21 +623,29 @@ function orientationPhrase(identity: BackgroundReportSource["data"]["demographic
 
 function livingItem(source: BackgroundReportSource, voice: Voice, who: Speaker): string | null {
   const living = source.data.demographics.livingSituation
-  const status = source.data.relationshipStatus.relationshipStatus
-  const partner = source.data.relationships.find((row) => row.relationshipToClient === "current_partner")
+  const household = living.household
   const lives = verb(who.plural, "lives", "live")
   const has = verb(who.plural, "has", "have")
+  const othersInHome = living.othersInHome ?? []
+  const whoClause = formatReportLivesWithClause(
+    source.data.relationships,
+    source.data.relationshipBlocks ?? [],
+    othersInHome,
+    source.data.relationshipStatus.relationshipStatus
+  )
+  // Prefer household; fall back to legacy livesWith when JSON is not yet backfilled.
+  const alone =
+    household === "alone" || (!household && living.livesWith === "alone")
+  const noFixed =
+    household === "no_fixed_address" ||
+    (!household && living.livesWith === "no_fixed_address")
   let home = ""
-  if (living.livesWith === "alone") home = `${who.text} ${lives} alone`
-  else if (living.livesWith === "no_fixed_address") home = `${who.text} ${has} no fixed address`
-  else if (living.livesWith) {
-    const raw = living.livesWith === "other" ? living.livesWithOther : LIVES_WITH_LABELS[living.livesWith]
-    let whoWith = lowerFirst(raw.replace(/^With\s+/i, ""))
-    const noun = partnerNoun(status, partner?.sex ?? "")
-    if ((noun === "wife" || noun === "husband") && whoWith.startsWith("partner")) {
-      whoWith = whoWith.replace(/^partner/, noun)
-    }
-    home = `${who.text} ${lives} with ${voice.possessive} ${whoWith}`
+  if (alone) {
+    home = `${who.text} ${lives} alone`
+  } else if (noFixed) {
+    home = `${who.text} ${has} no fixed address`
+  } else if (whoClause) {
+    home = `${who.text} ${lives} with ${voice.possessive} ${whoClause}`
   }
   const housingLabel = living.housingType.trim()
   const housing =

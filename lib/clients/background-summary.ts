@@ -30,7 +30,7 @@ function yearOf(value: string): string {
   return /^(\d{4})/.exec(value.trim())?.[1] ?? ""
 }
 
-function livesWithClient(person: RelationshipRecord): boolean {
+export function livesWithClient(person: RelationshipRecord): boolean {
   return (
     person.livingSituation === "lives_with_client_full_time" ||
     person.livingSituation === "lives_with_client_part_time"
@@ -133,9 +133,16 @@ function blockFor(
 }
 
 /** Partner wording used by the Relationships section (wife / husband / partner). */
-function partnerRoleWord(person: RelationshipRecord, block: RelationshipBlock | undefined): string {
+function partnerRoleWord(
+  person: RelationshipRecord,
+  block: RelationshipBlock | undefined,
+  relationshipStatus?: string | null
+): string {
   const sex = person.sex.trim().toLowerCase()
-  if (block?.kind === "client_current" && block.status === "married") {
+  const married =
+    (block?.kind === "client_current" && block.status === "married") ||
+    relationshipStatus === "married"
+  if (married) {
     if (sex === "female") return "wife"
     if (sex === "male") return "husband"
   }
@@ -144,12 +151,13 @@ function partnerRoleWord(person: RelationshipRecord, block: RelationshipBlock | 
 
 function formatPartnerGroup(
   partners: RelationshipRecord[],
-  blocks: RelationshipBlock[]
+  blocks: RelationshipBlock[],
+  relationshipStatus?: string | null
 ): string | null {
   if (partners.length === 0) return null
   if (partners.length === 1) {
     const person = partners[0]!
-    const word = partnerRoleWord(person, blockFor(person, blocks))
+    const word = partnerRoleWord(person, blockFor(person, blocks), relationshipStatus)
     return withPartTimeSuffix(word, partners)
   }
   return withPartTimeSuffix(countLabel(partners.length, "partner", "partners"), partners)
@@ -257,9 +265,10 @@ function formatOthersGroup(others: RelationshipRecord[]): string | null {
   return withPartTimeSuffix(countLabel(others.length, "other", "others"), others)
 }
 
-function formatLivesWithGroups(
+export function formatLivesWithGroups(
   people: RelationshipRecord[],
-  blocks: RelationshipBlock[]
+  blocks: RelationshipBlock[],
+  relationshipStatus?: string | null
 ): string {
   const living = people.filter(livesWithClient)
   const partners = living.filter((person) => person.blockRole === "partner")
@@ -277,7 +286,7 @@ function formatLivesWithGroups(
   const others = living.filter((person) => !used.has(person.relationshipRecordId))
 
   const groups = [
-    formatPartnerGroup(partners, blocks),
+    formatPartnerGroup(partners, blocks, relationshipStatus),
     formatChildLivingGroup(children, false),
     formatChildLivingGroup(stepChildren, true),
     formatParentsCaregiversGroup(parentsCaregivers),
@@ -299,18 +308,81 @@ function housingLabel(data: ClientBackgroundData): string {
   return housing || ""
 }
 
+/**
+ * Report-style "lives with …" who-clause (no "lives with" prefix).
+ * Reuses people grouping helpers; lumps all children (incl. step) as "children"
+ * so Tom's letter stays "wife and children".
+ */
+export function formatReportLivesWithClause(
+  people: RelationshipRecord[],
+  blocks: RelationshipBlock[],
+  othersInHome: Array<{ who: string }> = [],
+  relationshipStatus?: string | null
+): string {
+  const living = people.filter(livesWithClient)
+  const partners = living.filter((person) => person.blockRole === "partner")
+  const children = living.filter((person) => isChildRecord(person))
+  const parentsCaregivers = living.filter(
+    (person) => person.blockRole === "parent" || person.blockRole === "caregiver"
+  )
+  const siblings = living.filter((person) => person.blockRole === "sibling")
+  const used = new Set(
+    [...partners, ...children, ...parentsCaregivers, ...siblings].map(
+      (person) => person.relationshipRecordId
+    )
+  )
+  const others = living.filter((person) => !used.has(person.relationshipRecordId))
+
+  const groups: string[] = []
+  const partnerGroup = formatPartnerGroup(partners, blocks, relationshipStatus)
+  if (partnerGroup) groups.push(partnerGroup)
+  if (children.length === 1) groups.push("child")
+  else if (children.length > 1) groups.push("children")
+  const parentsGroup = formatParentsCaregiversGroup(parentsCaregivers)
+  if (parentsGroup) groups.push(parentsGroup)
+  const siblingGroup = formatSiblingGroup(siblings)
+  if (siblingGroup) groups.push(siblingGroup)
+  const othersGroup = formatOthersGroup(others)
+  if (othersGroup) groups.push(othersGroup)
+  for (const other of othersInHome) {
+    const who = other.who.trim()
+    if (who) groups.push(who)
+  }
+  return joinGroups(groups)
+}
+
 function formatLivingRow(data: ClientBackgroundData): string {
   const living = data.demographics.livingSituation
   const housing = housingLabel(data)
   const livingPeople = data.relationships.filter(livesWithClient)
+  const othersLabels = (living.othersInHome ?? [])
+    .map((row) => row.who.trim())
+    .filter(Boolean)
 
   let withLine = ""
-  if (livingPeople.length > 0) {
-    withLine = `lives with ${formatLivesWithGroups(data.relationships, data.relationshipBlocks ?? [])}`
-  } else if (living.livesWith === "alone") {
+  if (livingPeople.length > 0 || othersLabels.length > 0) {
+    const peoplePart = livingPeople.length
+      ? formatLivesWithGroups(
+          data.relationships,
+          data.relationshipBlocks ?? [],
+          data.relationshipStatus.relationshipStatus
+        )
+      : ""
+    const othersPart = othersLabels.length ? joinGroups(othersLabels) : ""
+    const joined =
+      peoplePart && othersPart
+        ? joinGroups([peoplePart, othersPart])
+        : peoplePart || othersPart
+    withLine = `lives with ${joined}`
+  } else if (living.household === "alone" || living.livesWith === "alone") {
     withLine = "lives alone"
+  } else if (
+    living.household === "no_fixed_address" ||
+    living.livesWith === "no_fixed_address"
+  ) {
+    withLine = "no fixed address"
   }
-  // Nobody marked as living with the client and not "alone": housing type only.
+  // Nobody marked as living with the client and not alone: housing type only.
 
   if (!housing && !withLine) return "Not recorded"
   if (housing && withLine) return `${housing} · ${withLine}`

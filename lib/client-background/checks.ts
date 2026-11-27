@@ -5,15 +5,14 @@ import { eventsForQuestion, historyQuestionAcceptsEntries, historyQuestionCheckL
 import {
   CLIENT_RELATIONSHIP_STATUS_LABELS,
   EMPLOYED_WORK_STATUSES,
-  LIVES_WITH_LABELS,
   WORK_STATUS_LABELS,
   type ClientBackgroundData,
   type ClientRelationshipStatus,
-  type LivesWith,
   type RelationshipBlock,
   type RelationshipRecord,
-  type RelationshipToClient,
 } from "@/lib/client-background/types"
+import { personLivesWithClient } from "@/lib/client-background/household"
+import { householdAloneContradiction } from "@/lib/client-background/interview-contradictions"
 
 export type BackgroundCheckTarget =
   | "reason"
@@ -56,13 +55,6 @@ const ENDED_STATUS_CODE: Partial<Record<ClientRelationshipStatus, "separated" | 
 }
 
 const PARTNER_UNEXPECTED: readonly ClientRelationshipStatus[] = ["single", "separated", "divorced", "widowed"]
-
-const LIVES_WITH_KINDS: Partial<Record<LivesWith, readonly RelationshipToClient[]>> = {
-  with_partner: ["current_partner"],
-  with_partner_and_children: ["current_partner", "child_biological", "child_step"],
-  with_children_sole_parent: ["child_biological", "child_step"],
-  with_parents: ["mother", "father", "parent", "step_parent"],
-}
 
 /** Client Background accordion that holds this check's interview section. */
 export function backgroundSectionForCheck(
@@ -127,13 +119,6 @@ function siblingsAnswerMissing(block: RelationshipBlock, people: RelationshipRec
   return block.parentSide === "father" ? "father's other relationship" : "mother's other relationship"
 }
 
-function markedLivingWith(person: RelationshipRecord): boolean {
-  return (
-    person.livingSituation === "lives_with_client_full_time" ||
-    person.livingSituation === "lives_with_client_part_time"
-  )
-}
-
 export function backgroundChecks(input: BackgroundCheckInput): BackgroundCheck[] {
   const { data } = input
   const checks: BackgroundCheck[] = []
@@ -194,12 +179,17 @@ export function backgroundChecks(input: BackgroundCheckInput): BackgroundCheck[]
     }
   }
 
-  const livesWith = data.demographics.livingSituation.livesWith
-  const kinds = livesWith ? LIVES_WITH_KINDS[livesWith] : undefined
-  if (livesWith && kinds && !data.relationships.some((person) => kinds.includes(person.relationshipToClient) && markedLivingWith(person))) {
+  const living = data.demographics.livingSituation
+  if (
+    householdAloneContradiction({
+      household: living.household,
+      someoneLivesWithClient: data.relationships.some(personLivesWithClient),
+      othersInHomeCount: (living.othersInHome ?? []).filter((row) => row.who.trim()).length,
+    })
+  ) {
     checks.push({
       id: "lives-with",
-      message: `Lives with ${LIVES_WITH_LABELS[livesWith].replace(/^With /, "")}, but no one is marked as living with the client.`,
+      message: "Someone is recorded as living with the client.",
       target: "living",
     })
   }

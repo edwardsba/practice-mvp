@@ -1,6 +1,14 @@
 "use client"
 
-import { useEffect, useId, useRef, useState, type ReactNode } from "react"
+import {
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react"
+import { createPortal } from "react-dom"
 import { Plus } from "lucide-react"
 
 import {
@@ -18,8 +26,11 @@ import { cn } from "@/lib/utils"
  * Round ⊕ on a tree line. One choice → opens immediately; several → shows a
  * choice row under the line. Shared by relationship and history trees.
  *
- * The choice menu closes on select, outside tap/click, or Escape — otherwise
- * it sticks open on mobile after ⊕ (Round AP.2 follow-up).
+ * The choice menu closes on select, outside tap (backdrop), or Escape —
+ * otherwise it sticks open on iPhone (Round AP.2 follow-up). iOS Safari does
+ * not fire pointer events on non-interactive content, so a full-screen
+ * transparent backdrop is required. Backdrop + menu are portaled to body so
+ * ancestor overflow/stacking cannot swallow the dismiss tap.
  */
 export function TreeAddControl({
   choices,
@@ -35,16 +46,36 @@ export function TreeAddControl({
   const [open, setOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
   const listId = useId()
+  const showMenu = open && choices.length > 1
+  const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null)
 
-  useEffect(() => {
-    if (!open) return
+  useLayoutEffect(() => {
+    if (!showMenu || !rootRef.current) {
+      setMenuPos(null)
+      return
+    }
 
-    function onPointerDown(event: PointerEvent) {
+    function updatePosition() {
       const root = rootRef.current
       if (!root) return
-      if (event.target instanceof Node && root.contains(event.target)) return
-      setOpen(false)
+      const rect = root.getBoundingClientRect()
+      setMenuPos({
+        top: rect.bottom + 4,
+        right: Math.max(0, window.innerWidth - rect.right),
+      })
     }
+
+    updatePosition()
+    window.addEventListener("resize", updatePosition)
+    window.addEventListener("scroll", updatePosition, true)
+    return () => {
+      window.removeEventListener("resize", updatePosition)
+      window.removeEventListener("scroll", updatePosition, true)
+    }
+  }, [showMenu])
+
+  useEffect(() => {
+    if (!showMenu) return
 
     function onKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
@@ -53,15 +84,11 @@ export function TreeAddControl({
       }
     }
 
-    // Pointer down (not click) so iOS Safari dismisses before another control
-    // steals the gesture; capture so a parent stopPropagation cannot block us.
-    document.addEventListener("pointerdown", onPointerDown, true)
     window.addEventListener("keydown", onKeyDown, true)
     return () => {
-      document.removeEventListener("pointerdown", onPointerDown, true)
       window.removeEventListener("keydown", onKeyDown, true)
     }
-  }, [open])
+  }, [showMenu])
 
   if (choices.length === 0) return null
 
@@ -76,6 +103,10 @@ export function TreeAddControl({
     setOpen((prev) => !prev)
   }
 
+  function dismiss() {
+    setOpen(false)
+  }
+
   return (
     <div ref={rootRef} className={cn("relative shrink-0", className)}>
       <button
@@ -88,16 +119,35 @@ export function TreeAddControl({
       >
         <Plus className="size-5" aria-hidden />
       </button>
-      {open && choices.length > 1 ? (
-        <TreeAddChoiceRow
-          id={listId}
-          choices={choices}
-          onSelect={(id) => {
-            setOpen(false)
-            onSelect(id)
-          }}
-        />
-      ) : null}
+      {showMenu && menuPos && typeof document !== "undefined"
+        ? createPortal(
+            <>
+              <div
+                aria-hidden
+                className="fixed inset-0 z-[100]"
+                onPointerDown={(event) => {
+                  event.preventDefault()
+                  event.stopPropagation()
+                  dismiss()
+                }}
+              />
+              <div
+                className="fixed z-[110]"
+                style={{ top: menuPos.top, right: menuPos.right }}
+              >
+                <TreeAddChoiceRow
+                  id={listId}
+                  choices={choices}
+                  onSelect={(id) => {
+                    setOpen(false)
+                    onSelect(id)
+                  }}
+                />
+              </div>
+            </>,
+            document.body
+          )
+        : null}
     </div>
   )
 }
@@ -116,8 +166,9 @@ export function TreeAddChoiceRow({
     <div
       id={id}
       role="menu"
-      className="absolute top-full right-0 z-10 mt-1 flex flex-wrap justify-end gap-1.5 rounded-lg border border-border bg-background p-1.5 shadow-sm"
+      className="flex flex-wrap justify-end gap-1.5 rounded-lg border border-border bg-background p-1.5 shadow-sm"
       onClick={(event) => event.stopPropagation()}
+      onPointerDown={(event) => event.stopPropagation()}
     >
       {choices.map((choice) => (
         <button

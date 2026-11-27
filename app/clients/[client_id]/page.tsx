@@ -40,6 +40,7 @@ import { loadClientBackground } from "@/lib/client-background/load"
 import { buildBackgroundPanelSummary } from "@/lib/clients/background-summary"
 import { formatCommunicationSummary } from "@/lib/clients/communication-summary"
 import { buildEditDetailsHref } from "@/lib/clients/edit-details-panels"
+import { formatClientDisplayName } from "@/lib/clients/display-name"
 import {
   formatCrisisPlanSummary,
   formatEmergencyContactSummary,
@@ -189,7 +190,11 @@ export default async function ClientDetailPage({
       </div>
       <EntityPageHeader
         kicker="Client details"
-        name={`${client.firstName} ${client.lastName}`}
+        name={formatClientDisplayName(
+          client.firstName,
+          client.preferredName,
+          client.lastName
+        )}
         subheading={`Date of birth: ${formatDate(client.dateOfBirth)}`}
         badge={
           <StatusBadge

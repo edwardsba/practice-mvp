@@ -22,6 +22,7 @@ import {
   buildReferralFundingCardProps,
 } from "@/lib/funding/referral-funding-card-props"
 import { loadMedicalContactsForClient } from "@/lib/medical-contacts/load"
+import { formatClientDisplayName } from "@/lib/clients/display-name"
 
 export default async function BackgroundInterviewRoute({
   params,
@@ -35,6 +36,7 @@ export default async function BackgroundInterviewRoute({
   const [client] = await db
     .select({
       firstName: clients.firstName,
+      preferredName: clients.preferredName,
       lastName: clients.lastName,
       phone: clients.phone,
       email: clients.email,
@@ -118,7 +120,11 @@ export default async function BackgroundInterviewRoute({
       <InterviewPage
         clientId={clientId}
         practiceId={context.practiceId}
-        clientName={`${client.firstName} ${client.lastName}`.trim()}
+        clientName={formatClientDisplayName(
+          client.firstName,
+          client.preferredName,
+          client.lastName
+        )}
         data={data}
         screening={interview.screening}
         answers={interview.answers}

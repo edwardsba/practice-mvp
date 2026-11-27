@@ -34,6 +34,7 @@ export async function getActiveClients() {
     .select({
       clientId: clients.clientId,
       firstName: clients.firstName,
+      preferredName: clients.preferredName,
       lastName: clients.lastName,
       email: clients.email,
       phone: clients.phone,

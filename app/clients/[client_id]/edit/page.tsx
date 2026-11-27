@@ -1,10 +1,7 @@
 import { notFound } from "next/navigation"
 import { and, eq } from "drizzle-orm"
 
-import {
-  CommunicationPreferencesForm,
-  ContactInformationForm,
-} from "@/app/clients/[client_id]/edit/edit-client-form"
+import { ContactDetailsForm } from "@/components/clients/contact-details-form"
 import { ScrollToOpenPanel } from "@/app/clients/[client_id]/edit/scroll-to-open-panel"
 import { deleteClient, getClientDeleteStatus } from "@/app/clients/actions"
 import { ClientPanel } from "@/components/clients/client-panel"
@@ -31,6 +28,7 @@ import {
 import { ensureFamilyOfOrigin } from "@/lib/client-background/mutations"
 import { emptyBlockAnswers } from "@/lib/client-background/types"
 import { formatCommunicationSummary } from "@/lib/clients/communication-summary"
+import { formatClientDisplayName } from "@/lib/clients/display-name"
 import {
   editDetailsPanelElementId,
   parseEditDetailsOpenParam,
@@ -56,6 +54,7 @@ export default async function EditClientPage({
   const [client] = await db
     .select({
       firstName: clients.firstName,
+      preferredName: clients.preferredName,
       lastName: clients.lastName,
       dateOfBirth: clients.dateOfBirth,
       email: clients.email,
@@ -113,7 +112,11 @@ export default async function EditClientPage({
     emergencyContacts = []
   }
 
-  const clientName = `${client.firstName} ${client.lastName}`
+  const clientName = formatClientDisplayName(
+    client.firstName,
+    client.preferredName,
+    client.lastName
+  )
   const communicationSummary = formatCommunicationSummary({
     commsOptOut: client.commsOptOut,
     reminderOptOut: client.reminderOptOut,
@@ -163,9 +166,12 @@ export default async function EditClientPage({
 
               <section className="space-y-3 border-t pt-6">
                 <h3 className="text-sm font-semibold">Contact information</h3>
-                <ContactInformationForm
+                <ContactDetailsForm
                   clientId={clientId}
-                  client={client}
+                  client={{ ...client, notes: client.notes }}
+                  mode="page"
+                  showNotes
+                  redirectPanel="details"
                   showSaved={showSaved && openPanel === "details"}
                 />
               </section>
@@ -290,9 +296,12 @@ export default async function EditClientPage({
           control="expand"
           defaultExpanded={openPanel === "communication"}
           expandedContent={
-            <CommunicationPreferencesForm
+            <ContactDetailsForm
               clientId={clientId}
               client={client}
+              mode="page"
+              showNotes={false}
+              redirectPanel="communication"
               showSaved={showSaved && openPanel === "communication"}
             />
           }

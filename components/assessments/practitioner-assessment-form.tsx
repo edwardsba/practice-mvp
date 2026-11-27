@@ -29,6 +29,7 @@ import {
 } from "@/lib/assessments/form-rules"
 import type { SavePractitionerAssessmentState } from "@/lib/assessments/save-practitioner-assessment"
 import { UNGROUPED_SECTION_KEY } from "@/lib/assessments/section-presentation"
+import { attentionSaveBannerClass } from "@/lib/ui/status-colours"
 import { cn } from "@/lib/utils"
 
 export function PractitionerAssessmentForm({
@@ -343,7 +344,7 @@ export function PractitionerAssessmentForm({
         ) : null}
         <p
           className={cn(
-            "border-b-2 border-blue-500 pb-2 text-sm text-blue-800",
+            attentionSaveBannerClass,
             showProgress ? "mt-2" : null
           )}
         >

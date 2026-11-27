@@ -67,6 +67,8 @@ import { scoreSageSrPersonalityCriteria } from "@/lib/sage-sr/score-personality-
 import { sanitizeBackgroundAnswers } from "@/lib/background-questionnaire/answers"
 import { backgroundResultSections } from "@/lib/background-questionnaire/questions"
 import { BACKGROUND_ASSESSMENT_CODE } from "@/lib/background-questionnaire/types"
+import { problemBorderClass } from "@/lib/ui/status-colours"
+import { cn } from "@/lib/utils"
 
 /** Shape of assessmentResults.structuredScoreJson for a SAGE_SR_CORE instance, as
  *  written by lib/sage-sr/import-sage-sr-report.ts. Either key may be absent if only
@@ -436,7 +438,7 @@ export default async function AssessmentResultDetailPage({
         ) : null}
 
         {clinician && clinician.alerts.length > 0 ? (
-          <Card className="mb-6 border-red-200">
+          <Card className={cn("mb-6", problemBorderClass)}>
             <CardHeader>
               <CardTitle>Alerts</CardTitle>
             </CardHeader>

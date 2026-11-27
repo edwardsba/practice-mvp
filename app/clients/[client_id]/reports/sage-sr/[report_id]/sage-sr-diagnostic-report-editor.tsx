@@ -10,6 +10,8 @@ import {
   type FinaliseSageDiagnosticReportState,
 } from "@/app/clients/[client_id]/reports/sage-sr-diagnostic-report-actions"
 import type { SageSrDiagnosticReportContent } from "@/lib/assessment-summary/load-sage-sr-diagnostic-report"
+import { statusColours } from "@/lib/ui/status-colours"
+import { cn } from "@/lib/utils"
 
 const BACKGROUND_FIELD_LABELS = {
   opening: "Opening",
@@ -83,13 +85,13 @@ export function SageSrDiagnosticReportEditor({
           ) : null}
           <div>
             <FieldCaption>Exclusion clause</FieldCaption>
-            <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
+            <div className={cn("rounded-lg p-4 text-sm", statusColours.attention.soft)}>
               <EditableParagraph
                 value={content.exclusionClause}
                 onChange={(exclusionClause) =>
                   setContent((current) => ({ ...current, exclusionClause }))
                 }
-                className="text-amber-950"
+                className={statusColours.attention.text}
               />
             </div>
           </div>

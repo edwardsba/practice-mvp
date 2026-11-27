@@ -63,6 +63,7 @@ import {
   type EventType,
   type RelationshipRecord,
 } from "@/lib/client-background/types"
+import { statusColours } from "@/lib/ui/status-colours"
 import { cn } from "@/lib/utils"
 
 type HistoryView = "chronological" | "interview"
@@ -551,9 +552,9 @@ export function HistoryTags({ entry }: { entry: EventRecord }) {
   const gap = entryDetailGap(entry)
   return (
     <>
-      {gap ? <span className="shrink-0 rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-950">Needs detail</span> : null}
+      {gap ? <span className={cn("shrink-0", statusColours.attention.pill)}>Needs detail</span> : null}
       {treatmentNeedsLink(entry) ? (
-        <span className="shrink-0 rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-950">Not linked</span>
+        <span className={cn("shrink-0", statusColours.attention.pill)}>Not linked</span>
       ) : null}
     </>
   )

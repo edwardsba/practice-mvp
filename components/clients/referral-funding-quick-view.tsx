@@ -4,6 +4,7 @@ import Link from "next/link"
 
 import { Badge } from "@/components/ui/badge"
 import type { QuickViewLine } from "@/lib/funding/claims-page"
+import { attentionStatusBadgeClass } from "@/lib/ui/status-colours"
 import { cn } from "@/lib/utils"
 
 function approvalHref(
@@ -102,7 +103,7 @@ export function ReferralFundingQuickView({
                       {line.subtitle}
                     </p>
                     {line.reportTag ? (
-                      <span className="inline-flex rounded-md border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs text-amber-800">
+                      <span className={attentionStatusBadgeClass}>
                         {line.reportTag}
                       </span>
                     ) : null}

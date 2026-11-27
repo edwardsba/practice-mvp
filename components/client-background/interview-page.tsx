@@ -99,6 +99,8 @@ import { formatCommunicationSummary } from "@/lib/clients/communication-summary"
 import { formatEmergencyContactSummary } from "@/lib/clients/emergency-details-summary"
 import { todayDateString } from "@/lib/dates/practice-time"
 import type { SectionStatus } from "@/lib/section-status"
+import { statusColours } from "@/lib/ui/status-colours"
+import { cn } from "@/lib/utils"
 
 type EditorKey =
   | "funding"
@@ -864,7 +866,7 @@ export function InterviewPage({
       </header>
 
       {selfReport ? (
-        <p className="mt-4 rounded-md bg-blue-50 px-3 py-2 text-sm text-blue-800">
+        <p className={cn("mt-4 px-3 py-2 text-sm", statusColours.client.soft)}>
           Self-report received {received}. Blue lines show the client&apos;s answers; items without one aren&apos;t in
           the self-report. &quot;Use&quot; copies an answer into the field; nothing is filled in automatically.
         </p>
@@ -1026,7 +1028,7 @@ export function InterviewPage({
           </DialogHeader>
           <p className="text-sm text-muted-foreground">Complete this background interview?</p>
           {worthChecks.length > 0 ? (
-            <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-950">
+            <div className={cn("px-3 py-2 text-sm", statusColours.attention.soft)}>
               <p className="font-medium">Worth checking ({worthChecks.length})</p>
               <div className="mt-2">
                 <WorthCheckingLinks

@@ -18,6 +18,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { formatTimeForInput } from "@/lib/calendar/time-slots"
+import { doneSuccessMessageClass } from "@/lib/ui/status-colours"
 import { cn } from "@/lib/utils"
 
 const selectClassName = cn(
@@ -285,7 +286,7 @@ export function PractitionerForm({ profile }: { profile: Profile }) {
             </p>
           ) : null}
           {state.success ? (
-            <p className="text-sm text-emerald-700">Profile saved.</p>
+            <p className={doneSuccessMessageClass}>Profile saved.</p>
           ) : null}
           <div className="flex flex-wrap gap-3">
             <Button type="submit" disabled={pending}>

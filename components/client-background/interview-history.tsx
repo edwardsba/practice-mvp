@@ -43,6 +43,8 @@ import type {
   RelationshipRecord,
   StressorsRecord,
 } from "@/lib/client-background/types"
+import { statusColours } from "@/lib/ui/status-colours"
+import { cn } from "@/lib/utils"
 
 export function InterviewHistory({
   clientId,
@@ -295,7 +297,7 @@ export function InterviewHistory({
             <p className="text-sm text-muted-foreground">Complete this background interview?</p>
           )}
           {checks.length > 0 ? (
-            <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-950">
+            <div className={cn("px-3 py-2 text-sm", statusColours.attention.soft)}>
               <p className="font-medium">Worth checking ({checks.length})</p>
               <div className="mt-2">
                 <WorthCheckingLinks

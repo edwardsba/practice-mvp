@@ -83,6 +83,7 @@ import {
   type TreatmentAnswer,
   type TreatmentTypeChoice,
 } from "@/lib/client-background/types"
+import { statusColours } from "@/lib/ui/status-colours"
 import { cn } from "@/lib/utils"
 
 type Selection =
@@ -567,7 +568,7 @@ export function HistoryTreeSection({
   const clientBody = (
     <>
       {medicationClient && (!groupFilter || groupFilter === "client") ? (
-        <div className="mb-4 space-y-1 rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-950">
+        <div className={cn("mb-4 space-y-1 px-3 py-2 text-sm", statusColours.client.soft)}>
           {medicationClient.everAdmitted ? (
             <ClientAnswer label={`Ever admitted: ${medicationClient.everAdmitted.label}`} matches={false} />
           ) : null}
@@ -1123,7 +1124,7 @@ function ConnectedList({
                   <span className={cn(treeLayer2MetaClassName, selected && "text-[#1e3a8a]")}>{node.meta}</span>
                 ) : null}
                 {node.needsWho ? (
-                  <span className="mt-1 w-fit rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-950">
+                  <span className={cn("mt-1 w-fit", statusColours.attention.pill)}>
                     Needs who
                   </span>
                 ) : null}
@@ -1288,8 +1289,8 @@ function Tag({ label }: { label: "Episode" | "Treatment" | "Other" | "Step" }) {
     <span
       className={cn(
         "shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
-        label === "Episode" && "bg-indigo-100 text-indigo-800",
-        label === "Treatment" && "bg-emerald-100 text-emerald-800",
+        label === "Episode" && "bg-secondary text-secondary-foreground",
+        label === "Treatment" && "bg-muted text-muted-foreground",
         label === "Other" && "bg-zinc-200 text-zinc-700",
         label === "Step" && "bg-zinc-100 text-zinc-700"
       )}

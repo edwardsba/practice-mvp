@@ -8,8 +8,8 @@ import type { CommunicationPreferencesInput } from "@/lib/clients/communication-
 import { formatAustralianPhone } from "@/lib/format/phone"
 import {
   formatDisplayDate,
+  formatMedicareCardDisplay,
   formatMedicareExpiry,
-  formatMedicareIdentifier,
   isInsurerClaim,
   isMedicareClaim,
   isNdisClaim,
@@ -66,32 +66,22 @@ export type InterviewClaimFactInput = {
   }>
 }
 
-function approvalLines(
-  approvals: InterviewClaimFactInput["approvals"]
-): string[] {
-  if (approvals.length === 0) return ["No funding approvals"]
-  return approvals.map((approval) => {
-    const used =
-      approval.appointmentsApproved == null
-        ? `${approval.appointmentsAttended} sessions used`
-        : `${approval.appointmentsAttended} of ${approval.appointmentsApproved} sessions used`
-    return `${approval.name}: ${used}`
-  })
-}
-
+/** Claim-only facts (no funding approval lines). Empty when nothing on file. */
 export function medicareFactLines(claim: InterviewClaimFactInput | null): string[] {
-  if (!claim) return ["No Medicare details yet"]
-  const id = formatMedicareIdentifier(claim.medicareCardNumber, claim.medicareIrn)
+  if (!claim) return []
+  const card = formatMedicareCardDisplay(claim.medicareCardNumber, claim.medicareIrn)
   const expiry = formatMedicareExpiry(claim.medicareExpiry)
-  const lines: string[] = []
-  if (id) lines.push(`Card: ${id}`)
-  else lines.push("Card: Not recorded")
+  const lines: string[] = ["Medicare"]
+  if (card) lines.push(card)
   if (expiry) lines.push(`Expiry: ${expiry}`)
-  else lines.push("Expiry: Not recorded")
-  lines.push(...approvalLines(claim.approvals))
+  const dates = [formatDisplayDate(claim.startDate), formatDisplayDate(claim.endDate)]
+    .filter((part) => part !== "—")
+    .join(" – ")
+  if (dates) lines.push(dates)
   return lines
 }
 
+/** Claim-only facts for NDIS or insurer groups. Empty when none on file. */
 export function claimGroupFactLines(
   claims: InterviewClaimFactInput[],
   kind: "ndis" | "insurer"
@@ -99,7 +89,7 @@ export function claimGroupFactLines(
   const matching = claims.filter((claim) =>
     kind === "ndis" ? isNdisClaim(claim.claimTypeCode) : isInsurerClaim(claim.claimTypeCode)
   )
-  if (matching.length === 0) return ["Nothing recorded yet"]
+  if (matching.length === 0) return []
   const lines: string[] = []
   for (const claim of matching) {
     const bits = [claim.claimTypeName]
@@ -109,9 +99,6 @@ export function claimGroupFactLines(
       .filter((part) => part !== "—")
       .join(" – ")
     lines.push(dates ? `${bits.join(" · ")} (${dates})` : bits.join(" · "))
-    for (const approval of approvalLines(claim.approvals)) {
-      lines.push(`  ${approval}`)
-    }
   }
   return lines
 }

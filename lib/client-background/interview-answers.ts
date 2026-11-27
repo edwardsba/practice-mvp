@@ -348,7 +348,10 @@ export function interviewSectionStatus(
   }
 }
 
-/** Per-record confirm rows under section 4 when the parent item is Yes. */
+/**
+ * Per-record confirm rows under section 4 whenever matching records exist
+ * (shown before the parent is answered, so the practitioner can see what's on file).
+ */
 export function section4ExtraItems(input: {
   answers: InterviewAnswersJson
   emergencyContacts: Array<{ id: string; label: string }>
@@ -356,22 +359,58 @@ export function section4ExtraItems(input: {
   otherMedicalContacts: Array<{ id: string; label: string }>
 }): InterviewItemDef[] {
   const extras: InterviewItemDef[] = []
-  if (input.answers.items.s4_emergency?.value === "yes") {
-    for (const contact of input.emergencyContacts) {
-      extras.push({ key: `${S4_EC_PREFIX}${contact.id}`, label: contact.label, kind: "cna" })
-    }
+  for (const contact of input.emergencyContacts) {
+    extras.push({ key: `${S4_EC_PREFIX}${contact.id}`, label: contact.label, kind: "cna" })
   }
-  if (input.answers.items.s4_gp?.value === "yes") {
-    for (const contact of input.gpContacts) {
-      extras.push({ key: `${S4_MC_PREFIX}${contact.id}`, label: contact.label, kind: "cna" })
-    }
+  for (const contact of input.gpContacts) {
+    extras.push({ key: `${S4_MC_PREFIX}${contact.id}`, label: contact.label, kind: "cna" })
   }
-  if (input.answers.items.s4_other_professionals?.value === "yes") {
-    for (const contact of input.otherMedicalContacts) {
-      extras.push({ key: `${S4_MC_PREFIX}${contact.id}`, label: contact.label, kind: "cna" })
-    }
+  for (const contact of input.otherMedicalContacts) {
+    extras.push({ key: `${S4_MC_PREFIX}${contact.id}`, label: contact.label, kind: "cna" })
   }
   return extras
+}
+
+/**
+ * Confirm all shown: set every Confirmed/Not applicable (cna) item in the section
+ * that is unanswered or still to confirm to Confirmed + confirmed:true.
+ * Never changes ya/yna/living items, already-confirmed rows, or Not applicable answers.
+ * Includes section 4 per-record keys when passed in extraItems.
+ */
+export function confirmAllShownInSection(
+  answers: InterviewAnswersJson,
+  sectionNumber: number,
+  extraItems: readonly InterviewItemDef[] = []
+): InterviewAnswersJson {
+  const section = INTERVIEW_SECTIONS.find((item) => item.number === sectionNumber)
+  if (!section) return answers
+  const items = { ...answers.items }
+  for (const item of [...section.items, ...extraItems]) {
+    if (item.kind !== "cna") continue
+    const existing = items[item.key]
+    if (existing?.confirmed && existing.value === "confirmed") continue
+    if (existing?.value === "not_applicable") continue
+    items[item.key] = { value: "confirmed", confirmed: true }
+  }
+  return { version: 1, items }
+}
+
+/** True when confirmAllShownInSection would change at least one item. */
+export function sectionHasConfirmAllTargets(
+  answers: InterviewAnswersJson,
+  sectionNumber: number,
+  extraItems: readonly InterviewItemDef[] = []
+): boolean {
+  const section = INTERVIEW_SECTIONS.find((item) => item.number === sectionNumber)
+  if (!section) return false
+  for (const item of [...section.items, ...extraItems]) {
+    if (item.kind !== "cna") continue
+    const existing = answers.items[item.key]
+    if (existing?.confirmed && existing.value === "confirmed") continue
+    if (existing?.value === "not_applicable") continue
+    return true
+  }
+  return false
 }
 
 /** Mark every unanswered item in the section Not applicable (confirmed). Leaves existing answers alone. */
@@ -415,9 +454,10 @@ export function confirmAllAnswers(answers: InterviewAnswersJson): InterviewAnswe
 }
 
 export function sectionsWithLeft(answers: InterviewAnswersJson): number[] {
-  return INTERVIEW_SECTIONS.filter((section) => interviewSectionStatus(section, answers).status === "left").map(
-    (section) => section.number
-  )
+  return INTERVIEW_SECTIONS.filter((section) => {
+    const status = interviewSectionStatus(section, answers).status
+    return status === "left" || status === "not_started"
+  }).map((section) => section.number)
 }
 
 export function sectionsWithToConfirm(answers: InterviewAnswersJson): number[] {

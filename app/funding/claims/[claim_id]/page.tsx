@@ -28,7 +28,7 @@ import {
   formatApprovalProgress,
   formatDisplayDate,
   formatMedicareExpiry,
-  formatMedicareIdentifier,
+  formatMedicareCardDisplay,
   isInsurerClaim,
   isMedicareClaim,
 } from "@/lib/funding/format"
@@ -116,7 +116,7 @@ export default async function ClaimDetailPage({
                   <dt className="text-sm text-muted-foreground">Medicare card no.</dt>
                   <dd className="font-medium">
                     {displayValue(
-                      formatMedicareIdentifier(
+                      formatMedicareCardDisplay(
                         claim.medicareCardNumber,
                         claim.medicareIrn
                       )

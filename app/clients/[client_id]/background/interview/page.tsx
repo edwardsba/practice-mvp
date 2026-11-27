@@ -15,7 +15,6 @@ import { ensureFamilyOfOrigin } from "@/lib/client-background/mutations"
 import { loadEmergencyContacts } from "@/lib/crisis-plans/load"
 import { todayDateString } from "@/lib/dates/practice-time"
 import { db } from "@/lib/db"
-import { buildReferralFundingQuickView } from "@/lib/funding/claims-page"
 import { loadClaimsPageForClient } from "@/lib/funding/load-claims-page"
 import {
   anyReferralRecorded,
@@ -117,7 +116,6 @@ export default async function BackgroundInterviewRoute({
       inactiveClaims: [],
       calendarYear: new Date().getFullYear(),
     }
-  const referralQuickViewLines = buildReferralFundingQuickView(claimsModel)
   const interviewClaims = interviewClaimsFromModel(claimsModel)
 
   const today = todayDateString()
@@ -193,7 +191,6 @@ export default async function BackgroundInterviewRoute({
           adminCommsOptOut: client.adminCommsOptOut,
           onlineBookingPermitted: client.onlineBookingPermitted,
         }}
-        referralQuickViewLines={referralQuickViewLines}
         referralFormOptions={referralCard.formOptions}
         referralRecorded={anyReferralRecorded(referralFundingData.approvals)}
         lrampStartHref={lrampStartHref}

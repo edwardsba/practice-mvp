@@ -2,7 +2,7 @@ import "server-only"
 
 import { and, eq } from "drizzle-orm"
 
-import { claims, claimTypes } from "@/db/schema"
+import { claims, claimTypes, clients } from "@/db/schema"
 import { db } from "@/lib/db"
 import {
   findConflictingActiveMedicareOrNdisClaim,
@@ -19,12 +19,25 @@ export type SaveMedicareClaimInput = {
 
 /**
  * Create or update the client's active Medicare claim.
- * Does not create a claim when called incorrectly for a second Medicare type —
- * uniqueness is enforced here and by the DB trigger.
+ * Confirms the client belongs to the practice before any claim read/write.
+ * Uniqueness is also enforced by the DB trigger.
  */
 export async function saveMedicareClaimDetails(
   input: SaveMedicareClaimInput
 ): Promise<{ error?: string; claimId?: string; created?: boolean }> {
+  const [client] = await db
+    .select({ clientId: clients.clientId })
+    .from(clients)
+    .where(
+      and(
+        eq(clients.clientId, input.clientId),
+        eq(clients.practiceId, input.practiceId),
+        eq(clients.isActive, true)
+      )
+    )
+    .limit(1)
+  if (!client) return { error: "Client was not found." }
+
   const [medicareType] = await db
     .select({
       claimTypeId: claimTypes.claimTypeId,

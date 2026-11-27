@@ -140,8 +140,8 @@ Status and meaning colours are defined once in [`lib/ui/status-colours.ts`](./li
 
 | Name | Colour | Means | Used for |
 |------|--------|-------|----------|
-| **neutral** | white / very light grey, grey outline, muted text | Not started; nothing to flag | Items and sections still to answer (assessment form and interview chips, status pills); empty states |
-| **attention** | amber | Needs your attention | Pre-filled answers to confirm; Worth checking; Not placed; needs badges; funding running low / ending / pending; Badge `warning` |
+| **neutral** | white / very light grey, grey outline, muted text | Not started; nothing to flag | Sections with no answers yet (assessment form and interview chips, status pills); empty states |
+| **attention** | amber | Needs your attention | Started but not finished; pre-filled answers to confirm; Worth checking; Not placed; needs badges; funding running low / ending / pending; Badge `warning` |
 | **done** | green (emerald) | Done or active | Sections done; confirmed; active claims and approvals; Badge `success` |
 | **problem** | red | Problem or risk | Errors, failed saves, Badge `destructive`, urgent risk items. Delete buttons keep the existing `destructive` theme colour. |
 | **client** | blue | The client's own words | Self-report "Client: …" lines and their "Use" button |

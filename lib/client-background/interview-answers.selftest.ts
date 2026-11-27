@@ -37,7 +37,11 @@ check("confirmed value → done", interviewItemStatus({ value: "yes", confirmed:
 
 const section1 = INTERVIEW_SECTIONS[0]
 const empty = emptyInterviewAnswers()
-check("empty section → left with all items", interviewSectionStatus(section1, empty).status, "left")
+check(
+  "empty section → not_started with all items",
+  interviewSectionStatus(section1, empty).status,
+  "not_started"
+)
 check("empty section left count", interviewSectionStatus(section1, empty).left, section1.items.length)
 
 const prefilled: InterviewAnswersJson = {
@@ -242,8 +246,19 @@ const section4Extras = section4ExtraItems({
   otherMedicalContacts: [],
 })
 check(
-  "section4ExtraItems when parent yes",
+  "section4ExtraItems always when records exist",
   section4Extras.map((item) => item.key),
+  ["s4_ec:ec1", "s4_mc:gp1"]
+)
+const section4ExtrasUnanswered = section4ExtraItems({
+  answers: emptyInterviewAnswers(),
+  emergencyContacts: [{ id: "ec1", label: "Parent" }],
+  gpContacts: [{ id: "gp1", label: "Dr Smith" }],
+  otherMedicalContacts: [],
+})
+check(
+  "section4ExtraItems before parent answered",
+  section4ExtrasUnanswered.map((item) => item.key),
   ["s4_ec:ec1", "s4_mc:gp1"]
 )
 check(

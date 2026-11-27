@@ -1,11 +1,17 @@
 /**
  * Shared section/item status helpers for the assessment form and Background interview.
  * Pure — no database, no UI.
+ *
+ * Section colours (see AGENTS.md — Colours: one meaning each):
+ * - not_started → neutral
+ * - left (in progress) or to_confirm → attention
+ * - done → done
+ * - skipped → dashed muted
  */
 
 import { statusColours } from "@/lib/ui/status-colours"
 
-export type SectionStatusKind = "skipped" | "left" | "to_confirm" | "done"
+export type SectionStatusKind = "skipped" | "not_started" | "left" | "to_confirm" | "done"
 
 export type SectionStatus = {
   groupLabel: string
@@ -40,8 +46,12 @@ export function itemStatus(item: StatusItem): ItemStatusKind {
 }
 
 /**
- * Precedence: any left → left; else any to_confirm → to_confirm; else done.
- * Empty sections with no items are done (interview) — callers pass skipped separately.
+ * Precedence:
+ * - no answers at all → not_started
+ * - any unanswered → left (in progress)
+ * - else any to_confirm → to_confirm
+ * - else done
+ * Empty sections with no items are done — callers pass skipped separately.
  */
 export function aggregateSectionStatus(
   items: readonly StatusItem[],
@@ -49,23 +59,35 @@ export function aggregateSectionStatus(
 ): Pick<SectionStatus, "status" | "left" | "toConfirm" | "hasDefaults"> {
   let left = 0
   let toConfirm = 0
+  let answered = 0
   for (const item of items) {
     const status = itemStatus(item)
     if (status === "left") left += 1
-    else if (status === "to_confirm") toConfirm += 1
+    else {
+      answered += 1
+      if (status === "to_confirm") toConfirm += 1
+    }
+  }
+  const hasDefaults = Boolean(options?.hasDefaults)
+  if (items.length === 0) {
+    return { status: "done", left: 0, toConfirm: 0, hasDefaults }
+  }
+  if (answered === 0) {
+    return { status: "not_started", left, toConfirm: 0, hasDefaults }
   }
   if (left > 0) {
-    return { status: "left", left, toConfirm: 0, hasDefaults: Boolean(options?.hasDefaults) }
+    return { status: "left", left, toConfirm: 0, hasDefaults }
   }
   if (toConfirm > 0) {
-    return { status: "to_confirm", left: 0, toConfirm, hasDefaults: Boolean(options?.hasDefaults) }
+    return { status: "to_confirm", left: 0, toConfirm, hasDefaults }
   }
-  return { status: "done", left: 0, toConfirm: 0, hasDefaults: Boolean(options?.hasDefaults) }
+  return { status: "done", left: 0, toConfirm: 0, hasDefaults }
 }
 
 /** Short pill text for a section header. */
 export function statusPillLabel(section: Pick<SectionStatus, "status" | "left" | "toConfirm" | "hasDefaults">): string {
   if (section.status === "skipped") return "Skipped"
+  if (section.status === "not_started") return "Not started"
   if (section.status === "left") return `${section.left} left`
   if (section.status === "to_confirm") return `${section.toConfirm} to confirm`
   if (section.hasDefaults) return "Confirmed"
@@ -75,8 +97,6 @@ export function statusPillLabel(section: Pick<SectionStatus, "status" | "left" |
 /**
  * Full status string for a progress chip's aria-label / title
  * (chips themselves show only the badge).
- * e.g. "Section 1, Presentation: 5 to confirm"
- *      "Section C, Risk factors: skipped"
  */
 export function progressChipAriaLabel(section: SectionStatus): string {
   let detail: string
@@ -84,8 +104,11 @@ export function progressChipAriaLabel(section: SectionStatus): string {
     case "skipped":
       detail = "skipped"
       break
+    case "not_started":
+      detail = "not started"
+      break
     case "left":
-      detail = `${section.left} to answer`
+      detail = `${section.left} left`
       break
     case "to_confirm":
       detail = `${section.toConfirm} to confirm`
@@ -102,10 +125,10 @@ export function sectionProgressClass(section: Pick<SectionStatus, "status">): st
   if (section.status === "done") {
     return statusColours.done.chip
   }
-  if (section.status === "left") {
+  if (section.status === "not_started") {
     return statusColours.neutral.chip
   }
-  if (section.status === "to_confirm") {
+  if (section.status === "left" || section.status === "to_confirm") {
     return statusColours.attention.chip
   }
   return "border-dashed border-muted-foreground/40 bg-muted/30 text-muted-foreground"

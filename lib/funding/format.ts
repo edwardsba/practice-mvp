@@ -37,11 +37,40 @@ export function isInsurerClaim(code: string | null | undefined) {
   return normalizeClaimTypeCode(code) === "insurer"
 }
 
+/**
+ * Display-only Medicare card grouping: `2123 45670 1` for 10 digits.
+ * Spaces/dashes in the input are ignored; short or odd lengths left unchanged.
+ */
+export function formatMedicareCardNumber(cardNumber: string | null | undefined): string | null {
+  const raw = cardNumber?.trim()
+  if (!raw) return null
+  const digits = raw.replace(/\D/g, "")
+  if (digits.length !== 10) return raw
+  return `${digits.slice(0, 4)} ${digits.slice(4, 9)} ${digits.slice(9)}`
+}
+
+/**
+ * Display helper: "Card 2123 45670 1 · IRN 1" when both are present.
+ * Falls back sensibly when only one side is set.
+ */
+export function formatMedicareCardDisplay(
+  cardNumber: string | null | undefined,
+  irn: string | null | undefined
+): string | null {
+  const card = formatMedicareCardNumber(cardNumber)
+  const irnValue = irn?.trim() || null
+  if (!card && !irnValue) return null
+  if (card && irnValue) return `Card ${card} · IRN ${irnValue}`
+  if (card) return `Card ${card}`
+  return `IRN ${irnValue}`
+}
+
+/** @deprecated Prefer formatMedicareCardDisplay for UI. Kept for call sites needing card/irn slash form. */
 export function formatMedicareIdentifier(
   cardNumber: string | null | undefined,
   irn: string | null | undefined
 ) {
-  const card = cardNumber?.trim()
+  const card = formatMedicareCardNumber(cardNumber) ?? cardNumber?.trim() ?? null
   const irnValue = irn?.trim()
   if (!card && !irnValue) return null
   if (!card) return irnValue ?? null

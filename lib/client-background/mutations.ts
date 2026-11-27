@@ -35,19 +35,21 @@ import {
 import { sanitizeHistoryIssue } from "@/lib/client-background/history-issues"
 import {
   blockAnswersFromInterview,
-  confirmAllAnswers,
+  confirmSectionAnswers,
   emptyInterviewAnswers,
   isPerRecordContactKey,
   mergeScreeningMirror,
   perRecordContactId,
   prefillAnswersForReview,
   sanitizeInterviewAnswers,
+  sectionsNotConfirmed,
   setItemAnswer,
   S4_EC_PREFIX,
   S4_MC_PREFIX,
   validateItemAnswer,
   type InterviewAnswerValue,
   type InterviewAnswersJson,
+  type InterviewItemDef,
 } from "@/lib/client-background/interview-answers"
 import {
   finalScreeningAnswers,
@@ -1392,13 +1394,77 @@ async function verifiedSelfReportId(
   return row?.id ?? null
 }
 
+export async function confirmInterviewSection(input: {
+  clientId: string
+  practiceId: string
+  userId: string
+  sectionNumber: number
+  detailHasValue: Record<string, boolean>
+  extraItems?: InterviewItemDef[]
+}): Promise<{ error?: string; answers?: InterviewAnswersJson; screening?: ScreeningAnswers }> {
+  const client = await assertClient(input.clientId, input.practiceId)
+  if (!client) return { error: "Client was not found." }
+  try {
+    return await db.transaction(async (tx) => {
+      const [existing] = await tx
+        .select({
+          clientBackgroundInterviewId: clientBackgroundInterviews.clientBackgroundInterviewId,
+          answersJson: clientBackgroundInterviews.answersJson,
+          screeningJson: clientBackgroundInterviews.screeningJson,
+        })
+        .from(clientBackgroundInterviews)
+        .where(
+          and(
+            eq(clientBackgroundInterviews.clientId, input.clientId),
+            eq(clientBackgroundInterviews.practiceId, input.practiceId),
+            eq(clientBackgroundInterviews.status, "in_progress")
+          )
+        )
+        .limit(1)
+      if (!existing) return { error: "There is no background interview in progress." }
+      const current = sanitizeInterviewAnswers(existing.answersJson)
+      const confirmed = confirmSectionAnswers(
+        current,
+        input.sectionNumber,
+        input.detailHasValue,
+        input.extraItems ?? [],
+        new Date().toISOString()
+      )
+      if (!confirmed.ok) return { error: confirmed.error }
+      const screening = mergeScreeningMirror(sanitizeScreening(existing.screeningJson), confirmed.answers)
+      await tx
+        .update(clientBackgroundInterviews)
+        .set({
+          answersJson: confirmed.answers,
+          screeningJson: screening,
+          updatedAt: new Date(),
+        })
+        .where(eq(clientBackgroundInterviews.clientBackgroundInterviewId, existing.clientBackgroundInterviewId))
+      await writeAudit(tx, {
+        practiceId: input.practiceId,
+        userId: input.userId,
+        clientId: input.clientId,
+        eventType: "client_background_interview.section_confirmed",
+        entityType: "client_background_interview",
+        entityId: existing.clientBackgroundInterviewId,
+      })
+      return { answers: confirmed.answers, screening }
+    }).then(async (result) => {
+      if (result.answers) {
+        await writeBlockAnswerMirrors(input.clientId, input.practiceId, result.answers)
+      }
+      return result
+    })
+  } catch {
+    return { error: "Could not confirm the interview section." }
+  }
+}
+
 export async function completeBackgroundInterview(input: {
   clientId: string
   practiceId: string
   userId: string
   selfReportId: string | null
-  /** When true, mark every answers_json item confirmed before completing. */
-  confirmAllItems?: boolean
 }): Promise<{ error?: string }> {
   const client = await assertClient(input.clientId, input.practiceId)
   if (!client) return { error: "Client was not found." }
@@ -1441,8 +1507,11 @@ export async function completeBackgroundInterview(input: {
         )
       const dateOfBirth = clientRow?.dateOfBirth ?? null
       const events = eventRows.map((row) => settleEventDates(toEvent(row), dateOfBirth))
-      let answers = sanitizeInterviewAnswers(interview.answersJson)
-      if (input.confirmAllItems) answers = confirmAllAnswers(answers)
+      const answers = sanitizeInterviewAnswers(interview.answersJson)
+      const unfinished = sectionsNotConfirmed(answers)
+      if (unfinished.length > 0) {
+        return { error: "Confirm every interview section before completing." }
+      }
       const screening = finalScreeningAnswers(
         mergeScreeningMirror(sanitizeScreening(interview.screeningJson), answers),
         events,

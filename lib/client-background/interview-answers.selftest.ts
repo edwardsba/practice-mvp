@@ -104,7 +104,7 @@ check("review prefill copies values with confirmed false", review, {
 })
 
 const tapped = setItemAnswer(
-  { version: 1, items: { s2_medicare: { value: "yes", confirmed: false } } },
+  { version: 1, items: { s2_medicare: { value: "yes", confirmed: false } , sections: {} }, sections: {} },
   "s2_medicare",
   "yes"
 )
@@ -263,7 +263,7 @@ check(
 )
 check(
   "section4 status counts extras",
-  interviewSectionStatus(section4, { version: 1, items: { s4_emergency: { value: "yes", confirmed: true } } }, section4Extras)
+  interviewSectionStatus(section4, { version: 1, items: { s4_emergency: { value: "yes", confirmed: true } , sections: {} }, sections: {} }, section4Extras)
     .left,
   section4.items.length + section4Extras.length - 1
 )

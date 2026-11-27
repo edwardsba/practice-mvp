@@ -1,7 +1,7 @@
 -- Round AM: backfill living_situation_json.household from legacy livesWith.
 -- Does not remove livesWith (later round). No new columns.
 
-UPDATE client_background
+UPDATE client_backgrounds
 SET living_situation_json = jsonb_set(
   COALESCE(living_situation_json, '{}'::jsonb),
   '{household}',
@@ -23,7 +23,7 @@ WHERE living_situation_json IS NOT NULL
   AND COALESCE(living_situation_json->>'livesWith', '') <> '';
 
 -- Ensure othersInHome is an array when missing on rows that already have living JSON.
-UPDATE client_background
+UPDATE client_backgrounds
 SET living_situation_json = jsonb_set(
   living_situation_json,
   '{othersInHome}',

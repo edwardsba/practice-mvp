@@ -219,15 +219,15 @@ export function sanitizeScreening(value: unknown): ScreeningAnswers {
 }
 
 /**
- * Category questions + each issue's Treatment question + stressors.
- * Treatment questions are dynamic (one per issue).
- * Stressors remain in totals used outside the interview Complete flow.
+ * Category questions + stressors.
+ * Treatment is an event under an issue, not a counted interview question.
+ * `issueCount` is kept for call-site compatibility and is unused.
  */
-export function interviewAnswerTotal(issueCount: number): number {
-  return HISTORY_QUESTION_KEYS.length + issueCount + STRESSOR_ITEMS.length
+export function interviewAnswerTotal(_issueCount = 0): number {
+  return HISTORY_QUESTION_KEYS.length + STRESSOR_ITEMS.length
 }
 
-/** @deprecated Prefer interviewAnswerTotal(issueCount). Base total with no issues. */
+/** @deprecated Prefer interviewAnswerTotal(). Base total with no issues. */
 export const INTERVIEW_ANSWER_TOTAL = interviewAnswerTotal(0)
 
 export type BackgroundInterviewAnswerSource = {
@@ -290,22 +290,15 @@ export function unansweredQuestionLabels(
   screening: ScreeningAnswers,
   events: Pick<EventRecord, "eventType" | "startPrecision" | "startValue" | "conditionGroupId" | "parentEventId" | "about">[],
   dateOfBirth: string | null,
-  issues: HistoryIssue[] = []
+  _issues: HistoryIssue[] = []
 ): string[] {
   const withEntries = answeredCategoryKeys(screening, events, dateOfBirth)
-  const labels = HISTORY_QUESTION_KEYS.filter((key) => !withEntries.has(key) && screening[key] == null).map(
+  return HISTORY_QUESTION_KEYS.filter((key) => !withEntries.has(key) && screening[key] == null).map(
     (key) => HISTORY_QUESTIONS[key].label
   )
-  for (const issue of issues) {
-    if (!issue.treatmentAnswer) {
-      const title = issue.title.trim() || "Issue"
-      labels.push(`Treatment (${title})`)
-    }
-  }
-  return labels
 }
 
-/** Unanswered items: History categories, treatment answers, then Stressors (Client Background). */
+/** Unanswered items: History categories, then Stressors (Client Background). */
 export function unansweredInterviewLabels(
   screening: ScreeningAnswers,
   events: Pick<EventRecord, "eventType" | "startPrecision" | "startValue" | "conditionGroupId" | "parentEventId" | "about">[],

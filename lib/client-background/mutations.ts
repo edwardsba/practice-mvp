@@ -23,7 +23,6 @@ import { BACKGROUND_ASSESSMENT_CODE } from "@/lib/background-questionnaire/types
 import { db } from "@/lib/db"
 import { settleEventDates } from "@/lib/client-background/age"
 import { personKey } from "@/lib/client-background/condition-groups"
-import { treatmentAnswerAfterChange, treatmentsForIssue } from "@/lib/client-background/history-issues"
 import { isConditionEvent, isTreatmentEvent } from "@/lib/client-background/history-links"
 import { toClientRelationshipStatus, toEvent, toHistoryIssue, toRelationship } from "@/lib/client-background/map"
 import {
@@ -640,40 +639,14 @@ async function conditionLinkError(
   return null
 }
 
+/** No-op: treatment is an event under an issue; treatment_answer is no longer synced. */
 async function syncIssueTreatmentAnswer(
-  tx: Tx,
-  clientId: string,
-  practiceId: string,
-  issueId: string | null | undefined
+  _tx: Tx,
+  _clientId: string,
+  _practiceId: string,
+  _issueId: string | null | undefined
 ) {
-  if (!issueId || issueId.startsWith("title:")) return
-  const [issue] = await tx
-    .select()
-    .from(clientHistoryIssues)
-    .where(
-      and(
-        eq(clientHistoryIssues.issueId, issueId),
-        eq(clientHistoryIssues.clientId, clientId),
-        eq(clientHistoryIssues.practiceId, practiceId)
-      )
-    )
-    .limit(1)
-  if (!issue) return
-  const eventRows = await tx
-    .select()
-    .from(clientEventRecords)
-    .where(and(eq(clientEventRecords.clientId, clientId), eq(clientEventRecords.practiceId, practiceId)))
-  const events = eventRows.map((row) => toEvent(row))
-  const count = treatmentsForIssue(events, issueId).length
-  const current = (issue.treatmentAnswer === "yes" || issue.treatmentAnswer === "none" || issue.treatmentAnswer === "not_asked"
-    ? issue.treatmentAnswer
-    : "") as TreatmentAnswer | ""
-  const next = treatmentAnswerAfterChange(current, count)
-  if (next === current) return
-  await tx
-    .update(clientHistoryIssues)
-    .set({ treatmentAnswer: next, updatedAt: new Date() })
-    .where(eq(clientHistoryIssues.issueId, issueId))
+  return
 }
 
 function eventColumns(event: EventRecord) {
@@ -882,10 +855,6 @@ export async function createHistoryIssue(input: {
   if (parsed.about === "significant_other" && !parsed.relationshipRecordId && !parsed.aboutOther.trim()) {
     return { error: "Choose who this issue is about." }
   }
-  const treatmentAnswer =
-    parsed.treatmentAnswer === "yes" || parsed.treatmentAnswer === "none" || parsed.treatmentAnswer === "not_asked"
-      ? parsed.treatmentAnswer
-      : null
   try {
     return await db.transaction(async (tx) => {
       const issueId = parsed.issueId || randomUUID()
@@ -903,7 +872,7 @@ export async function createHistoryIssue(input: {
               ? parsed.aboutOther.trim() || null
               : null,
           title: parsed.title.trim(),
-          treatmentAnswer,
+          treatmentAnswer: null,
           displayOrder: parsed.displayOrder,
         })
         .returning()
@@ -994,10 +963,6 @@ export async function updateHistoryIssue(input: {
         )
         .limit(1)
       if (!existing) return { error: "That issue was not found." }
-      const treatmentAnswer =
-        parsed.treatmentAnswer === "yes" || parsed.treatmentAnswer === "none" || parsed.treatmentAnswer === "not_asked"
-          ? parsed.treatmentAnswer
-          : existing.treatmentAnswer
       const [updated] = await tx
         .update(clientHistoryIssues)
         .set({
@@ -1011,7 +976,7 @@ export async function updateHistoryIssue(input: {
           category: (CONDITION_EVENT_TYPES as readonly string[]).includes(parsed.category)
             ? parsed.category
             : (existing.category as ConditionEventType),
-          treatmentAnswer,
+          treatmentAnswer: existing.treatmentAnswer,
           updatedAt: new Date(),
         })
         .where(eq(clientHistoryIssues.issueId, existing.issueId))
@@ -1031,6 +996,7 @@ export async function updateHistoryIssue(input: {
   }
 }
 
+/** No-op write: treatment is an event; treatment_answer is no longer set from the UI. */
 export async function updateHistoryIssueTreatmentAnswer(input: {
   clientId: string
   practiceId: string
@@ -1038,49 +1004,24 @@ export async function updateHistoryIssueTreatmentAnswer(input: {
   issueId: string
   treatmentAnswer: TreatmentAnswer | ""
 }): Promise<MutationResult<{ issue?: HistoryIssue }>> {
+  void input.userId
+  void input.treatmentAnswer
   const client = await assertClient(input.clientId, input.practiceId)
   if (!client) return { error: "Client was not found." }
-  const answer =
-    input.treatmentAnswer === "yes" || input.treatmentAnswer === "none" || input.treatmentAnswer === "not_asked"
-      ? input.treatmentAnswer
-      : null
   try {
-    return await db.transaction(async (tx) => {
-      const [existing] = await tx
-        .select()
-        .from(clientHistoryIssues)
-        .where(
-          and(
-            eq(clientHistoryIssues.issueId, input.issueId),
-            eq(clientHistoryIssues.clientId, input.clientId),
-            eq(clientHistoryIssues.practiceId, input.practiceId)
-          )
+    const [existing] = await db
+      .select()
+      .from(clientHistoryIssues)
+      .where(
+        and(
+          eq(clientHistoryIssues.issueId, input.issueId),
+          eq(clientHistoryIssues.clientId, input.clientId),
+          eq(clientHistoryIssues.practiceId, input.practiceId)
         )
-        .limit(1)
-      if (!existing) return { error: "That issue was not found." }
-      const eventRows = await tx
-        .select()
-        .from(clientEventRecords)
-        .where(and(eq(clientEventRecords.clientId, input.clientId), eq(clientEventRecords.practiceId, input.practiceId)))
-      const events = eventRows.map((row) => toEvent(row))
-      if (treatmentsForIssue(events, input.issueId).length > 0 && answer !== "yes") {
-        return { error: "Remove treatments before changing this answer." }
-      }
-      const [updated] = await tx
-        .update(clientHistoryIssues)
-        .set({ treatmentAnswer: answer, updatedAt: new Date() })
-        .where(eq(clientHistoryIssues.issueId, existing.issueId))
-        .returning()
-      await writeAudit(tx, {
-        practiceId: input.practiceId,
-        userId: input.userId,
-        clientId: input.clientId,
-        eventType: "client_history_issue.updated",
-        entityType: "client_history_issue",
-        entityId: updated.issueId,
-      })
-      return { issue: toHistoryIssue(updated) }
-    })
+      )
+      .limit(1)
+    if (!existing) return { error: "That issue was not found." }
+    return { issue: toHistoryIssue(existing) }
   } catch {
     return { error: "Could not save the treatment answer." }
   }

@@ -9,7 +9,6 @@ import {
   createUnplacedPersonAction,
   deleteEventAction,
   updateEventAction,
-  updateHistoryIssueTreatmentAnswerAction,
 } from "@/app/clients/[client_id]/background/actions"
 import { ContextStrip } from "@/components/client-background/context-strip"
 import { DiscardChangesDialog } from "@/components/client-background/discard-changes-dialog"
@@ -69,8 +68,6 @@ import {
   CONDITION_EVENT_TYPES,
   emptyEvent,
   EVENT_TYPE_LABELS,
-  TREATMENT_ANSWER_LABELS,
-  TREATMENT_ANSWERS,
   type ConditionEventType,
   type EventRecord,
   type EventType,
@@ -78,7 +75,6 @@ import {
   type RelationshipRecord,
   type SmartEventKind,
   type StartPrecision,
-  type TreatmentAnswer,
   type TreatmentTypeChoice,
 } from "@/lib/client-background/types"
 import { statusColours } from "@/lib/ui/status-colours"
@@ -363,17 +359,6 @@ export function HistoryTreeSection({
     publishEvents(
       isNew ? [...shown, result.event] : shown.map((event) => (event.eventRecordId === result.event!.eventRecordId ? result.event! : event))
     )
-    if (isNew && isConditionEvent(result.event.eventType) === false) {
-      // Adding a treatment sets the issue Treatment answer to Yes (server syncs).
-      const issueId = result.event.conditionGroupId
-      if (issueId) {
-        publishIssues(
-          issues.map((item) =>
-            item.issueId === issueId ? { ...item, treatmentAnswer: "yes" as TreatmentAnswer } : item
-          )
-        )
-      }
-    }
     setDraft(result.event)
     setSelection({ kind: "entry", id: result.event.eventRecordId })
     setIsNew(false)
@@ -476,15 +461,6 @@ export function HistoryTreeSection({
           ? selection.parentId
           : null
 
-  async function setTreatmentAnswer(issueId: string, value: TreatmentAnswer | "") {
-    const result = await updateHistoryIssueTreatmentAnswerAction(clientId, issueId, value)
-    if (result.error || !result.issue) {
-      setError(result.error ?? "Could not save the treatment answer.")
-      return
-    }
-    publishIssues(issues.map((item) => (item.issueId === result.issue!.issueId ? result.issue! : item)))
-  }
-
   const contextForPanel = (() => {
     if (!selection) return null
     const about =
@@ -557,7 +533,6 @@ export function HistoryTreeSection({
           }
           startNewEvent({ about, category: eventType })
         },
-    onTreatmentAnswer: readOnly ? undefined : (issueId: string, value: TreatmentAnswer | "") => void setTreatmentAnswer(issueId, value),
     onScreeningChange: presentation === "interview" ? onScreeningChange : undefined,
     hideScreeningControls: presentation === "interview" ? hideScreeningControls : false,
     applyScreeningFilter: presentation === "interview",
@@ -766,11 +741,6 @@ export function HistoryTreeSection({
               ) : (
                 <>
                   {draft ? <EntryDetails entry={draft} dateOfBirth={dateOfBirth} /> : null}
-                  {selectedIssue ? (
-                    <p className="mt-2 text-sm text-muted-foreground">
-                      Treatment: {treatmentAnswerText(selectedIssue.treatmentAnswer)}
-                    </p>
-                  ) : null}
                   <div className="mt-6 flex flex-wrap gap-2">
                     {showAddStep && entry ? (
                       <Button type="button" variant="outline" size="sm" onClick={() => startStep(entry)}>
@@ -823,13 +793,6 @@ export function HistoryTreeSection({
       />
     </div>
   )
-}
-
-function treatmentAnswerText(answer: TreatmentAnswer | ""): string {
-  if (answer === "none") return "None"
-  if (answer === "not_asked") return "not asked"
-  if (answer === "yes") return "Yes"
-  return ""
 }
 
 function StepEditor({
@@ -923,7 +886,6 @@ type SectionBodyProps = {
   onAddEvent?: (issueId: string, about: "self" | "significant_other", initialKind?: SmartEventKind) => void
   onAddNestedEvent?: (parentEventId: string, about: "self" | "significant_other") => void
   onAddCategory?: (about: "self" | "significant_other", eventType: EventType) => void
-  onTreatmentAnswer?: (issueId: string, value: TreatmentAnswer | "") => void
   onScreeningChange?: (key: HistoryQuestionKey, answer: ScreeningAnswer | "") => void
   hideScreeningControls?: boolean
   applyScreeningFilter?: boolean
@@ -952,7 +914,6 @@ function CategoryBlock({
   onAddEvent,
   onAddNestedEvent,
   onAddCategory,
-  onTreatmentAnswer,
   onScreeningChange,
   hideScreeningControls = false,
   applyScreeningFilter = false,
@@ -1034,7 +995,6 @@ function CategoryBlock({
           onOpen={onOpen}
           onAddEvent={onAddEvent}
           onAddNestedEvent={onAddNestedEvent}
-          onTreatmentAnswer={onTreatmentAnswer}
           selectedId={selectedId}
           readOnly={readOnly}
         />
@@ -1050,7 +1010,6 @@ function ConnectedList({
   onOpen,
   onAddEvent,
   onAddNestedEvent,
-  onTreatmentAnswer,
   selectedId,
   readOnly,
 }: {
@@ -1061,7 +1020,6 @@ function ConnectedList({
   onOpen: (id: string) => void
   onAddEvent?: (issueId: string, about: "self" | "significant_other", initialKind?: SmartEventKind) => void
   onAddNestedEvent?: (parentEventId: string, about: "self" | "significant_other") => void
-  onTreatmentAnswer?: (issueId: string, value: TreatmentAnswer | "") => void
   selectedId: string | null
   readOnly?: boolean
 }) {
@@ -1106,39 +1064,6 @@ function ConnectedList({
                   <span className={cn("mt-1 w-fit", statusColours.attention.pill)}>Needs who</span>
                 ) : null}
               </TreeLineRow>
-              {readOnly && node.treatmentAnswer ? (
-                <p className="px-1 py-1 text-xs text-muted-foreground">
-                  Treatment: {treatmentAnswerText(node.treatmentAnswer)}
-                </p>
-              ) : null}
-              {!readOnly && onTreatmentAnswer ? (
-                <div className="py-1 pl-1">
-                  <TreeInlineSelect
-                    id={`treatment_${node.id}`}
-                    label="Treatment"
-                    value={node.treatmentAnswer || ""}
-                    disabled={Boolean(node.children.some((child) => child.kind === "row" && child.tag === "Treatment"))}
-                    onChange={(next) => {
-                      const value = next === "yes" || next === "none" || next === "not_asked" ? next : ""
-                      onTreatmentAnswer(node.id, value)
-                    }}
-                  >
-                    <option value="">Select…</option>
-                    {TREATMENT_ANSWERS.map((option) => (
-                      <option
-                        key={option}
-                        value={option}
-                        disabled={
-                          node.children.some((child) => child.kind === "row" && child.tag === "Treatment") &&
-                          option !== "yes"
-                        }
-                      >
-                        {TREATMENT_ANSWER_LABELS[option]}
-                      </option>
-                    ))}
-                  </TreeInlineSelect>
-                </div>
-              ) : null}
               {node.children.length > 0 ? (
                 <ConnectedList
                   nodes={node.children}
@@ -1147,7 +1072,6 @@ function ConnectedList({
                   onOpen={onOpen}
                   onAddEvent={onAddEvent}
                   onAddNestedEvent={onAddNestedEvent}
-                  onTreatmentAnswer={onTreatmentAnswer}
                   selectedId={selectedId}
                   readOnly={readOnly}
                 />
@@ -1210,7 +1134,6 @@ function ConnectedList({
                   onOpen={onOpen}
                   onAddEvent={onAddEvent}
                   onAddNestedEvent={onAddNestedEvent}
-                  onTreatmentAnswer={onTreatmentAnswer}
                   selectedId={selectedId}
                   readOnly={readOnly}
                 />

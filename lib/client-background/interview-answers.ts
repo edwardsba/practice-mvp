@@ -265,6 +265,11 @@ export function detailsItemsInSection(
   return [...section.items, ...extraItems].filter((item) => isDetailsKind(item.kind))
 }
 
+/** "Answer 1 question first" / "Answer N questions first" (Confirm section helper). */
+export function answerQuestionsFirstLabel(unanswered: number): string {
+  return unanswered === 1 ? "Answer 1 question first" : `Answer ${unanswered} questions first`
+}
+
 /** Count of question items in the section that still have no answer. */
 export function unansweredQuestionCount(
   section: InterviewSectionDef,
@@ -293,14 +298,7 @@ export function confirmSectionAnswers(
   if (!section) return { ok: false, error: "Unknown interview section.", unanswered: 0 }
   const unanswered = unansweredQuestionCount(section, answers, extraItems)
   if (unanswered > 0) {
-    return {
-      ok: false,
-      error:
-        unanswered === 1
-          ? "Answer 1 question first"
-          : `Answer ${unanswered} questions first`,
-      unanswered,
-    }
+    return { ok: false, error: answerQuestionsFirstLabel(unanswered), unanswered }
   }
   const items = { ...answers.items }
   for (const item of [...section.items, ...extraItems]) {

@@ -1,50 +1,52 @@
 "use client"
 
 import Link from "next/link"
-import { useActionState, useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import { useRouter } from "next/navigation"
 
 import {
   completeBackgroundInterviewAction,
+  confirmInterviewSectionAction,
   saveEducationAction,
   saveIdentityAction,
   saveInterviewAnswersBulkAction,
   saveInterviewItemAnswerAction,
   saveLivingSituationAction,
-  saveMedicareInterviewAction,
   saveOccupationAction,
   updateBlockMemberAction,
-  type SaveMedicareInterviewState,
 } from "@/app/clients/[client_id]/background/actions"
-import { InterviewEditorPanel } from "@/components/client-background/interview-editor-panel"
-import { InterviewItemRow } from "@/components/client-background/interview-item-row"
-import { InterviewNumberedSection } from "@/components/client-background/interview-numbered-section"
 import {
   EducationFieldsEditor,
   IdentityFieldsEditor,
-  LivingFieldsEditor,
   OccupationFieldsEditor,
 } from "@/components/client-background/demographics-section"
-import { AutosaveFields, type SavePhase } from "@/components/client-background/interview-autosave"
+import { HistoryTreeSection } from "@/components/client-background/history-tree-section"
+import type { SavePhase } from "@/components/client-background/interview-autosave"
+import { InterviewConfirmSection } from "@/components/client-background/interview-confirm-section"
+import { InterviewDetailRow } from "@/components/client-background/interview-detail-row"
+import {
+  headingAnswerHasContent,
+  InterviewHeadingAnswer,
+} from "@/components/client-background/interview-heading-answer"
+import {
+  InterviewContactEditor,
+  InterviewEmergencyContactsEditor,
+  InterviewFieldsEditor,
+  InterviewFundingEditor,
+  InterviewLivingEditor,
+  InterviewMedicalContactsEditor,
+  InterviewMedicareEditor,
+} from "@/components/client-background/interview-item-editors"
+import { InterviewItemRow } from "@/components/client-background/interview-item-row"
+import { InterviewNumberedSection } from "@/components/client-background/interview-numbered-section"
 import {
   readSectionOpenState,
   writeSectionOpenState,
 } from "@/components/client-background/interview-section-card"
-import { HistoryTreeSection } from "@/components/client-background/history-tree-section"
 import { RelationshipBlocksSection } from "@/components/client-background/relationship-blocks-section"
 import { scrollToBackgroundCheck, WorthCheckingLinks } from "@/components/client-background/worth-checking"
-import {
-  ContactDetailsForm,
-  type ContactDetailsClient,
-} from "@/components/clients/contact-details-form"
-import { EmergencyContactsSection } from "@/components/emergency-contacts/emergency-contacts-section"
-import { InterviewFundingAddPanel } from "@/components/funding/interview-funding-add-panel"
-import { MedicareFields } from "@/components/funding/medicare-fields"
-import {
-  MedicalContactsSection,
-  type MedicalContactListItem,
-} from "@/components/medical-contacts/medical-contacts-section"
-import { ConfirmPrefilledDialog } from "@/components/shared/confirm-prefilled-dialog"
+import type { ContactDetailsClient } from "@/components/clients/contact-details-form"
+import type { MedicalContactListItem } from "@/components/medical-contacts/medical-contacts-section"
 import { SectionProgressChips } from "@/components/shared/section-progress-chips"
 import { Button } from "@/components/ui/button"
 import {
@@ -70,24 +72,33 @@ import type { HistoryQuestionKey, ScreeningAnswers } from "@/lib/client-backgrou
 import {
   applyNothingToRecord,
   blockAnswersFromInterview,
-  confirmAllShownInSection,
   dropMissingPerRecordAnswers,
   formatSectionList,
   INTERVIEW_SECTIONS,
+  interviewItemDef,
   interviewSectionStatus,
+  isDetailsKind,
   perRecordContactId,
   S4_EC_PREFIX,
   S4_MC_PREFIX,
   section4ExtraItems,
-  sectionHasConfirmAllTargets,
+  sectionsNotConfirmed,
+  unansweredQuestionCount,
+  type BlockAnswerMirrorKey,
   type InterviewAnswerValue,
   type InterviewAnswersJson,
   type InterviewItemDef,
+  type InterviewSectionDef,
 } from "@/lib/client-background/interview-answers"
 import {
   householdAloneContradiction,
   interviewContradictionNotes,
 } from "@/lib/client-background/interview-contradictions"
+import {
+  detailPresenceForInterview,
+  detailPresenceForSection,
+  sectionByNumber,
+} from "@/lib/client-background/interview-detail-presence"
 import { personLivesWithClient } from "@/lib/client-background/household"
 import {
   claimGroupFactLines,
@@ -114,6 +125,13 @@ import {
   formatSection3FactLines,
   formatSiblingFacts,
 } from "@/lib/client-background/interview-facts"
+import {
+  headingAddNeedsYes,
+  interviewItemKeyForTreeHeading,
+  interviewYesItemForTreeHeading,
+  type RelationshipTreeHeading,
+  type TreeHeadingRef,
+} from "@/lib/client-background/interview-tree-headings"
 import type {
   ClientBackgroundData,
   Demographics,
@@ -130,20 +148,20 @@ import type { SectionStatus } from "@/lib/section-status"
 import { statusColours } from "@/lib/ui/status-colours"
 import { cn } from "@/lib/utils"
 
+/** Side-panel editors for sections 1–4 and 7. */
 type EditorKey =
   | "contact"
   | "medicare"
-  | "emergency"
-  | "medical"
   | "funding"
   | "identity"
   | "education"
   | "occupation"
-  | "intimate"
-  | "caregivers"
+  | "emergency"
+  | "medical"
   | "living"
-  | "history-client"
-  | "history-family"
+
+/** Sections answered under the relationship and history tree headings. */
+const TREE_SECTIONS = new Set([5, 6, 8, 9])
 
 function clientAge(dateOfBirth: string | null) {
   if (!dateOfBirth) return ""
@@ -165,11 +183,7 @@ function editorForItem(itemKey: string): EditorKey | null {
   if (itemKey === "s3_identity" || itemKey === "s3_disability") return "identity"
   if (itemKey === "s3_education") return "education"
   if (itemKey === "s3_occupation" || itemKey === "s3_financial") return "occupation"
-  if (itemKey.startsWith("s5_")) return "intimate"
-  if (itemKey.startsWith("s6_")) return "caregivers"
   if (itemKey.startsWith("s7_")) return "living"
-  if (itemKey.startsWith("s8_")) return "history-client"
-  if (itemKey.startsWith("s9_")) return "history-family"
   return null
 }
 
@@ -220,7 +234,6 @@ export function InterviewPage({
   lrampStartHref?: string | null
 }) {
   const router = useRouter()
-  const [fundingAddOpen, setFundingAddOpen] = useState(false)
   const identityRef = useRef(data.demographics.identity)
   const educationRef = useRef(data.demographics.education)
   const occupationRef = useRef(data.demographics.occupation)
@@ -258,20 +271,20 @@ export function InterviewPage({
   const [screening, setScreening] = useState(initialScreening)
   const [events, setEvents] = useState(data.events)
   const [issues, setIssues] = useState<HistoryIssue[]>(data.issues ?? [])
+  const [confirmingSection, setConfirmingSection] = useState<number | null>(null)
+  const [confirmErrors, setConfirmErrors] = useState<Record<number, string>>({})
   const [notFinishedOpen, setNotFinishedOpen] = useState(false)
   const [notFinishedSections, setNotFinishedSections] = useState<number[]>([])
-  const [confirmPrefilledOpen, setConfirmPrefilledOpen] = useState(false)
-  const [confirmPrefilledSections, setConfirmPrefilledSections] = useState<number[]>([])
   const [worthCheckingOpen, setWorthCheckingOpen] = useState(false)
   const [worthChecks, setWorthChecks] = useState<BackgroundCheck[]>([])
   const [completing, setCompleting] = useState(false)
   const [completeError, setCompleteError] = useState<string | null>(null)
-  const [confirmAllOnComplete, setConfirmAllOnComplete] = useState(false)
   const answerToken = useRef(0)
 
   const age = clientAge(data.dateOfBirth)
   const suggestions = selfReport ? backgroundAnswersToClientBackground(selfReport.answers) : null
   const received = selfReport ? formatReceived(selfReport.assessmentDate) : ""
+  const clientFirstName = clientName.split(/\s+/)[0] || clientName
 
   useEffect(() => {
     // sessionStorage is browser-only; hydrate open state after mount.
@@ -293,6 +306,16 @@ export function InterviewPage({
   const onPhase = useCallback((id: string, phase: SavePhase, retry: (() => void) | null) => {
     setPhases((current) => ({ ...current, [id]: { phase, retry } }))
   }, [])
+
+  // Sections 5 and 6 each mount a relationship tree; keep their save states apart.
+  const onIntimatePhase = useCallback(
+    (id: string, phase: SavePhase, retry: (() => void) | null) => onPhase(`${id}:intimate`, phase, retry),
+    [onPhase]
+  )
+  const onCaregiversPhase = useCallback(
+    (id: string, phase: SavePhase, retry: (() => void) | null) => onPhase(`${id}:caregivers`, phase, retry),
+    [onPhase]
+  )
 
   const registerFlush = useCallback((flush: () => Promise<void>) => {
     flushers.current.add(flush)
@@ -319,15 +342,6 @@ export function InterviewPage({
   const onBlockAnswers = useCallback((next: RelationshipBlockAnswers) => {
     answersRef.current = next
     setBlockAnswers(next)
-  }, [])
-
-  const syncDemographicsFromRefs = useCallback(() => {
-    setDemographics({
-      identity: identityRef.current,
-      education: educationRef.current,
-      occupation: occupationRef.current,
-      livingSituation: livingRef.current,
-    })
   }, [])
 
   const getChecks = useCallback(
@@ -371,13 +385,18 @@ export function InterviewPage({
 
   async function flushAll() {
     await Promise.all([...flushers.current].map((flush) => flush()))
-    syncDemographicsFromRefs()
   }
 
-  async function closeEditor() {
-    await flushAll()
+  function closeEditor() {
     setOpenEditor(null)
-    setFundingAddOpen(false)
+  }
+
+  function scrollToSection(sectionNumber: number) {
+    requestAnimationFrame(() => {
+      document
+        .getElementById(`interview-section-${sectionNumber}`)
+        ?.scrollIntoView({ behavior: "smooth", block: "start" })
+    })
   }
 
   function openSections(numbers: number[]) {
@@ -385,11 +404,7 @@ export function InterviewPage({
       setSection(String(number), true)
     }
     const first = numbers[0]
-    if (first) {
-      requestAnimationFrame(() => {
-        document.getElementById(`interview-section-${first}`)?.scrollIntoView({ behavior: "smooth", block: "start" })
-      })
-    }
+    if (first) scrollToSection(first)
   }
 
   function jumpToCheck(check: BackgroundCheck) {
@@ -427,19 +442,14 @@ export function InterviewPage({
     setInterviewAnswers(nextAnswers)
     if (nextScreening) setScreening(nextScreening)
     const mirrors = blockAnswersFromInterview(nextAnswers)
-    if (Object.keys(mirrors).length > 0) {
-      const merged: RelationshipBlockAnswers = { ...answersRef.current }
-      if (mirrors.previousRelationships) merged.previousRelationships = mirrors.previousRelationships
-      if (mirrors.motherOtherRelationships) {
-        merged.motherOtherRelationships = mirrors.motherOtherRelationships
-      }
-      if (mirrors.fatherOtherRelationships) {
-        merged.fatherOtherRelationships = mirrors.fatherOtherRelationships
-      }
-      if (mirrors.caregiverArrangements) merged.caregiverArrangements = mirrors.caregiverArrangements
-      answersRef.current = merged
-      setBlockAnswers(merged)
-    }
+    const current = answersRef.current
+    const changed = (Object.keys(mirrors) as BlockAnswerMirrorKey[]).filter(
+      (key) => mirrors[key] !== current[key]
+    )
+    if (changed.length === 0) return
+    const merged: RelationshipBlockAnswers = { ...current }
+    for (const key of changed) merged[key] = mirrors[key] ?? current[key]
+    onBlockAnswers(merged)
   }
 
   async function selectAnswer(itemKey: string, value: InterviewAnswerValue) {
@@ -467,60 +477,88 @@ export function InterviewPage({
     onPhase("answers", "saved", null)
   }
 
-  async function confirmAllShown(sectionNumber: number) {
-    const extras = sectionExtraItems(sectionNumber)
-    const next = confirmAllShownInSection(interviewAnswers, sectionNumber, extras)
-    onPhase("answers", "saving", null)
-    const result = await saveInterviewAnswersBulkAction(clientId, next)
-    if (result.error || !result.answers) {
-      onPhase("answers", "error", () => void confirmAllShown(sectionNumber))
-      return
-    }
-    applyLocalMirrors(result.answers, result.screening)
-    onPhase("answers", "saved", null)
-  }
-
   function sectionExtraItems(sectionNumber: number): InterviewItemDef[] {
     if (sectionNumber !== 4) return []
     return section4ExtraItems(section4ExtraInput)
   }
 
-  function unfinishedSectionNumbers(
-    answers: InterviewAnswersJson,
-    status: "left" | "to_confirm"
-  ): number[] {
-    return INTERVIEW_SECTIONS.filter((section) => {
-      const extras = sectionExtraItems(section.number)
-      return interviewSectionStatus(section, answers, extras).status === status
-    }).map((section) => section.number)
+  /** Details on file right now, read from refs so tree saves just flushed are included. */
+  function currentDetailPresence() {
+    return detailPresenceForInterview({
+      clientDisplayName: clientName,
+      preferredName: contactClient.preferredName,
+      dateOfBirth: contactClient.dateOfBirth,
+      ageLabel: age,
+      phone: contactClient.phone,
+      email: contactClient.email,
+      address: contactClient.address,
+      comms: contactComms,
+      demographics: {
+        identity: identityRef.current,
+        education: educationRef.current,
+        occupation: occupationRef.current,
+        livingSituation: livingRef.current,
+      },
+      relationships: relationshipsRef.current,
+      blocks: blocksRef.current,
+      emergencyContacts: emergencyContactRows.map((row) => ({
+        id: row.contactId,
+        name: row.name,
+        role: row.role,
+        phone: row.phone,
+        email: row.email,
+      })),
+      medicalContacts: medicalContactLines.map((line) => ({
+        id: line.id,
+        name: line.name,
+        organisationName: line.organisationName,
+        phone: line.phone,
+        isMain: line.isMain,
+      })),
+    })
+  }
+
+  async function confirmSection(sectionNumber: number) {
+    const section = sectionByNumber(sectionNumber)
+    if (!section || confirmingSection != null) return
+    setConfirmingSection(sectionNumber)
+    setConfirmErrors((current) => {
+      const next = { ...current }
+      delete next[sectionNumber]
+      return next
+    })
+    await flushAll()
+    const extras = sectionExtraItems(sectionNumber)
+    const detailHasValue = detailPresenceForSection(section, currentDetailPresence(), extras)
+    onPhase("answers", "saving", null)
+    const result = await confirmInterviewSectionAction(clientId, sectionNumber, detailHasValue, extras)
+    setConfirmingSection(null)
+    if (result.error || !result.answers) {
+      onPhase("answers", "error", () => void confirmSection(sectionNumber))
+      setConfirmErrors((current) => ({
+        ...current,
+        [sectionNumber]: result.error ?? "Could not confirm this section.",
+      }))
+      return
+    }
+    applyLocalMirrors(result.answers, result.screening)
+    onPhase("answers", "saved", null)
+    setSection(String(sectionNumber), false)
+    scrollToSection(sectionNumber)
   }
 
   async function beginComplete() {
     await flushAll()
-    const left = [
-      ...unfinishedSectionNumbers(interviewAnswers, "left"),
-      ...INTERVIEW_SECTIONS.filter((section) => {
-        const extras = sectionExtraItems(section.number)
-        return interviewSectionStatus(section, interviewAnswers, extras).status === "not_started"
-      }).map((section) => section.number),
-    ]
-    const leftUnique = [...new Set(left)].sort((a, b) => a - b)
-    if (leftUnique.length > 0) {
-      setNotFinishedSections(leftUnique)
+    const unconfirmed = sectionsNotConfirmed(interviewAnswers)
+    if (unconfirmed.length > 0) {
+      setNotFinishedSections(unconfirmed)
       setNotFinishedOpen(true)
       return
     }
-    const toConfirm = unfinishedSectionNumbers(interviewAnswers, "to_confirm")
-    if (toConfirm.length > 0) {
-      setConfirmPrefilledSections(toConfirm)
-      setConfirmPrefilledOpen(true)
-      return
-    }
-    openWorthChecking(false)
+    openWorthChecking()
   }
 
-  function openWorthChecking(confirmAll: boolean) {
-    setConfirmAllOnComplete(confirmAll)
+  function openWorthChecking() {
     const base = getChecks({
       screening,
       events,
@@ -548,9 +586,7 @@ export function InterviewPage({
   async function finishComplete() {
     setCompleting(true)
     setCompleteError(null)
-    const result = await completeBackgroundInterviewAction(clientId, selfReport?.resultId ?? null, {
-      confirmAllItems: confirmAllOnComplete,
-    })
+    const result = await completeBackgroundInterviewAction(clientId, selfReport?.resultId ?? null)
     if (result.error) {
       setCompleting(false)
       setCompleteError(result.error)
@@ -593,27 +629,25 @@ export function InterviewPage({
     return interviewSectionStatus(section, interviewAnswers, extras)
   })
 
-  const section1Facts = useMemo(
-    () =>
-      section1FactLines({
-        preferredName: contactClient.preferredName,
-        dateOfBirth: contactClient.dateOfBirth,
-        ageLabel: age,
-        phone: contactClient.phone,
-        email: contactClient.email,
-        address: contactClient.address,
-        comms: {
-          commsOptOut: contactClient.commsOptOut,
-          reminderOptOut: contactClient.reminderOptOut,
-          preSessionOptOut: contactClient.preSessionOptOut,
-          postSessionOptOut: contactClient.postSessionOptOut,
-          adminCommsOptOut: contactClient.adminCommsOptOut,
-          onlineBookingPermitted: contactClient.onlineBookingPermitted,
-        },
-        clientDisplayName: clientName,
-      }),
-    [age, clientName, contactClient]
-  )
+  const contactComms = {
+    commsOptOut: contactClient.commsOptOut,
+    reminderOptOut: contactClient.reminderOptOut,
+    preSessionOptOut: contactClient.preSessionOptOut,
+    postSessionOptOut: contactClient.postSessionOptOut,
+    adminCommsOptOut: contactClient.adminCommsOptOut,
+    onlineBookingPermitted: contactClient.onlineBookingPermitted,
+  }
+
+  const section1Facts = section1FactLines({
+    preferredName: contactClient.preferredName,
+    dateOfBirth: contactClient.dateOfBirth,
+    ageLabel: age,
+    phone: contactClient.phone,
+    email: contactClient.email,
+    address: contactClient.address,
+    comms: contactComms,
+    clientDisplayName: clientName,
+  })
 
   const medicareClaim = useMemo(() => pickMedicareClaim(interviewClaims), [interviewClaims])
 
@@ -778,295 +812,168 @@ export function InterviewPage({
   const contradictionByKey: Record<string, string> = {}
   for (const note of contradictionNotes) contradictionByKey[note.itemKey] = note.message
 
-  function renderEditor(sectionNumber: number) {
-    if (sectionNumber === 1 && openEditor === "contact") {
+  function detailLabel(item: InterviewItemDef): string {
+    if (item.key.startsWith(S4_EC_PREFIX)) return "Emergency contact"
+    if (item.key.startsWith(S4_MC_PREFIX)) {
+      const id = perRecordContactId(item.key)
+      return id && gpMedicalIds.has(id) ? "GP" : "Treating professional"
+    }
+    return item.label
+  }
+
+  function renderDetailRow(item: InterviewItemDef) {
+    const editor = editorForItem(item.key)
+    return (
+      <div key={item.key} id={`check-contradiction-${item.key}`} className="scroll-mt-36">
+        <InterviewDetailRow
+          label={detailLabel(item)}
+          answer={interviewAnswers.items[item.key]}
+          factLines={factLinesForItem(item.key)}
+          contradictionNote={contradictionByKey[item.key] ?? null}
+          onEdit={editor ? () => setOpenEditor(editor) : undefined}
+        />
+      </div>
+    )
+  }
+
+  function renderQuestionRow(item: InterviewItemDef) {
+    const editor = editorForItem(item.key)
+    return (
+      <div key={item.key} id={`check-contradiction-${item.key}`} className="scroll-mt-36">
+        <InterviewItemRow
+          label={item.label}
+          kind={item.kind}
+          answer={interviewAnswers.items[item.key]}
+          factLines={factLinesForItem(item.key)}
+          contradictionNote={contradictionByKey[item.key] ?? null}
+          showEdit={Boolean(editor)}
+          editing={editor != null && openEditor === editor}
+          onEdit={editor ? () => setOpenEditor(editor) : undefined}
+          onSelect={(value) => void selectAnswer(item.key, value)}
+        />
+      </div>
+    )
+  }
+
+  /** Sections 1–4 and 7: details as overview rows (grouped), questions with their buttons. */
+  function renderItemRows(section: InterviewSectionDef) {
+    const rows =
+      section.number === 4
+        ? section.items.flatMap((item) => [item, ...extraItemsAfterParent(item.key)])
+        : section.items
+    const groups: InterviewItemDef[][] = []
+    for (const item of rows) {
+      const last = groups[groups.length - 1]
+      if (last && isDetailsKind(item.kind) && isDetailsKind(last[0].kind)) last.push(item)
+      else groups.push([item])
+    }
+    return (
+      <div className="space-y-3">
+        {groups.map((group) =>
+          isDetailsKind(group[0].kind) ? (
+            <div key={group[0].key} className="divide-y rounded-md border">
+              {group.map(renderDetailRow)}
+            </div>
+          ) : (
+            renderQuestionRow(group[0])
+          )
+        )}
+      </div>
+    )
+  }
+
+  function headingAnswer(ref: TreeHeadingRef): ReactNode {
+    const key = interviewItemKeyForTreeHeading(ref)
+    const item = key ? interviewItemDef(key) : undefined
+    if (!key || !item) return null
+    const answer = interviewAnswers.items[key]
+    const note = contradictionByKey[key] ?? null
+    if (!headingAnswerHasContent(item, answer, note)) return null
+    return (
+      <InterviewHeadingAnswer
+        item={item}
+        answer={answer}
+        contradictionNote={note}
+        onSelect={(value) => void selectAnswer(key, value)}
+      />
+    )
+  }
+
+  /** ⊕ under a heading means the answer to its question is Yes. */
+  function headingAddYes(ref: TreeHeadingRef) {
+    const key = interviewYesItemForTreeHeading(ref)
+    if (!key || !headingAddNeedsYes(interviewAnswers.items[key])) return
+    void selectAnswer(key, "yes")
+  }
+
+  const relationshipTreeProps = {
+    clientId,
+    relationships,
+    blocks,
+    blockAnswers,
+    relationshipStatus,
+    onRelationships,
+    onBlocks,
+    onBlockAnswers,
+    onRelationshipStatus,
+    registerFlush,
+    embedWithoutChrome: true,
+    hideTopLevelAnswers: true,
+    renderHeadingAnswer: (heading: RelationshipTreeHeading) => headingAnswer({ tree: "relationships", heading }),
+    onHeadingAdd: (heading: RelationshipTreeHeading) => headingAddYes({ tree: "relationships", heading }),
+  }
+
+  const historyTreeProps = {
+    clientId,
+    clientName: clientFirstName,
+    dateOfBirth: data.dateOfBirth,
+    events,
+    relationships,
+    screening,
+    medicalContacts,
+    professionals,
+    issues,
+    presentation: "interview" as const,
+    hideScreeningControls: true,
+    onEventsChange: setEvents,
+    onIssuesChange: setIssues,
+    historyClient: suggestions?.history,
+    renderHeadingAnswer: (screeningKey: HistoryQuestionKey) => headingAnswer({ tree: "history", screeningKey }),
+    onHeadingAdd: (screeningKey: HistoryQuestionKey) => headingAddYes({ tree: "history", screeningKey }),
+  }
+
+  /** Sections 5, 6, 8, 9: the shared trees, with each question answered under its heading. */
+  function renderTreeSection(sectionNumber: number) {
+    if (sectionNumber === 5) {
       return (
-        <InterviewEditorPanel onDone={() => void closeEditor()}>
-          <ContactDetailsForm clientId={clientId} client={contactClient} mode="embedded" />
-        </InterviewEditorPanel>
+        <RelationshipBlocksSection
+          {...relationshipTreeProps}
+          onPhase={onIntimatePhase}
+          relationshipClient={suggestions?.relationshipStatus}
+          childrenPrompt={suggestions?.numberOfChildren?.label ?? null}
+          visibleSections={["intimate"]}
+        />
       )
     }
-    if (sectionNumber === 2 && openEditor === "medicare") {
+    if (sectionNumber === 6) {
       return (
-        <InterviewEditorPanel onDone={() => void closeEditor()}>
-          <InterviewMedicareForm
-            clientId={clientId}
-            medicareCardNumber={medicareClaim?.medicareCardNumber}
-            medicareIrn={medicareClaim?.medicareIrn}
-            medicareExpiry={medicareClaim?.medicareExpiry}
-          />
-        </InterviewEditorPanel>
+        <RelationshipBlocksSection
+          {...relationshipTreeProps}
+          onPhase={onCaregiversPhase}
+          visibleSections={["caregivers"]}
+        />
       )
     }
-    if (sectionNumber === 4 && openEditor === "emergency") {
+    if (sectionNumber === 8) {
       return (
-        <InterviewEditorPanel onDone={() => void closeEditor()}>
-          <div className="-mx-4">
-            <EmergencyContactsSection clientId={clientId} contacts={emergencyContactRows} />
-          </div>
-        </InterviewEditorPanel>
+        <HistoryTreeSection
+          {...historyTreeProps}
+          groupFilter="client"
+          medicationClient={suggestions?.medication}
+        />
       )
     }
-    if (sectionNumber === 4 && openEditor === "medical") {
-      return (
-        <InterviewEditorPanel onDone={() => void closeEditor()}>
-          <MedicalContactsSection
-            clientId={clientId}
-            contacts={medicalContactItems}
-            professionals={professionals}
-          />
-        </InterviewEditorPanel>
-      )
-    }
-    if (sectionNumber === 2 && openEditor === "funding") {
-      return (
-        <InterviewEditorPanel onDone={() => void closeEditor()}>
-          <button
-            type="button"
-            className="inline-flex min-h-11 items-center text-sm font-medium text-primary hover:underline"
-            onClick={() => setFundingAddOpen(true)}
-          >
-            + Add referral or funding approval
-          </button>
-          <InterviewFundingAddPanel
-            clientId={clientId}
-            practiceId={practiceId}
-            formOptions={referralFormOptions}
-            open={fundingAddOpen}
-            onOpenChange={setFundingAddOpen}
-          />
-        </InterviewEditorPanel>
-      )
-    }
-    if (sectionNumber === 3 && openEditor === "identity") {
-      return (
-        <InterviewEditorPanel onDone={() => void closeEditor()}>
-          <AutosaveFields
-            saved={demographics.identity}
-            save={async (value) => {
-              identityRef.current = value
-              const result = await saveIdentityAction(clientId, value)
-              if ("error" in result && result.error) return { error: result.error }
-              if (!("identity" in result) || !result.identity) return { error: "Could not save." }
-              identityRef.current = result.identity
-              return { value: result.identity }
-            }}
-            onPhase={(phase, retry) => onPhase("identity", phase, retry)}
-            registerFlush={registerFlush}
-          >
-            {(value, onChange, commit) => {
-              identityRef.current = value
-              return (
-                <IdentityFieldsEditor
-                  value={value}
-                  onChange={onChange}
-                  onCommit={commit}
-                  client={suggestions?.identity}
-                />
-              )
-            }}
-          </AutosaveFields>
-        </InterviewEditorPanel>
-      )
-    }
-    if (sectionNumber === 3 && openEditor === "education") {
-      return (
-        <InterviewEditorPanel onDone={() => void closeEditor()}>
-          <AutosaveFields
-            saved={demographics.education}
-            save={async (value) => {
-              educationRef.current = value
-              const result = await saveEducationAction(clientId, value)
-              if ("error" in result && result.error) return { error: result.error }
-              if (!("education" in result) || !result.education) return { error: "Could not save." }
-              educationRef.current = result.education
-              return { value: result.education }
-            }}
-            onPhase={(phase, retry) => onPhase("education", phase, retry)}
-            registerFlush={registerFlush}
-          >
-            {(value, onChange, commit) => {
-              educationRef.current = value
-              return (
-                <EducationFieldsEditor
-                  value={value}
-                  onChange={onChange}
-                  onCommit={commit}
-                  client={suggestions?.education}
-                />
-              )
-            }}
-          </AutosaveFields>
-        </InterviewEditorPanel>
-      )
-    }
-    if (sectionNumber === 3 && openEditor === "occupation") {
-      return (
-        <InterviewEditorPanel onDone={() => void closeEditor()}>
-          <AutosaveFields
-            saved={demographics.occupation}
-            save={async (value) => {
-              occupationRef.current = value
-              const result = await saveOccupationAction(clientId, value)
-              if ("error" in result && result.error) return { error: result.error }
-              if (!("occupation" in result) || !result.occupation) return { error: "Could not save." }
-              occupationRef.current = result.occupation
-              return { value: result.occupation }
-            }}
-            onPhase={(phase, retry) => onPhase("occupation", phase, retry)}
-            registerFlush={registerFlush}
-          >
-            {(value, onChange, commit) => {
-              occupationRef.current = value
-              return (
-                <OccupationFieldsEditor
-                  value={value}
-                  onChange={onChange}
-                  onCommit={commit}
-                  client={suggestions?.occupation}
-                />
-              )
-            }}
-          </AutosaveFields>
-        </InterviewEditorPanel>
-      )
-    }
-    if (sectionNumber === 5 && openEditor === "intimate") {
-      return (
-        <InterviewEditorPanel onDone={() => void closeEditor()}>
-          <RelationshipBlocksSection
-            clientId={clientId}
-            relationships={relationships}
-            blocks={blocks}
-            blockAnswers={blockAnswers}
-            relationshipStatus={relationshipStatus}
-            onRelationships={onRelationships}
-            onBlocks={onBlocks}
-            onBlockAnswers={onBlockAnswers}
-            onRelationshipStatus={onRelationshipStatus}
-            onPhase={onPhase}
-            registerFlush={registerFlush}
-            relationshipClient={suggestions?.relationshipStatus}
-            childrenPrompt={suggestions?.numberOfChildren?.label ?? null}
-            visibleSections={["intimate"]}
-            embedWithoutChrome
-            hideTopLevelAnswers
-          />
-        </InterviewEditorPanel>
-      )
-    }
-    if (sectionNumber === 6 && openEditor === "caregivers") {
-      return (
-        <InterviewEditorPanel onDone={() => void closeEditor()}>
-          <RelationshipBlocksSection
-            clientId={clientId}
-            relationships={relationships}
-            blocks={blocks}
-            blockAnswers={blockAnswers}
-            relationshipStatus={relationshipStatus}
-            onRelationships={onRelationships}
-            onBlocks={onBlocks}
-            onBlockAnswers={onBlockAnswers}
-            onRelationshipStatus={onRelationshipStatus}
-            onPhase={onPhase}
-            registerFlush={registerFlush}
-            visibleSections={["caregivers"]}
-            embedWithoutChrome
-            hideTopLevelAnswers
-          />
-        </InterviewEditorPanel>
-      )
-    }
-    if (sectionNumber === 7 && openEditor === "living") {
-      return (
-        <InterviewEditorPanel onDone={() => void closeEditor()}>
-          <AutosaveFields
-            saved={demographics.livingSituation}
-            save={async (value) => {
-              livingRef.current = value
-              const result = await saveLivingSituationAction(clientId, value)
-              if ("error" in result && result.error) return { error: result.error }
-              if (!("livingSituation" in result) || !result.livingSituation) {
-                return { error: "Could not save." }
-              }
-              livingRef.current = result.livingSituation
-              return { value: result.livingSituation }
-            }}
-            onPhase={(phase, retry) => onPhase("living", phase, retry)}
-            registerFlush={registerFlush}
-          >
-            {(value, onChange, commit) => {
-              livingRef.current = value
-              return (
-                <LivingFieldsEditor
-                  value={value}
-                  relationships={relationships}
-                  onChange={onChange}
-                  onCommit={commit}
-                  onPersonChange={async (person) => {
-                    onRelationships(
-                      relationships.map((row) =>
-                        row.relationshipRecordId === person.relationshipRecordId ? person : row
-                      )
-                    )
-                    await updateBlockMemberAction(clientId, person)
-                  }}
-                  client={suggestions?.living}
-                />
-              )
-            }}
-          </AutosaveFields>
-        </InterviewEditorPanel>
-      )
-    }
-    if (sectionNumber === 8 && openEditor === "history-client") {
-      return (
-        <InterviewEditorPanel onDone={() => void closeEditor()}>
-          <HistoryTreeSection
-            clientId={clientId}
-            clientName={clientName.split(/\s+/)[0] || clientName}
-            dateOfBirth={data.dateOfBirth}
-            events={events}
-            relationships={relationships}
-            screening={screening}
-            medicalContacts={medicalContacts}
-            professionals={professionals}
-            issues={issues}
-            presentation="interview"
-            groupFilter="client"
-            hideScreeningControls
-            onEventsChange={setEvents}
-            onIssuesChange={setIssues}
-            medicationClient={suggestions?.medication}
-            historyClient={suggestions?.history}
-          />
-        </InterviewEditorPanel>
-      )
-    }
-    if (sectionNumber === 9 && openEditor === "history-family") {
-      return (
-        <InterviewEditorPanel onDone={() => void closeEditor()}>
-          <HistoryTreeSection
-            clientId={clientId}
-            clientName={clientName.split(/\s+/)[0] || clientName}
-            dateOfBirth={data.dateOfBirth}
-            events={events}
-            relationships={relationships}
-            screening={screening}
-            medicalContacts={medicalContacts}
-            professionals={professionals}
-            issues={issues}
-            presentation="interview"
-            groupFilter="significant_other"
-            hideScreeningControls
-            onEventsChange={setEvents}
-            onIssuesChange={setIssues}
-            historyClient={suggestions?.history}
-          />
-        </InterviewEditorPanel>
-      )
-    }
-    return null
+    return <HistoryTreeSection {...historyTreeProps} groupFilter="significant_other" />
   }
 
   return (
@@ -1094,11 +1001,7 @@ export function InterviewPage({
             sections={sectionStatuses}
             onSelect={(section) => {
               setSection(section.letter, true)
-              requestAnimationFrame(() => {
-                document
-                  .getElementById(`interview-section-${section.letter}`)
-                  ?.scrollIntoView({ behavior: "smooth", block: "start" })
-              })
+              scrollToSection(Number(section.letter))
             }}
           />
         </div>
@@ -1115,21 +1018,6 @@ export function InterviewPage({
         {INTERVIEW_SECTIONS.map((section) => {
           const sectionExtras = section.number === 4 ? section4Extras : []
           const status = interviewSectionStatus(section, interviewAnswers, sectionExtras)
-          const allSectionItems =
-            section.number === 4
-              ? section.items.flatMap((item) => {
-                  const rows: InterviewItemDef[] = [item]
-                  rows.push(...extraItemsAfterParent(item.key))
-                  return rows
-                })
-              : section.items
-          const unanswered = allSectionItems.some((item) => !interviewAnswers.items[item.key])
-          const showConfirmAll = sectionHasConfirmAllTargets(
-            interviewAnswers,
-            section.number,
-            sectionExtras
-          )
-          const sectionEditor = renderEditor(section.number)
           return (
             <InterviewNumberedSection
               key={section.id}
@@ -1137,58 +1025,148 @@ export function InterviewPage({
               open={Boolean(sectionOpen[String(section.number)] ?? section.number <= 2)}
               onToggle={() => toggleSection(String(section.number))}
             >
-              {(section.nothingToRecord && unanswered) || showConfirmAll ? (
-                <div className="flex flex-wrap gap-2">
-                  {section.nothingToRecord && unanswered ? (
-                    <button
-                      type="button"
-                      className="inline-flex min-h-11 flex-1 items-center justify-center rounded-md border border-dashed px-3 text-sm"
-                      onClick={() => void nothingToRecord(section.number)}
-                    >
-                      Nothing to record
-                    </button>
-                  ) : null}
-                  {showConfirmAll ? (
-                    <button
-                      type="button"
-                      className="inline-flex min-h-11 flex-1 items-center justify-center rounded-md border px-3 text-sm font-medium"
-                      onClick={() => void confirmAllShown(section.number)}
-                    >
-                      Confirm all shown
-                    </button>
-                  ) : null}
-                </div>
-              ) : null}
-
-              <div className="space-y-3">
-                {allSectionItems.map((item) => {
-                  const editor = editorForItem(item.key)
-                  const showEdit = Boolean(editor)
-                  return (
-                    <InterviewItemRow
-                      key={item.key}
-                      label={item.label}
-                      kind={item.kind}
-                      answer={interviewAnswers.items[item.key]}
-                      factLines={factLinesForItem(item.key)}
-                      contradictionNote={contradictionByKey[item.key] ?? null}
-                      showEdit={showEdit}
-                      editing={editor != null && openEditor === editor}
-                      onEdit={() => {
-                        if (editor) setOpenEditor(editor)
-                      }}
-                      onSelect={(value) => void selectAnswer(item.key, value)}
-                    />
-                  )
-                })}
-              </div>
-
-              {sectionEditor}
+              {TREE_SECTIONS.has(section.number)
+                ? renderTreeSection(section.number)
+                : renderItemRows(section)}
+              <InterviewConfirmSection
+                unansweredQuestions={unansweredQuestionCount(section, interviewAnswers, sectionExtras)}
+                showNothingToRecord={section.nothingToRecord}
+                confirming={confirmingSection === section.number}
+                error={confirmErrors[section.number] ?? null}
+                onNothingToRecord={() => void nothingToRecord(section.number)}
+                onConfirm={() => void confirmSection(section.number)}
+              />
             </InterviewNumberedSection>
           )
         })}
-
       </div>
+
+      {openEditor === "contact" ? (
+        <InterviewContactEditor clientId={clientId} client={contactClient} onClose={closeEditor} />
+      ) : null}
+      {openEditor === "medicare" ? (
+        <InterviewMedicareEditor
+          clientId={clientId}
+          medicareCardNumber={medicareClaim?.medicareCardNumber}
+          medicareIrn={medicareClaim?.medicareIrn}
+          medicareExpiry={medicareClaim?.medicareExpiry}
+          onClose={closeEditor}
+        />
+      ) : null}
+      {openEditor === "funding" ? (
+        <InterviewFundingEditor
+          clientId={clientId}
+          practiceId={practiceId}
+          formOptions={referralFormOptions}
+          onClose={closeEditor}
+        />
+      ) : null}
+      {openEditor === "identity" ? (
+        <InterviewFieldsEditor
+          title="Identity"
+          saved={demographics.identity}
+          save={async (value) => {
+            const result = await saveIdentityAction(clientId, value)
+            if ("error" in result && result.error) return { error: result.error }
+            if (!("identity" in result) || !result.identity) return { error: "Could not save." }
+            const identity = result.identity
+            identityRef.current = identity
+            setDemographics((current) => ({ ...current, identity }))
+            return {}
+          }}
+          onClose={closeEditor}
+        >
+          {(value, onChange) => (
+            <IdentityFieldsEditor value={value} onChange={onChange} client={suggestions?.identity} />
+          )}
+        </InterviewFieldsEditor>
+      ) : null}
+      {openEditor === "education" ? (
+        <InterviewFieldsEditor
+          title="Education"
+          saved={demographics.education}
+          save={async (value) => {
+            const result = await saveEducationAction(clientId, value)
+            if ("error" in result && result.error) return { error: result.error }
+            if (!("education" in result) || !result.education) return { error: "Could not save." }
+            const education = result.education
+            educationRef.current = education
+            setDemographics((current) => ({ ...current, education }))
+            return {}
+          }}
+          onClose={closeEditor}
+        >
+          {(value, onChange) => (
+            <EducationFieldsEditor value={value} onChange={onChange} client={suggestions?.education} />
+          )}
+        </InterviewFieldsEditor>
+      ) : null}
+      {openEditor === "occupation" ? (
+        <InterviewFieldsEditor
+          title="Occupation"
+          saved={demographics.occupation}
+          save={async (value) => {
+            const result = await saveOccupationAction(clientId, value)
+            if ("error" in result && result.error) return { error: result.error }
+            if (!("occupation" in result) || !result.occupation) return { error: "Could not save." }
+            const occupation = result.occupation
+            occupationRef.current = occupation
+            setDemographics((current) => ({ ...current, occupation }))
+            return {}
+          }}
+          onClose={closeEditor}
+        >
+          {(value, onChange) => (
+            <OccupationFieldsEditor value={value} onChange={onChange} client={suggestions?.occupation} />
+          )}
+        </InterviewFieldsEditor>
+      ) : null}
+      {openEditor === "living" ? (
+        <InterviewLivingEditor
+          saved={demographics.livingSituation}
+          relationships={relationships}
+          client={suggestions?.living}
+          save={async (value, changedPeople) => {
+            let nextPeople = relationshipsRef.current
+            for (const person of changedPeople) {
+              const result = await updateBlockMemberAction(clientId, person)
+              if (!result || ("error" in result && result.error)) {
+                return { error: (result && "error" in result && result.error) || "Could not save." }
+              }
+              nextPeople =
+                "relationships" in result && result.relationships
+                  ? result.relationships
+                  : nextPeople.map((row) =>
+                      row.relationshipRecordId === person.relationshipRecordId ? person : row
+                    )
+              onRelationships(nextPeople)
+            }
+            const result = await saveLivingSituationAction(clientId, value)
+            if ("error" in result && result.error) return { error: result.error }
+            if (!("livingSituation" in result) || !result.livingSituation) return { error: "Could not save." }
+            const livingSituation = result.livingSituation
+            livingRef.current = livingSituation
+            setDemographics((current) => ({ ...current, livingSituation }))
+            return {}
+          }}
+          onClose={closeEditor}
+        />
+      ) : null}
+      {openEditor === "emergency" ? (
+        <InterviewEmergencyContactsEditor
+          clientId={clientId}
+          contacts={emergencyContactRows}
+          onClose={closeEditor}
+        />
+      ) : null}
+      {openEditor === "medical" ? (
+        <InterviewMedicalContactsEditor
+          clientId={clientId}
+          contacts={medicalContactItems}
+          professionals={professionals}
+          onClose={closeEditor}
+        />
+      ) : null}
 
       <Dialog
         open={notFinishedOpen}
@@ -1200,8 +1178,9 @@ export function InterviewPage({
           <DialogHeader>
             <DialogTitle>Not finished</DialogTitle>
             <DialogDescription>
-              {formatSectionList(notFinishedSections)} still have items to answer. Answer them, or use Nothing to
-              record, then press Complete again.
+              {formatSectionList(notFinishedSections)}{" "}
+              {notFinishedSections.length === 1 ? "isn't" : "aren't"} confirmed yet. Answer any questions left,
+              press Confirm section, then press Complete again.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -1218,21 +1197,6 @@ export function InterviewPage({
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      <ConfirmPrefilledDialog
-        open={confirmPrefilledOpen}
-        title="Confirm pre-filled answers?"
-        body={`${formatSectionList(confirmPrefilledSections)} still have answers carried over from last time that haven't been confirmed. Confirm them and complete?`}
-        confirmLabel="Confirm and complete"
-        onGoBack={() => {
-          setConfirmPrefilledOpen(false)
-          openSections(confirmPrefilledSections)
-        }}
-        onConfirmAndSave={() => {
-          setConfirmPrefilledOpen(false)
-          openWorthChecking(true)
-        }}
-      />
 
       <div className="fixed inset-x-0 bottom-0 z-30 border-t bg-background/95 px-4 py-3 backdrop-blur">
         <div className="mx-auto flex max-w-2xl items-center justify-between gap-3">
@@ -1292,44 +1256,6 @@ export function InterviewPage({
         </DialogContent>
       </Dialog>
     </div>
-  )
-}
-
-const medicareFormInitial: SaveMedicareInterviewState = {}
-
-function InterviewMedicareForm({
-  clientId,
-  medicareCardNumber,
-  medicareIrn,
-  medicareExpiry,
-}: {
-  clientId: string
-  medicareCardNumber?: string | null
-  medicareIrn?: string | null
-  medicareExpiry?: string | null
-}) {
-  const router = useRouter()
-  const [state, formAction, pending] = useActionState(
-    saveMedicareInterviewAction.bind(null, clientId),
-    medicareFormInitial
-  )
-
-  useEffect(() => {
-    if (state.success) router.refresh()
-  }, [router, state.success])
-
-  return (
-    <form action={formAction} className="space-y-4">
-      <MedicareFields
-        medicareCardNumber={medicareCardNumber}
-        medicareIrn={medicareIrn}
-        medicareExpiry={medicareExpiry}
-      />
-      {state.error ? <p className="text-sm text-destructive">{state.error}</p> : null}
-      <Button type="submit" className="min-h-11" disabled={pending}>
-        {pending ? "Saving…" : "Save Medicare details"}
-      </Button>
-    </form>
   )
 }
 

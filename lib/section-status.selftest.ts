@@ -66,13 +66,30 @@ check(
 
 let partial = emptyInterviewAnswers()
 partial = setItemAnswer(partial, "s1_name", "confirmed")
-check("interview section in progress", interviewSectionStatus(section1, partial).status, "left")
+check(
+  "interview details-only section with a detail touched → ready to confirm",
+  interviewSectionStatus(section1, partial).status,
+  "to_confirm"
+)
+
+const section2 = INTERVIEW_SECTIONS[1]
+const section2Partial = setItemAnswer(emptyInterviewAnswers(), "s2_medicare", "yes")
+check("interview section with questions left → left", interviewSectionStatus(section2, section2Partial), {
+  groupLabel: section2.id,
+  letter: "2",
+  title: section2.title,
+  status: "left",
+  left: 2,
+  toConfirm: 0,
+  hasDefaults: false,
+})
 
 const toConfirmAnswers = {
   version: 1 as const,
   items: Object.fromEntries(
     section1.items.map((item) => [item.key, { value: "confirmed" as const, confirmed: false }])
   ),
+  sections: {},
 }
 check(
   "interview section to_confirm",
@@ -80,20 +97,35 @@ check(
   "to_confirm"
 )
 
-const doneAnswers = {
+const itemsConfirmed = {
   version: 1 as const,
   items: Object.fromEntries(
     section1.items.map((item) => [item.key, { value: "confirmed" as const, confirmed: true }])
   ),
+  sections: {},
+}
+check(
+  "interview section needs Confirm section to be done",
+  interviewSectionStatus(section1, itemsConfirmed).status,
+  "to_confirm"
+)
+const doneAnswers = {
+  ...itemsConfirmed,
+  sections: { "1": { confirmed: true as const, confirmedAt: "2026-11-27T00:00:00.000Z" } },
 }
 check("interview section done", interviewSectionStatus(section1, doneAnswers).status, "done")
 
 check("pill not started", statusPillLabel({ status: "not_started", left: 3, toConfirm: 0, hasDefaults: false }), "Not started")
-check("pill left", statusPillLabel({ status: "left", left: 2, toConfirm: 0, hasDefaults: false }), "2 left")
+check("pill left", statusPillLabel({ status: "left", left: 2, toConfirm: 0, hasDefaults: false }), "2 to answer")
 check(
   "pill to confirm",
   statusPillLabel({ status: "to_confirm", left: 0, toConfirm: 4, hasDefaults: false }),
   "4 to confirm"
+)
+check(
+  "pill ready to confirm",
+  statusPillLabel({ status: "to_confirm", left: 0, toConfirm: 0, hasDefaults: false }),
+  "Ready to confirm"
 )
 check("pill done", statusPillLabel({ status: "done", left: 0, toConfirm: 0, hasDefaults: false }), "Done")
 

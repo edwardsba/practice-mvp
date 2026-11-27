@@ -791,7 +791,7 @@ check("element count is 98", LRAMP_ELEMENTS.length, 98)
       left: 3,
       toConfirm: 0,
     }),
-    "Section 1, Presentation: 3 left"
+    "Section 1, Presentation: 3 to answer"
   )
   check(
     "aria: not_started",

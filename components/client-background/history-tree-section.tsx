@@ -124,6 +124,10 @@ export function HistoryTreeSection({
   groupFilter,
   /** Hide Yes/No/Not asked radios; item rows own those answers in the interview shell. */
   hideScreeningControls = false,
+  /** Interview: the category's question answer, shown under its heading. */
+  renderHeadingAnswer,
+  /** Interview: ⊕ under a category heading was used (answers that question Yes). */
+  onHeadingAdd,
 }: {
   clientId: string
   /** First name (or display name) for context strip "About: Tom (client)". */
@@ -152,6 +156,8 @@ export function HistoryTreeSection({
   historyClient?: Partial<Record<HistoryQuestionKey, { label: string; apply: ScreeningAnswer }>>
   groupFilter?: "client" | "significant_other"
   hideScreeningControls?: boolean
+  renderHeadingAnswer?: (key: HistoryQuestionKey) => ReactNode
+  onHeadingAdd?: (key: HistoryQuestionKey) => void
 }) {
   const [localEvents, setLocalEvents] = useState<EventRecord[] | null>(null)
   const [localIssues, setLocalIssues] = useState<HistoryIssue[] | null>(null)
@@ -540,6 +546,8 @@ export function HistoryTreeSection({
     applyScreeningFilter: presentation === "interview",
     screening,
     historyClient: presentation === "interview" ? historyClient : undefined,
+    renderHeadingAnswer: presentation === "interview" ? renderHeadingAnswer : undefined,
+    onHeadingAdd: presentation === "interview" ? onHeadingAdd : undefined,
     selectedId,
     readOnly,
   }
@@ -927,6 +935,8 @@ type SectionBodyProps = {
   applyScreeningFilter?: boolean
   screening: ScreeningAnswers
   historyClient?: Partial<Record<HistoryQuestionKey, { label: string; apply: ScreeningAnswer }>>
+  renderHeadingAnswer?: (key: HistoryQuestionKey) => ReactNode
+  onHeadingAdd?: (key: HistoryQuestionKey) => void
   selectedId: string | null
   readOnly?: boolean
 }
@@ -955,6 +965,8 @@ function CategoryBlock({
   applyScreeningFilter = false,
   screening,
   historyClient,
+  renderHeadingAnswer,
+  onHeadingAdd,
   selectedId,
   readOnly,
 }: {
@@ -972,9 +984,12 @@ function CategoryBlock({
       ? screening[key] ?? ""
       : ""
   const suggestion = key ? historyClient?.[key] : undefined
+  const headingAnswer = key && renderHeadingAnswer ? renderHeadingAnswer(key) : null
   const filterByScreening = applyScreeningFilter || Boolean(onScreeningChange)
-  const treeChildren =
-    filterByScreening && shown !== "yes" && shown !== ""
+  // With the answer under the heading, "None" / "Not asked" notes would repeat it.
+  const treeChildren = headingAnswer
+    ? node.children.filter((child) => child.kind !== "note")
+    : filterByScreening && shown !== "yes" && shown !== ""
       ? node.children.filter((child) => child.kind === "note")
       : filterByScreening && shown === "yes"
         ? node.children.filter((child) => child.kind !== "note")
@@ -1012,10 +1027,14 @@ function CategoryBlock({
           <TreeAddControl
             choices={headingAdd}
             aria-label={`Add under ${node.title}`}
-            onSelect={() => onAddCategory!(about, eventType)}
+            onSelect={() => {
+              onAddCategory!(about, eventType)
+              if (key) onHeadingAdd?.(key)
+            }}
           />
         ) : null}
       </div>
+      {headingAnswer}
       {suggestion && onScreeningChange && !hideScreeningControls ? (
         <ClientAnswer
           label={suggestion.label}

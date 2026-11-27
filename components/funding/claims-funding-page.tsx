@@ -25,6 +25,10 @@ import { FUNDING_APPROVAL_STATUS_CONFIG } from "@/lib/status"
 import { Badge } from "@/components/ui/badge"
 import { personRoleLabel } from "@/lib/client-background/tree"
 import type { RelationshipToClient } from "@/lib/client-background/types"
+import {
+  attentionStatusBadgeClass,
+  doneStatusBadgeClass,
+} from "@/lib/ui/status-colours"
 
 type RelationshipOption = {
   relationshipRecordId: string
@@ -193,8 +197,8 @@ function ApprovalCardBody({
         <span
           className={
             approval.reportTag.kind === "sent"
-              ? "inline-flex rounded-md border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs text-emerald-800"
-              : "inline-flex rounded-md border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs text-amber-800"
+              ? doneStatusBadgeClass
+              : attentionStatusBadgeClass
           }
         >
           {approval.reportTag.label}

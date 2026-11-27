@@ -9,6 +9,8 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import type { BackgroundCheck } from "@/lib/client-background/checks"
 import type { BackgroundInterviewCardData } from "@/lib/client-background/load"
+import { statusColours } from "@/lib/ui/status-colours"
+import { cn } from "@/lib/utils"
 
 export function BackgroundInterviewCard({
   clientId,
@@ -68,7 +70,7 @@ export function BackgroundInterviewCard({
         )}
         {error ? <p className="text-sm text-destructive">{error}</p> : null}
         {checks.length > 0 ? (
-          <div className="text-sm text-amber-800">
+          <div className={cn("text-sm", statusColours.attention.text)}>
             <p>
               {checks.length} {checks.length === 1 ? "thing" : "things"} worth checking ·{" "}
               <button

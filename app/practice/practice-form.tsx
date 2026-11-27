@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { doneSuccessMessageClass } from "@/lib/ui/status-colours"
 
 type Practice = {
   practiceName: string
@@ -131,7 +132,7 @@ export function PracticeForm({ practice }: { practice: Practice }) {
             </p>
           ) : null}
           {state.success ? (
-            <p className="text-sm text-emerald-700">Practice details saved.</p>
+            <p className={doneSuccessMessageClass}>Practice details saved.</p>
           ) : null}
           <div className="flex flex-wrap gap-3">
             <Button type="submit" disabled={pending}>

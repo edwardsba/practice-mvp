@@ -14,6 +14,11 @@ import {
   type PartialDate,
 } from "@/lib/client-background/partial-date"
 import { todayDateString } from "@/lib/dates/practice-time"
+import {
+  clientSuggestionRowClass,
+  clientUseButtonClass,
+  statusColours,
+} from "@/lib/ui/status-colours"
 import { cn } from "@/lib/utils"
 
 /** 16px below the lg breakpoint so mobile browsers do not zoom on focus. */
@@ -59,16 +64,12 @@ export function ClientAnswer({
   onUse?: () => void
 }) {
   if (matches || !onUse) {
-    return <p className="text-sm text-blue-800">Client: {label}</p>
+    return <p className={cn("text-sm", statusColours.client.text)}>Client: {label}</p>
   }
   return (
-    <div className="flex items-center justify-between gap-2 rounded-md bg-blue-50 px-2.5 py-1.5">
-      <p className="min-w-0 text-sm text-blue-800">Client: {label}</p>
-      <button
-        type="button"
-        className="min-h-11 shrink-0 rounded-md bg-blue-700 px-3 text-sm font-medium text-white hover:bg-blue-800"
-        onClick={onUse}
-      >
+    <div className={clientSuggestionRowClass}>
+      <p className={cn("min-w-0 text-sm", statusColours.client.text)}>Client: {label}</p>
+      <button type="button" className={clientUseButtonClass} onClick={onUse}>
         Use
       </button>
     </div>

@@ -61,6 +61,7 @@ Open sub-questions (left unresolved on purpose — do not guess in a session):
 | 7 | Multi-practitioner / multi-timezone | Known limitation | `getPractitionerContext()` takes the first active profile and first active membership (`lib/auth.ts`) — effectively single-practice. `PRACTICE_TIMEZONE` is hardcoded to `Australia/Sydney`; a per-practice TZ needs cron/query changes, not only `lib/dates/practice-time.ts`. Schema already has memberships and `practices.timezone`. |
 | 8 | Rate limiting | Not built | Public questionnaire routes (`/q/*`, `/api/assessments/submit`, `/api/assessments/submit-background`) and cron are ungated beyond token expiry / `CRON_SECRET`. No application-level rate limiter. (`express-rate-limit` appears only as a transitive dependency.) |
 | 9 | Authentication & tenancy scoping | Built | Session refresh and auth gate in `proxy.ts` (public: `/login`, `/q/*`, `/api/assessments/submit`, `/api/assessments/submit-background`, `/api/cron/*`). Protected entry points use `requirePractitionerContext()` and must filter by `context.practiceId`. Tenant isolation is application-query enforcement — do not assume DB RLS covers a missing filter. Questionnaire access is hashed, expiring tokens. |
+| 10 | Status colours (one meaning each) | Built | Shared palette in `lib/ui/status-colours.ts` (neutral / attention / done / problem / client). Rule in `AGENTS.md` — "Colours: one meaning each." Guard: `lib/ui/status-colours-guard.selftest.ts`. Orange is not used. |
 
 ---
 

@@ -3,6 +3,7 @@ import {
   statusPillLabel,
   type SectionStatus,
 } from "@/lib/section-status"
+import { statusColours } from "@/lib/ui/status-colours"
 import { cn } from "@/lib/utils"
 
 export function SectionNumberBadge({
@@ -34,11 +35,11 @@ export function SectionStatusPill({
 }) {
   const tone =
     section.status === "left"
-      ? "text-orange-800"
+      ? statusColours.neutral.text
       : section.status === "to_confirm"
-        ? "text-amber-800"
+        ? statusColours.attention.text
         : section.status === "done"
-          ? "text-emerald-800"
+          ? statusColours.done.text
           : "text-muted-foreground"
   return <span className={cn("text-xs font-medium", tone, className)}>{statusPillLabel(section)}</span>
 }

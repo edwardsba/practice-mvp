@@ -14,6 +14,8 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
+import { statusColours } from "@/lib/ui/status-colours"
+import { cn } from "@/lib/utils"
 
 /** Human-readable labels for the 6 report kinds the API route can detect. Kept here
  *  rather than imported from lib/sage-sr, since that module's SageSrReportKind type
@@ -259,7 +261,7 @@ export function ImportSageSrDialog({
                     {entry.status.state === "pending" ? "Ready to upload" : null}
                     {entry.status.state === "uploading" ? "Uploading…" : null}
                     {entry.status.state === "success" ? (
-                      <span className="text-emerald-600 dark:text-emerald-400">
+                      <span className={cn(statusColours.done.text)}>
                         {KIND_LABELS[entry.status.kind] ?? entry.status.kind}
                         {entry.status.mergedIntoExisting
                           ? " — merged"

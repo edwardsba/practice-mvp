@@ -3,6 +3,8 @@
  * Pure — no database, no UI.
  */
 
+import { statusColours } from "@/lib/ui/status-colours"
+
 export type SectionStatusKind = "skipped" | "left" | "to_confirm" | "done"
 
 export type SectionStatus = {
@@ -98,13 +100,13 @@ export function progressChipAriaLabel(section: SectionStatus): string {
 /** Tailwind classes for chip / number badge colour by status. */
 export function sectionProgressClass(section: Pick<SectionStatus, "status">): string {
   if (section.status === "done") {
-    return "border-emerald-600 bg-emerald-50 text-emerald-800"
+    return statusColours.done.chip
   }
   if (section.status === "left") {
-    return "border-orange-500 bg-orange-50 text-orange-900"
+    return statusColours.neutral.chip
   }
   if (section.status === "to_confirm") {
-    return "border-amber-400 bg-amber-50 text-amber-900"
+    return statusColours.attention.chip
   }
   return "border-dashed border-muted-foreground/40 bg-muted/30 text-muted-foreground"
 }

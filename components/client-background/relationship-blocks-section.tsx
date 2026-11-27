@@ -88,6 +88,7 @@ import {
   type RelationshipBlockAnswers,
   type RelationshipRecord,
 } from "@/lib/client-background/types"
+import { statusColours } from "@/lib/ui/status-colours"
 import { cn } from "@/lib/utils"
 
 type EditorState = {
@@ -111,7 +112,7 @@ const INTIMATE_KINDS = new Set<BlockKind>(["client_current", "client_previous", 
 const CAREGIVER_KINDS = new Set<BlockKind>(["biological_parents", "parent_other", "caregiver_arrangement"])
 
 function Needs({ need }: { need: string }) {
-  return <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-950">{need}</span>
+  return <span className={statusColours.attention.pill}>{need}</span>
 }
 
 function resolvedChildrenAnswer(block: RelationshipBlock): BlockAnswer | "" {
@@ -885,7 +886,7 @@ export function RelationshipBlocksSection({
       <section className="space-y-3">
         <h3 className={treeLayer1ClassName}>Current intimate relationship and children</h3>
         {childrenPrompt ? (
-          <p className="text-sm text-blue-800">
+          <p className={cn("text-sm", statusColours.client.text)}>
             Client: {childrenPrompt} · {recordedChildren} recorded
           </p>
         ) : null}
@@ -2247,8 +2248,8 @@ function UnplacedGroup({
   onMove: (id: string) => void
 }) {
   return (
-    <section className="space-y-3 rounded-md border border-amber-300 bg-amber-50 p-3">
-      <h3 className="text-sm font-medium text-amber-950">Not placed</h3>
+    <section className={cn("space-y-3 p-3", statusColours.attention.soft)}>
+      <h3 className={cn("text-sm font-medium", statusColours.attention.text)}>Not placed</h3>
       {people.map((person) => (
         <div key={person.relationshipRecordId} className="flex flex-wrap items-center gap-2 rounded-md bg-white p-2">
           <button

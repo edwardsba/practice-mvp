@@ -1,4 +1,6 @@
 import type { SageSrDiagnosticReportContent } from "@/lib/assessment-summary/load-sage-sr-diagnostic-report"
+import { statusColours } from "@/lib/ui/status-colours"
+import { cn } from "@/lib/utils"
 
 /**
  * Read-only rendering of a SAGE-SR Diagnostic Report's generated content — the same
@@ -30,7 +32,7 @@ export function SageSrDiagnosticReportContentView({
       {content.introduction ? (
         <p className="text-sm">{content.introduction}</p>
       ) : null}
-      <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
+      <div className={cn("rounded-lg p-4 text-sm", statusColours.attention.soft)}>
         {content.exclusionClause}
       </div>
       {content.background ? (

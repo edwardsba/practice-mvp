@@ -134,6 +134,18 @@ Assessment instruments are data-driven (definitions/elements/options). Seed via 
 
 Every assessment, client-facing or practitioner-facing, is defined as data (definitions, elements, options) and is completed in the shared form (`components/assessments/form/`) and shown in the shared results view (`components/assessments/answers/`). Never build an assessment-specific page, form, answer control or results layout, and never lay out answer options differently. If an assessment needs something the shared form can't do, add it to the shared form as a general, data-driven rule. Each assessment may add only its own scoring rule (`lib/assessments/scoring/`) and summary box (`lib/assessments/result-summaries.ts`).
 
+### Colours: one meaning each
+
+Status and meaning colours are defined once in [`lib/ui/status-colours.ts`](./lib/ui/status-colours.ts). Use those exports; never write Tailwind palette colour classes (`amber-`, `orange-`, `emerald-`, `blue-`, `red-`, `sky-`, `indigo-`, etc.) elsewhere under `app/`, `components/`, or `lib/`. Orange is not used. Links keep existing link / primary styles and are outside this palette. Guard: `lib/ui/status-colours-guard.selftest.ts`.
+
+| Name | Colour | Means | Used for |
+|------|--------|-------|----------|
+| **neutral** | white / very light grey, grey outline, muted text | Not started; nothing to flag | Items and sections still to answer (assessment form and interview chips, status pills); empty states |
+| **attention** | amber | Needs your attention | Pre-filled answers to confirm; Worth checking; Not placed; needs badges; funding running low / ending / pending; Badge `warning` |
+| **done** | green (emerald) | Done or active | Sections done; confirmed; active claims and approvals; Badge `success` |
+| **problem** | red | Problem or risk | Errors, failed saves, Badge `destructive`, urgent risk items. Delete buttons keep the existing `destructive` theme colour. |
+| **client** | blue | The client's own words | Self-report "Client: …" lines and their "Use" button |
+
 Appointment automations: `lib/appointments/run-automations.ts` via daily cron (`08:00 UTC`).
 
 ## Naming

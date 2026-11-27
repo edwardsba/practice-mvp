@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, type ReactNode } from "react"
+import { useEffect, useId, useRef, useState, type ReactNode } from "react"
 import { Plus } from "lucide-react"
 
 import {
@@ -17,6 +17,9 @@ import { cn } from "@/lib/utils"
 /**
  * Round ⊕ on a tree line. One choice → opens immediately; several → shows a
  * choice row under the line. Shared by relationship and history trees.
+ *
+ * The choice menu closes on select, outside tap/click, or Escape — otherwise
+ * it sticks open on mobile after ⊕ (Round AP.2 follow-up).
  */
 export function TreeAddControl({
   choices,
@@ -30,6 +33,36 @@ export function TreeAddControl({
   className?: string
 }) {
   const [open, setOpen] = useState(false)
+  const rootRef = useRef<HTMLDivElement>(null)
+  const listId = useId()
+
+  useEffect(() => {
+    if (!open) return
+
+    function onPointerDown(event: PointerEvent) {
+      const root = rootRef.current
+      if (!root) return
+      if (event.target instanceof Node && root.contains(event.target)) return
+      setOpen(false)
+    }
+
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        event.stopPropagation()
+        setOpen(false)
+      }
+    }
+
+    // Pointer down (not click) so iOS Safari dismisses before another control
+    // steals the gesture; capture so a parent stopPropagation cannot block us.
+    document.addEventListener("pointerdown", onPointerDown, true)
+    window.addEventListener("keydown", onKeyDown, true)
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown, true)
+      window.removeEventListener("keydown", onKeyDown, true)
+    }
+  }, [open])
+
   if (choices.length === 0) return null
 
   function handlePlusClick(event: React.MouseEvent) {
@@ -44,11 +77,12 @@ export function TreeAddControl({
   }
 
   return (
-    <div className={cn("relative shrink-0", className)}>
+    <div ref={rootRef} className={cn("relative shrink-0", className)}>
       <button
         type="button"
         aria-label={ariaLabel}
         aria-expanded={choices.length > 1 ? open : undefined}
+        aria-controls={choices.length > 1 && open ? listId : undefined}
         className="inline-flex size-11 items-center justify-center rounded-full border border-input bg-background text-foreground hover:bg-zinc-100"
         onClick={handlePlusClick}
       >
@@ -56,6 +90,7 @@ export function TreeAddControl({
       </button>
       {open && choices.length > 1 ? (
         <TreeAddChoiceRow
+          id={listId}
           choices={choices}
           onSelect={(id) => {
             setOpen(false)
@@ -69,14 +104,18 @@ export function TreeAddControl({
 
 /** Row of small round-edged choice buttons under a tree line. */
 export function TreeAddChoiceRow({
+  id,
   choices,
   onSelect,
 }: {
+  id?: string
   choices: TreeAddChoice[]
   onSelect: (choiceId: string) => void
 }) {
   return (
     <div
+      id={id}
+      role="menu"
       className="absolute top-full right-0 z-10 mt-1 flex flex-wrap justify-end gap-1.5 rounded-lg border border-border bg-background p-1.5 shadow-sm"
       onClick={(event) => event.stopPropagation()}
     >
@@ -84,6 +123,7 @@ export function TreeAddChoiceRow({
         <button
           key={choice.id}
           type="button"
+          role="menuitem"
           className="inline-flex min-h-9 items-center rounded-full border border-input bg-background px-3 text-sm hover:bg-zinc-100"
           onClick={() => onSelect(choice.id)}
         >

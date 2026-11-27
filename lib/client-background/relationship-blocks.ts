@@ -15,6 +15,8 @@ import {
   type BlockKind,
   type BlockRole,
   type ChildType,
+  type ClientRelationshipStatus,
+  type ClientRelationshipStatusValue,
   type CurrentBlockStatus,
   type PreviousBlockStatus,
   type RelationshipBlock,
@@ -27,6 +29,36 @@ import {
 
 export function isPartneredClientStatus(status: string): boolean {
   return (PARTNERED_CLIENT_STATUSES as readonly string[]).includes(status)
+}
+
+/**
+ * When a client_current block's status is edited, mirror it onto the client's
+ * relationship_status. Returns null when the block is not the current one or
+ * the status is not a current-block status.
+ */
+export function clientStatusFromCurrentBlockEdit(
+  blockKind: string,
+  status: string,
+  statusDetail = ""
+): ClientRelationshipStatusValue | null {
+  if (blockKind !== "client_current") return null
+  if (!(CURRENT_BLOCK_STATUSES as readonly string[]).includes(status)) return null
+  if (status === "other") {
+    return { relationshipStatus: "other", relationshipStatusOther: statusDetail.trim() }
+  }
+  return {
+    relationshipStatus: status as ClientRelationshipStatus,
+    relationshipStatusOther: "",
+  }
+}
+
+/**
+ * When the client's status is saved, what the client_current block should show.
+ * Partnered statuses (and other) open/keep a current block; non-partnered dissolve it.
+ */
+export function currentBlockStatusFromClientStatus(status: string): string | null {
+  if (isPartneredClientStatus(status) || status === "other") return status
+  return null
 }
 
 export function statusesForBlock(kind: BlockKind): readonly string[] {

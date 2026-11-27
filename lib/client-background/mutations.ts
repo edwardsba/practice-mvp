@@ -73,7 +73,6 @@ import {
   type IdentityFields,
   type LivingSituationFields,
   type OccupationFields,
-  type RiskRatings,
   type StressorsRecord,
 } from "@/lib/client-background/types"
 
@@ -324,13 +323,6 @@ export async function ensureFamilyOfOrigin(input: {
   }
 }
 
-function orientationColumns(identity: IdentityFields) {
-  return {
-    sexualOrientation: identity.sexualOrientation || null,
-    sexualOrientationOther: identity.sexualOrientation === "another" ? identity.sexualOrientationOther || null : null,
-  }
-}
-
 async function upsertBackgroundColumn(
   clientId: string,
   practiceId: string,
@@ -340,10 +332,7 @@ async function upsertBackgroundColumn(
     livingSituationJson: LivingSituationFields
     educationJson: EducationFields
     occupationJson: OccupationFields
-    riskJson: RiskRatings
     stressorsJson: StressorsRecord
-    sexualOrientation: string | null
-    sexualOrientationOther: string | null
   }>
 ) {
   const client = await assertClient(clientId, practiceId)
@@ -405,7 +394,6 @@ export async function saveIdentity(
   try {
     const result = await upsertBackgroundColumn(input.clientId, input.practiceId, input.userId, {
       identityJson: identity,
-      ...orientationColumns(identity),
     })
     return { ...result, identity }
   } catch {
@@ -460,7 +448,6 @@ export async function saveDemographics(input: {
       livingSituationJson: livingSituation,
       educationJson: education,
       occupationJson: occupation,
-      ...orientationColumns(identity),
     })
     return {
       ...result,

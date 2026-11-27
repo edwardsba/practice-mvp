@@ -14,7 +14,7 @@ import { clients, practices, practitionerProfiles } from "./01-core"
 
 /**
  * Living client background. One row per client, edited in place.
- * Demographics and clinician-rated risk sit here as JSON.
+ * Demographics sit here as JSON.
  * Relationships and history are normalized child tables
  * keyed by client_id — there is no interview document or version chain.
  */
@@ -33,7 +33,6 @@ export const clientBackgrounds = pgTable("client_backgrounds", {
   occupationJson: jsonb("occupation_json"),
   /** One answer per stressor, plus the main reason for attending. */
   stressorsJson: jsonb("stressors_json"),
-  riskJson: jsonb("risk_json"),
   /** Client's current relationship status. Not a field of any relative. */
   relationshipStatus: text("relationship_status"),
   relationshipStatusOther: text("relationship_status_other"),
@@ -43,10 +42,6 @@ export const clientBackgrounds = pgTable("client_backgrounds", {
   motherOtherRelationships: text("mother_other_relationships"),
   fatherOtherRelationships: text("father_other_relationships"),
   caregiverArrangements: text("caregiver_arrangements"),
-  /** Heterosexual, gay, lesbian, bisexual, pansexual, asexual, queer, another, or prefer_not_to_say. */
-  sexualOrientation: text("sexual_orientation"),
-  /** Free text when sexual_orientation is another. */
-  sexualOrientationOther: text("sexual_orientation_other"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 })

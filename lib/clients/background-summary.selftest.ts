@@ -5,7 +5,6 @@ import {
   emptyClientRelationshipStatus,
   emptyDemographics,
   emptyHistoryIssue,
-  emptyRisk,
   emptyStressors,
   type ClientBackgroundData,
   type RelationshipBlock,
@@ -55,7 +54,6 @@ function base(partial: Partial<ClientBackgroundData> = {}): ClientBackgroundData
     blockAnswers: emptyBlockAnswers(),
     events: [],
     issues: [],
-    risk: emptyRisk(),
     ...partial,
   }
 }
@@ -122,7 +120,7 @@ const withData = buildBackgroundPanelSummary(
       livingSituation: {
         ...emptyDemographics().livingSituation,
         housingType: "Own home",
-        livesWith: "with_partner_and_children",
+        household: "with_others",
       },
     },
     issues: [
@@ -156,7 +154,6 @@ const tomSummary = buildBackgroundPanelSummary({
   blockAnswers: tom.data.blockAnswers,
   events: tom.data.events,
   issues: tom.data.issues,
-  risk: tom.data.risk,
 })
 assert.equal(tomSummary.children, "4 children, 1 step-child")
 assert.equal(
@@ -421,7 +418,7 @@ const livesAlone = buildBackgroundPanelSummary(
       livingSituation: {
         ...emptyDemographics().livingSituation,
         housingType: "Own home",
-        livesWith: "alone",
+        household: "alone",
       },
     },
   })
@@ -435,7 +432,7 @@ const housingOnly = buildBackgroundPanelSummary(
       livingSituation: {
         ...emptyDemographics().livingSituation,
         housingType: "Own home",
-        livesWith: "with_partner_and_children",
+        household: "with_others",
       },
     },
   })

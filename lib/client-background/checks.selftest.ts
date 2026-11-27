@@ -6,7 +6,6 @@ import {
   emptyClientRelationshipStatus,
   emptyDemographics,
   emptyEvent,
-  emptyRisk,
   emptyStressors,
   type ClientBackgroundData,
   type EventRecord,
@@ -57,7 +56,6 @@ function data(overrides: Partial<ClientBackgroundData> = {}): ClientBackgroundDa
     stressors: emptyStressors(),
     relationships: [],
     events: [],
-    risk: emptyRisk(),
     ...overrides,
     demographics: {
       identity: { ...demographics.identity, ...overrides.demographics?.identity },

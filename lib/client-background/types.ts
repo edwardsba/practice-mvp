@@ -76,9 +76,6 @@ export type SelfHarmType = (typeof SELF_HARM_TYPES)[number]
 export const SUBSTANCE_STATUSES = ["active", "in_recovery", "abstinent"] as const
 export type SubstanceStatus = (typeof SUBSTANCE_STATUSES)[number]
 
-export const RATED_VALUES = ["not_reported", "no", "somewhat", "yes"] as const
-export type RatedValue = (typeof RATED_VALUES)[number]
-
 export const RELATIONSHIP_TO_CLIENT_LABELS: Record<RelationshipToClient, string> = {
   mother: "Mother",
   father: "Father",
@@ -229,13 +226,6 @@ export const SUBSTANCE_STATUS_LABELS: Record<SubstanceStatus, string> = {
   active: "Active use",
   in_recovery: "In recovery",
   abstinent: "Abstinent since",
-}
-
-export const RATED_VALUE_LABELS: Record<RatedValue, string> = {
-  not_reported: "Not reported / not observed",
-  no: "No",
-  somewhat: "Somewhat",
-  yes: "Yes",
 }
 
 export const SEX_OPTIONS = ["Female", "Male", "Another term", "Prefer not to say"] as const
@@ -563,44 +553,6 @@ export const NECESSITY_LABELS: Record<NecessityKey, string> = {
   phoneInternet: "Phone / internet",
 }
 
-export const RISK_FACTORS = [
-  { key: "suicideSelfHarmHistory", label: "Suicide/self-harm history" },
-  { key: "recentPsychiatricHospitalisation", label: "Recent psychiatric hospitalisation" },
-  { key: "substanceUse", label: "Substance use" },
-  { key: "accessToLethalMeans", label: "Access to lethal means" },
-  { key: "perceivedBurdensomeness", label: "Perceived burdensomeness to others" },
-  { key: "significantIllnessInjuryHistory", label: "Significant illness/injury history" },
-  { key: "significantPsychiatricDiagnosisHistory", label: "Significant psychiatric diagnosis history" },
-] as const
-
-export const PROTECTIVE_FACTORS = [
-  { key: "familySupport", label: "Family support" },
-  { key: "pets", label: "Pets" },
-  { key: "friendships", label: "Friendships" },
-  { key: "religiousEngagement", label: "Religious engagement" },
-  { key: "groupMembership", label: "Group membership" },
-  { key: "reluctanceToAbandonDependents", label: "Reluctance to abandon dependents" },
-  { key: "attachmentToTherapist", label: "Attachment to therapist / support provider" },
-  { key: "fearOfSuicideDeathDying", label: "Fear of suicide, death and dying" },
-  { key: "fearOfSocialDisapproval", label: "Fear of social disapproval of suicide" },
-  { key: "beliefSuicideMorallyWrong", label: "Belief that suicide is morally wrong" },
-  { key: "hopeForTheFuture", label: "Hope for the future" },
-  { key: "confidenceToCope", label: "Confidence in ability to solve or cope with problems" },
-] as const
-
-export const RATED_FACTOR_KEYS = [
-  ...RISK_FACTORS.map((item) => item.key),
-  ...PROTECTIVE_FACTORS.map((item) => item.key),
-] as const
-export type RatedFactorKey = (typeof RATED_FACTOR_KEYS)[number]
-
-export type RatedFactor = {
-  value: RatedValue | ""
-  comment: string
-}
-
-export type RiskRatings = Record<RatedFactorKey, RatedFactor>
-
 export const SEXUAL_ORIENTATIONS = [
   "heterosexual",
   "gay",
@@ -810,19 +762,6 @@ export type ClientBackgroundData = {
   blockAnswers?: RelationshipBlockAnswers
   events: EventRecord[]
   issues?: HistoryIssue[]
-  risk: RiskRatings
-}
-
-export function emptyRatedFactor(): RatedFactor {
-  return { value: "", comment: "" }
-}
-
-export function emptyRisk(): RiskRatings {
-  const risk = {} as RiskRatings
-  for (const key of RATED_FACTOR_KEYS) {
-    risk[key] = emptyRatedFactor()
-  }
-  return risk
 }
 
 export function emptyIdentity(): IdentityFields {

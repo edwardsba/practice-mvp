@@ -79,9 +79,8 @@ async function main() {
       `INSERT INTO client_backgrounds (
          client_id, practice_id, identity_json, living_situation_json, education_json, occupation_json,
          stressors_json, relationship_status,
-         previous_relationships, other_children, mother_other_relationships, father_other_relationships, caregiver_arrangements,
-         sexual_orientation, sexual_orientation_other
-       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
+         previous_relationships, other_children, mother_other_relationships, father_other_relationships, caregiver_arrangements
+       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
       [
         clientId,
         account.practice_id,
@@ -96,8 +95,6 @@ async function main() {
         source.data.blockAnswers?.motherOtherRelationships,
         source.data.blockAnswers?.fatherOtherRelationships,
         source.data.blockAnswers?.caregiverArrangements,
-        identity.sexualOrientation || null,
-        identity.sexualOrientation === "another" ? text(identity.sexualOrientationOther) : null,
       ]
     )
     for (const block of tomBlocks()) {

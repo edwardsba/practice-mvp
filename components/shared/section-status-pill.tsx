@@ -34,9 +34,9 @@ export function SectionStatusPill({
   className?: string
 }) {
   const tone =
-    section.status === "left"
+    section.status === "not_started"
       ? statusColours.neutral.text
-      : section.status === "to_confirm"
+      : section.status === "left" || section.status === "to_confirm"
         ? statusColours.attention.text
         : section.status === "done"
           ? statusColours.done.text

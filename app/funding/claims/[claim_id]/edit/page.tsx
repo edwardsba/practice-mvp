@@ -58,6 +58,7 @@ export default async function EditClaimPage({
         claimTypes={claimTypes.map((type) => ({
           claimTypeId: type.claimTypeId,
           claimTypeName: type.claimTypeName,
+          code: type.code,
         }))}
         organisations={organisations.map((org) => ({
           organisationId: org.organisationId,
@@ -69,6 +70,7 @@ export default async function EditClaimPage({
           claimTypeId: claim.claimTypeId,
           medicareCardNumber: claim.medicareCardNumber,
           medicareIrn: claim.medicareIrn,
+          medicareExpiry: claim.medicareExpiry,
           insuranceOrganisationId: claim.insuranceOrganisationId,
           insuranceReferenceNumber: claim.insuranceReferenceNumber,
           startDate: claim.startDate,

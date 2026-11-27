@@ -94,6 +94,7 @@ export default async function NewFundingApprovalPage({
         clientId: initialClientId,
         claimTypeId: claim.claimTypeId,
         claimTypeName: claim.claimTypeName,
+        claimTypeCode: claim.claimTypeCode,
         startDate: claim.startDate,
       }))
     : allClaims.map((claim) => ({
@@ -101,6 +102,7 @@ export default async function NewFundingApprovalPage({
         clientId: claim.clientId,
         claimTypeId: claim.claimTypeId,
         claimTypeName: claim.claimTypeName,
+        claimTypeCode: claim.claimTypeCode,
         startDate: claim.startDate,
       }))
 

@@ -16,6 +16,9 @@ export type MedicalContactRecord = {
 
 export type MedicalContactWithProfessional = MedicalContactRecord & {
   professional: ProfessionalOption
+  /** First active organisation link, when loaded. */
+  organisationName?: string | null
+  phone?: string | null
 }
 
 /**

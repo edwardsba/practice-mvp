@@ -29,9 +29,9 @@ import {
 import {
   formatApprovalProgress,
   formatDisplayDate,
-  formatMedicareIdentifier,
-  isInsuranceClaimType,
-  isMedicareClaimType,
+  formatMedicareCardDisplay,
+  isInsurerClaim,
+  isMedicareClaim,
 } from "@/lib/funding/format"
 import {
   REPORTING_REQUIREMENT_STATUS_CONFIG,
@@ -88,8 +88,8 @@ export default async function FundingApprovalDetailPage({
         )
       : 0
 
-  const showMedicare = isMedicareClaimType(approval.claimTypeName)
-  const showInsurance = isInsuranceClaimType(approval.claimTypeName)
+  const showMedicare = isMedicareClaim(approval.claimTypeCode)
+  const showInsurance = isInsurerClaim(approval.claimTypeCode)
 
   const reportingRequirements = await getReportingRequirementsForApproval(
     approval.fundingApprovalId,
@@ -281,7 +281,7 @@ export default async function FundingApprovalDetailPage({
                 <dt className="text-sm text-muted-foreground">Medicare card no.</dt>
                 <dd className="font-medium">
                   {displayValue(
-                    formatMedicareIdentifier(
+                    formatMedicareCardDisplay(
                       approval.medicareCardNumber,
                       approval.medicareIrn
                     )

@@ -93,6 +93,7 @@ export const INTERVIEW_SECTIONS: InterviewSectionDef[] = [
     nothingToRecord: false,
     items: [
       { key: "s1_name", label: "Name", kind: "cna" },
+      { key: "s1_preferred_name", label: "Preferred name", kind: "cna" },
       { key: "s1_dob", label: "Date of birth", kind: "cna" },
       { key: "s1_phone", label: "Phone", kind: "cna" },
       { key: "s1_email", label: "Email", kind: "cna" },
@@ -202,8 +203,33 @@ const ITEM_BY_KEY = new Map(
   INTERVIEW_SECTIONS.flatMap((section) => section.items.map((item) => [item.key, item] as const))
 )
 
+export const S4_EC_PREFIX = "s4_ec:"
+export const S4_MC_PREFIX = "s4_mc:"
+
+export function isPerRecordContactKey(key: string): boolean {
+  return key.startsWith(S4_EC_PREFIX) || key.startsWith(S4_MC_PREFIX)
+}
+
+export function perRecordContactId(key: string): string | null {
+  if (key.startsWith(S4_EC_PREFIX)) return key.slice(S4_EC_PREFIX.length) || null
+  if (key.startsWith(S4_MC_PREFIX)) return key.slice(S4_MC_PREFIX.length) || null
+  return null
+}
+
+export function kindForInterviewItemKey(key: string): InterviewAnswerKind | null {
+  const def = ITEM_BY_KEY.get(key)
+  if (def) return def.kind
+  if (isPerRecordContactKey(key) && perRecordContactId(key)) return "cna"
+  return null
+}
+
 export function interviewItemDef(key: string): InterviewItemDef | undefined {
-  return ITEM_BY_KEY.get(key)
+  const staticDef = ITEM_BY_KEY.get(key)
+  if (staticDef) return staticDef
+  if (isPerRecordContactKey(key) && perRecordContactId(key)) {
+    return { key, label: key, kind: "cna" }
+  }
+  return undefined
 }
 
 export function emptyInterviewAnswers(): InterviewAnswersJson {
@@ -213,17 +239,28 @@ export function emptyInterviewAnswers(): InterviewAnswersJson {
 /**
  * Validate an item key + value for save.
  * Unknown keys and values that don't suit the item's kind are refused.
+ * Per-record keys `s4_ec:<id>` / `s4_mc:<id>` take Confirmed or Not applicable.
  */
 export function validateItemAnswer(
   itemKey: string,
   value: unknown
 ): { ok: true; value: InterviewAnswerValue } | { ok: false; error: string } {
-  const def = ITEM_BY_KEY.get(itemKey)
-  if (!def) return { ok: false, error: "Unknown interview item." }
-  if (!isValueAllowedForKind(def.kind, value)) {
+  const kind = kindForInterviewItemKey(itemKey)
+  if (!kind) return { ok: false, error: "Unknown interview item." }
+  if (!isValueAllowedForKind(kind, value)) {
     return { ok: false, error: "That answer is not allowed for this item." }
   }
   return { ok: true, value }
+}
+
+function readAnswerEntry(
+  entry: unknown,
+  kind: InterviewAnswerKind
+): InterviewItemAnswer | null {
+  if (!entry || typeof entry !== "object" || Array.isArray(entry)) return null
+  const row = entry as Record<string, unknown>
+  if (!isValueAllowedForKind(kind, row.value)) return null
+  return { value: row.value, confirmed: row.confirmed === true }
 }
 
 export function sanitizeInterviewAnswers(value: unknown): InterviewAnswersJson {
@@ -236,11 +273,37 @@ export function sanitizeInterviewAnswers(value: unknown): InterviewAnswersJson {
   for (const key of ALL_INTERVIEW_ITEM_KEYS) {
     const def = ITEM_BY_KEY.get(key)
     if (!def) continue
-    const entry = itemsRaw[key]
-    if (!entry || typeof entry !== "object" || Array.isArray(entry)) continue
-    const row = entry as Record<string, unknown>
-    if (!isValueAllowedForKind(def.kind, row.value)) continue
-    items[key] = { value: row.value, confirmed: row.confirmed === true }
+    const parsed = readAnswerEntry(itemsRaw[key], def.kind)
+    if (parsed) items[key] = parsed
+  }
+  for (const key of Object.keys(itemsRaw)) {
+    if (!isPerRecordContactKey(key) || !perRecordContactId(key)) continue
+    const parsed = readAnswerEntry(itemsRaw[key], "cna")
+    if (parsed) items[key] = parsed
+  }
+  return { version: 1, items }
+}
+
+/**
+ * Drop per-record answers whose ids are no longer in the living contact lists.
+ * Static keys are unchanged.
+ */
+export function dropMissingPerRecordAnswers(
+  answers: InterviewAnswersJson,
+  living: { emergencyContactIds: readonly string[]; medicalContactIds: readonly string[] }
+): InterviewAnswersJson {
+  const ec = new Set(living.emergencyContactIds)
+  const mc = new Set(living.medicalContactIds)
+  const items: Record<string, InterviewItemAnswer> = {}
+  for (const [key, answer] of Object.entries(answers.items)) {
+    if (key.startsWith(S4_EC_PREFIX)) {
+      const id = perRecordContactId(key)
+      if (!id || !ec.has(id)) continue
+    } else if (key.startsWith(S4_MC_PREFIX)) {
+      const id = perRecordContactId(key)
+      if (!id || !mc.has(id)) continue
+    }
+    items[key] = answer
   }
   return { version: 1, items }
 }
@@ -249,9 +312,9 @@ export function sanitizeInterviewAnswers(value: unknown): InterviewAnswersJson {
 export function prefillAnswersForReview(source: InterviewAnswersJson): InterviewAnswersJson {
   const items: Record<string, InterviewItemAnswer> = {}
   for (const [key, answer] of Object.entries(source.items)) {
-    const def = ITEM_BY_KEY.get(key)
-    if (!def) continue
-    if (!isValueAllowedForKind(def.kind, answer.value)) continue
+    const kind = kindForInterviewItemKey(key)
+    if (!kind) continue
+    if (!isValueAllowedForKind(kind, answer.value)) continue
     items[key] = { value: answer.value, confirmed: false }
   }
   return { version: 1, items }
@@ -268,9 +331,11 @@ export function interviewItemStatus(answer: InterviewItemAnswer | undefined) {
 
 export function interviewSectionStatus(
   section: InterviewSectionDef,
-  answers: InterviewAnswersJson
+  answers: InterviewAnswersJson,
+  extraItems: readonly InterviewItemDef[] = []
 ): SectionStatus {
-  const items = section.items.map((item) => statusItemForAnswer(answers.items[item.key]))
+  const allItems = [...section.items, ...extraItems]
+  const items = allItems.map((item) => statusItemForAnswer(answers.items[item.key]))
   const agg = aggregateSectionStatus(items)
   return {
     groupLabel: section.id,
@@ -281,6 +346,71 @@ export function interviewSectionStatus(
     toConfirm: agg.toConfirm,
     hasDefaults: false,
   }
+}
+
+/**
+ * Per-record confirm rows under section 4 whenever matching records exist
+ * (shown before the parent is answered, so the practitioner can see what's on file).
+ */
+export function section4ExtraItems(input: {
+  answers: InterviewAnswersJson
+  emergencyContacts: Array<{ id: string; label: string }>
+  gpContacts: Array<{ id: string; label: string }>
+  otherMedicalContacts: Array<{ id: string; label: string }>
+}): InterviewItemDef[] {
+  const extras: InterviewItemDef[] = []
+  for (const contact of input.emergencyContacts) {
+    extras.push({ key: `${S4_EC_PREFIX}${contact.id}`, label: contact.label, kind: "cna" })
+  }
+  for (const contact of input.gpContacts) {
+    extras.push({ key: `${S4_MC_PREFIX}${contact.id}`, label: contact.label, kind: "cna" })
+  }
+  for (const contact of input.otherMedicalContacts) {
+    extras.push({ key: `${S4_MC_PREFIX}${contact.id}`, label: contact.label, kind: "cna" })
+  }
+  return extras
+}
+
+/**
+ * Confirm all shown: set every Confirmed/Not applicable (cna) item in the section
+ * that is unanswered or still to confirm to Confirmed + confirmed:true.
+ * Never changes ya/yna/living items, already-confirmed rows, or Not applicable answers.
+ * Includes section 4 per-record keys when passed in extraItems.
+ */
+export function confirmAllShownInSection(
+  answers: InterviewAnswersJson,
+  sectionNumber: number,
+  extraItems: readonly InterviewItemDef[] = []
+): InterviewAnswersJson {
+  const section = INTERVIEW_SECTIONS.find((item) => item.number === sectionNumber)
+  if (!section) return answers
+  const items = { ...answers.items }
+  for (const item of [...section.items, ...extraItems]) {
+    if (item.kind !== "cna") continue
+    const existing = items[item.key]
+    if (existing?.confirmed && existing.value === "confirmed") continue
+    if (existing?.value === "not_applicable") continue
+    items[item.key] = { value: "confirmed", confirmed: true }
+  }
+  return { version: 1, items }
+}
+
+/** True when confirmAllShownInSection would change at least one item. */
+export function sectionHasConfirmAllTargets(
+  answers: InterviewAnswersJson,
+  sectionNumber: number,
+  extraItems: readonly InterviewItemDef[] = []
+): boolean {
+  const section = INTERVIEW_SECTIONS.find((item) => item.number === sectionNumber)
+  if (!section) return false
+  for (const item of [...section.items, ...extraItems]) {
+    if (item.kind !== "cna") continue
+    const existing = answers.items[item.key]
+    if (existing?.confirmed && existing.value === "confirmed") continue
+    if (existing?.value === "not_applicable") continue
+    return true
+  }
+  return false
 }
 
 /** Mark every unanswered item in the section Not applicable (confirmed). Leaves existing answers alone. */
@@ -324,9 +454,10 @@ export function confirmAllAnswers(answers: InterviewAnswersJson): InterviewAnswe
 }
 
 export function sectionsWithLeft(answers: InterviewAnswersJson): number[] {
-  return INTERVIEW_SECTIONS.filter((section) => interviewSectionStatus(section, answers).status === "left").map(
-    (section) => section.number
-  )
+  return INTERVIEW_SECTIONS.filter((section) => {
+    const status = interviewSectionStatus(section, answers).status
+    return status === "left" || status === "not_started"
+  }).map((section) => section.number)
 }
 
 export function sectionsWithToConfirm(answers: InterviewAnswersJson): number[] {

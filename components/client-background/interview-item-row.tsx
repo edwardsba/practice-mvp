@@ -3,6 +3,8 @@
 import { InterviewAnswerButtons } from "@/components/client-background/interview-answer-buttons"
 import { PrefilledTag } from "@/components/shared/prefilled-tag"
 import type { InterviewAnswerKind, InterviewAnswerValue, InterviewItemAnswer } from "@/lib/client-background/interview-answers"
+import { statusColours } from "@/lib/ui/status-colours"
+import { cn } from "@/lib/utils"
 
 export function InterviewItemRow({
   label,
@@ -12,6 +14,8 @@ export function InterviewItemRow({
   summary,
   /** Multi-line "Label: value" facts (section 3+) — preferred over summary when set. */
   factLines,
+  /** Attention note when answer contradicts records on file. */
+  contradictionNote,
   disabled,
   onSelect,
   showEdit = false,
@@ -23,6 +27,7 @@ export function InterviewItemRow({
   answer: InterviewItemAnswer | undefined
   summary?: string | null
   factLines?: string[] | null
+  contradictionNote?: string | null
   disabled?: boolean
   onSelect: (value: InterviewAnswerValue) => void
   showEdit?: boolean
@@ -57,6 +62,9 @@ export function InterviewItemRow({
             </li>
           ))}
         </ul>
+      ) : null}
+      {contradictionNote ? (
+        <p className={cn("px-2 py-1.5 text-sm", statusColours.attention.soft)}>{contradictionNote}</p>
       ) : null}
       <InterviewAnswerButtons
         kind={kind}

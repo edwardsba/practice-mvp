@@ -71,12 +71,14 @@ export async function loadClaimsPageForClient(
     .select({
       claimId: claims.claimId,
       claimTypeName: claimTypes.claimTypeName,
+      claimTypeCode: claimTypes.code,
       isActive: claims.isActive,
       startDate: claims.startDate,
       endDate: claims.endDate,
       createdAt: claims.createdAt,
       medicareCardNumber: claims.medicareCardNumber,
       medicareIrn: claims.medicareIrn,
+      medicareExpiry: claims.medicareExpiry,
       insuranceOrganisationName: professionalOrganisations.organisationName,
       insuranceReferenceNumber: claims.insuranceReferenceNumber,
     })
@@ -218,12 +220,14 @@ export async function loadClaimsPageForClient(
   const claimInputs: ClaimsPageClaimInput[] = claimRows.map((row) => ({
     claimId: row.claimId,
     claimTypeName: row.claimTypeName,
+    claimTypeCode: row.claimTypeCode,
     isActive: row.isActive,
     startDate: row.startDate,
     endDate: row.endDate,
     createdAt: row.createdAt,
     medicareCardNumber: row.medicareCardNumber,
     medicareIrn: row.medicareIrn,
+    medicareExpiry: row.medicareExpiry,
     insuranceOrganisationName: row.insuranceOrganisationName,
     insuranceReferenceNumber: row.insuranceReferenceNumber,
   }))

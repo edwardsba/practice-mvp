@@ -1,6 +1,7 @@
 import PDFDocument from "pdfkit"
 
 import type { CrisisPlanPdfData } from "@/lib/crisis-plan/build-pdf-data"
+import { formatAustralianPhone } from "@/lib/format/phone"
 
 const PAGE_MARGIN = 50
 const PAGE_WIDTH = 595.28
@@ -121,7 +122,9 @@ function drawEmergencyContactsTable(
     const row = [
       contact.role || "—",
       contact.name,
-      contact.phone || "—",
+      contact.phone?.trim()
+        ? formatAustralianPhone(contact.phone)
+        : "—",
       contact.email || "—",
     ]
     const rowStartY = y

@@ -18,10 +18,13 @@ import {
   formatAppointmentDate,
   formatAppointmentTime,
 } from "@/lib/appointments/format"
+import { formatClientDisplayName } from "@/lib/clients/display-name"
+import { formatAustralianPhone } from "@/lib/format/phone"
 
 export type ClientRow = {
   clientId: string
   firstName: string
+  preferredName: string | null
   lastName: string
   email: string | null
   phone: string | null
@@ -50,7 +53,11 @@ export function ClientsTable({ clients }: { clients: ClientRow[] }) {
     if (!normalized) return clients
 
     return clients.filter((client) => {
-      const fullName = `${client.firstName} ${client.lastName}`.toLowerCase()
+      const fullName = formatClientDisplayName(
+        client.firstName,
+        client.preferredName,
+        client.lastName
+      ).toLowerCase()
       return fullName.includes(normalized)
     })
   }, [clients, query])
@@ -127,7 +134,9 @@ export function ClientsTable({ clients }: { clients: ClientRow[] }) {
                     </TableCell>
                     <TableCell>
                       <Link href={clientHref} className="block">
-                        {client.phone ?? "—"}
+                        {client.phone?.trim()
+                          ? formatAustralianPhone(client.phone)
+                          : "—"}
                       </Link>
                     </TableCell>
                     <TableCell>

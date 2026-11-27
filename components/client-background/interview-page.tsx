@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useActionState, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 
 import {
@@ -11,8 +11,10 @@ import {
   saveInterviewAnswersBulkAction,
   saveInterviewItemAnswerAction,
   saveLivingSituationAction,
+  saveMedicareInterviewAction,
   saveOccupationAction,
   saveStressorsAction,
+  type SaveMedicareInterviewState,
 } from "@/app/clients/[client_id]/background/actions"
 import { InterviewEditorPanel } from "@/components/client-background/interview-editor-panel"
 import { InterviewItemRow } from "@/components/client-background/interview-item-row"
@@ -33,8 +35,17 @@ import { HistoryTreeSection } from "@/components/client-background/history-tree-
 import { StressorsFields } from "@/components/client-background/medication-stressors"
 import { RelationshipBlocksSection } from "@/components/client-background/relationship-blocks-section"
 import { scrollToBackgroundCheck, WorthCheckingLinks } from "@/components/client-background/worth-checking"
-import { ReferralFundingQuickView } from "@/components/clients/referral-funding-quick-view"
+import {
+  ContactDetailsForm,
+  type ContactDetailsClient,
+} from "@/components/clients/contact-details-form"
+import { EmergencyContactsSection } from "@/components/emergency-contacts/emergency-contacts-section"
 import { InterviewFundingAddPanel } from "@/components/funding/interview-funding-add-panel"
+import { MedicareFields } from "@/components/funding/medicare-fields"
+import {
+  MedicalContactsSection,
+  type MedicalContactListItem,
+} from "@/components/medical-contacts/medical-contacts-section"
 import { ConfirmPrefilledDialog } from "@/components/shared/confirm-prefilled-dialog"
 import { SectionProgressChips } from "@/components/shared/section-progress-chips"
 import { Button } from "@/components/ui/button"
@@ -46,7 +57,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import type { QuickViewLine } from "@/lib/funding/claims-page"
+import { isInsurerClaim, isNdisClaim } from "@/lib/funding/format"
 import type { ReferralFundingCardFormOptions } from "@/lib/funding/referral-funding-card-props"
 import { backgroundAnswersToClientBackground } from "@/lib/background-questionnaire/to-client-background"
 import type { BackgroundSelfReport } from "@/lib/background-questionnaire/types"
@@ -61,14 +72,31 @@ import type { HistoryQuestionKey, ScreeningAnswers } from "@/lib/client-backgrou
 import {
   applyNothingToRecord,
   blockAnswersFromInterview,
+  confirmAllShownInSection,
+  dropMissingPerRecordAnswers,
   formatSectionList,
   INTERVIEW_SECTIONS,
   interviewSectionStatus,
-  sectionsWithLeft,
-  sectionsWithToConfirm,
+  perRecordContactId,
+  S4_EC_PREFIX,
+  S4_MC_PREFIX,
+  section4ExtraItems,
+  sectionHasConfirmAllTargets,
   type InterviewAnswerValue,
   type InterviewAnswersJson,
+  type InterviewItemDef,
 } from "@/lib/client-background/interview-answers"
+import { interviewContradictionNotes } from "@/lib/client-background/interview-contradictions"
+import {
+  claimGroupFactLines,
+  emergencyContactFactLines,
+  isGpProfession,
+  medicalContactFactLines,
+  medicareFactLines,
+  pickMedicareClaim,
+  section1FactLines,
+  type InterviewClaimFactInput,
+} from "@/lib/client-background/interview-section-1-4-facts"
 import {
   factLinesOrFallback,
   formatBiologicalParentsFacts,
@@ -95,14 +123,17 @@ import type {
   StressorsRecord,
 } from "@/lib/client-background/types"
 import { emptyBlockAnswers } from "@/lib/client-background/types"
-import { formatCommunicationSummary } from "@/lib/clients/communication-summary"
-import { formatEmergencyContactSummary } from "@/lib/clients/emergency-details-summary"
+import type { EmergencyContactRow } from "@/lib/crisis-plans/types"
 import { todayDateString } from "@/lib/dates/practice-time"
 import type { SectionStatus } from "@/lib/section-status"
 import { statusColours } from "@/lib/ui/status-colours"
 import { cn } from "@/lib/utils"
 
 type EditorKey =
+  | "contact"
+  | "medicare"
+  | "emergency"
+  | "medical"
   | "funding"
   | "identity"
   | "education"
@@ -119,7 +150,17 @@ function clientAge(dateOfBirth: string | null) {
 }
 
 function editorForItem(itemKey: string): EditorKey | null {
-  if (itemKey.startsWith("s2_")) return "funding"
+  if (itemKey.startsWith("s1_")) return "contact"
+  if (itemKey === "s2_medicare") return "medicare"
+  if (itemKey === "s2_ndis" || itemKey === "s2_insurance") return "funding"
+  if (itemKey === "s4_emergency" || itemKey.startsWith(S4_EC_PREFIX)) return "emergency"
+  if (
+    itemKey === "s4_gp" ||
+    itemKey === "s4_other_professionals" ||
+    itemKey.startsWith(S4_MC_PREFIX)
+  ) {
+    return "medical"
+  }
   if (itemKey === "s3_identity" || itemKey === "s3_disability") return "identity"
   if (itemKey === "s3_education") return "education"
   if (itemKey === "s3_occupation" || itemKey === "s3_financial") return "occupation"
@@ -131,30 +172,12 @@ function editorForItem(itemKey: string): EditorKey | null {
   return null
 }
 
-export type InterviewContactDetails = {
-  phone: string | null
-  email: string | null
-  address: string | null
-  comms: {
-    commsOptOut: boolean
-    reminderOptOut: boolean
-    preSessionOptOut: boolean
-    postSessionOptOut: boolean
-    adminCommsOptOut: boolean
-    onlineBookingPermitted: boolean
-  }
-}
-
-export type InterviewEmergencyContact = {
-  name: string
-  role: string | null
-  phone: string | null
-  email: string | null
-}
-
 export type InterviewMedicalContactLine = {
+  id: string
   name: string
   professionName: string | null
+  organisationName: string | null
+  phone: string | null
   isMain: boolean
 }
 
@@ -169,9 +192,10 @@ export function InterviewPage({
   reasonSupport,
   medicalContacts = [],
   medicalContactLines = [],
-  emergencyContacts = [],
-  contactDetails,
-  referralQuickViewLines,
+  medicalContactItems = [],
+  emergencyContactRows = [],
+  contactClient,
+  interviewClaims = [],
   referralFormOptions,
   referralRecorded = false,
   lrampStartHref = null,
@@ -185,10 +209,11 @@ export function InterviewPage({
   selfReport: BackgroundSelfReport | null
   reasonSupport: ReasonSupport
   medicalContacts?: import("@/lib/client-background/professionals").ProfessionalOption[]
+  medicalContactItems?: MedicalContactListItem[]
   medicalContactLines?: InterviewMedicalContactLine[]
-  emergencyContacts?: InterviewEmergencyContact[]
-  contactDetails: InterviewContactDetails
-  referralQuickViewLines: QuickViewLine[]
+  emergencyContactRows?: EmergencyContactRow[]
+  contactClient: ContactDetailsClient
+  interviewClaims?: InterviewClaimFactInput[]
   referralFormOptions: ReferralFundingCardFormOptions
   referralRecorded?: boolean
   lrampStartHref?: string | null
@@ -217,7 +242,18 @@ export function InterviewPage({
   const flushers = useRef(new Set<() => Promise<void>>())
   const [sectionOpen, setSectionOpen] = useState<Record<string, boolean>>({})
   const [openEditor, setOpenEditor] = useState<EditorKey | null>(null)
-  const [interviewAnswers, setInterviewAnswers] = useState(initialAnswers)
+  const livingContactIds = useMemo(
+    () => ({
+      emergencyContactIds: emergencyContactRows.map((row) => row.contactId),
+      medicalContactIds: medicalContactItems.map((row) => row.medicalContactId),
+    }),
+    [emergencyContactRows, medicalContactItems]
+  )
+  const [interviewAnswersRaw, setInterviewAnswers] = useState(initialAnswers)
+  const interviewAnswers = useMemo(
+    () => dropMissingPerRecordAnswers(interviewAnswersRaw, livingContactIds),
+    [interviewAnswersRaw, livingContactIds]
+  )
   const [screening, setScreening] = useState(initialScreening)
   const [events, setEvents] = useState(data.events)
   const [issues, setIssues] = useState<HistoryIssue[]>(data.issues ?? [])
@@ -242,7 +278,6 @@ export function InterviewPage({
     // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional hydrate from sessionStorage
     setSectionOpen(readSectionOpenState(clientId, "interview"))
   }, [clientId])
-
   function setSection(id: string, open: boolean) {
     setSectionOpen((current) => {
       const next = { ...current, [id]: open }
@@ -360,6 +395,14 @@ export function InterviewPage({
   }
 
   function jumpToCheck(check: BackgroundCheck) {
+    if (check.id.startsWith("contradiction-")) {
+      const itemKey = check.id.slice("contradiction-".length)
+      const match = /^s(\d)_/.exec(itemKey)
+      if (match) setSection(match[1], true)
+      pendingCheck.current = check
+      setScrollNonce((count) => count + 1)
+      return
+    }
     const map: Record<string, string> = {
       reason: "2",
       identity: "3",
@@ -426,15 +469,50 @@ export function InterviewPage({
     onPhase("answers", "saved", null)
   }
 
+  async function confirmAllShown(sectionNumber: number) {
+    const extras = sectionExtraItems(sectionNumber)
+    const next = confirmAllShownInSection(interviewAnswers, sectionNumber, extras)
+    onPhase("answers", "saving", null)
+    const result = await saveInterviewAnswersBulkAction(clientId, next)
+    if (result.error || !result.answers) {
+      onPhase("answers", "error", () => void confirmAllShown(sectionNumber))
+      return
+    }
+    applyLocalMirrors(result.answers, result.screening)
+    onPhase("answers", "saved", null)
+  }
+
+  function sectionExtraItems(sectionNumber: number): InterviewItemDef[] {
+    if (sectionNumber !== 4) return []
+    return section4ExtraItems(section4ExtraInput)
+  }
+
+  function unfinishedSectionNumbers(
+    answers: InterviewAnswersJson,
+    status: "left" | "to_confirm"
+  ): number[] {
+    return INTERVIEW_SECTIONS.filter((section) => {
+      const extras = sectionExtraItems(section.number)
+      return interviewSectionStatus(section, answers, extras).status === status
+    }).map((section) => section.number)
+  }
+
   async function beginComplete() {
     await flushAll()
-    const left = sectionsWithLeft(interviewAnswers)
-    if (left.length > 0) {
-      setNotFinishedSections(left)
+    const left = [
+      ...unfinishedSectionNumbers(interviewAnswers, "left"),
+      ...INTERVIEW_SECTIONS.filter((section) => {
+        const extras = sectionExtraItems(section.number)
+        return interviewSectionStatus(section, interviewAnswers, extras).status === "not_started"
+      }).map((section) => section.number),
+    ]
+    const leftUnique = [...new Set(left)].sort((a, b) => a - b)
+    if (leftUnique.length > 0) {
+      setNotFinishedSections(leftUnique)
       setNotFinishedOpen(true)
       return
     }
-    const toConfirm = sectionsWithToConfirm(interviewAnswers)
+    const toConfirm = unfinishedSectionNumbers(interviewAnswers, "to_confirm")
     if (toConfirm.length > 0) {
       setConfirmPrefilledSections(toConfirm)
       setConfirmPrefilledOpen(true)
@@ -445,13 +523,27 @@ export function InterviewPage({
 
   function openWorthChecking(confirmAll: boolean) {
     setConfirmAllOnComplete(confirmAll)
-    setWorthChecks(
-      getChecks({
-        screening,
-        events,
-        stressors: stressorsRef.current,
-      })
-    )
+    const base = getChecks({
+      screening,
+      events,
+      stressors: stressorsRef.current,
+    })
+    const contradictionChecks = contradictionNotes.map((note) => {
+      const target: BackgroundCheck["target"] =
+        note.target === "history"
+          ? "history"
+          : note.target === "relationships"
+            ? "relationships"
+            : note.target === "funding"
+              ? "reason"
+              : "relationships"
+      return {
+        id: `contradiction-${note.itemKey}`,
+        message: note.message,
+        target,
+      } satisfies BackgroundCheck
+    })
+    setWorthChecks([...base, ...contradictionChecks])
     setCompleteError(null)
     setWorthCheckingOpen(true)
   }
@@ -474,20 +566,135 @@ export function InterviewPage({
     for (const item of failed) item.retry?.()
   }
 
-  const sectionStatuses: SectionStatus[] = useMemo(
-    () => INTERVIEW_SECTIONS.map((section) => interviewSectionStatus(section, interviewAnswers)),
-    [interviewAnswers]
+  const gpMedicalIds = useMemo(
+    () =>
+      new Set(
+        medicalContactLines
+          .filter((line) => isGpProfession(line.professionName))
+          .map((line) => line.id)
+      ),
+    [medicalContactLines]
   )
+
+  const section4ExtraInput = {
+    answers: interviewAnswers,
+    emergencyContacts: emergencyContactRows.map((row) => ({
+      id: row.contactId,
+      label: row.name.trim() || "Unnamed",
+    })),
+    gpContacts: medicalContactLines
+      .filter((line) => isGpProfession(line.professionName))
+      .map((line) => ({ id: line.id, label: line.name })),
+    otherMedicalContacts: medicalContactLines
+      .filter((line) => !isGpProfession(line.professionName))
+      .map((line) => ({ id: line.id, label: line.name })),
+  }
+  const section4Extras = section4ExtraItems(section4ExtraInput)
+
+  const sectionStatuses: SectionStatus[] = INTERVIEW_SECTIONS.map((section) => {
+    const extras = section.number === 4 ? section4Extras : []
+    return interviewSectionStatus(section, interviewAnswers, extras)
+  })
+
+  const section1Facts = useMemo(
+    () =>
+      section1FactLines({
+        preferredName: contactClient.preferredName,
+        dateOfBirth: contactClient.dateOfBirth,
+        ageLabel: age,
+        phone: contactClient.phone,
+        email: contactClient.email,
+        address: contactClient.address,
+        comms: {
+          commsOptOut: contactClient.commsOptOut,
+          reminderOptOut: contactClient.reminderOptOut,
+          preSessionOptOut: contactClient.preSessionOptOut,
+          postSessionOptOut: contactClient.postSessionOptOut,
+          adminCommsOptOut: contactClient.adminCommsOptOut,
+          onlineBookingPermitted: contactClient.onlineBookingPermitted,
+        },
+        clientDisplayName: clientName,
+      }),
+    [age, clientName, contactClient]
+  )
+
+  const medicareClaim = useMemo(() => pickMedicareClaim(interviewClaims), [interviewClaims])
 
   const section3Facts = useMemo(() => formatSection3FactLines(demographics), [demographics])
-  const contactSummaries = useMemo(
-    () => contactItemSummaries({ clientName, dateOfBirth: data.dateOfBirth, contactDetails, emergencyContacts, medicalContactLines }),
-    [clientName, contactDetails, data.dateOfBirth, emergencyContacts, medicalContactLines]
-  )
+
+  function extraItemsAfterParent(parentKey: string): InterviewItemDef[] {
+    if (parentKey === "s4_emergency") {
+      return section4Extras.filter((item) => item.key.startsWith(S4_EC_PREFIX))
+    }
+    if (parentKey === "s4_gp") {
+      return section4Extras.filter((item) => {
+        const id = perRecordContactId(item.key)
+        return id != null && gpMedicalIds.has(id)
+      })
+    }
+    if (parentKey === "s4_other_professionals") {
+      return section4Extras.filter((item) => {
+        const id = perRecordContactId(item.key)
+        return id != null && !gpMedicalIds.has(id)
+      })
+    }
+    return []
+  }
+
+  function factsIfAny(lines: string[]): string[] | null {
+    return lines.length > 0 ? lines : null
+  }
 
   function factLinesForItem(itemKey: string): string[] | null {
-    if (itemKey.startsWith("s1_") || itemKey.startsWith("s2_") || itemKey.startsWith("s4_")) {
-      return null
+    if (itemKey.startsWith("s1_")) {
+      return factLinesOrFallback(section1Facts[itemKey] ?? [], "Not recorded")
+    }
+    if (itemKey === "s2_medicare") {
+      return factsIfAny(medicareFactLines(medicareClaim))
+    }
+    if (itemKey === "s2_ndis") {
+      return factsIfAny(claimGroupFactLines(interviewClaims, "ndis"))
+    }
+    if (itemKey === "s2_insurance") {
+      return factsIfAny(claimGroupFactLines(interviewClaims, "insurer"))
+    }
+    if (itemKey === "s4_emergency") {
+      const count = emergencyContactRows.length
+      return count > 0 ? [`${count} emergency contact${count === 1 ? "" : "s"} recorded`] : null
+    }
+    if (itemKey === "s4_gp") {
+      const count = medicalContactLines.filter((line) => isGpProfession(line.professionName)).length
+      return count > 0 ? [`${count} GP${count === 1 ? "" : "s"} recorded`] : null
+    }
+    if (itemKey === "s4_other_professionals") {
+      const count = medicalContactLines.filter((line) => !isGpProfession(line.professionName)).length
+      return count > 0
+        ? [`${count} treating professional${count === 1 ? "" : "s"} recorded`]
+        : null
+    }
+    if (itemKey.startsWith(S4_EC_PREFIX)) {
+      const id = perRecordContactId(itemKey)
+      const contact = emergencyContactRows.find((row) => row.contactId === id)
+      return contact
+        ? emergencyContactFactLines({
+            name: contact.name,
+            role: contact.role,
+            phone: contact.phone,
+            email: contact.email,
+          })
+        : null
+    }
+    if (itemKey.startsWith(S4_MC_PREFIX)) {
+      const id = perRecordContactId(itemKey)
+      const contact = medicalContactLines.find((line) => line.id === id)
+      return contact
+        ? medicalContactFactLines({
+            name: contact.name,
+            organisationName: contact.organisationName,
+            phone: contact.phone,
+            isMain: contact.isMain,
+          })
+        : null
     }
     if (itemKey.startsWith("s3_")) {
       return factLinesOrFallback(section3Facts[itemKey] ?? [], "Not recorded")
@@ -496,90 +703,125 @@ export function InterviewPage({
     if (itemKey === "s7_housing_type") return [formatLivingTypeLine(demographics.livingSituation)]
     if (itemKey === "s7_housing_security") return [formatLivingSecurityLine(demographics.livingSituation)]
 
-    const yesAnswer = interviewAnswers.items[itemKey]?.value === "yes"
-    if (!yesAnswer && !itemKey.startsWith("s6_biological")) {
-      // Still show recorded facts for CNA biological parents; for YNA only when Yes.
-      if (itemKey !== "s6_biological_parents") return null
-    }
-
     if (itemKey === "s5_current") {
-      return factLinesOrFallback(
-        formatCurrentRelationshipFacts(relationshipStatus, blocks, relationships),
-        "Nothing recorded yet"
-      )
+      return factsIfAny(formatCurrentRelationshipFacts(relationshipStatus, blocks, relationships))
     }
     if (itemKey === "s5_previous") {
-      return yesAnswer
-        ? factLinesOrFallback(formatPreviousRelationshipFacts(blocks, relationships), "Nothing recorded yet")
-        : null
+      return factsIfAny(formatPreviousRelationshipFacts(blocks, relationships))
     }
     if (itemKey === "s5_children") {
-      return yesAnswer
-        ? factLinesOrFallback(
-            formatChildrenFacts(blocks, relationships, data.dateOfBirth),
-            "Nothing recorded yet"
-          )
-        : null
+      return factsIfAny(formatChildrenFacts(blocks, relationships, data.dateOfBirth))
     }
     if (itemKey === "s6_biological_parents") {
-      return factLinesOrFallback(formatBiologicalParentsFacts(blocks, relationships), "Not recorded")
+      return factsIfAny(formatBiologicalParentsFacts(blocks, relationships))
     }
     if (itemKey === "s6_mother_other") {
-      return yesAnswer
-        ? factLinesOrFallback(formatParentOtherFacts("mother", blocks, relationships), "Nothing recorded yet")
-        : null
+      return factsIfAny(formatParentOtherFacts("mother", blocks, relationships))
     }
     if (itemKey === "s6_father_other") {
-      return yesAnswer
-        ? factLinesOrFallback(formatParentOtherFacts("father", blocks, relationships), "Nothing recorded yet")
-        : null
+      return factsIfAny(formatParentOtherFacts("father", blocks, relationships))
     }
     if (itemKey === "s6_caregiver") {
-      return yesAnswer
-        ? factLinesOrFallback(formatCaregiverFacts(blocks, relationships), "Nothing recorded yet")
-        : null
+      return factsIfAny(formatCaregiverFacts(blocks, relationships))
     }
     if (itemKey === "s6_siblings") {
-      return yesAnswer
-        ? factLinesOrFallback(formatSiblingFacts(blocks, relationships), "Nothing recorded yet")
-        : null
+      return factsIfAny(formatSiblingFacts(blocks, relationships))
     }
     if (itemKey.startsWith("s8_")) {
       const key = itemKey.slice(3) as HistoryQuestionKey
-      return yesAnswer
-        ? factLinesOrFallback(formatHistoryCategoryFacts(key, issues, events, "self"), "Nothing recorded yet")
-        : null
+      return factsIfAny(formatHistoryCategoryFacts(key, issues, events, "self"))
     }
     if (itemKey.startsWith("s9_")) {
       const key = itemKey.slice(3) as HistoryQuestionKey
-      return yesAnswer
-        ? factLinesOrFallback(
-            formatHistoryCategoryFacts(key, issues, events, "significant_other"),
-            "Nothing recorded yet"
-          )
-        : null
+      return factsIfAny(formatHistoryCategoryFacts(key, issues, events, "significant_other"))
     }
     return null
   }
 
+  const gpCount = medicalContactLines.filter((line) => isGpProfession(line.professionName)).length
+  const otherProfessionalCount = medicalContactLines.filter(
+    (line) => !isGpProfession(line.professionName)
+  ).length
+  const relationshipHasEntries: Record<string, boolean> = {
+    s5_current: Boolean(factLinesForItem("s5_current")?.length),
+    s5_previous: Boolean(factLinesForItem("s5_previous")?.length),
+    s5_children: Boolean(factLinesForItem("s5_children")?.length),
+    s6_mother_other: Boolean(factLinesForItem("s6_mother_other")?.length),
+    s6_father_other: Boolean(factLinesForItem("s6_father_other")?.length),
+    s6_caregiver: Boolean(factLinesForItem("s6_caregiver")?.length),
+    s6_siblings: Boolean(factLinesForItem("s6_siblings")?.length),
+  }
+  const historyHasEntries: Record<string, boolean> = {}
+  for (const section of INTERVIEW_SECTIONS) {
+    if (section.number !== 8 && section.number !== 9) continue
+    for (const item of section.items) {
+      historyHasEntries[item.key] = Boolean(factLinesForItem(item.key)?.length)
+    }
+  }
+  const contradictionNotes = interviewContradictionNotes({
+    answers: interviewAnswers.items,
+    medicareClaimExists: medicareClaim != null,
+    ndisClaimCount: interviewClaims.filter((c) => isNdisClaim(c.claimTypeCode)).length,
+    insurerClaimCount: interviewClaims.filter((c) => isInsurerClaim(c.claimTypeCode)).length,
+    emergencyContactCount: emergencyContactRows.length,
+    gpCount,
+    otherProfessionalCount,
+    historyHasEntries,
+    relationshipHasEntries,
+  })
+  const contradictionByKey: Record<string, string> = {}
+  for (const note of contradictionNotes) contradictionByKey[note.itemKey] = note.message
+
   function renderEditor(sectionNumber: number) {
+    if (sectionNumber === 1 && openEditor === "contact") {
+      return (
+        <InterviewEditorPanel onDone={() => void closeEditor()}>
+          <ContactDetailsForm clientId={clientId} client={contactClient} mode="embedded" />
+        </InterviewEditorPanel>
+      )
+    }
+    if (sectionNumber === 2 && openEditor === "medicare") {
+      return (
+        <InterviewEditorPanel onDone={() => void closeEditor()}>
+          <InterviewMedicareForm
+            clientId={clientId}
+            medicareCardNumber={medicareClaim?.medicareCardNumber}
+            medicareIrn={medicareClaim?.medicareIrn}
+            medicareExpiry={medicareClaim?.medicareExpiry}
+          />
+        </InterviewEditorPanel>
+      )
+    }
+    if (sectionNumber === 4 && openEditor === "emergency") {
+      return (
+        <InterviewEditorPanel onDone={() => void closeEditor()}>
+          <div className="-mx-4">
+            <EmergencyContactsSection clientId={clientId} contacts={emergencyContactRows} />
+          </div>
+        </InterviewEditorPanel>
+      )
+    }
+    if (sectionNumber === 4 && openEditor === "medical") {
+      return (
+        <InterviewEditorPanel onDone={() => void closeEditor()}>
+          <MedicalContactsSection
+            clientId={clientId}
+            contacts={medicalContactItems}
+            professionals={professionals}
+          />
+        </InterviewEditorPanel>
+      )
+    }
     if (sectionNumber === 2 && openEditor === "funding") {
       return (
         <InterviewEditorPanel onDone={() => void closeEditor()}>
-          <ReferralFundingQuickView
-            clientId={clientId}
-            lines={referralQuickViewLines}
-            returnTo={`/clients/${clientId}/background/interview`}
-            footer={
-              <button
-                type="button"
-                className="inline-flex min-h-11 items-center text-sm font-medium text-primary hover:underline"
-                onClick={() => setFundingAddOpen(true)}
-              >
-                + Add referral or funding approval
-              </button>
-            }
-          />
+          <button
+            type="button"
+            className="inline-flex min-h-11 items-center text-sm font-medium text-primary hover:underline"
+            onClick={() => setFundingAddOpen(true)}
+          >
+            + Add referral or funding approval
+          </button>
           <InterviewFundingAddPanel
             clientId={clientId}
             practiceId={practiceId}
@@ -814,43 +1056,26 @@ export function InterviewPage({
   }
 
   return (
-    <div className="mx-auto min-w-0 max-w-2xl">
+    <div className="mx-auto min-w-0 max-w-2xl pb-28">
       <header className="sticky top-0 z-30 -mx-4 border-b bg-background px-4">
-        <div className="flex items-start justify-between gap-3 py-3">
+        <div className="flex items-start justify-between gap-3 py-2">
           <div className="min-w-0">
             <p className="text-sm font-medium">Background interview</p>
-            <p className="truncate text-sm text-muted-foreground">
+            <p className="truncate text-xs text-muted-foreground">
               {clientName}
               {age ? `, ${age}` : ""}
             </p>
           </div>
-          <div className="flex shrink-0 flex-col items-end gap-1 sm:flex-row sm:items-center sm:gap-3">
-            {lrampStartHref ? (
-              <Link
-                href={lrampStartHref}
-                className="inline-flex min-h-11 items-center text-sm font-medium text-primary underline"
-              >
-                Start LRAMP
-              </Link>
-            ) : null}
-            <button type="button" className="min-h-11 text-sm underline" onClick={() => void leave()}>
-              Save and leave
-            </button>
-          </div>
+          {lrampStartHref ? (
+            <Link
+              href={lrampStartHref}
+              className="inline-flex min-h-10 shrink-0 items-center text-sm font-medium text-primary underline"
+            >
+              Start LRAMP
+            </Link>
+          ) : null}
         </div>
-        <div className="flex flex-wrap items-center gap-3 pb-2">
-          {failed.length > 0 && !saving ? (
-            <button type="button" className="min-h-11 text-sm text-destructive underline" onClick={retryFailed}>
-              {saveLabel}
-            </button>
-          ) : (
-            <p className="text-sm text-muted-foreground">{saveLabel}</p>
-          )}
-          <Button type="button" className="min-h-11" onClick={() => void beginComplete()}>
-            Complete
-          </Button>
-        </div>
-        <div className="sticky top-0 z-20 bg-background pb-3">
+        <div className="pb-2">
           <SectionProgressChips
             sections={sectionStatuses}
             onSelect={(section) => {
@@ -874,8 +1099,22 @@ export function InterviewPage({
 
       <div className="space-y-4 py-4">
         {INTERVIEW_SECTIONS.map((section) => {
-          const status = interviewSectionStatus(section, interviewAnswers)
-          const unanswered = section.items.some((item) => !interviewAnswers.items[item.key])
+          const sectionExtras = section.number === 4 ? section4Extras : []
+          const status = interviewSectionStatus(section, interviewAnswers, sectionExtras)
+          const allSectionItems =
+            section.number === 4
+              ? section.items.flatMap((item) => {
+                  const rows: InterviewItemDef[] = [item]
+                  rows.push(...extraItemsAfterParent(item.key))
+                  return rows
+                })
+              : section.items
+          const unanswered = allSectionItems.some((item) => !interviewAnswers.items[item.key])
+          const showConfirmAll = sectionHasConfirmAllTargets(
+            interviewAnswers,
+            section.number,
+            sectionExtras
+          )
           const sectionEditor = renderEditor(section.number)
           return (
             <InterviewNumberedSection
@@ -884,43 +1123,44 @@ export function InterviewPage({
               open={Boolean(sectionOpen[String(section.number)] ?? section.number <= 2)}
               onToggle={() => toggleSection(String(section.number))}
             >
-              {section.nothingToRecord && unanswered ? (
-                <button
-                  type="button"
-                  className="inline-flex min-h-11 w-full items-center justify-center rounded-md border border-dashed px-3 text-sm"
-                  onClick={() => void nothingToRecord(section.number)}
-                >
-                  Nothing to record
-                </button>
+              {(section.nothingToRecord && unanswered) || showConfirmAll ? (
+                <div className="flex flex-wrap gap-2">
+                  {section.nothingToRecord && unanswered ? (
+                    <button
+                      type="button"
+                      className="inline-flex min-h-11 flex-1 items-center justify-center rounded-md border border-dashed px-3 text-sm"
+                      onClick={() => void nothingToRecord(section.number)}
+                    >
+                      Nothing to record
+                    </button>
+                  ) : null}
+                  {showConfirmAll ? (
+                    <button
+                      type="button"
+                      className="inline-flex min-h-11 flex-1 items-center justify-center rounded-md border px-3 text-sm font-medium"
+                      onClick={() => void confirmAllShown(section.number)}
+                    >
+                      Confirm all shown
+                    </button>
+                  ) : null}
+                </div>
               ) : null}
 
               <div className="space-y-3">
-                {section.items.map((item) => {
+                {allSectionItems.map((item) => {
                   const editor = editorForItem(item.key)
-                  const showEdit = Boolean(editor) || section.number === 1 || section.number === 4
+                  const showEdit = Boolean(editor)
                   return (
                     <InterviewItemRow
                       key={item.key}
                       label={item.label}
                       kind={item.kind}
                       answer={interviewAnswers.items[item.key]}
-                      summary={
-                        item.key.startsWith("s1_") || item.key.startsWith("s2_") || item.key.startsWith("s4_")
-                          ? contactSummaries[item.key] ?? null
-                          : null
-                      }
                       factLines={factLinesForItem(item.key)}
+                      contradictionNote={contradictionByKey[item.key] ?? null}
                       showEdit={showEdit}
                       editing={editor != null && openEditor === editor}
                       onEdit={() => {
-                        if (section.number === 1) {
-                          router.push(`/clients/${clientId}/edit`)
-                          return
-                        }
-                        if (section.number === 4) {
-                          router.push(`/clients/${clientId}/edit?open=emergency`)
-                          return
-                        }
                         if (editor) setOpenEditor(editor)
                       }}
                       onSelect={(value) => void selectAnswer(item.key, value)}
@@ -928,14 +1168,6 @@ export function InterviewPage({
                   )
                 })}
               </div>
-
-              {section.number === 2 && openEditor !== "funding" ? (
-                <ReferralFundingQuickView
-                  clientId={clientId}
-                  lines={referralQuickViewLines}
-                  returnTo={`/clients/${clientId}/background/interview`}
-                />
-              ) : null}
 
               {sectionEditor}
             </InterviewNumberedSection>
@@ -1021,6 +1253,26 @@ export function InterviewPage({
         }}
       />
 
+      <div className="fixed inset-x-0 bottom-0 z-30 border-t bg-background/95 px-4 py-3 backdrop-blur">
+        <div className="mx-auto flex max-w-2xl items-center justify-between gap-3">
+          <button type="button" className="min-h-11 text-sm underline" onClick={() => void leave()}>
+            Save and leave
+          </button>
+          <div className="flex min-w-0 flex-1 flex-col items-center">
+            {failed.length > 0 && !saving ? (
+              <button type="button" className="text-xs text-destructive underline" onClick={retryFailed}>
+                {saveLabel}
+              </button>
+            ) : (
+              <p className="text-xs text-muted-foreground">{saveLabel}</p>
+            )}
+          </div>
+          <Button type="button" className="min-h-11" onClick={() => void beginComplete()}>
+            Complete
+          </Button>
+        </div>
+      </div>
+
       <Dialog open={worthCheckingOpen} onOpenChange={(next) => !completing && setWorthCheckingOpen(next)}>
         <DialogContent className="max-h-[85vh] overflow-y-auto">
           <DialogHeader>
@@ -1062,6 +1314,44 @@ export function InterviewPage({
   )
 }
 
+const medicareFormInitial: SaveMedicareInterviewState = {}
+
+function InterviewMedicareForm({
+  clientId,
+  medicareCardNumber,
+  medicareIrn,
+  medicareExpiry,
+}: {
+  clientId: string
+  medicareCardNumber?: string | null
+  medicareIrn?: string | null
+  medicareExpiry?: string | null
+}) {
+  const router = useRouter()
+  const [state, formAction, pending] = useActionState(
+    saveMedicareInterviewAction.bind(null, clientId),
+    medicareFormInitial
+  )
+
+  useEffect(() => {
+    if (state.success) router.refresh()
+  }, [router, state.success])
+
+  return (
+    <form action={formAction} className="space-y-4">
+      <MedicareFields
+        medicareCardNumber={medicareCardNumber}
+        medicareIrn={medicareIrn}
+        medicareExpiry={medicareExpiry}
+      />
+      {state.error ? <p className="text-sm text-destructive">{state.error}</p> : null}
+      <Button type="submit" className="min-h-11" disabled={pending}>
+        {pending ? "Saving…" : "Save Medicare details"}
+      </Button>
+    </form>
+  )
+}
+
 function formatReceived(iso: string) {
   const date = new Date(iso)
   if (Number.isNaN(date.getTime())) return iso
@@ -1071,31 +1361,4 @@ function formatReceived(iso: string) {
     year: "numeric",
     timeZone: "Australia/Sydney",
   })
-}
-
-function contactItemSummaries(input: {
-  clientName: string
-  dateOfBirth: string | null
-  contactDetails: InterviewContactDetails
-  emergencyContacts: InterviewEmergencyContact[]
-  medicalContactLines: InterviewMedicalContactLine[]
-}): Record<string, string> {
-  const gps = input.medicalContactLines.filter(
-    (line) => line.isMain || (line.professionName ?? "").toLowerCase().includes("general")
-  )
-  const others = input.medicalContactLines.filter((line) => !gps.includes(line))
-  return {
-    s1_name: input.clientName,
-    s1_dob: input.dateOfBirth?.trim() || "Not recorded",
-    s1_phone: input.contactDetails.phone?.trim() || "Not recorded",
-    s1_email: input.contactDetails.email?.trim() || "Not recorded",
-    s1_address: input.contactDetails.address?.trim() || "Not recorded",
-    s1_comms: formatCommunicationSummary(input.contactDetails.comms),
-    s2_medicare: "See funding details",
-    s2_ndis: "See funding details",
-    s2_insurance: "See funding details",
-    s4_emergency: formatEmergencyContactSummary(input.emergencyContacts),
-    s4_gp: gps.map((line) => line.name).join(", ") || "Not recorded",
-    s4_other_professionals: others.map((line) => line.name).join(", ") || "Not recorded",
-  }
 }

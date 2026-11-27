@@ -40,10 +40,12 @@ import { loadClientBackground } from "@/lib/client-background/load"
 import { buildBackgroundPanelSummary } from "@/lib/clients/background-summary"
 import { formatCommunicationSummary } from "@/lib/clients/communication-summary"
 import { buildEditDetailsHref } from "@/lib/clients/edit-details-panels"
+import { formatClientDisplayName } from "@/lib/clients/display-name"
 import {
   formatCrisisPlanSummary,
   formatEmergencyContactSummary,
 } from "@/lib/clients/emergency-details-summary"
+import { formatAustralianPhone } from "@/lib/format/phone"
 import { buildReferralFundingQuickView } from "@/lib/funding/claims-page"
 import { loadClaimsPageForClient } from "@/lib/funding/load-claims-page"
 import { formatStressorsSummary } from "@/lib/clients/stressors-summary"
@@ -188,7 +190,11 @@ export default async function ClientDetailPage({
       </div>
       <EntityPageHeader
         kicker="Client details"
-        name={`${client.firstName} ${client.lastName}`}
+        name={formatClientDisplayName(
+          client.firstName,
+          client.preferredName,
+          client.lastName
+        )}
         subheading={`Date of birth: ${formatDate(client.dateOfBirth)}`}
         badge={
           <StatusBadge
@@ -258,7 +264,9 @@ export default async function ClientDetailPage({
         >
           <ClientPanelFields>
             <ClientPanelField label="Phone">
-              {client.phone?.trim() || (
+              {client.phone?.trim() ? (
+                formatAustralianPhone(client.phone)
+              ) : (
                 <span className="font-normal text-muted-foreground">
                   None recorded
                 </span>
@@ -303,7 +311,14 @@ export default async function ClientDetailPage({
                     : "whitespace-pre-line font-normal"
                 }
               >
-                {formatEmergencyContactSummary(emergencyContacts)}
+                {formatEmergencyContactSummary(
+                  emergencyContacts.map((contact) => ({
+                    ...contact,
+                    phone: contact.phone?.trim()
+                      ? formatAustralianPhone(contact.phone)
+                      : contact.phone,
+                  }))
+                )}
               </span>
             </ClientPanelField>
             <ClientPanelField label="Medical contact">

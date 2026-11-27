@@ -554,12 +554,6 @@ export function sectionStatuses(
     const toConfirmItems = visibleInSection.filter((element) =>
       isElementPrefilled(element, answers, confirmedKeys)
     )
-    // left count already computed for required gaps; map into shared aggregate shape
-    const statusItems = [
-      ...Array.from({ length: left }, () => ({ hasValue: false, confirmed: false })),
-      ...toConfirmItems.map(() => ({ hasValue: true, confirmed: false })),
-      // remaining visible required/answered slots count as done for aggregation
-    ]
     if (left === 0 && toConfirmItems.length === 0) {
       return {
         groupLabel,
@@ -571,6 +565,14 @@ export function sectionStatuses(
         hasDefaults,
       }
     }
+    // statusItems only lists gaps + to_confirm; include a done stub when anything
+    // in the section is already answered so aggregate can tell not_started from left.
+    const anyAnswered = visibleInSection.some((el) => hasAnswer(el, answers))
+    const statusItems = [
+      ...Array.from({ length: left }, () => ({ hasValue: false, confirmed: false })),
+      ...toConfirmItems.map(() => ({ hasValue: true, confirmed: false })),
+      ...(anyAnswered && left > 0 ? [{ hasValue: true, confirmed: true }] : []),
+    ]
     const agg = aggregateSectionStatus(statusItems, { hasDefaults })
     return {
       groupLabel,

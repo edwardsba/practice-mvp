@@ -4,6 +4,7 @@
  */
 
 import { isClaimPeriodActive } from "@/lib/funding/claim-period-active"
+import { formatMedicareCardNumber } from "@/lib/funding/format"
 import {
   REFERRAL_SOURCE_LABELS,
   type ReferralSource,
@@ -13,12 +14,14 @@ import type { ReportingRequirementStatus } from "@/lib/funding/reporting-status"
 export type ClaimsPageClaimInput = {
   claimId: string
   claimTypeName: string
+  claimTypeCode?: string | null
   isActive: boolean
   startDate: string | null
   endDate: string | null
   createdAt?: string | Date | null
   medicareCardNumber?: string | null
   medicareIrn?: string | null
+  medicareExpiry?: string | null
   insuranceOrganisationName?: string | null
   insuranceReferenceNumber?: string | null
 }
@@ -285,8 +288,8 @@ export function buildClaimDetailRows(
   formatDate: (value: string | null | undefined) => string
 ): Array<{ label: string; value: string }> {
   const rows: Array<{ label: string; value: string }> = []
-  const masked = maskMedicareLast4(claim.medicareCardNumber)
-  if (masked) rows.push({ label: "Medicare card", value: masked })
+  const card = formatMedicareCardNumber(claim.medicareCardNumber)
+  if (card) rows.push({ label: "Medicare card", value: card })
   const irn = claim.medicareIrn?.trim()
   if (irn) rows.push({ label: "IRN", value: irn })
   const insurer = claim.insuranceOrganisationName?.trim()

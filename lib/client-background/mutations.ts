@@ -4,7 +4,21 @@ import { randomUUID } from "node:crypto"
 
 import { and, desc, eq, inArray, isNull } from "drizzle-orm"
 
-import { auditEvents, assessmentDefinitions, assessmentInstances, assessmentResults, clientBackgroundInterviews, clientBackgrounds, clientEventRecords, clientHistoryIssues, clientRelationshipBlocks, clientRelationshipRecords, clients } from "@/db/schema"
+import {
+  auditEvents,
+  assessmentDefinitions,
+  assessmentInstances,
+  assessmentResults,
+  clientBackgroundInterviews,
+  clientBackgrounds,
+  clientEmergencyContacts,
+  clientEventRecords,
+  clientHistoryIssues,
+  clientMedicalContacts,
+  clientRelationshipBlocks,
+  clientRelationshipRecords,
+  clients,
+} from "@/db/schema"
 import { BACKGROUND_ASSESSMENT_CODE } from "@/lib/background-questionnaire/types"
 import { db } from "@/lib/db"
 import { settleEventDates } from "@/lib/client-background/age"
@@ -24,10 +38,14 @@ import {
   blockAnswersFromInterview,
   confirmAllAnswers,
   emptyInterviewAnswers,
+  isPerRecordContactKey,
   mergeScreeningMirror,
+  perRecordContactId,
   prefillAnswersForReview,
   sanitizeInterviewAnswers,
   setItemAnswer,
+  S4_EC_PREFIX,
+  S4_MC_PREFIX,
   validateItemAnswer,
   type InterviewAnswerValue,
   type InterviewAnswersJson,
@@ -1224,6 +1242,47 @@ async function writeBlockAnswerMirrors(
   await db.update(clientBackgrounds).set(next).where(eq(clientBackgrounds.clientBackgroundId, existing.id))
 }
 
+async function assertPerRecordContactBelongsToClient(input: {
+  clientId: string
+  practiceId: string
+  itemKey: string
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (!isPerRecordContactKey(input.itemKey)) return { ok: true }
+  const id = perRecordContactId(input.itemKey)
+  if (!id) return { ok: false, error: "Unknown interview item." }
+  if (input.itemKey.startsWith(S4_EC_PREFIX)) {
+    const [row] = await db
+      .select({ id: clientEmergencyContacts.contactId })
+      .from(clientEmergencyContacts)
+      .where(
+        and(
+          eq(clientEmergencyContacts.contactId, id),
+          eq(clientEmergencyContacts.clientId, input.clientId),
+          eq(clientEmergencyContacts.practiceId, input.practiceId)
+        )
+      )
+      .limit(1)
+    if (!row) return { ok: false, error: "That emergency contact was not found for this client." }
+    return { ok: true }
+  }
+  if (input.itemKey.startsWith(S4_MC_PREFIX)) {
+    const [row] = await db
+      .select({ id: clientMedicalContacts.medicalContactId })
+      .from(clientMedicalContacts)
+      .where(
+        and(
+          eq(clientMedicalContacts.medicalContactId, id),
+          eq(clientMedicalContacts.clientId, input.clientId),
+          eq(clientMedicalContacts.practiceId, input.practiceId)
+        )
+      )
+      .limit(1)
+    if (!row) return { ok: false, error: "That medical contact was not found for this client." }
+    return { ok: true }
+  }
+  return { ok: false, error: "Unknown interview item." }
+}
+
 export async function saveInterviewItemAnswer(input: {
   clientId: string
   practiceId: string
@@ -1235,6 +1294,12 @@ export async function saveInterviewItemAnswer(input: {
   if (!client) return { error: "Client was not found." }
   const validated = validateItemAnswer(input.itemKey, input.value)
   if (!validated.ok) return { error: validated.error }
+  const ownership = await assertPerRecordContactBelongsToClient({
+    clientId: input.clientId,
+    practiceId: input.practiceId,
+    itemKey: input.itemKey,
+  })
+  if (!ownership.ok) return { error: ownership.error }
   try {
     return await db.transaction(async (tx) => {
       const [existing] = await tx

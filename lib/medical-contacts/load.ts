@@ -5,6 +5,8 @@ import { and, asc, eq, inArray } from "drizzle-orm"
 import {
   clientEventRecords,
   clientMedicalContacts,
+  professionalOrganisationLinks,
+  professionalOrganisations,
   professionals,
   professions,
 } from "@/db/schema"
@@ -52,21 +54,65 @@ export async function loadMedicalContactsForClient(
     )
     .orderBy(asc(professionals.lastName), asc(professionals.firstName))
 
-  const contacts: MedicalContactWithProfessional[] = rows.map((row) => ({
-    medicalContactId: row.medicalContactId,
-    clientId: row.clientId,
-    practiceId: row.practiceId,
-    professionalId: row.professionalId,
-    isMain: row.isMain,
-    notes: row.notes,
-    professional: {
+  const professionalIds = [...new Set(rows.map((row) => row.professionalId))]
+  const orgLinks =
+    professionalIds.length === 0
+      ? []
+      : await db
+          .select({
+            professionalId: professionalOrganisationLinks.professionalId,
+            organisationName: professionalOrganisations.organisationName,
+            organisationPhone: professionalOrganisations.phone,
+            directPhone: professionalOrganisationLinks.directPhone,
+          })
+          .from(professionalOrganisationLinks)
+          .innerJoin(
+            professionalOrganisations,
+            eq(
+              professionalOrganisations.organisationId,
+              professionalOrganisationLinks.organisationId
+            )
+          )
+          .where(
+            and(
+              inArray(professionalOrganisationLinks.professionalId, professionalIds),
+              eq(professionalOrganisationLinks.isActive, true),
+              eq(professionalOrganisations.isActive, true)
+            )
+          )
+
+  const orgByProfessional = new Map<
+    string,
+    { organisationName: string | null; phone: string | null }
+  >()
+  for (const link of orgLinks) {
+    if (orgByProfessional.has(link.professionalId)) continue
+    orgByProfessional.set(link.professionalId, {
+      organisationName: link.organisationName,
+      phone: link.directPhone?.trim() || link.organisationPhone || null,
+    })
+  }
+
+  const contacts: MedicalContactWithProfessional[] = rows.map((row) => {
+    const org = orgByProfessional.get(row.professionalId)
+    return {
+      medicalContactId: row.medicalContactId,
+      clientId: row.clientId,
+      practiceId: row.practiceId,
       professionalId: row.professionalId,
-      title: row.title,
-      firstName: row.firstName,
-      lastName: row.lastName,
-      professionName: row.professionName,
-    },
-  }))
+      isMain: row.isMain,
+      notes: row.notes,
+      organisationName: org?.organisationName ?? null,
+      phone: org?.phone ?? null,
+      professional: {
+        professionalId: row.professionalId,
+        title: row.title,
+        firstName: row.firstName,
+        lastName: row.lastName,
+        professionName: row.professionName,
+      },
+    }
+  })
 
   const sortedPros = sortProfessionals(contacts.map((c) => c.professional))
   const order = new Map(sortedPros.map((p, i) => [p.professionalId, i]))

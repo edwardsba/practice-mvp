@@ -15,13 +15,40 @@ import { ensureFamilyOfOrigin } from "@/lib/client-background/mutations"
 import { loadEmergencyContacts } from "@/lib/crisis-plans/load"
 import { todayDateString } from "@/lib/dates/practice-time"
 import { db } from "@/lib/db"
-import { buildReferralFundingQuickView } from "@/lib/funding/claims-page"
 import { loadClaimsPageForClient } from "@/lib/funding/load-claims-page"
 import {
   anyReferralRecorded,
   buildReferralFundingCardProps,
 } from "@/lib/funding/referral-funding-card-props"
-import { loadMedicalContactsForClient } from "@/lib/medical-contacts/load"
+import type { InterviewClaimFactInput } from "@/lib/client-background/interview-section-1-4-facts"
+import { professionalOptionLabel } from "@/lib/client-background/professionals"
+import type { ClaimsPageClaimModel, ClaimsPageModel } from "@/lib/funding/claims-page"
+import {
+  loadMedicalContactsWithSupervises,
+} from "@/lib/medical-contacts/load"
+import { formatClientDisplayName } from "@/lib/clients/display-name"
+
+function interviewClaimsFromModel(model: ClaimsPageModel): InterviewClaimFactInput[] {
+  const claims: ClaimsPageClaimModel[] = [...model.activeClaims, ...model.inactiveClaims]
+  return claims.map((claim) => ({
+    claimId: claim.claimId,
+    claimTypeName: claim.claimTypeName,
+    claimTypeCode: claim.claimTypeCode ?? null,
+    medicareCardNumber: claim.medicareCardNumber,
+    medicareIrn: claim.medicareIrn,
+    medicareExpiry: claim.medicareExpiry,
+    insuranceOrganisationName: claim.insuranceOrganisationName,
+    insuranceReferenceNumber: claim.insuranceReferenceNumber,
+    startDate: claim.startDate,
+    endDate: claim.endDate,
+    approvals: claim.approvals.map((approval) => ({
+      name: approval.name,
+      appointmentsAttended: approval.appointmentsAttended,
+      appointmentsApproved: approval.appointmentsApproved,
+      approvalStatus: approval.approvalStatus,
+    })),
+  }))
+}
 
 export default async function BackgroundInterviewRoute({
   params,
@@ -35,6 +62,7 @@ export default async function BackgroundInterviewRoute({
   const [client] = await db
     .select({
       firstName: clients.firstName,
+      preferredName: clients.preferredName,
       lastName: clients.lastName,
       phone: clients.phone,
       email: clients.email,
@@ -73,7 +101,7 @@ export default async function BackgroundInterviewRoute({
       loadReasonSupport(clientId, context.practiceId, null),
       loadClaimsPageForClient(clientId),
       getReferralFundingCardData(clientId),
-      loadMedicalContactsForClient(clientId, context.practiceId),
+      loadMedicalContactsWithSupervises(clientId, context.practiceId),
       loadEmergencyContacts(clientId, context.practiceId),
     ])
 
@@ -81,14 +109,14 @@ export default async function BackgroundInterviewRoute({
     context.practiceId,
     referralFundingData
   )
-  const referralQuickViewLines = buildReferralFundingQuickView(
+  const claimsModel =
     claimsPage?.model ?? {
       referralsWithoutClaim: [],
       activeClaims: [],
       inactiveClaims: [],
       calendarYear: new Date().getFullYear(),
     }
-  )
+  const interviewClaims = interviewClaimsFromModel(claimsModel)
 
   const today = todayDateString()
   const notes = await db
@@ -118,38 +146,51 @@ export default async function BackgroundInterviewRoute({
       <InterviewPage
         clientId={clientId}
         practiceId={context.practiceId}
-        clientName={`${client.firstName} ${client.lastName}`.trim()}
+        clientName={formatClientDisplayName(
+          client.firstName,
+          client.preferredName,
+          client.lastName
+        )}
         data={data}
         screening={interview.screening}
         answers={interview.answers}
         selfReport={selfReport}
         reasonSupport={reasonSupport}
-        medicalContacts={medicalContacts.map((row) => row.professional)}
-        medicalContactLines={medicalContacts.map((row) => ({
-          name: `${row.professional.firstName} ${row.professional.lastName}`.trim(),
+        medicalContacts={medicalContacts.contacts.map((row) => row.professional)}
+        medicalContactItems={medicalContacts.contacts.map((contact) => ({
+          medicalContactId: contact.medicalContactId,
+          professionalId: contact.professionalId,
+          isMain: contact.isMain,
+          isResolvedMain: contact.isResolvedMain,
+          notes: contact.notes,
+          supervisesLine: contact.supervisesLine,
+          professional: contact.professional,
+        }))}
+        medicalContactLines={medicalContacts.contacts.map((row) => ({
+          id: row.medicalContactId,
+          name: professionalOptionLabel(row.professional),
           professionName: row.professional.professionName,
-          isMain: row.isMain,
+          organisationName: row.organisationName ?? null,
+          phone: row.phone ?? null,
+          isMain: row.isResolvedMain,
         }))}
-        emergencyContacts={emergencyContacts.map((row) => ({
-          name: row.name,
-          role: row.role,
-          phone: row.phone,
-          email: row.email,
-        }))}
-        contactDetails={{
-          phone: client.phone,
+        emergencyContactRows={emergencyContacts}
+        interviewClaims={interviewClaims}
+        contactClient={{
+          firstName: client.firstName,
+          preferredName: client.preferredName,
+          lastName: client.lastName,
+          dateOfBirth: client.dateOfBirth,
           email: client.email,
+          phone: client.phone,
           address: client.address,
-          comms: {
-            commsOptOut: client.commsOptOut,
-            reminderOptOut: client.reminderOptOut,
-            preSessionOptOut: client.preSessionOptOut,
-            postSessionOptOut: client.postSessionOptOut,
-            adminCommsOptOut: client.adminCommsOptOut,
-            onlineBookingPermitted: client.onlineBookingPermitted,
-          },
+          commsOptOut: client.commsOptOut,
+          reminderOptOut: client.reminderOptOut,
+          preSessionOptOut: client.preSessionOptOut,
+          postSessionOptOut: client.postSessionOptOut,
+          adminCommsOptOut: client.adminCommsOptOut,
+          onlineBookingPermitted: client.onlineBookingPermitted,
         }}
-        referralQuickViewLines={referralQuickViewLines}
         referralFormOptions={referralCard.formOptions}
         referralRecorded={anyReferralRecorded(referralFundingData.approvals)}
         lrampStartHref={lrampStartHref}

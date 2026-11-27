@@ -3,6 +3,7 @@ import assert from "node:assert/strict"
 import {
   applyNothingToRecord,
   blockAnswersFromInterview,
+  dropMissingPerRecordAnswers,
   emptyInterviewAnswers,
   INTERVIEW_SECTIONS,
   interviewItemStatus,
@@ -13,6 +14,7 @@ import {
   prefillAnswersForReview,
   sanitizeInterviewAnswers,
   screeningFromInterviewAnswers,
+  section4ExtraItems,
   setItemAnswer,
   validateItemAnswer,
   type InterviewAnswersJson,
@@ -35,7 +37,11 @@ check("confirmed value → done", interviewItemStatus({ value: "yes", confirmed:
 
 const section1 = INTERVIEW_SECTIONS[0]
 const empty = emptyInterviewAnswers()
-check("empty section → left with all items", interviewSectionStatus(section1, empty).status, "left")
+check(
+  "empty section → not_started with all items",
+  interviewSectionStatus(section1, empty).status,
+  "not_started"
+)
 check("empty section left count", interviewSectionStatus(section1, empty).left, section1.items.length)
 
 const prefilled: InterviewAnswersJson = {
@@ -172,6 +178,95 @@ check("validate wrong value for cna", validateItemAnswer("s1_name", "yes"), {
   error: "That answer is not allowed for this item.",
 })
 check("validate ok ya", validateItemAnswer("s2_medicare", "yes"), { ok: true, value: "yes" })
+
+check("validate s4_ec allows confirmed", validateItemAnswer("s4_ec:abc", "confirmed"), {
+  ok: true,
+  value: "confirmed",
+})
+check("validate s4_ec allows not_applicable", validateItemAnswer("s4_ec:abc", "not_applicable"), {
+  ok: true,
+  value: "not_applicable",
+})
+check("validate s4_ec rejects yes", validateItemAnswer("s4_ec:abc", "yes"), {
+  ok: false,
+  error: "That answer is not allowed for this item.",
+})
+check("validate s4_mc allows confirmed", validateItemAnswer("s4_mc:xyz", "confirmed"), {
+  ok: true,
+  value: "confirmed",
+})
+
+check(
+  "dropMissingPerRecordAnswers drops unknown ids",
+  dropMissingPerRecordAnswers(
+    {
+      version: 1,
+      items: {
+        "s4_ec:gone": { value: "confirmed", confirmed: true },
+        "s4_ec:live": { value: "confirmed", confirmed: true },
+        "s4_mc:gone": { value: "not_applicable", confirmed: true },
+      },
+    },
+    { emergencyContactIds: ["live"], medicalContactIds: [] }
+  ).items,
+  { "s4_ec:live": { value: "confirmed", confirmed: true } }
+)
+
+check(
+  "prefill copies per-record unconfirmed",
+  prefillAnswersForReview({
+    version: 1,
+    items: {
+      "s4_ec:live": { value: "confirmed", confirmed: true },
+      "s4_mc:mc1": { value: "not_applicable", confirmed: true },
+    },
+  }),
+  {
+    version: 1,
+    items: {
+      "s4_ec:live": { value: "confirmed", confirmed: false },
+      "s4_mc:mc1": { value: "not_applicable", confirmed: false },
+    },
+  }
+)
+
+assert.equal(section1.items.length, 7)
+check("section1 includes s1_preferred_name", section1.items.some((item) => item.key === "s1_preferred_name"), true)
+
+const section4Extras = section4ExtraItems({
+  answers: {
+    version: 1,
+    items: {
+      s4_emergency: { value: "yes", confirmed: true },
+      s4_gp: { value: "yes", confirmed: true },
+    },
+  },
+  emergencyContacts: [{ id: "ec1", label: "Parent" }],
+  gpContacts: [{ id: "gp1", label: "Dr Smith" }],
+  otherMedicalContacts: [],
+})
+check(
+  "section4ExtraItems always when records exist",
+  section4Extras.map((item) => item.key),
+  ["s4_ec:ec1", "s4_mc:gp1"]
+)
+const section4ExtrasUnanswered = section4ExtraItems({
+  answers: emptyInterviewAnswers(),
+  emergencyContacts: [{ id: "ec1", label: "Parent" }],
+  gpContacts: [{ id: "gp1", label: "Dr Smith" }],
+  otherMedicalContacts: [],
+})
+check(
+  "section4ExtraItems before parent answered",
+  section4ExtrasUnanswered.map((item) => item.key),
+  ["s4_ec:ec1", "s4_mc:gp1"]
+)
+check(
+  "section4 status counts extras",
+  interviewSectionStatus(section4, { version: 1, items: { s4_emergency: { value: "yes", confirmed: true } } }, section4Extras)
+    .left,
+  section4.items.length + section4Extras.length - 1
+)
 
 const wrongSanitized = sanitizeInterviewAnswers({
   version: 1,

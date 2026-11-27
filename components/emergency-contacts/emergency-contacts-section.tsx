@@ -4,6 +4,7 @@ import { useState } from "react"
 
 import { TappableContactCard } from "@/components/clients/tappable-contact-card"
 import { EmergencyContactDialog } from "@/components/emergency-contacts/emergency-contact-dialog"
+import { formatAustralianPhone } from "@/lib/format/phone"
 import type { EmergencyContactRow } from "@/lib/crisis-plans/types"
 
 export function EmergencyContactsSection({
@@ -49,7 +50,9 @@ export function EmergencyContactsSection({
                       ) : null}
                     </p>
                     <p className="text-muted-foreground">
-                      {contact.phone?.trim() || "No phone recorded"}
+                      {contact.phone?.trim()
+                        ? formatAustralianPhone(contact.phone)
+                        : "No phone recorded"}
                     </p>
                     <p className="text-muted-foreground">
                       {contact.email?.trim() || "No email recorded"}

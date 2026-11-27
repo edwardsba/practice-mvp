@@ -25,6 +25,7 @@ import {
   formatProfessionalName,
 } from "@/lib/contacts/format"
 import { formatDisplayDate } from "@/lib/funding/format"
+import { formatAustralianPhone } from "@/lib/format/phone"
 
 export default async function ProfessionalDetailPage({
   params,
@@ -137,7 +138,11 @@ export default async function ProfessionalDetailPage({
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Direct phone</p>
-                  <p className="text-sm">{link.directPhone ?? "—"}</p>
+                  <p className="text-sm">
+                    {link.directPhone?.trim()
+                      ? formatAustralianPhone(link.directPhone)
+                      : "—"}
+                  </p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Direct email</p>

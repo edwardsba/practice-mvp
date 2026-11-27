@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/table"
 import { getProfessionalOrganisationById } from "@/lib/actions/contacts"
 import { formatProfessionalName } from "@/lib/contacts/format"
+import { formatAustralianPhone } from "@/lib/format/phone"
 
 export default async function OrganisationDetailPage({
   params,
@@ -75,7 +76,11 @@ export default async function OrganisationDetailPage({
             </div>
             <div>
               <dt className="text-sm text-muted-foreground">Phone</dt>
-              <dd className="font-medium">{organisation.phone ?? "—"}</dd>
+              <dd className="font-medium">
+                {organisation.phone?.trim()
+                  ? formatAustralianPhone(organisation.phone)
+                  : "—"}
+              </dd>
             </div>
             <div>
               <dt className="text-sm text-muted-foreground">Fax</dt>
@@ -164,7 +169,11 @@ export default async function OrganisationDetailPage({
                           )}
                         </Link>
                       </TableCell>
-                      <TableCell>{professional.directPhone ?? "—"}</TableCell>
+                      <TableCell>
+                        {professional.directPhone?.trim()
+                          ? formatAustralianPhone(professional.directPhone)
+                          : "—"}
+                      </TableCell>
                       <TableCell>{professional.directEmail ?? "—"}</TableCell>
                     </TableRow>
                   ))

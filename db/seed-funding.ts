@@ -34,7 +34,10 @@ async function main() {
   const practiceId = practice.practiceId
   const now = new Date()
 
-  async function upsertClaimType(name: string) {
+  async function upsertClaimType(
+    name: string,
+    code: "medicare" | "ndis" | "insurer" | null
+  ) {
     const [existing] = await db
       .select()
       .from(claimTypes)
@@ -47,6 +50,14 @@ async function main() {
       .limit(1)
 
     if (existing) {
+      if (code && existing.code !== code) {
+        const [updated] = await db
+          .update(claimTypes)
+          .set({ code, updatedAt: now })
+          .where(eq(claimTypes.claimTypeId, existing.claimTypeId))
+          .returning()
+        return updated ?? existing
+      }
       return existing
     }
 
@@ -55,6 +66,7 @@ async function main() {
       .values({
         practiceId,
         claimTypeName: name,
+        code,
         updatedAt: now,
       })
       .returning()
@@ -62,10 +74,11 @@ async function main() {
     return created
   }
 
-  const medicare = await upsertClaimType("Medicare")
-  const ndis = await upsertClaimType("NDIS")
+  const medicare = await upsertClaimType("Medicare", "medicare")
+  const ndis = await upsertClaimType("NDIS", "ndis")
   const workCover = await upsertClaimType(
-    "WorkCover (Workers Compensation Insurance NSW)"
+    "WorkCover (Workers Compensation Insurance NSW)",
+    "insurer"
   )
 
   async function upsertApprovalType(data: {

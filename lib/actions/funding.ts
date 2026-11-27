@@ -33,8 +33,10 @@ import {
   type RelationshipToClient,
 } from "@/lib/client-background/types"
 import {
+  findConflictingActiveMedicareOrNdisClaim,
   formatApprovalDropdownLabel,
-  isMedicareClaimType,
+  isMedicareClaim,
+  parseMedicareExpiryFromForm,
 } from "@/lib/funding/format"
 import {
   CREATE_PRIVATE_CLAIM,
@@ -360,6 +362,7 @@ export async function getClaims(practiceId: string) {
       clientLastName: clients.lastName,
       claimTypeId: claims.claimTypeId,
       claimTypeName: claimTypes.claimTypeName,
+      claimTypeCode: claimTypes.code,
       startDate: claims.startDate,
       endDate: claims.endDate,
     })
@@ -405,8 +408,10 @@ export async function getClaimById(claimId: string) {
       clientLastName: clients.lastName,
       claimTypeId: claims.claimTypeId,
       claimTypeName: claimTypes.claimTypeName,
+      claimTypeCode: claimTypes.code,
       medicareCardNumber: claims.medicareCardNumber,
       medicareIrn: claims.medicareIrn,
+      medicareExpiry: claims.medicareExpiry,
       insuranceOrganisationId: claims.insuranceOrganisationId,
       insuranceOrganisationName: professionalOrganisations.organisationName,
       insuranceReferenceNumber: claims.insuranceReferenceNumber,
@@ -515,9 +520,26 @@ export async function upsertClaim(
     String(formData.get("insurance_reference_number") ?? "").trim() || null
   const startDate = String(formData.get("start_date") ?? "").trim() || null
   const endDate = String(formData.get("end_date") ?? "").trim() || null
+  const medicareExpiry = parseMedicareExpiryFromForm(formData)
 
   if (!claimTypeId) {
     return { error: "Claim type is required." }
+  }
+
+  const [claimTypeRow] = await db
+    .select({ code: claimTypes.code })
+    .from(claimTypes)
+    .where(
+      and(
+        eq(claimTypes.claimTypeId, claimTypeId),
+        eq(claimTypes.practiceId, context.practiceId),
+        eq(claimTypes.isActive, true)
+      )
+    )
+    .limit(1)
+
+  if (!claimTypeRow) {
+    return { error: "Claim type not found." }
   }
 
   const now = new Date()
@@ -542,12 +564,40 @@ export async function upsertClaim(
         clientId = existing.clientId
       }
 
+      const activeClaimsForClient = await db
+        .select({
+          claimId: claims.claimId,
+          clientId: claims.clientId,
+          isActive: claims.isActive,
+          claimTypeCode: claimTypes.code,
+        })
+        .from(claims)
+        .innerJoin(claimTypes, eq(claims.claimTypeId, claimTypes.claimTypeId))
+        .where(
+          and(
+            eq(claims.clientId, clientId),
+            eq(claims.practiceId, context.practiceId),
+            eq(claims.isActive, true)
+          )
+        )
+
+      const conflict = findConflictingActiveMedicareOrNdisClaim({
+        clientId,
+        claimId,
+        claimTypeCode: claimTypeRow.code,
+        existingActiveClaims: activeClaimsForClient,
+      })
+      if (conflict.conflict) {
+        return { error: conflict.message }
+      }
+
       await db
         .update(claims)
         .set({
           claimTypeId,
           medicareCardNumber,
           medicareIrn,
+          medicareExpiry,
           insuranceOrganisationId,
           insuranceReferenceNumber,
           startDate,
@@ -565,6 +615,32 @@ export async function upsertClaim(
         return { error: "Client is required." }
       }
 
+      const activeClaimsForClient = await db
+        .select({
+          claimId: claims.claimId,
+          clientId: claims.clientId,
+          isActive: claims.isActive,
+          claimTypeCode: claimTypes.code,
+        })
+        .from(claims)
+        .innerJoin(claimTypes, eq(claims.claimTypeId, claimTypes.claimTypeId))
+        .where(
+          and(
+            eq(claims.clientId, clientId),
+            eq(claims.practiceId, context.practiceId),
+            eq(claims.isActive, true)
+          )
+        )
+
+      const conflict = findConflictingActiveMedicareOrNdisClaim({
+        clientId,
+        claimTypeCode: claimTypeRow.code,
+        existingActiveClaims: activeClaimsForClient,
+      })
+      if (conflict.conflict) {
+        return { error: conflict.message }
+      }
+
       const [created] = await db
         .insert(claims)
         .values({
@@ -573,6 +649,7 @@ export async function upsertClaim(
           claimTypeId,
           medicareCardNumber,
           medicareIrn,
+          medicareExpiry,
           insuranceOrganisationId,
           insuranceReferenceNumber,
           startDate,
@@ -1248,6 +1325,7 @@ export async function getFundingApprovalById(fundingApprovalId: string) {
       appointmentsApproved: fundingApprovals.appointmentsApproved,
       approvalStatus: fundingApprovals.approvalStatus,
       claimTypeName: claimTypes.claimTypeName,
+      claimTypeCode: claimTypes.code,
       medicareCardNumber: claims.medicareCardNumber,
       medicareIrn: claims.medicareIrn,
       insuranceOrganisationId: claims.insuranceOrganisationId,
@@ -1533,10 +1611,10 @@ export async function upsertFundingApproval(
     referrerOther = null
   }
 
-  let claimTypeName: string | null = null
+  let claimTypeCode: string | null = null
   if (claimId) {
     const [claimRow] = await db
-      .select({ claimTypeName: claimTypes.claimTypeName })
+      .select({ code: claimTypes.code })
       .from(claims)
       .innerJoin(claimTypes, eq(claims.claimTypeId, claimTypes.claimTypeId))
       .where(
@@ -1547,10 +1625,10 @@ export async function upsertFundingApproval(
         )
       )
       .limit(1)
-    claimTypeName = claimRow?.claimTypeName ?? null
+    claimTypeCode = claimRow?.code ?? null
   }
 
-  if (isMedicareClaimType(claimTypeName) && !referrerId) {
+  if (isMedicareClaim(claimTypeCode) && !referrerId) {
     return { error: "Referrer is required for Medicare claims." }
   }
 
@@ -1851,6 +1929,7 @@ export async function getClaimsForClientDropdown(
       claimId: claims.claimId,
       claimTypeId: claims.claimTypeId,
       claimTypeName: claimTypes.claimTypeName,
+      claimTypeCode: claimTypes.code,
       startDate: claims.startDate,
       endDate: claims.endDate,
     })

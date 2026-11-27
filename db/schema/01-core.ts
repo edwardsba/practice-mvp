@@ -59,6 +59,7 @@ export const clients = pgTable('clients', {
   clientId: uuid('client_id').primaryKey().defaultRandom(),
   practiceId: uuid('practice_id').notNull().references(() => practices.practiceId),
   firstName: text('first_name').notNull(),
+  preferredName: text('preferred_name'),
   lastName: text('last_name').notNull(),
   dateOfBirth: text('date_of_birth'),
   email: citext('email'),

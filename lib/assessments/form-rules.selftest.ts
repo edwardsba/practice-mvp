@@ -655,14 +655,48 @@ check("element count is 98", LRAMP_ELEMENTS.length, 98)
   delete missingQ2.q2
   const leftStatuses = sectionStatuses(mseLike, missingQ2, noneConfirmed)
   check(
-    "N left takes precedence over to_confirm",
+    "empty section with required gap → not_started",
     leftStatuses.find((s) => s.letter === "2")?.status,
-    "left"
+    "not_started"
   )
   check(
     "other pre-filled sections still to_confirm",
     leftStatuses.find((s) => s.letter === "1")?.status,
     "to_confirm"
+  )
+
+  // Multi-item section: one answered (to confirm) + one unanswered → left wins
+  const mixedSection: FormElement[] = [
+    {
+      ...mseLike[0],
+      elementKey: "m1",
+      groupLabel: "Mixed",
+      options: [
+        { label: "A", value: "a", displayOrder: 1, isDefaultSelection: true },
+        { label: "B", value: "b", displayOrder: 2 },
+      ],
+    },
+    {
+      ...mseLike[0],
+      elementKey: "m2",
+      groupLabel: "Mixed",
+      options: [
+        { label: "C", value: "c", displayOrder: 1 },
+        { label: "D", value: "d", displayOrder: 2 },
+      ],
+    },
+  ]
+  const mixedAnswers = { m1: ["a"] }
+  const mixedStatuses = sectionStatuses(mixedSection, mixedAnswers, noneConfirmed)
+  check(
+    "N left takes precedence over to_confirm",
+    mixedStatuses.find((s) => s.title === "Mixed")?.status,
+    "left"
+  )
+  check(
+    "mixed section left count",
+    mixedStatuses.find((s) => s.title === "Mixed")?.left,
+    1
   )
 
   const allConfirmed = new Set(mseLike.map((el) => el.elementKey))
@@ -757,7 +791,17 @@ check("element count is 98", LRAMP_ELEMENTS.length, 98)
       left: 3,
       toConfirm: 0,
     }),
-    "Section 1, Presentation: 3 to answer"
+    "Section 1, Presentation: 3 left"
+  )
+  check(
+    "aria: not_started",
+    progressChipAriaLabel({
+      ...base,
+      status: "not_started",
+      left: 5,
+      toConfirm: 0,
+    }),
+    "Section 1, Presentation: not started"
   )
   check(
     "aria: skipped (lettered)",
@@ -806,7 +850,15 @@ check("element count is 98", LRAMP_ELEMENTS.length, 98)
   check("shared itemStatus to_confirm", itemStatus({ hasValue: true, confirmed: false }), "to_confirm")
   check("shared itemStatus done", itemStatus({ hasValue: true, confirmed: true }), "done")
   check(
-    "shared aggregate left wins",
+    "shared aggregate not_started when none answered",
+    aggregateSectionStatus([
+      { hasValue: false, confirmed: false },
+      { hasValue: false, confirmed: false },
+    ]),
+    { status: "not_started", left: 2, toConfirm: 0, hasDefaults: false }
+  )
+  check(
+    "shared aggregate left wins when some answered",
     aggregateSectionStatus([
       { hasValue: false, confirmed: false },
       { hasValue: true, confirmed: false },
@@ -817,6 +869,11 @@ check("element count is 98", LRAMP_ELEMENTS.length, 98)
     "shared aggregate to_confirm",
     aggregateSectionStatus([{ hasValue: true, confirmed: false }]),
     { status: "to_confirm", left: 0, toConfirm: 1, hasDefaults: false }
+  )
+  check(
+    "shared aggregate done",
+    aggregateSectionStatus([{ hasValue: true, confirmed: true }]),
+    { status: "done", left: 0, toConfirm: 0, hasDefaults: false }
   )
 }
 

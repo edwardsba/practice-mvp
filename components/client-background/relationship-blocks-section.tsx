@@ -1452,9 +1452,6 @@ function InterviewPersonPanel({
 }) {
   const [mode, setMode] = useState<"view" | "edit">("view")
   const [draft, setDraft] = useState(() => draftFromPerson(person))
-  useEffect(() => {
-    setDraft(draftFromPerson(person))
-  }, [person])
   const baseline = draftFromPerson(person)
   const dirty = mode === "edit" && JSON.stringify(draft) !== JSON.stringify(baseline)
   useEffect(() => {
@@ -1557,9 +1554,6 @@ function InterviewBlockPanel({
 }) {
   const [mode, setMode] = useState<"view" | "edit">("view")
   const [draft, setDraft] = useState(block)
-  useEffect(() => {
-    setDraft(block)
-  }, [block])
   const dirty =
     mode === "edit" &&
     (draft.status !== block.status ||

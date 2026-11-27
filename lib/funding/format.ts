@@ -37,22 +37,6 @@ export function isInsurerClaim(code: string | null | undefined) {
   return normalizeClaimTypeCode(code) === "insurer"
 }
 
-/**
- * @deprecated Prefer `isMedicareClaim(code)`. Kept only for transitional call sites
- * that still receive a display name; new code must pass claim_types.code.
- */
-export function isMedicareClaimType(claimTypeName: string | null | undefined) {
-  return claimTypeName?.trim().toLowerCase() === "medicare"
-}
-
-/**
- * @deprecated Prefer `isInsurerClaim(code)` (or !medicare && !ndis).
- */
-export function isInsuranceClaimType(claimTypeName: string | null | undefined) {
-  if (!claimTypeName?.trim()) return false
-  return !isMedicareClaimType(claimTypeName)
-}
-
 export function formatMedicareIdentifier(
   cardNumber: string | null | undefined,
   irn: string | null | undefined

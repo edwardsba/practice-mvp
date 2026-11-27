@@ -350,7 +350,7 @@ export async function upsertFundingApprovalType(
   return { success: true, fundingApprovalTypeId: savedTypeId }
 }
 
-function parseMedicareExpiryFromForm(formData: FormData): string | null {
+export function parseMedicareExpiryFromForm(formData: FormData): string | null {
   const month = String(formData.get("medicare_expiry_month") ?? "").trim()
   const year = String(formData.get("medicare_expiry_year") ?? "").trim()
   if (!month && !year) return null

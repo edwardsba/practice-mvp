@@ -41,6 +41,8 @@ import {
 } from "@/lib/client-background/mutations"
 import type { InterviewAnswerValue, InterviewAnswersJson } from "@/lib/client-background/interview-answers"
 import type { BlockKind, BlockRole, RelationshipBlockAnswers, TreatmentAnswer } from "@/lib/client-background/types"
+import { parseMedicareExpiryFromForm } from "@/lib/actions/funding"
+import { saveMedicareClaimDetails } from "@/lib/funding/save-medicare-claim"
 import { ensureMedicalContact } from "@/lib/medical-contacts/mutations"
 
 function refresh(clientId: string) {
@@ -234,6 +236,36 @@ export async function saveInterviewItemAnswerAction(
   })
   if (!result.error) refresh(clientId)
   return result
+}
+
+export type SaveMedicareInterviewState = {
+  error?: string
+  success?: boolean
+}
+
+/** Interview section 2: create or update the client's Medicare claim from MedicareFields. */
+export async function saveMedicareInterviewAction(
+  clientId: string,
+  _prev: SaveMedicareInterviewState,
+  formData: FormData
+): Promise<SaveMedicareInterviewState> {
+  const context = await requirePractitionerContext()
+  const medicareCardNumber =
+    String(formData.get("medicare_card_number") ?? "").trim() || null
+  const medicareIrn = String(formData.get("medicare_irn") ?? "").trim() || null
+  const medicareExpiry = parseMedicareExpiryFromForm(formData)
+  const result = await saveMedicareClaimDetails({
+    clientId,
+    practiceId: context.practiceId,
+    medicareCardNumber,
+    medicareIrn,
+    medicareExpiry,
+  })
+  if (result.error) return { error: result.error }
+  refresh(clientId)
+  revalidatePath(`/clients/${clientId}/claims`)
+  revalidatePath(`/funding/claims`)
+  return { success: true }
 }
 
 export async function saveInterviewAnswersBulkAction(clientId: string, answers: InterviewAnswersJson) {

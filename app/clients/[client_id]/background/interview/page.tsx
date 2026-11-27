@@ -172,8 +172,8 @@ export default async function BackgroundInterviewRoute({
           id: row.medicalContactId,
           name: professionalOptionLabel(row.professional),
           professionName: row.professional.professionName,
-          organisationName: null,
-          phone: null,
+          organisationName: row.organisationName ?? null,
+          phone: row.phone ?? null,
           isMain: row.isResolvedMain,
         }))}
         emergencyContactRows={emergencyContacts}

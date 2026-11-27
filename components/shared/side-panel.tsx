@@ -8,9 +8,15 @@ import { cn } from "@/lib/utils"
 /**
  * Shared right-hand side panel for relationship and history trees.
  * See AGENTS.md — "Trees and panels: one look."
+ *
+ * Two modes:
+ * - Info page: pass `leading` (avatar/tag) + `summary`; body is read-only fields; footer Edit.
+ * - Form: title only (or context strip for new items); one field per line; footer Remove · Cancel · Save.
  */
 export function SidePanel({
   title,
+  summary,
+  leading,
   ariaLabel,
   onDismiss,
   context,
@@ -19,9 +25,13 @@ export function SidePanel({
   returnFocusRef,
 }: {
   title: string
+  /** One summary line under the title (info page). */
+  summary?: string
+  /** Avatar (people), tag (events), or nothing (relationships, issues). */
+  leading?: ReactNode
   ariaLabel?: string
   onDismiss: () => void
-  /** Optional grey context strip (e.g. ContextStrip / “Adding to: …”). */
+  /** Optional grey context strip (e.g. “Adding to: …”). */
   context?: ReactNode
   children: ReactNode
   footer?: ReactNode
@@ -93,10 +103,14 @@ export function SidePanel({
         className="absolute inset-y-0 right-0 flex w-full animate-[side-panel-in_200ms_ease-out] flex-col bg-background shadow-xl outline-none sm:w-[440px]"
       >
         <style>{`@keyframes side-panel-in { from { transform: translateX(100%); } to { transform: translateX(0); } }`}</style>
-        <header className="flex items-start gap-3 border-b p-4">
-          <h2 id={titleId} className="min-w-0 flex-1 truncate text-base font-semibold">
-            {title}
-          </h2>
+        <header className="flex items-start gap-3 border-b px-4 py-4">
+          {leading ? <div className="mt-0.5 shrink-0">{leading}</div> : null}
+          <div className="min-w-0 flex-1">
+            <h2 id={titleId} className="text-lg font-semibold leading-snug break-words">
+              {title}
+            </h2>
+            {summary ? <p className="mt-0.5 text-sm text-muted-foreground break-words">{summary}</p> : null}
+          </div>
           <button
             type="button"
             className="inline-flex size-10 shrink-0 items-center justify-center rounded-md hover:bg-muted"
@@ -106,7 +120,7 @@ export function SidePanel({
             <X className="size-4" />
           </button>
         </header>
-        {context ? <div className="border-b px-4 pt-3 pb-3">{context}</div> : null}
+        {context ? <div className="border-b bg-muted/60 px-4 py-3 text-sm text-muted-foreground">{context}</div> : null}
         <div
           className={cn(
             "min-h-0 flex-1 flex flex-col",
@@ -122,7 +136,8 @@ export function SidePanel({
 }
 
 /**
- * Standard footer: Remove (left, existing only) · Cancel · Save · optional Add another.
+ * Form footer: Remove (left, existing only) · Cancel · Save.
+ * Fixed at the bottom of the panel.
  */
 export function SidePanelFooter({
   saving = false,
@@ -131,8 +146,6 @@ export function SidePanelFooter({
   onRemove,
   onCancel,
   onSave,
-  onAddAnother,
-  addAnotherLabel = "Add another",
   className,
 }: {
   saving?: boolean
@@ -141,8 +154,6 @@ export function SidePanelFooter({
   onRemove?: () => void
   onCancel: () => void
   onSave: () => void
-  onAddAnother?: () => void
-  addAnotherLabel?: string
   className?: string
 }) {
   return (
@@ -166,16 +177,6 @@ export function SidePanelFooter({
       >
         Cancel
       </button>
-      {onAddAnother ? (
-        <button
-          type="button"
-          className="inline-flex min-h-10 items-center rounded-md border px-3 text-sm"
-          disabled={saving || saveDisabled}
-          onClick={onAddAnother}
-        >
-          {addAnotherLabel}
-        </button>
-      ) : null}
       <button
         type="button"
         className="inline-flex min-h-10 items-center rounded-md bg-primary px-3 text-sm text-primary-foreground disabled:opacity-60"

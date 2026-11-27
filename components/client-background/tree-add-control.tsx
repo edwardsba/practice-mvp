@@ -8,7 +8,8 @@ import {
   treeLayer2ShellClassName,
   treeLayer3ShellClassName,
   treeLayer4ShellClassName,
-  treeLayerBarStyle,
+  treeLayerBarElementStyle,
+  treeLayerOuterStyle,
 } from "@/components/client-background/tree-levels"
 import type { TreeAddChoice } from "@/lib/client-background/tree-add"
 import { cn } from "@/lib/utils"
@@ -94,7 +95,8 @@ export function TreeAddChoiceRow({
 }
 
 /**
- * Full-width tree line: left-bar content (tap opens panel) + optional ⊕ on the right.
+ * Full-width tree line: straight left bar + content (tap opens panel) + optional ⊕.
+ * Hover/selected fill sits inside the bar and never bends it.
  */
 export function TreeLineRow({
   layer,
@@ -117,36 +119,35 @@ export function TreeLineRow({
 }) {
   const shell =
     layer === 2 ? treeLayer2ShellClassName : layer === 3 ? treeLayer3ShellClassName : treeLayer4ShellClassName
-  const barStyle = treeLayerBarStyle(layer)
   const showAdd = Boolean(addChoices && addChoices.length > 0 && onAdd)
 
-  const body =
-    interactive && onOpen ? (
-      <button
-        type="button"
-        aria-current={selected ? "true" : undefined}
-        className={cn("min-w-0 flex-1", shell, treeItemStateClassName({ selected, square: layer === 2 }))}
-        style={barStyle}
-        onClick={onOpen}
-      >
-        {children}
-      </button>
-    ) : (
-      <div
-        className={cn(
-          "min-w-0 flex-1",
-          shell,
-          treeItemStateClassName({ interactive: false, square: layer === 2, selected })
-        )}
-        style={barStyle}
-      >
-        {children}
-      </div>
-    )
+  const fill = interactive && onOpen ? (
+    <button
+      type="button"
+      aria-current={selected ? "true" : undefined}
+      className={cn("min-w-0 flex-1", shell, treeItemStateClassName({ selected }))}
+      onClick={onOpen}
+    >
+      {children}
+    </button>
+  ) : (
+    <div
+      className={cn(
+        "min-w-0 flex-1",
+        shell,
+        treeItemStateClassName({ interactive: false, selected })
+      )}
+    >
+      {children}
+    </div>
+  )
 
   return (
     <div className="flex items-start gap-1">
-      {body}
+      <div className="min-w-0 flex-1" style={treeLayerOuterStyle(layer)}>
+        <span aria-hidden style={treeLayerBarElementStyle(layer)} />
+        {fill}
+      </div>
       {showAdd ? (
         <TreeAddControl choices={addChoices!} onSelect={onAdd!} aria-label={addAriaLabel} />
       ) : null}

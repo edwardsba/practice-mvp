@@ -157,9 +157,19 @@ Relationship and history trees share one visual system and one add control:
 | Tree lines (left bars, typography, hover/selected) | `components/client-background/tree-levels.tsx` |
 | ⊕ button + choice row | `components/client-background/tree-add-control.tsx` (`TreeAddControl`, `TreeAddChoiceRow`, `TreeLineRow`) |
 | Which lines get ⊕ / which choices | `lib/client-background/tree-add.ts` |
-| Side panel shell (slide-in, backdrop, title, close, context, footer) | `components/shared/side-panel.tsx` (`SidePanel`, `SidePanelFooter`) |
+| Side panel shell (slide-in, backdrop, title, summary, leading, close, context, footer) | `components/shared/side-panel.tsx` (`SidePanel`, `SidePanelFooter`) |
+| Info-page field lists (every field, empty → Not recorded) | `lib/client-background/panel-info.ts` |
+| Info-page layout + Connected + Edit footer | `components/client-background/panel-info-view.tsx` |
 
-Do not add a second tree look, a second ⊕ control, or a second side-panel shell. Interview sections 5/6/8/9 and the Client Background page must use these.
+**Flow:** tap a line → info page → **Edit** → form → **Save** → back to that item's info page. ⊕ → form for a new item → **Save** → the new item's info page. Cancel on an existing item returns to its info page; Cancel on a new item closes the panel. Outside click / × / Escape closes (with the existing discard dialog when the form is dirty).
+
+**Info page:** header is avatar (people) or tag (events) or nothing (relationships, issues) + large title + one summary line + ×. Body groups use a thin rule and a small uppercase grey heading; each field is label (~40%) / value, with empty values as grey italic "Not recorded". Last group is **Connected** (tappable links). Footer is **Edit** only.
+
+**Form:** same groups and order as the info page; **one field per line** (full width). Choices with four or fewer options are tap buttons (`ChoiceButtons`); longer lists stay dropdowns. Year / Month / Day (`PartialDatePicker`) stays on one line — the only exception — and age is typed into Year (no separate Age box). Footer fixed at the bottom: **Remove** (existing only) · **Cancel** · **Save**. New items keep the grey "Adding to: …" context strip. Do not put **Add another** or **Add step** in the panel; add the next item or a sub-step with ⊕ on the tree.
+
+Left bars are straight with square corners at every level; hover/selected soft fills sit inside the bar and must not bend it.
+
+Do not add a second tree look, a second ⊕ control, a second side-panel shell, or a second info/form layout. Interview sections 5/6/8/9 and the Client Background page must use these.
 
 Appointment automations: `lib/appointments/run-automations.ts` via daily cron (`08:00 UTC`).
 

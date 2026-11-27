@@ -15,6 +15,8 @@ export type HistoryAddLineKind =
   | { type: "heading"; mode: "condition" | "event" }
   | { type: "issue" }
   | { type: "nestable_event" }
+  /** Episode / Treatment / Other rows — ⊕ adds a step underneath. */
+  | { type: "event_with_steps" }
 
 /**
  * ⊕ choices for a relationship tree line.
@@ -53,6 +55,9 @@ export function historyTreeAddChoices(line: HistoryAddLineKind): TreeAddChoice[]
   }
   if (line.type === "nestable_event") {
     return [{ id: "event", label: "Event" }]
+  }
+  if (line.type === "event_with_steps") {
+    return [{ id: "step", label: "Step" }]
   }
   return null
 }

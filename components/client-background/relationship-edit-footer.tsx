@@ -4,7 +4,7 @@ import { SidePanelFooter } from "@/components/shared/side-panel"
 
 /**
  * Shared Cancel / Save footer for relationship person and draft forms.
- * Remove stays on the left for existing people only; Add another for new items.
+ * Remove stays on the left for existing people only.
  */
 export function RelationshipEditFooter({
   saving = false,
@@ -13,7 +13,6 @@ export function RelationshipEditFooter({
   onRemove,
   onCancel,
   onSave,
-  onAddAnother,
 }: {
   saving?: boolean
   saveDisabled?: boolean
@@ -21,7 +20,6 @@ export function RelationshipEditFooter({
   onRemove?: () => void
   onCancel: () => void
   onSave: () => void
-  onAddAnother?: () => void
 }) {
   return (
     <SidePanelFooter
@@ -31,7 +29,6 @@ export function RelationshipEditFooter({
       onRemove={onRemove}
       onCancel={onCancel}
       onSave={onSave}
-      onAddAnother={onAddAnother}
       className="border-t-0"
     />
   )

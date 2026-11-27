@@ -12,7 +12,7 @@ import {
 } from "@/app/clients/[client_id]/background/actions"
 import { ContextStrip } from "@/components/client-background/context-strip"
 import { DiscardChangesDialog } from "@/components/client-background/discard-changes-dialog"
-import { ClientAnswer, ReadOnlyField, SelectField } from "@/components/client-background/fields"
+import { ClientAnswer, SelectField } from "@/components/client-background/fields"
 import { NewPersonDraftForm } from "@/components/client-background/new-person-draft-form"
 import {
   RelationshipPanelShell,
@@ -44,9 +44,14 @@ import {
   treeLayer4TitleClassName,
   treeSelectedTitleClassName,
 } from "@/components/client-background/tree-levels"
+import {
+  PanelConnectedGroup,
+  PanelInfoFields,
+  SidePanelInfoFooter,
+} from "@/components/client-background/panel-info-view"
 import { SidePanel, SidePanelFooter } from "@/components/shared/side-panel"
-import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { eventInfoGroups, issueInfoGroups } from "@/lib/client-background/panel-info"
 import { clientAgeAtStart, formatPartialWhen } from "@/lib/client-background/age"
 import { resolveFormContext } from "@/lib/client-background/form-context"
 import { resolveHistoryIssues } from "@/lib/client-background/history-issues"
@@ -447,11 +452,6 @@ export function HistoryTreeSection({
         : selection?.kind === "new_issue"
           ? issueDraft
           : undefined
-  const entry = selection?.kind === "entry" ? shown.find((event) => event.eventRecordId === selection.id) : undefined
-  const showAddStep =
-    !readOnly &&
-    ((entry != null && (mode === "view" || mode === "edit") && !isNew) ||
-      (selection?.kind === "new_event" && mode === "edit" && draft?.eventRecordId))
   const selectedId =
     selection?.kind === "entry" || selection?.kind === "issue"
       ? selection.id
@@ -517,12 +517,14 @@ export function HistoryTreeSection({
     onAddNestedEvent: readOnly
       ? undefined
       : (parentEventId: string, about: "self" | "significant_other") => {
+          void about
           const parent = shown.find((event) => event.eventRecordId === parentEventId)
-          startNewEvent({
-            about,
-            parentEventId,
-            category: parent?.eventType,
-          })
+          if (parent) {
+            // ⊕ Step under Episode / Treatment / Other (and nested events).
+            startStep(parent)
+            return
+          }
+          startNewEvent({ about, parentEventId })
         },
     onAddCategory: readOnly
       ? undefined
@@ -548,10 +550,51 @@ export function HistoryTreeSection({
       : selection?.kind === "new_event"
         ? "New event"
         : selection?.kind === "step" || draft?.parentEventId
-          ? "Step"
+          ? draft?.title.trim() || "Step"
           : draft?.title.trim() ||
             issueDraft?.title.trim() ||
             (draft ? EVENT_TYPE_LABELS[draft.eventType] : "History")
+  const panelSummary =
+    mode !== "view"
+      ? undefined
+      : selection?.kind === "issue" && selectedIssue
+        ? [
+            CONDITION_CATEGORY_LABELS[selectedIssue.category as ConditionEventType] ?? selectedIssue.category,
+            draft
+              ? [
+                  dated(draft.startPrecision, draft.startValue, dateOfBirth),
+                  draft.resolvedOrOngoing === "ongoing" || draft.endOngoing
+                    ? "ongoing"
+                    : dated(draft.endPrecision, draft.endValue, dateOfBirth),
+                ]
+                  .filter(Boolean)
+                  .join("–")
+              : "",
+          ]
+            .filter(Boolean)
+            .join(" · ")
+        : draft
+          ? [
+              draft.parentEventId ? "Step" : EVENT_TYPE_LABELS[draft.eventType] ?? draft.eventType,
+              dated(draft.startPrecision, draft.startValue, dateOfBirth),
+            ]
+              .filter(Boolean)
+              .join(" · ")
+          : undefined
+  const panelLeading =
+    mode === "view" && draft && selection?.kind !== "issue" ? (
+      <Tag
+        label={
+          draft.parentEventId
+            ? "Step"
+            : isConditionEvent(draft.eventType)
+              ? "Episode"
+              : draft.eventType === "other_event"
+                ? "Other"
+                : "Treatment"
+        }
+      />
+    ) : undefined
 
   const clientBody = (
     <>
@@ -615,13 +658,15 @@ export function HistoryTreeSection({
         ? createPortal(
             <SidePanel
               title={panelTitle}
+              summary={panelSummary}
+              leading={panelLeading}
               ariaLabel={panelTitle}
               onDismiss={requestClose}
               context={
-                contextForPanel ? (
+                isNew && contextForPanel ? (
                   <ContextStrip
                     lines={contextForPanel.lines}
-                    readOnly={mode === "view" || readOnly}
+                    readOnly={readOnly}
                     editors={
                       mode === "edit"
                         ? {
@@ -682,10 +727,12 @@ export function HistoryTreeSection({
                     saving={pending}
                     onCancel={cancel}
                     onSave={() => void save()}
-                    saveLabel={selection.kind === "new_event" ? "Done" : "Save"}
+                    saveLabel="Save"
                     onRemove={isNew ? undefined : () => void remove()}
                   />
-                ) : undefined
+                ) : (
+                  <SidePanelInfoFooter onEdit={() => setMode("edit")} />
+                )
               }
             >
               {mode === "edit" ? (
@@ -729,28 +776,28 @@ export function HistoryTreeSection({
                       lockContext
                     />
                   ) : null}
-                  {showAddStep && entry && selection.kind !== "new_event" ? (
-                    <div className="mt-4">
-                      <Button type="button" variant="outline" size="sm" onClick={() => startStep(entry)}>
-                        Add step
-                      </Button>
-                    </div>
-                  ) : null}
                   {error ? <p className="mt-2 text-sm text-destructive">{error}</p> : null}
                 </>
               ) : (
                 <>
-                  {draft ? <EntryDetails entry={draft} dateOfBirth={dateOfBirth} /> : null}
-                  <div className="mt-6 flex flex-wrap gap-2">
-                    {showAddStep && entry ? (
-                      <Button type="button" variant="outline" size="sm" onClick={() => startStep(entry)}>
-                        Add step
-                      </Button>
-                    ) : null}
-                    <Button type="button" size="sm" onClick={() => setMode("edit")}>
-                      Edit
-                    </Button>
-                  </div>
+                  {selection.kind === "issue" && selectedIssue ? (
+                    <>
+                      <PanelInfoFields groups={issueInfoGroups(selectedIssue, draft)} />
+                      <PanelConnectedGroup
+                        index={2}
+                        links={shown
+                          .filter((event) => event.conditionGroupId === selectedIssue.issueId && !event.parentEventId)
+                          .map((event) => ({
+                            id: event.eventRecordId,
+                            label: `${EVENT_TYPE_LABELS[event.eventType] ?? event.eventType} · ${dated(event.startPrecision, event.startValue, dateOfBirth) || "No date"}`,
+                            onOpen: () => openEntry(event.eventRecordId),
+                          }))}
+                        empty="No events"
+                      />
+                    </>
+                  ) : draft ? (
+                    <PanelInfoFields groups={eventInfoGroups(draft)} />
+                  ) : null}
                   {error ? <p className="mt-2 text-sm text-destructive">{error}</p> : null}
                 </>
               )}
@@ -841,31 +888,10 @@ function StepEditor({
   )
 }
 
-function EntryDetails({ entry, dateOfBirth }: { entry: EventRecord; dateOfBirth: string | null }) {
-  const endOngoing = entry.endOngoing || entry.resolvedOrOngoing === "ongoing"
-  return (
-    <div className="space-y-4">
-      <ReadOnlyField label="Type" value={EVENT_TYPE_LABELS[entry.eventType]} />
-      <ReadOnlyField label="Title" value={entry.title} />
-      <ReadOnlyField label="Start" value={dated(entry.startPrecision, entry.startValue, dateOfBirth)} />
-      <ReadOnlyField
-        label="End"
-        value={endOngoing ? ongoingEnd(entry, dateOfBirth) : dated(entry.endPrecision, entry.endValue, dateOfBirth)}
-      />
-      <ReadOnlyField label="Description" value={entry.description} />
-    </div>
-  )
-}
-
 function dated(precision: StartPrecision | "", value: string, dateOfBirth: string | null): string {
   const when = formatPartialWhen(precision, value)
   const age = clientAgeAtStart(dateOfBirth, precision, value)
   return [when, age != null ? `age ${age}` : ""].filter(Boolean).join(" · ")
-}
-
-function ongoingEnd(entry: EventRecord, dateOfBirth: string | null): string {
-  const age = clientAgeAtStart(dateOfBirth, entry.startPrecision, entry.startValue)
-  return age != null ? `Ongoing · from age ${age}` : "Ongoing"
 }
 
 function TreeCard({ title, children }: { title: string; children: ReactNode }) {
@@ -1105,16 +1131,29 @@ function ConnectedList({
             node.tag !== "Episode" &&
             node.tag !== "Treatment" &&
             node.tag !== "Other"
+          const stepAdd =
+            !readOnly &&
+            !isStep &&
+            (node.tag === "Episode" || node.tag === "Treatment" || node.tag === "Other")
+              ? historyTreeAddChoices({ type: "event_with_steps" })
+              : null
           const nestAdd = nestable ? historyTreeAddChoices({ type: "nestable_event" }) : null
+          const rowAdd = stepAdd ?? nestAdd
           return (
             <TreeBranch key={nodeKey(node, index)} intoLayer={visualLayer} isLast={isLast}>
               <TreeLineRow
                 layer={visualLayer}
                 selected={selected}
                 onOpen={() => onOpen(node.id)}
-                addChoices={nestAdd}
+                addChoices={rowAdd}
                 addAriaLabel={`Add under ${title}`}
-                onAdd={() => onAddNestedEvent?.(node.id, about)}
+                onAdd={(choiceId) => {
+                  if (stepAdd && (choiceId === "step" || !choiceId)) {
+                    onAddNestedEvent?.(node.id, about)
+                    return
+                  }
+                  onAddNestedEvent?.(node.id, about)
+                }}
               >
                 <span className="flex min-w-0 items-center gap-2">
                   {node.tag ? <Tag label={node.tag} /> : null}

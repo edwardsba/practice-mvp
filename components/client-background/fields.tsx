@@ -53,6 +53,52 @@ export function Field({
   )
 }
 
+/**
+ * Tap buttons for short choice lists (≤4 options including Not recorded).
+ * Longer lists stay as SelectField dropdowns.
+ */
+export function ChoiceButtons({
+  id,
+  label,
+  value,
+  onChange,
+  options,
+  hint,
+}: {
+  id: string
+  label: string
+  value: string
+  onChange: (value: string) => void
+  options: { value: string; label: string }[]
+  hint?: string
+}) {
+  return (
+    <Field label={label} htmlFor={id} hint={hint}>
+      <div id={id} role="group" aria-label={label} className="flex flex-wrap gap-2">
+        {options.map((option) => {
+          const selected = value === option.value
+          return (
+            <button
+              key={option.value || "__empty"}
+              type="button"
+              className={cn(
+                "inline-flex min-h-10 items-center rounded-md border px-3 text-sm",
+                selected
+                  ? "border-primary bg-primary/10 font-medium text-foreground"
+                  : "border-input bg-transparent text-foreground hover:bg-muted"
+              )}
+              aria-pressed={selected}
+              onClick={() => onChange(option.value)}
+            >
+              {option.label}
+            </button>
+          )
+        })}
+      </div>
+    </Field>
+  )
+}
+
 /** Blue client line under a field label. Use writes through the field's onChange. */
 export function ClientAnswer({
   label,
@@ -234,8 +280,9 @@ function isWholeAge(text: string): boolean {
 }
 
 /**
- * Partial date as three native selects. Person and client-at-event modes add
- * an age that fills the year and is never stored. Date-only mode is the selects.
+ * Partial date as Year / Month / Day on one line.
+ * Person and client-at-event modes accept an age typed into Year (fills the year;
+ * age is never stored). There is no separate Age box.
  */
 export function PartialDatePicker({
   id,
@@ -243,7 +290,7 @@ export function PartialDatePicker({
   value,
   onChange,
   mode,
-  ageLabel,
+  ageLabel: _ageLabel,
   clientDateOfBirth = null,
   legacyAge = "",
 }: {
@@ -252,12 +299,13 @@ export function PartialDatePicker({
   value: string
   onChange: (value: string) => void
   mode: "person" | "client-at-event" | "date-only"
-  /** Names the age that fills this date. History passes start and end separately. */
+  /** @deprecated Separate Age box removed — age is typed into Year. */
   ageLabel?: string
   clientDateOfBirth?: string | null
-  /** Shown in the disabled age input when a legacy age-only value could not be converted. */
+  /** Shown when a legacy age-only value could not be converted. */
   legacyAge?: string
 }) {
+  void _ageLabel
   const asOf = todayDateString()
   const parsed = parsePartialDate(value)
   const asOfParts = parsePartialDate(asOf)
@@ -269,31 +317,38 @@ export function PartialDatePicker({
         ? assessAge(parsed, birthParts, "client-at-event")
         : null
   const ageDisabled = mode === "client-at-event" && birthParts.year == null
-  const [ageDraft, setAgeDraft] = useState<string | null>(null)
-  const derivedNumber =
-    reading && (reading.kind === "exact" || reading.kind === "approximate") ? String(reading.years) : ""
-  const ageShown = ageDraft ?? (ageDisabled && legacyAge.trim() ? legacyAge.trim() : derivedNumber)
-  const ageInvalid = ageDraft != null && ageDraft.trim() !== "" && !isWholeAge(ageDraft.trim())
+  const [yearDraft, setYearDraft] = useState<string | null>(null)
+  const ageCapable = mode === "person" || mode === "client-at-event"
 
   function commit(next: PartialDate) {
-    setAgeDraft(null)
+    setYearDraft(null)
     onChange(formatPartialDate(next))
   }
 
-  function onAgeInput(raw: string) {
+  function applyYearOrAge(raw: string) {
     const text = raw.trim()
     if (text === "") {
-      setAgeDraft(null)
-      onChange("")
+      setYearDraft(null)
+      commit({ year: null, month: null, day: null })
       return
     }
-    if (!isWholeAge(text)) {
-      setAgeDraft(raw)
+    if (/^\d{4}$/.test(text)) {
+      const year = Number(text)
+      setYearDraft(null)
+      commit({ year, month: parsed.month, day: parsed.month == null ? null : parsed.day })
+      return
+    }
+    if (!ageCapable || !isWholeAge(text)) {
+      setYearDraft(raw)
+      return
+    }
+    if (ageDisabled) {
+      setYearDraft(raw)
       return
     }
     const age = Number(text)
     if (reading && typedAgeMatches(reading, age)) {
-      setAgeDraft(reading.kind === "ambiguous" ? String(age) : null)
+      setYearDraft(reading.kind === "ambiguous" ? String(age) : null)
       return
     }
     const year =
@@ -301,48 +356,65 @@ export function PartialDatePicker({
         ? yearFromTypedAge(age, { kind: "today", asOf })
         : yearFromTypedAge(age, { kind: "since-birth", birthDate: clientDateOfBirth ?? "" })
     if (year == null) {
-      setAgeDraft(raw)
+      setYearDraft(raw)
       return
     }
-    setAgeDraft(null)
+    setYearDraft(null)
     onChange(year)
   }
 
   const through = asOfParts.year ?? new Date().getFullYear()
   const years = yearChoices(parsed.year, through)
-  const resolvedAgeLabel = ageLabel ?? (mode === "person" ? "Age" : "Client age at the time")
-  const ageHint = ageInvalid
-    ? "Enter an age between 0 and 130"
-    : ageDisabled
-      ? "The client's date of birth is needed to enter by age."
-      : reading?.kind === "before_birth"
-        ? mode === "client-at-event"
+  const yearShown =
+    yearDraft ??
+    (parsed.year != null
+      ? String(parsed.year)
+      : ageCapable && legacyAge.trim()
+        ? legacyAge.trim()
+        : "")
+  const yearHint =
+    yearDraft != null && yearDraft.trim() !== "" && !/^\d{4}$/.test(yearDraft.trim()) && !isWholeAge(yearDraft.trim())
+      ? "Enter a year or an age between 0 and 130"
+      : ageDisabled
+        ? "The client's date of birth is needed to enter by age."
+        : reading?.kind === "before_birth" && mode === "client-at-event"
           ? "Before client was born"
-          : undefined
-        : reading
-          ? agePrecisionNote(reading)
-          : undefined
+          : reading && ageCapable
+            ? agePrecisionNote(reading)
+            : undefined
 
-  const ageField =
-    mode === "date-only" ? null : (
-      <Field label={resolvedAgeLabel} htmlFor={`${id}-age`} hint={ageHint || undefined}>
-        <Input
-          id={`${id}-age`}
-          className={mobileControlClassName}
-          inputMode="numeric"
-          autoComplete="off"
-          disabled={ageDisabled}
-          value={ageShown}
-          onFocus={(event) => event.currentTarget.select()}
-          onChange={(event) => onAgeInput(event.target.value)}
-        />
-      </Field>
-    )
-
-  const dateField = (
+  return (
     <fieldset className="mx-0 w-full min-w-0 border-0 p-0">
       <legend className="mb-1.5 block w-full p-0 text-sm leading-none font-medium">{dateLabel}</legend>
       <div className="flex min-w-0 gap-2">
+        {ageCapable ? (
+          <Input
+            id={`${id}-year`}
+            list={`${id}-year-list`}
+            aria-label={`${dateLabel} year or age`}
+            className={cn(mobileControlClassName, "h-9 w-0 min-w-0 flex-1 basis-0 px-2.5")}
+            inputMode="numeric"
+            autoComplete="off"
+            placeholder="Year or age"
+            value={yearShown}
+            onFocus={(event) => event.currentTarget.select()}
+            onChange={(event) => {
+              const raw = event.target.value
+              if (raw === "" || /^\d{0,4}$/.test(raw)) {
+                if (raw === "" || /^\d{4}$/.test(raw) || (isWholeAge(raw) && raw.length <= 3)) {
+                  applyYearOrAge(raw)
+                  return
+                }
+                setYearDraft(raw)
+                return
+              }
+              setYearDraft(raw)
+            }}
+            onBlur={() => {
+              if (yearDraft != null) applyYearOrAge(yearDraft)
+            }}
+          />
+        ) : (
           <select
             id={`${id}-year`}
             aria-label={`${dateLabel} year`}
@@ -370,66 +442,67 @@ export function PartialDatePicker({
               </option>
             ))}
           </select>
-          <select
-            id={`${id}-month`}
-            aria-label={`${dateLabel} month`}
-            className={cn(
-              selectClassName,
-              "w-0 min-w-0 flex-1 basis-0",
-              parsed.month == null ? "text-muted-foreground" : "text-foreground"
-            )}
-            disabled={parsed.year == null}
-            value={parsed.month == null ? "" : String(parsed.month)}
-            onChange={(event) => {
-              if (parsed.year == null) return
-              const month = event.target.value === "" ? null : Number(event.target.value)
-              commit({ year: parsed.year, month, day: month == null ? null : parsed.day })
-            }}
-          >
-            <option value="" className="text-foreground">
-              Month
-            </option>
-            {MONTH_LABELS.map((label, index) => (
-              <option key={label} value={index + 1} className="text-foreground">
-                {label}
-              </option>
+        )}
+        {ageCapable ? (
+          <datalist id={`${id}-year-list`}>
+            {years.map((year) => (
+              <option key={year} value={String(year)} />
             ))}
-          </select>
-          <select
-            id={`${id}-day`}
-            aria-label={`${dateLabel} day`}
-            className={cn(
-              selectClassName,
-              "w-0 min-w-0 flex-1 basis-0",
-              parsed.day == null ? "text-muted-foreground" : "text-foreground"
-            )}
-            disabled={parsed.year == null || parsed.month == null}
-            value={parsed.day == null ? "" : String(parsed.day)}
-            onChange={(event) => {
-              if (parsed.year == null || parsed.month == null) return
-              const day = event.target.value === "" ? null : Number(event.target.value)
-              commit({ year: parsed.year, month: parsed.month, day })
-            }}
-          >
-            <option value="" className="text-foreground">
-              Day
+          </datalist>
+        ) : null}
+        <select
+          id={`${id}-month`}
+          aria-label={`${dateLabel} month`}
+          className={cn(
+            selectClassName,
+            "w-0 min-w-0 flex-1 basis-0",
+            parsed.month == null ? "text-muted-foreground" : "text-foreground"
+          )}
+          disabled={parsed.year == null}
+          value={parsed.month == null ? "" : String(parsed.month)}
+          onChange={(event) => {
+            if (parsed.year == null) return
+            const month = event.target.value === "" ? null : Number(event.target.value)
+            commit({ year: parsed.year, month, day: month == null ? null : parsed.day })
+          }}
+        >
+          <option value="" className="text-foreground">
+            Month
+          </option>
+          {MONTH_LABELS.map((label, index) => (
+            <option key={label} value={index + 1} className="text-foreground">
+              {label}
             </option>
-            {Array.from({ length: 31 }, (_, index) => index + 1).map((day) => (
-              <option key={day} value={day} className="text-foreground">
-                {String(day).padStart(2, "0")}
-              </option>
-            ))}
-          </select>
+          ))}
+        </select>
+        <select
+          id={`${id}-day`}
+          aria-label={`${dateLabel} day`}
+          className={cn(
+            selectClassName,
+            "w-0 min-w-0 flex-1 basis-0",
+            parsed.day == null ? "text-muted-foreground" : "text-foreground"
+          )}
+          disabled={parsed.year == null || parsed.month == null}
+          value={parsed.day == null ? "" : String(parsed.day)}
+          onChange={(event) => {
+            if (parsed.year == null || parsed.month == null) return
+            const day = event.target.value === "" ? null : Number(event.target.value)
+            commit({ year: parsed.year, month: parsed.month, day })
+          }}
+        >
+          <option value="" className="text-foreground">
+            Day
+          </option>
+          {Array.from({ length: 31 }, (_, index) => index + 1).map((day) => (
+            <option key={day} value={day} className="text-foreground">
+              {String(day).padStart(2, "0")}
+            </option>
+          ))}
+        </select>
       </div>
+      {yearHint ? <p className="mt-1 text-xs text-muted-foreground">{yearHint}</p> : null}
     </fieldset>
-  )
-
-  return (
-    <>
-      {mode === "person" ? ageField : null}
-      {dateField}
-      {mode === "client-at-event" ? ageField : null}
-    </>
   )
 }
 

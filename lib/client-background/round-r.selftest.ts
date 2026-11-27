@@ -11,6 +11,7 @@ import {
   newRelationshipFormIdForEntryPoint,
 } from "@/lib/client-background/new-relationship-form"
 import {
+  relationshipHeadingAllowsAdd,
   relationshipSectionAddSpec,
   relationshipSectionAllowsAdd,
 } from "@/lib/client-background/relationship-tree"
@@ -73,7 +74,10 @@ assert.deepEqual(relationshipSectionAddSpec("Other caregiver arrangements"), {
 })
 assert.equal(relationshipSectionAddSpec("Biological parents"), null)
 assert.equal(relationshipSectionAllowsAdd([{ kind: "note", text: "None" }]), false)
-assert.equal(relationshipSectionAllowsAdd([{ kind: "note", text: "Not asked" }]), false)
+// "Not asked" still allows ⊕ (Father · other relationships case).
+assert.equal(relationshipSectionAllowsAdd([{ kind: "note", text: "Not asked" }]), true)
+assert.equal(relationshipHeadingAllowsAdd("not_asked"), true)
+assert.equal(relationshipHeadingAllowsAdd("none"), false)
 assert.equal(
   relationshipSectionAllowsAdd([
     { kind: "block", id: "b1", heading: "Married", meta: "", children: [], interactive: true },

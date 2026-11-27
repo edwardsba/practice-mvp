@@ -4,7 +4,6 @@ import { useMemo, useState } from "react"
 
 import { DiscardChangesDialog } from "@/components/client-background/discard-changes-dialog"
 import {
-  PanelHeader,
   PersonFields,
   emptyPersonDraft,
   type PersonDraft,
@@ -63,17 +62,7 @@ export function NewPersonDraftForm({
   const partnerName = block ? firstPartnerGivenName(people, block.relationshipBlockId) : ""
   const dirty = JSON.stringify(draft) !== JSON.stringify({ ...emptyPersonDraft, blockRoleType: siblingDefault })
   const canSave = personDraftHasRequiredContent(draft)
-  const title =
-    titleOverride ??
-    (role === "child"
-      ? "New child"
-      : role === "sibling"
-        ? "New sibling"
-        : role === "partner"
-          ? "New partner"
-          : role === "caregiver"
-            ? "New caregiver"
-            : "New person")
+  void titleOverride
 
   const syntheticPerson = useMemo((): RelationshipRecord => {
     return {
@@ -118,13 +107,6 @@ export function NewPersonDraftForm({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <PanelHeader
-        initial="+"
-        deceased={false}
-        title={title}
-        subtitle=""
-        onClose={requestClose}
-      />
       <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
         <p className="rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground">{resolvedContext}</p>
         <PersonFields

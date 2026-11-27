@@ -146,6 +146,21 @@ Status and meaning colours are defined once in [`lib/ui/status-colours.ts`](./li
 | **problem** | red | Problem or risk | Errors, failed saves, Badge `destructive`, urgent risk items. Delete buttons keep the existing `destructive` theme colour. |
 | **client** | blue | The client's own words | Self-report "Client: …" lines and their "Use" button |
 
+Tree left-bar colours (`treeBarColours` / selected surface) also live in `lib/ui/status-colours.ts` — they are hierarchy tokens, not status meanings.
+
+### Trees and panels: one look
+
+Relationship and history trees share one visual system and one add control:
+
+| Piece | Where |
+|-------|--------|
+| Tree lines (left bars, typography, hover/selected) | `components/client-background/tree-levels.tsx` |
+| ⊕ button + choice row | `components/client-background/tree-add-control.tsx` (`TreeAddControl`, `TreeAddChoiceRow`, `TreeLineRow`) |
+| Which lines get ⊕ / which choices | `lib/client-background/tree-add.ts` |
+| Side panel shell (slide-in, backdrop, title, close, context, footer) | `components/shared/side-panel.tsx` (`SidePanel`, `SidePanelFooter`) |
+
+Do not add a second tree look, a second ⊕ control, or a second side-panel shell. Interview sections 5/6/8/9 and the Client Background page must use these.
+
 Appointment automations: `lib/appointments/run-automations.ts` via daily cron (`08:00 UTC`).
 
 ## Naming

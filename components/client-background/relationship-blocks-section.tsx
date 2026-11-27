@@ -15,6 +15,7 @@ import {
 } from "@/app/clients/[client_id]/background/actions"
 import { AddToRelationshipMenu } from "@/components/client-background/add-to-relationship-menu"
 import { DiscardChangesDialog } from "@/components/client-background/discard-changes-dialog"
+import { TreeAddControl, TreeLineRow } from "@/components/client-background/tree-add-control"
 import { ClientAnswer, SelectField, TextField } from "@/components/client-background/fields"
 import type { SavePhase } from "@/components/client-background/interview-autosave"
 import { InterviewSectionCard, needsBadge } from "@/components/client-background/interview-section-card"
@@ -43,19 +44,18 @@ import {
 import {
   TreeBranch,
   TreeInlineSelect,
-  treeItemStateClassName,
   treeLayer1ClassName,
   treeLayer2ShellClassName,
   treeLayer3AvatarClassName,
   treeLayer3MetaClassName,
-  treeLayer3ShellClassName,
   treeLayer3TitleClassName,
   treeLayer4AvatarClassName,
   treeLayer4MetaClassName,
-  treeLayer4ShellClassName,
   treeLayer4TitleClassName,
+  treeLayerBarStyle,
   treeSelectedTitleClassName,
 } from "@/components/client-background/tree-levels"
+import { relationshipTreeAddChoices } from "@/lib/client-background/tree-add"
 import type { AppliedAnswer } from "@/lib/background-questionnaire/to-client-background"
 import {
   isPartneredClientStatus,
@@ -106,6 +106,7 @@ type Selection =
   | { type: "new_relationship_draft"; kind: BlockKind; parentSide?: "mother" | "father" }
   | { type: "new_person_draft"; blockId: string; role: BlockRole }
 
+/** Kept for non-tree links (Dates ›, Move to…). */
 const linkClass = "text-sm text-primary underline-offset-2 hover:underline"
 
 const INTIMATE_KINDS = new Set<BlockKind>(["client_current", "client_previous", "client_other_children"])
@@ -291,7 +292,13 @@ function AnswerSelect({
   )
 }
 
-const layer2BandClassName = cn(treeLayer2ShellClassName, "space-y-2")
+function Layer2Band({ children, className }: { children: ReactNode; className?: string }) {
+  return (
+    <div className={cn(treeLayer2ShellClassName, "space-y-2", className)} style={treeLayerBarStyle(2)}>
+      {children}
+    </div>
+  )
+}
 
 export function RelationshipBlocksSection({
   clientId,
@@ -884,20 +891,31 @@ export function RelationshipBlocksSection({
     <div id="check-relationships" className="space-y-6">
       {error && !selection ? <p className="text-sm text-destructive">{error}</p> : null}
       <section className="space-y-3">
-        <h3 className={treeLayer1ClassName}>Current intimate relationship and children</h3>
+        <div className="flex items-center gap-2">
+          <h3 className={cn(treeLayer1ClassName, "min-w-0 flex-1")}>
+            Current intimate relationship and children
+          </h3>
+          {currentBlocks.length === 0 ? (
+            <TreeAddControl
+              choices={relationshipTreeAddChoices({ type: "heading", section: "relationship" })!}
+              aria-label="Add current relationship"
+              onSelect={() => openNewRelationship("client_current")}
+            />
+          ) : null}
+        </div>
         {childrenPrompt ? (
           <p className={cn("text-sm", statusColours.client.text)}>
             Client: {childrenPrompt} · {recordedChildren} recorded
           </p>
         ) : null}
         {currentBlocks.length === 0 ? (
-          <div className={layer2BandClassName}>
+          <Layer2Band>
             <ClientStatusSelect
               status={status}
               relationshipClient={relationshipClient}
               onChange={setStatus}
             />
-          </div>
+          </Layer2Band>
         ) : (
           currentBlocks.map((block, index) => (
             <CurrentBlockTree
@@ -914,7 +932,6 @@ export function RelationshipBlocksSection({
               onOpenBlock={() => openBlock(block.relationshipBlockId)}
               onOpenPerson={openPerson}
               onAddToRelationship={(role) => openNewPerson(block.relationshipBlockId, role)}
-              onAddPartner={() => openNewPerson(block.relationshipBlockId, "partner")}
               onAddChild={() => openNewPerson(block.relationshipBlockId, "child")}
               onChildrenAnswer={(childrenAnswer) =>
                 patchBlock(block.relationshipBlockId, { childrenAnswer })
@@ -922,25 +939,31 @@ export function RelationshipBlocksSection({
             />
           ))
         )}
-        {currentBlocks.length === 0 ? (
-          <button type="button" className={linkClass} onClick={() => openNewRelationship("client_current")}>
-            + Add current relationship
-          </button>
-        ) : null}
       </section>
 
       <section className="space-y-3">
-        {hideTopLevelAnswers ? (
-          <h3 className={treeLayer1ClassName}>Previous significant relationships</h3>
-        ) : (
-          <AnswerSelect
-            id="previous_relationships_answer"
-            label="Previous significant relationships"
-            value={previous.length > 0 ? "yes" : answers.previousRelationships || ""}
-            locked={previous.length > 0}
-            onChange={(value) => setAnswer("previousRelationships", value)}
-          />
-        )}
+        <div className="flex items-center gap-2">
+          {hideTopLevelAnswers ? (
+            <h3 className={cn(treeLayer1ClassName, "min-w-0 flex-1")}>Previous significant relationships</h3>
+          ) : (
+            <div className="min-w-0 flex-1">
+              <AnswerSelect
+                id="previous_relationships_answer"
+                label="Previous significant relationships"
+                value={previous.length > 0 ? "yes" : answers.previousRelationships || ""}
+                locked={previous.length > 0}
+                onChange={(value) => setAnswer("previousRelationships", value)}
+              />
+            </div>
+          )}
+          {answers.previousRelationships !== "none" ? (
+            <TreeAddControl
+              choices={relationshipTreeAddChoices({ type: "heading", section: "relationship" })!}
+              aria-label="Add previous relationship"
+              onSelect={() => openNewRelationship("client_previous")}
+            />
+          ) : null}
+        </div>
         {(previous.length > 0 || answers.previousRelationships === "yes") &&
           previous.map((block) => (
             <PreviousBlockTree
@@ -952,28 +975,33 @@ export function RelationshipBlocksSection({
               onOpenPerson={openPerson}
               onStatus={(statusValue) => patchBlock(block.relationshipBlockId, { status: statusValue })}
               onAddToRelationship={(role) => openNewPerson(block.relationshipBlockId, role)}
-              onAddPartner={() => openNewPerson(block.relationshipBlockId, "partner")}
               onAddChild={() => openNewPerson(block.relationshipBlockId, "child")}
               onChildrenAnswer={(childrenAnswer) =>
                 patchBlock(block.relationshipBlockId, { childrenAnswer })
               }
             />
           ))}
-        {answers.previousRelationships !== "none" ? (
-          <button type="button" className={linkClass} onClick={() => openNewRelationship("client_previous")}>
-            + Add previous relationship
-          </button>
-        ) : null}
       </section>
 
       <section className="space-y-3">
-        <AnswerSelect
-          id="other_children_answer"
-          label="Other children"
-          value={otherChildren.length > 0 ? "yes" : answers.otherChildren || ""}
-          locked={otherChildren.length > 0}
-          onChange={(value) => setAnswer("otherChildren", value)}
-        />
+        <div className="flex items-start gap-2">
+          <div className="min-w-0 flex-1">
+            <AnswerSelect
+              id="other_children_answer"
+              label="Other children"
+              value={otherChildren.length > 0 ? "yes" : answers.otherChildren || ""}
+              locked={otherChildren.length > 0}
+              onChange={(value) => setAnswer("otherChildren", value)}
+            />
+          </div>
+          {answers.otherChildren === "yes" || otherChildren.length > 0 ? (
+            <TreeAddControl
+              choices={relationshipTreeAddChoices({ type: "heading", section: "other_children" })!}
+              aria-label="Add other-children relationship"
+              onSelect={() => openNewRelationship("client_other_children")}
+            />
+          ) : null}
+        </div>
         {(otherChildren.length > 0 || answers.otherChildren === "yes") &&
           otherChildren.map((block) => (
             <OtherChildrenTree
@@ -986,15 +1014,6 @@ export function RelationshipBlocksSection({
               onAddChild={() => openNewPerson(block.relationshipBlockId, "child")}
             />
           ))}
-        {answers.otherChildren === "yes" || otherChildren.length > 0 ? (
-          <button
-            type="button"
-            className={linkClass}
-            onClick={() => openNewRelationship("client_other_children")}
-          >
-            + Add relationship
-          </button>
-        ) : null}
       </section>
 
       {unplacedIntimate.length > 0 ? (
@@ -1036,7 +1055,6 @@ export function RelationshipBlocksSection({
         locked={motherOther.length > 0}
         onAnswer={(value) => setAnswer("motherOtherRelationships", value)}
         onAdd={() => openNewRelationship("parent_other", { parentSide: "mother" })}
-        addLabel="+ Add relationship"
         hideAdd={answers.motherOtherRelationships === "none"}
         hideAnswer={hideTopLevelAnswers}
       >
@@ -1050,7 +1068,6 @@ export function RelationshipBlocksSection({
             onOpenPerson={openPerson}
             onStatus={(statusValue) => patchBlock(block.relationshipBlockId, { status: statusValue })}
             onAddToRelationship={(role) => openNewPerson(block.relationshipBlockId, role)}
-            onAddPartner={() => openNewPerson(block.relationshipBlockId, "partner")}
             onAddSibling={() => openNewPerson(block.relationshipBlockId, "sibling")}
             onSiblingsAnswer={(siblingsAnswer) =>
               patchBlock(block.relationshipBlockId, { siblingsAnswer })
@@ -1066,7 +1083,6 @@ export function RelationshipBlocksSection({
         locked={fatherOther.length > 0}
         onAnswer={(value) => setAnswer("fatherOtherRelationships", value)}
         onAdd={() => openNewRelationship("parent_other", { parentSide: "father" })}
-        addLabel="+ Add relationship"
         hideAdd={answers.fatherOtherRelationships === "none"}
         hideAnswer={hideTopLevelAnswers}
       >
@@ -1080,7 +1096,6 @@ export function RelationshipBlocksSection({
             onOpenPerson={openPerson}
             onStatus={(statusValue) => patchBlock(block.relationshipBlockId, { status: statusValue })}
             onAddToRelationship={(role) => openNewPerson(block.relationshipBlockId, role)}
-            onAddPartner={() => openNewPerson(block.relationshipBlockId, "partner")}
             onAddSibling={() => openNewPerson(block.relationshipBlockId, "sibling")}
             onSiblingsAnswer={(siblingsAnswer) =>
               patchBlock(block.relationshipBlockId, { siblingsAnswer })
@@ -1096,7 +1111,7 @@ export function RelationshipBlocksSection({
         locked={caregivers.length > 0}
         onAnswer={(value) => setAnswer("caregiverArrangements", value)}
         onAdd={() => openNewRelationship("caregiver_arrangement")}
-        addLabel="+ Add arrangement"
+        addSection="arrangement"
         hideAdd={answers.caregiverArrangements === "none"}
         hideAnswer={hideTopLevelAnswers}
       >
@@ -1236,7 +1251,7 @@ export function RelationshipBlocksSection({
                     deceased={selectedPerson.deceased || selectedPerson.healthStatus === "deceased"}
                     title={selectedPerson.givenName.trim() || "Person"}
                     subtitle="Move to…"
-                    onClose={closePanel}
+                    showTitle={false}
                   />
                   <MoveStep
                     key={`move-${selectedPerson.relationshipRecordId}`}
@@ -1360,7 +1375,7 @@ function InterviewPersonPanel({
   error,
   saving,
   onDirtyChange,
-  onClose,
+  onClose: _onClose,
   onMove,
   onRemove,
   onCancel,
@@ -1377,6 +1392,7 @@ function InterviewPersonPanel({
   onCancel: () => void
   onSave: (draft: PersonDraft) => Promise<void>
 }) {
+  void _onClose
   const [draft, setDraft] = useState(() => draftFromPerson(person))
   const baseline = draftFromPerson(person)
   const dirty = JSON.stringify(draft) !== JSON.stringify(baseline)
@@ -1397,7 +1413,7 @@ function InterviewPersonPanel({
         deceased={person.deceased || person.healthStatus === "deceased"}
         title={name}
         subtitle={ROLE_LABELS[person.blockRole as BlockRole] || "Person"}
-        onClose={onClose}
+        showTitle={false}
       />
       <div className="min-h-0 flex-1 overflow-y-auto p-4">
         <PersonFields
@@ -1430,7 +1446,7 @@ function InterviewBlockPanel({
   error,
   saving,
   onDirtyChange,
-  onClose,
+  onClose: _onClose,
   onRemove,
   onCancel,
   onSave,
@@ -1445,6 +1461,7 @@ function InterviewBlockPanel({
   onCancel: () => void
   onSave: (draft: RelationshipBlock) => Promise<void>
 }) {
+  void _onClose
   const [draft, setDraft] = useState(block)
   const dirty =
     draft.status !== block.status ||
@@ -1465,7 +1482,7 @@ function InterviewBlockPanel({
         deceased={false}
         title="Dates"
         subtitle={blockMeta(block) || "Relationship"}
-        onClose={onClose}
+        showTitle={false}
       />
       <div className="min-h-0 flex-1 overflow-y-auto p-4">
         <BlockFields block={draft} locked={locked} onChange={setDraft} />
@@ -1508,15 +1525,7 @@ function PersonLine({
   return (
     <ul>
       <TreeBranch intoLayer={layer} isLast={isLast}>
-        <button
-          type="button"
-          aria-current={selected ? "true" : undefined}
-          className={cn(
-            layer4 ? treeLayer4ShellClassName : treeLayer3ShellClassName,
-            treeItemStateClassName({ selected })
-          )}
-          onClick={onOpen}
-        >
+        <TreeLineRow layer={layer} selected={selected} onOpen={onOpen}>
           <span className="flex min-w-0 items-center gap-2">
             <span
               className={cn(
@@ -1548,14 +1557,14 @@ function PersonLine({
             <span
               className={cn(
                 layer4 ? treeLayer4MetaClassName : treeLayer3MetaClassName,
-                selected && "text-[#1e3a8a]",
+                treeSelectedTitleClassName(selected),
                 "w-full"
               )}
             >
               {ROLE_LABELS[person.blockRole as BlockRole] ?? person.blockRole}
             </span>
           ) : null}
-        </button>
+        </TreeLineRow>
       </TreeBranch>
     </ul>
   )
@@ -1674,6 +1683,7 @@ function ChildrenQuestion({
   onAnswer: (value: BlockAnswer) => void
   selectedId: string | null
 }) {
+  void onAddChild
   const children = membersOf(block, people, "child")
   const answer = children.length > 0 ? "yes" : resolvedChildrenAnswer(block)
   return (
@@ -1699,9 +1709,6 @@ function ChildrenQuestion({
               onOpen={() => onOpenPerson(person.relationshipRecordId)}
             />
           ))}
-          <button type="button" className={linkClass} onClick={onAddChild}>
-            + Add child
-          </button>
         </>
       ) : null}
     </div>
@@ -1723,6 +1730,7 @@ function SiblingsQuestion({
   onAnswer: (value: BlockAnswer) => void
   selectedId: string | null
 }) {
+  void onAddSibling
   const siblings = membersOf(block, people, "sibling")
   const answer = siblings.length > 0 ? "yes" : resolvedSiblingsAnswer(block)
   return (
@@ -1748,9 +1756,6 @@ function SiblingsQuestion({
               onOpen={() => onOpenPerson(person.relationshipRecordId)}
             />
           ))}
-          <button type="button" className={linkClass} onClick={onAddSibling}>
-            + Add sibling
-          </button>
         </>
       ) : null}
     </div>
@@ -1770,7 +1775,6 @@ function CurrentBlockTree({
   onOpenBlock,
   onOpenPerson,
   onAddToRelationship,
-  onAddPartner,
   onAddChild,
   onChildrenAnswer,
 }: {
@@ -1786,7 +1790,6 @@ function CurrentBlockTree({
   onOpenBlock: () => void
   onOpenPerson: (id: string) => void
   onAddToRelationship: (role: BlockRole) => void
-  onAddPartner: () => void
   onAddChild: () => void
   onChildrenAnswer: (value: BlockAnswer) => void
 }) {
@@ -1804,7 +1807,7 @@ function CurrentBlockTree({
     />
   )
   return (
-    <div className={layer2BandClassName}>
+    <Layer2Band>
       <div className="flex flex-wrap items-end gap-3">
         <div className="min-w-[12rem] flex-1">
           {statusSource ? (
@@ -1845,10 +1848,7 @@ function CurrentBlockTree({
         ),
         children
       )}
-      <button type="button" className={linkClass} onClick={onAddPartner}>
-        + Add another partner
-      </button>
-    </div>
+    </Layer2Band>
   )
 }
 
@@ -1860,7 +1860,6 @@ function PreviousBlockTree({
   onOpenPerson,
   onStatus,
   onAddToRelationship,
-  onAddPartner,
   onAddChild,
   onChildrenAnswer,
 }: {
@@ -1871,7 +1870,6 @@ function PreviousBlockTree({
   onOpenPerson: (id: string) => void
   onStatus: (status: string) => void
   onAddToRelationship: (role: BlockRole) => void
-  onAddPartner: () => void
   onAddChild: () => void
   onChildrenAnswer: (value: BlockAnswer) => void
 }) {
@@ -1889,7 +1887,7 @@ function PreviousBlockTree({
     />
   )
   return (
-    <div className={layer2BandClassName}>
+    <Layer2Band>
       <div className="flex flex-wrap items-end gap-3">
         <div className="min-w-[12rem] flex-1">
           <SelectField
@@ -1926,10 +1924,7 @@ function PreviousBlockTree({
         ),
         children
       )}
-      <button type="button" className={linkClass} onClick={onAddPartner}>
-        + Add partner
-      </button>
-    </div>
+    </Layer2Band>
   )
 }
 
@@ -1950,14 +1945,21 @@ function OtherChildrenTree({
 }) {
   const children = membersOf(block, people, "child")
   return (
-    <div className={layer2BandClassName}>
-      <TextField
-        id={`${block.relationshipBlockId}-relationship-inline`}
-        label="Relationship"
-        placeholder="e.g. IVF with a donor, sole adoption"
-        value={block.statusDetail}
-        onChange={onStatusDetail}
-      />
+    <Layer2Band>
+      <div className="flex flex-wrap items-end gap-3">
+        <div className="min-w-0 flex-1">
+          <TextField
+            id={`${block.relationshipBlockId}-relationship-inline`}
+            label="Relationship"
+            placeholder="e.g. IVF with a donor, sole adoption"
+            value={block.statusDetail}
+            onChange={onStatusDetail}
+          />
+        </div>
+        <AddToRelationshipMenu block={block} onSelect={(role) => {
+          if (role === "child") onAddChild()
+        }} />
+      </div>
       {!block.statusDetail.trim() ? <Needs need="Unrecorded relationship" /> : null}
       {children.map((person, index) => (
         <PersonLine
@@ -1970,10 +1972,7 @@ function OtherChildrenTree({
           onOpen={() => onOpenPerson(person.relationshipRecordId)}
         />
       ))}
-      <button type="button" className={linkClass} onClick={onAddChild}>
-        + Add child
-      </button>
-    </div>
+    </Layer2Band>
   )
 }
 
@@ -2014,7 +2013,7 @@ function ParentsBlockTree({
   return (
     <section className="space-y-3">
       <h3 className={treeLayer1ClassName}>Biological parents</h3>
-      <div className={layer2BandClassName}>
+      <Layer2Band>
         <div className="flex flex-wrap items-end gap-3">
           <div className="min-w-[12rem] flex-1">
             <SelectField id={`${block.relationshipBlockId}-status-inline`} label="Relationship status" value={block.status} onChange={onStatus}>
@@ -2027,6 +2026,12 @@ function ParentsBlockTree({
             </SelectField>
           </div>
           <DatesControl block={block} needs={needs} onOpen={onOpenBlock} />
+          <AddToRelationshipMenu
+            block={block}
+            onSelect={(role) => {
+              if (role === "sibling") onAddSibling()
+            }}
+          />
         </div>
         {withNestedQuestion(
           parents,
@@ -2040,7 +2045,7 @@ function ParentsBlockTree({
           ),
           siblings
         )}
-      </div>
+      </Layer2Band>
     </section>
   )
 }
@@ -2053,7 +2058,6 @@ function ParentOtherTree({
   onOpenPerson,
   onStatus,
   onAddToRelationship,
-  onAddPartner,
   onAddSibling,
   onSiblingsAnswer,
 }: {
@@ -2064,7 +2068,6 @@ function ParentOtherTree({
   onOpenPerson: (id: string) => void
   onStatus: (status: string) => void
   onAddToRelationship: (role: BlockRole) => void
-  onAddPartner: () => void
   onAddSibling: () => void
   onSiblingsAnswer: (value: BlockAnswer) => void
 }) {
@@ -2082,7 +2085,7 @@ function ParentOtherTree({
     />
   )
   return (
-    <div className={layer2BandClassName}>
+    <Layer2Band>
       <div className="flex flex-wrap items-end gap-3">
         <div className="min-w-[12rem] flex-1">
           <SelectField id={`${block.relationshipBlockId}-status-inline`} label="Relationship status" value={block.status} onChange={onStatus}>
@@ -2114,10 +2117,7 @@ function ParentOtherTree({
         ),
         siblings
       )}
-      <button type="button" className={linkClass} onClick={onAddPartner}>
-        + Add partner
-      </button>
-    </div>
+    </Layer2Band>
   )
 }
 
@@ -2155,7 +2155,7 @@ function CaregiverTree({
     />
   )
   return (
-    <div className={layer2BandClassName}>
+    <Layer2Band>
       <div className="flex flex-wrap items-end gap-3">
         <div className="min-w-[12rem] flex-1">
           <SelectField
@@ -2178,6 +2178,13 @@ function CaregiverTree({
           onOpen={onOpenBlock}
         />
         {needs.includes("type") ? <Needs need={needLabel("type")} /> : null}
+        <AddToRelationshipMenu
+          block={block}
+          onSelect={(role) => {
+            if (role === "caregiver") onAddCaregiver()
+            else if (role === "sibling") onAddSibling()
+          }}
+        />
       </div>
       {withNestedQuestion(
         caregivers,
@@ -2191,10 +2198,7 @@ function CaregiverTree({
         ),
         siblings
       )}
-      <button type="button" className={linkClass} onClick={onAddCaregiver}>
-        + Add caregiver
-      </button>
-    </div>
+    </Layer2Band>
   )
 }
 
@@ -2205,7 +2209,7 @@ function AnsweredSideSection({
   locked,
   onAnswer,
   onAdd,
-  addLabel,
+  addSection = "relationship",
   hideAdd,
   hideAnswer = false,
   children,
@@ -2216,24 +2220,27 @@ function AnsweredSideSection({
   locked: boolean
   onAnswer: (value: BlockAnswer) => void
   onAdd: () => void
-  addLabel: string
+  addSection?: "relationship" | "arrangement" | "other_children"
   hideAdd: boolean
   hideAnswer?: boolean
   children: import("react").ReactNode
 }) {
+  const choices = relationshipTreeAddChoices({ type: "heading", section: addSection })
   return (
     <section className="space-y-3">
-      {hideAnswer ? (
-        <h3 className={treeLayer1ClassName}>{label}</h3>
-      ) : (
-        <AnswerSelect id={id} label={label} value={answer} locked={locked} onChange={onAnswer} />
-      )}
+      <div className="flex items-start gap-2">
+        {hideAnswer ? (
+          <h3 className={cn(treeLayer1ClassName, "min-w-0 flex-1")}>{label}</h3>
+        ) : (
+          <div className="min-w-0 flex-1">
+            <AnswerSelect id={id} label={label} value={answer} locked={locked} onChange={onAnswer} />
+          </div>
+        )}
+        {!hideAdd && choices ? (
+          <TreeAddControl choices={choices} aria-label={`Add under ${label}`} onSelect={onAdd} />
+        ) : null}
+      </div>
       {children}
-      {!hideAdd ? (
-        <button type="button" className={linkClass} onClick={onAdd}>
-          {addLabel}
-        </button>
-      ) : null}
     </section>
   )
 }

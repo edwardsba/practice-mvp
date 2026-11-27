@@ -108,3 +108,20 @@ export const doneSuccessMessageClass =
 /** Pre-filled inline tag (assessment / interview). */
 export const attentionPrefilledTagClass =
   "ml-2 align-middle text-xs font-normal text-amber-950 dark:text-amber-100"
+
+/**
+ * Relationship / history tree left-bar colours (not status meanings).
+ * See AGENTS.md — "Trees and panels: one look."
+ */
+export const treeBarColours = {
+  /** Level 2 — relationship / issue / single event (4 px). */
+  dark: "#334155",
+  /** Level 3 — person / event (2 px). */
+  mid: "#7c8aa0",
+  /** Level 4 — child of a person / sub-event (2 px). */
+  light: "#b8c1cf",
+} as const
+
+/** Tree line selected fill + title (panel open). */
+export const treeSelectedSurfaceClass = "bg-[#dbeafe] text-[#1e3a8a] hover:bg-[#dbeafe]"
+export const treeSelectedTitleClass = "text-[#1e3a8a]"

@@ -4,6 +4,7 @@ import { useState, type ReactNode } from "react"
 import { ChevronRight, X } from "lucide-react"
 
 import { PartialDatePicker, SelectField, TextAreaField, TextField } from "@/components/client-background/fields"
+import { SidePanel } from "@/components/shared/side-panel"
 import {
   childTypesForBlock,
   rolesForBlock,
@@ -157,15 +158,19 @@ export function PanelHeader({
   title,
   subtitle,
   onClose,
+  /** When false, omit the h2 — SidePanel already shows the title. */
+  showTitle = true,
 }: {
   initial: string
   deceased: boolean
   title: string
   subtitle: string
-  onClose: () => void
+  /** Omit when SidePanel owns the close control. */
+  onClose?: () => void
+  showTitle?: boolean
 }) {
   return (
-    <header className="flex items-start gap-3 border-b p-4">
+    <header className={cn("flex items-start gap-3", showTitle || onClose ? "border-b p-4" : "mb-3")}>
       <span
         className={cn(
           "flex size-10 shrink-0 items-center justify-center rounded-full text-sm font-medium",
@@ -176,17 +181,19 @@ export function PanelHeader({
         {initial}
       </span>
       <div className="min-w-0 flex-1">
-        <h2 className="truncate text-base font-medium">{title}</h2>
-        <p className="truncate text-sm text-muted-foreground">{subtitle}</p>
+        {showTitle ? <h2 className="truncate text-base font-medium">{title}</h2> : null}
+        {subtitle ? <p className="truncate text-sm text-muted-foreground">{subtitle}</p> : null}
       </div>
-      <button
-        type="button"
-        className="inline-flex size-10 items-center justify-center rounded-md hover:bg-muted"
-        aria-label="Close"
-        onClick={onClose}
-      >
-        <X className="size-4" />
-      </button>
+      {onClose ? (
+        <button
+          type="button"
+          className="inline-flex size-10 items-center justify-center rounded-md hover:bg-muted"
+          aria-label="Close"
+          onClick={onClose}
+        >
+          <X className="size-4" />
+        </button>
+      ) : null}
     </header>
   )
 }
@@ -774,24 +781,27 @@ export function MoveStep({
 export function RelationshipPanelShell({
   ariaLabel,
   onDismiss,
+  title,
+  context,
+  footer,
   children,
 }: {
   ariaLabel: string
   onDismiss: () => void
+  title?: string
+  context?: ReactNode
+  footer?: ReactNode
   children: ReactNode
 }) {
   return (
-    <div className="fixed inset-0 z-50">
-      <button type="button" className="absolute inset-0 bg-black/20" aria-label="Dismiss" onClick={onDismiss} />
-      <aside
-        role="dialog"
-        aria-modal="true"
-        aria-label={ariaLabel}
-        className="absolute inset-y-0 right-0 flex w-full animate-[relationship-panel_200ms_ease-out] flex-col bg-background shadow-xl sm:w-[440px]"
-      >
-        <style>{`@keyframes relationship-panel { from { transform: translateX(100%); } to { transform: translateX(0); } }`}</style>
-        {children}
-      </aside>
-    </div>
+    <SidePanel
+      title={title ?? ariaLabel}
+      ariaLabel={ariaLabel}
+      onDismiss={onDismiss}
+      context={context}
+      footer={footer}
+    >
+      {children}
+    </SidePanel>
   )
 }

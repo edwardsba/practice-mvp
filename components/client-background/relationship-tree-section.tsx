@@ -11,8 +11,8 @@ import {
   updateBlockMemberAction,
   updateRelationshipBlockAction,
 } from "@/app/clients/[client_id]/background/actions"
-import { AddToRelationshipMenu } from "@/components/client-background/add-to-relationship-menu"
 import { DiscardChangesDialog } from "@/components/client-background/discard-changes-dialog"
+import { TreeAddControl, TreeLineRow } from "@/components/client-background/tree-add-control"
 import {
   NewRelationshipPanel,
   NEW_RELATIONSHIP_ENTRY_POINTS,
@@ -36,23 +36,23 @@ import {
 } from "@/components/client-background/relationship-panel-shared"
 import {
   TreeBranch,
-  treeItemStateClassName,
   treeLayer1ClassName,
   treeLayer2MetaClassName,
-  treeLayer2ShellClassName,
   treeLayer2TitleClassName,
   treeLayer3AvatarClassName,
   treeLayer3MetaClassName,
-  treeLayer3ShellClassName,
   treeLayer3TitleClassName,
   treeLayer4AvatarClassName,
   treeLayer4MetaClassName,
-  treeLayer4ShellClassName,
   treeLayer4TitleClassName,
   treeSelectedTitleClassName,
 } from "@/components/client-background/tree-levels"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { relationshipLineSupportsAddMenu } from "@/lib/client-background/add-to-relationship"
+import {
+  addChoicesForBlockKind,
+  relationshipTreeAddChoices,
+} from "@/lib/client-background/tree-add"
 import { isPartneredClientStatus } from "@/lib/client-background/relationship-blocks"
 import {
   blockStatusDisplayLabel,
@@ -475,7 +475,30 @@ function TreeCard({
             {nodes.map((node, index) =>
               node.kind === "section" ? (
                 <div key={node.title} className="space-y-2">
-                  <h3 className={treeLayer1ClassName}>{node.title}</h3>
+                  <div className="flex items-center gap-2">
+                    <h3 className={cn(treeLayer1ClassName, "min-w-0 flex-1")}>{node.title}</h3>
+                    {(() => {
+                      const spec = relationshipSectionAddSpec(node.title)
+                      if (!spec || !relationshipSectionAllowsAdd(node.children, { kind: spec.kind })) {
+                        return null
+                      }
+                      const section =
+                        spec.kind === "caregiver_arrangement"
+                          ? "arrangement"
+                          : spec.kind === "client_other_children"
+                            ? "other_children"
+                            : "relationship"
+                      const choices = relationshipTreeAddChoices({ type: "heading", section })
+                      if (!choices) return null
+                      return (
+                        <TreeAddControl
+                          choices={choices}
+                          aria-label={`Add under ${node.title}`}
+                          onSelect={() => onAddSection(spec)}
+                        />
+                      )
+                    })()}
+                  </div>
                   {node.children.length > 0 ? (
                     <ConnectedList
                       nodes={node.children}
@@ -487,19 +510,6 @@ function TreeCard({
                       selectedId={selectedId}
                     />
                   ) : null}
-                  {(() => {
-                    const spec = relationshipSectionAddSpec(node.title)
-                    if (!spec || !relationshipSectionAllowsAdd(node.children, { kind: spec.kind })) return null
-                    return (
-                      <button
-                        type="button"
-                        className="text-sm text-primary underline-offset-2 hover:underline"
-                        onClick={() => onAddSection(spec)}
-                      >
-                        {spec.label}
-                      </button>
-                    )
-                  })()}
                 </div>
               ) : (
                 <ConnectedList
@@ -662,17 +672,10 @@ function TreeNode({
     const [name, ...rest] = node.line.split(" · ")
     const selected = selectedId === node.id
     const layer4 = personLayer === 4
+    const layer: 3 | 4 = layer4 ? 4 : 3
     return (
       <>
-        <button
-          type="button"
-          aria-current={selected ? "true" : undefined}
-          className={cn(
-            layer4 ? treeLayer4ShellClassName : treeLayer3ShellClassName,
-            treeItemStateClassName({ selected })
-          )}
-          onClick={() => onPerson(node.id)}
-        >
+        <TreeLineRow layer={layer} selected={selected} onOpen={() => onPerson(node.id)}>
           <span className="flex min-w-0 items-center gap-2">
             <span
               className={cn(
@@ -697,14 +700,14 @@ function TreeNode({
             <span
               className={cn(
                 layer4 ? treeLayer4MetaClassName : treeLayer3MetaClassName,
-                selected && "text-[#1e3a8a]",
+                treeSelectedTitleClassName(selected),
                 "w-full"
               )}
             >
               {rest.join(" · ")}
             </span>
           ) : null}
-        </button>
+        </TreeLineRow>
         {node.children.length > 0 ? (
           <ConnectedList
             nodes={node.children}
@@ -725,38 +728,32 @@ function TreeNode({
     const realBlock = node.id ? blocks.find((item) => item.relationshipBlockId === node.id) : undefined
     const blockKind = realBlock?.kind ?? node.blockKind
     const showAdd = Boolean(node.id && blockKind && relationshipLineSupportsAddMenu(blockKind))
-    const band = (
-      <>
-        <span className={cn(treeLayer2TitleClassName, treeSelectedTitleClassName(selected))}>{node.heading}</span>
-        {node.meta ? (
-          <span className={cn(treeLayer2MetaClassName, selected && "text-[#1e3a8a]")}>{node.meta}</span>
-        ) : null}
-      </>
-    )
-    const addMenu =
-      showAdd && node.id && realBlock ? (
-        <AddToRelationshipMenu block={realBlock} onSelect={(role) => onAddToRelationship(node.id, role)} />
-      ) : null
+    const addChoices =
+      showAdd && blockKind ? addChoicesForBlockKind(blockKind) : null
     return (
       <>
-        {node.interactive === false || !node.id ? (
-          <div className={cn("flex items-start gap-2", treeLayer2ShellClassName, treeItemStateClassName({ interactive: false, square: true }))}>
-            <div className="min-w-0 flex-1">{band}</div>
-            {addMenu}
-          </div>
-        ) : (
-          <div className="flex items-start gap-2">
-            <button
-              type="button"
-              aria-current={selected ? "true" : undefined}
-              className={cn("min-w-0 flex-1", treeLayer2ShellClassName, treeItemStateClassName({ selected, square: true }))}
-              onClick={() => onBlock(node.id)}
-            >
-              {band}
-            </button>
-            {addMenu}
-          </div>
-        )}
+        <TreeLineRow
+          layer={2}
+          selected={selected}
+          interactive={node.interactive !== false && Boolean(node.id)}
+          onOpen={node.id ? () => onBlock(node.id) : undefined}
+          addChoices={addChoices}
+          addAriaLabel="Add to this relationship"
+          onAdd={
+            node.id
+              ? (choiceId) => onAddToRelationship(node.id, choiceId as BlockRole)
+              : undefined
+          }
+        >
+          <span className={cn(treeLayer2TitleClassName, treeSelectedTitleClassName(selected))}>
+            {node.heading}
+          </span>
+          {node.meta ? (
+            <span className={cn(treeLayer2MetaClassName, treeSelectedTitleClassName(selected))}>
+              {node.meta}
+            </span>
+          ) : null}
+        </TreeLineRow>
         {node.children.length > 0 ? (
           <BranchList
             nodes={node.children}
@@ -851,7 +848,7 @@ function PersonPanel({
         deceased={person.deceased || person.healthStatus === "deceased"}
         title={nodeName}
         subtitle={`${title} · ${context}`}
-        onClose={onClose}
+        showTitle={false}
       />
       {mode === "move" ? (
         <MoveStep name={nodeName} person={person} blocks={blocks} people={people} saving={saving} error={error} onCancel={onCancel} onMove={onMove} />
@@ -1053,7 +1050,7 @@ function BlockPanel({
         deceased={false}
         title={title}
         subtitle={relationshipPanelSubtitle(block)}
-        onClose={onClose}
+        showTitle={false}
       />
       <div className="min-h-0 flex-1 overflow-y-auto p-4">
         {mode === "view" ? (

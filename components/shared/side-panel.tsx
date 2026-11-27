@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useId, useRef, type ReactNode } from "react"
+import { useEffect, useId, useLayoutEffect, useRef, type ReactNode } from "react"
 import { X } from "lucide-react"
 
 import { cn } from "@/lib/utils"
@@ -41,10 +41,19 @@ export function SidePanel({
   const panelRef = useRef<HTMLElement>(null)
   const titleId = useId()
   const previousFocus = useRef<HTMLElement | null>(null)
+  /** Always call the latest dismiss — parents pass a new function each render. */
+  const onDismissRef = useRef(onDismiss)
+  useLayoutEffect(() => {
+    onDismissRef.current = onDismiss
+  })
 
+  // Focus trap + Escape: run once on mount/unmount only. Re-running when
+  // onDismiss identity changes (every parent keystroke) stole focus from the
+  // active input and closed the iOS keyboard (Round AP.2).
   useEffect(() => {
     previousFocus.current = document.activeElement as HTMLElement | null
     const panel = panelRef.current
+    // Capture the opener once at open; do not re-read after later prop changes.
     const returnTo = returnFocusRef?.current ?? null
     if (!panel) return
 
@@ -61,7 +70,7 @@ export function SidePanel({
     function onKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
         event.stopPropagation()
-        onDismiss()
+        onDismissRef.current()
         return
       }
       if (event.key !== "Tab" || !panelRef.current) return
@@ -88,11 +97,17 @@ export function SidePanel({
       const restore = returnTo ?? previousFocus.current
       restore?.focus?.()
     }
-  }, [onDismiss, returnFocusRef])
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount/unmount only; onDismiss via ref
+  }, [])
 
   return (
     <div className="fixed inset-0 z-50">
-      <button type="button" className="absolute inset-0 bg-black/20" aria-label="Dismiss" onClick={onDismiss} />
+      <button
+        type="button"
+        className="absolute inset-0 bg-black/20"
+        aria-label="Dismiss"
+        onClick={() => onDismissRef.current()}
+      />
       <aside
         ref={panelRef}
         role="dialog"
@@ -115,7 +130,7 @@ export function SidePanel({
             type="button"
             className="inline-flex size-10 shrink-0 items-center justify-center rounded-md hover:bg-muted"
             aria-label="Close"
-            onClick={onDismiss}
+            onClick={() => onDismissRef.current()}
           >
             <X className="size-4" />
           </button>

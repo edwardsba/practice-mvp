@@ -544,16 +544,26 @@ export function HistoryTreeSection({
     readOnly,
   }
 
+  // While editing, keep a stable header — do not bind to draft.title (each
+  // keystroke would rewrite the panel heading on mobile).
   const panelTitle =
     selection?.kind === "new_issue"
       ? "New issue"
       : selection?.kind === "new_event"
         ? "New event"
         : selection?.kind === "step" || draft?.parentEventId
-          ? draft?.title.trim() || "Step"
-          : draft?.title.trim() ||
-            issueDraft?.title.trim() ||
-            (draft ? EVENT_TYPE_LABELS[draft.eventType] : "History")
+          ? mode === "edit"
+            ? "Step"
+            : draft?.title.trim() || "Step"
+          : mode === "edit"
+            ? draft
+              ? EVENT_TYPE_LABELS[draft.eventType]
+              : issueDraft
+                ? CONDITION_CATEGORY_LABELS[issueDraft.category as ConditionEventType] ?? "Issue"
+                : "History"
+            : draft?.title.trim() ||
+              issueDraft?.title.trim() ||
+              (draft ? EVENT_TYPE_LABELS[draft.eventType] : "History")
   const panelSummary =
     mode !== "view"
       ? undefined

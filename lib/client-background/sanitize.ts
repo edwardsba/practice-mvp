@@ -8,8 +8,6 @@ import {
   HEALTH_STATUSES,
   isOneOf,
   NECESSITY_KEYS,
-  RATED_FACTOR_KEYS,
-  RATED_VALUES,
   RELATIONSHIP_TO_CLIENT,
   RELATIONSHIP_LIVING_SITUATIONS,
   RELATIONSHIP_LIVING_SITUATION_LABELS,
@@ -35,7 +33,6 @@ import {
   emptyStressors,
   emptyNecessities,
   emptyOccupation,
-  emptyRisk,
   type AdmissionType,
   type BlockRole,
   type CaregiverRelationship,
@@ -59,12 +56,10 @@ import {
   type WorkStatus,
   type HistoryAbout,
   type PreviousJob,
-  type RatedValue,
   type RelationshipRecord,
   type RelationshipToClient,
   type RelationshipLivingSituation,
   type ResolvedOrOngoing,
-  type RiskRatings,
   type SelfHarmType,
   type StartPrecision,
   type SubstanceStatus,
@@ -186,19 +181,13 @@ function sanitizeOthersInHome(value: unknown): OtherInHome[] {
 
 export function sanitizeLivingSituation(value: unknown): LivingSituationFields {
   const raw = isRecord(value) ? value : {}
+  // Tolerate legacy livesWith keys when reading JSON; nothing uses their value.
   const livesWith = oneOf<LivesWith>(raw.livesWith, LIVES_WITH_OPTIONS)
-  let household = oneOf<Household>(raw.household, HOUSEHOLD_OPTIONS)
-  // Derive household from legacy pick-list when JSON has not been backfilled yet.
-  if (!household && livesWith) {
-    if (livesWith === "alone") household = "alone"
-    else if (livesWith === "no_fixed_address") household = "no_fixed_address"
-    else household = "with_others"
-  }
   return {
     housingType: housingTypeFrom(raw),
     livesWith,
     livesWithOther: livesWith === "other" ? str(raw.livesWithOther) : "",
-    household,
+    household: oneOf<Household>(raw.household, HOUSEHOLD_OPTIONS),
     othersInHome: sanitizeOthersInHome(raw.othersInHome),
     housingStability: str(raw.housingStability),
   }
@@ -332,41 +321,16 @@ export function demographicsFromStored(parts: {
   livingSituationJson: unknown
   educationJson: unknown
   occupationJson: unknown
-  sexualOrientation?: string | null
-  sexualOrientationOther?: string | null
 }): Demographics {
   const empty = emptyDemographics()
-  const identity = parts.identityJson ? sanitizeIdentity(parts.identityJson) : empty.identity
-  const stored = orientationFrom({
-    sexualOrientation: parts.sexualOrientation ?? identity.sexualOrientation,
-    sexualOrientationOther: parts.sexualOrientationOther ?? identity.sexualOrientationOther,
-  })
-  if (parts.sexualOrientation) {
-    identity.sexualOrientation = stored.sexualOrientation
-    identity.sexualOrientationOther = stored.sexualOrientationOther
-  }
   return {
-    identity,
+    identity: parts.identityJson ? sanitizeIdentity(parts.identityJson) : empty.identity,
     livingSituation: parts.livingSituationJson
       ? sanitizeLivingSituation(parts.livingSituationJson)
       : empty.livingSituation,
     education: parts.educationJson ? sanitizeEducation(parts.educationJson) : empty.education,
     occupation: parts.occupationJson ? sanitizeOccupation(parts.occupationJson) : empty.occupation,
   }
-}
-
-export function sanitizeRisk(value: unknown): RiskRatings {
-  const raw = isRecord(value) ? value : {}
-  const risk = emptyRisk()
-  for (const key of RATED_FACTOR_KEYS) {
-    const item = isRecord(raw[key]) ? raw[key] : {}
-    const rated = oneOf<RatedValue>(item.value, RATED_VALUES)
-    risk[key] = {
-      value: rated,
-      comment: str(item.comment),
-    }
-  }
-  return risk
 }
 
 /** Maps a stored caregiver relationship onto the dropdown. Unknown text becomes Other and is kept. */

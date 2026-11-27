@@ -656,12 +656,8 @@ function livingItem(source: BackgroundReportSource, voice: Voice, who: Speaker):
     othersInHome,
     source.data.relationshipStatus.relationshipStatus
   )
-  // Prefer household; fall back to legacy livesWith when JSON is not yet backfilled.
-  const alone =
-    household === "alone" || (!household && living.livesWith === "alone")
-  const noFixed =
-    household === "no_fixed_address" ||
-    (!household && living.livesWith === "no_fixed_address")
+  const alone = household === "alone"
+  const noFixed = household === "no_fixed_address"
   let home = ""
   if (alone) {
     home = `${who.text} ${lives} alone`

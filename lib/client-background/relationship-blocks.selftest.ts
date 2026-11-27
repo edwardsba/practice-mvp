@@ -4,6 +4,8 @@ import {
   NEW_CURRENT_RELATIONSHIP,
   NEW_PREVIOUS_RELATIONSHIP,
   answerAfterBlockCount,
+  clientStatusFromCurrentBlockEdit,
+  currentBlockStatusFromClientStatus,
   moveDestinationKind,
   moveDestinations,
   statusesForBlock,
@@ -44,6 +46,21 @@ function person(
     ...partial,
   }
 }
+
+assert.deepEqual(
+  clientStatusFromCurrentBlockEdit("client_current", "married"),
+  { relationshipStatus: "married", relationshipStatusOther: "" }
+)
+assert.deepEqual(
+  clientStatusFromCurrentBlockEdit("client_current", "other", "it's complicated"),
+  { relationshipStatus: "other", relationshipStatusOther: "it's complicated" }
+)
+assert.equal(clientStatusFromCurrentBlockEdit("client_previous", "divorced"), null)
+assert.equal(clientStatusFromCurrentBlockEdit("biological_parents", "married"), null)
+assert.equal(currentBlockStatusFromClientStatus("married"), "married")
+assert.equal(currentBlockStatusFromClientStatus("other"), "other")
+assert.equal(currentBlockStatusFromClientStatus("single"), null)
+assert.equal(currentBlockStatusFromClientStatus("divorced"), null)
 
 assert.deepEqual(statusesForBlock("client_current"), [
   "married",

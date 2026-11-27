@@ -5,7 +5,6 @@ import {
   episodeForTreatment,
   issueNeedsWho,
   mixedIssueEvents,
-  planHistoryIssueBackfill,
   sanitizeHistoryIssue,
   subEventsFor,
   treatmentAnswerAfterChange,
@@ -160,78 +159,6 @@ assert.deepEqual(
   ["step1"]
 )
 assert.equal(treatmentsForIssue(withStep, "issue-dep").some((item) => item.eventRecordId === "step1"), false)
-
-const plan = planHistoryIssueBackfill({
-  events: [
-    event({
-      eventRecordId: "a",
-      eventType: "emotional_problems",
-      title: "Depression",
-      conditionGroupId: "g1",
-      startPrecision: "year",
-      startValue: "2000",
-    }),
-    event({
-      eventRecordId: "b",
-      eventType: "psychiatric_admission",
-      title: "Admission",
-      conditionGroupId: "g1",
-      startPrecision: "year",
-      startValue: "2001",
-    }),
-    event({
-      eventRecordId: "c",
-      eventType: "illness_injury",
-      title: "Broken leg",
-      conditionGroupId: "g2",
-      about: "self",
-      startPrecision: "year",
-      startValue: "1982",
-    }),
-    event({
-      eventRecordId: "d",
-      eventType: "emotional_problems",
-      title: "Depression",
-      conditionGroupId: "g3",
-      about: "significant_other",
-      relationshipRecordId: "rel-1",
-    }),
-    event({
-      eventRecordId: "e",
-      eventType: "medication",
-      title: "Temazepam",
-      about: "self",
-    }),
-  ],
-  screening: {
-    psychiatric_admission: "no",
-    previous_therapy: "no",
-    medication_history: "no",
-    family_psychiatric_admission: "no",
-  },
-})
-assert.equal(plan.issues.find((issue) => issue.issueId === "g1")?.treatmentAnswer, "yes")
-assert.equal(plan.issues.find((issue) => issue.issueId === "g2")?.treatmentAnswer, "none")
-assert.equal(plan.issues.find((issue) => issue.issueId === "g3")?.treatmentAnswer, "none")
-assert.deepEqual(plan.treatmentGroupLinks, [])
-assert.equal(plan.otherTreatmentYes, true)
-
-const friendPlan = planHistoryIssueBackfill({
-  events: [
-    event({
-      eventRecordId: "friend-ep",
-      eventType: "substance_use",
-      title: "Alcohol",
-      conditionGroupId: "g-friend",
-      about: "significant_other",
-      aboutOther: "close friend",
-    }),
-  ],
-  screening: { family_psychiatric_admission: "no" },
-})
-assert.equal(friendPlan.issues[0]?.aboutOther, "close friend")
-assert.equal(friendPlan.issues[0]?.relationshipRecordId, null)
-assert.equal(friendPlan.issues[0]?.treatmentAnswer, "none")
 
 const needsWho = sanitizeHistoryIssue({
   ...emptyHistoryIssue("substance_use", "significant_other", 0),

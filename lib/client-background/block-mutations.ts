@@ -9,6 +9,7 @@ import {
   answerAfterBlockCount,
   answerKeyForBlock,
   childTypesForBlock,
+  clientStatusFromCurrentBlockEdit,
   isArrangementType,
   isBlockAnswer,
   isPartneredClientStatus,
@@ -614,20 +615,58 @@ export async function updateRelationshipBlock(input: Scope & { block: unknown })
   const childrenAnswer = isBlockAnswer(childrenAnswerRaw ?? "") ? childrenAnswerRaw : null
   const siblingsAnswer = isBlockAnswer(siblingsAnswerRaw ?? "") ? siblingsAnswerRaw : null
   const keepStatusDetail = existing.kind === "client_other_children" || status === "other"
-  await db
-    .update(clientRelationshipBlocks)
-    .set({
-      status: status || null,
-      statusDetail: keepStatusDetail ? statusDetail || null : null,
-      arrangementType: arrangementType || null,
-      arrangementDetail: arrangementType === "other" ? arrangementDetail || null : null,
-      startedOn: startedOn || null,
-      endedOn: endedOn || null,
-      childrenAnswer,
-      siblingsAnswer,
-      updatedAt: new Date(),
-    })
-    .where(eq(clientRelationshipBlocks.relationshipBlockId, existing.relationshipBlockId))
+  const mirrored = clientStatusFromCurrentBlockEdit(
+    existing.kind,
+    status ?? "",
+    keepStatusDetail ? statusDetail ?? "" : ""
+  )
+  await db.transaction(async (tx) => {
+    await tx
+      .update(clientRelationshipBlocks)
+      .set({
+        status: status || null,
+        statusDetail: keepStatusDetail ? statusDetail || null : null,
+        arrangementType: arrangementType || null,
+        arrangementDetail: arrangementType === "other" ? arrangementDetail || null : null,
+        startedOn: startedOn || null,
+        endedOn: endedOn || null,
+        childrenAnswer,
+        siblingsAnswer,
+        updatedAt: new Date(),
+      })
+      .where(eq(clientRelationshipBlocks.relationshipBlockId, existing.relationshipBlockId))
+    if (mirrored) {
+      const now = new Date()
+      const [background] = await tx
+        .select({ clientBackgroundId: clientBackgrounds.clientBackgroundId })
+        .from(clientBackgrounds)
+        .where(
+          and(
+            eq(clientBackgrounds.clientId, input.clientId),
+            eq(clientBackgrounds.practiceId, input.practiceId)
+          )
+        )
+        .limit(1)
+      if (background) {
+        await tx
+          .update(clientBackgrounds)
+          .set({
+            relationshipStatus: mirrored.relationshipStatus || null,
+            relationshipStatusOther: mirrored.relationshipStatusOther || null,
+            updatedAt: now,
+          })
+          .where(eq(clientBackgrounds.clientBackgroundId, background.clientBackgroundId))
+      } else {
+        await tx.insert(clientBackgrounds).values({
+          clientId: input.clientId,
+          practiceId: input.practiceId,
+          relationshipStatus: mirrored.relationshipStatus || null,
+          relationshipStatusOther: mirrored.relationshipStatusOther || null,
+          updatedAt: now,
+        })
+      }
+    }
+  })
   return loadBlockEditorState(input.clientId, input.practiceId)
 }
 

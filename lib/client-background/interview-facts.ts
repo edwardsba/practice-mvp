@@ -164,9 +164,6 @@ export function formatSection3FactLines(demographics: Demographics): Record<stri
 
 export function formatLivingWhoLine(living: LivingSituationFields): string {
   if (living.household) return HOUSEHOLD_LABELS[living.household]
-  if (living.livesWith === "alone") return HOUSEHOLD_LABELS.alone
-  if (living.livesWith === "no_fixed_address") return HOUSEHOLD_LABELS.no_fixed_address
-  if (living.livesWith) return HOUSEHOLD_LABELS.with_others
   return ""
 }
 

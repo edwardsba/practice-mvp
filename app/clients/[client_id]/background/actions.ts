@@ -23,7 +23,6 @@ import {
   createEvent,
   createHistoryIssue,
   deleteEvent,
-  saveClientRelationshipStatus,
   saveDemographics,
   saveEducation,
   saveIdentity,
@@ -147,18 +146,6 @@ export async function saveDemographicsAction(clientId: string, demographics: unk
     livingSituation: raw.livingSituation,
     education: raw.education,
     occupation: raw.occupation,
-  })
-  if (!result.error) refresh(clientId)
-  return result
-}
-
-export async function saveClientRelationshipStatusAction(clientId: string, relationshipStatus: unknown) {
-  const context = await requirePractitionerContext()
-  const result = await saveClientRelationshipStatus({
-    clientId,
-    practiceId: context.practiceId,
-    userId: context.userId,
-    relationshipStatus,
   })
   if (!result.error) refresh(clientId)
   return result

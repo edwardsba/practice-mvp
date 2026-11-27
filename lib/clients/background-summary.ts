@@ -374,12 +374,9 @@ function formatLivingRow(data: ClientBackgroundData): string {
         ? joinGroups([peoplePart, othersPart])
         : peoplePart || othersPart
     withLine = `lives with ${joined}`
-  } else if (living.household === "alone" || living.livesWith === "alone") {
+  } else if (living.household === "alone") {
     withLine = "lives alone"
-  } else if (
-    living.household === "no_fixed_address" ||
-    living.livesWith === "no_fixed_address"
-  ) {
+  } else if (living.household === "no_fixed_address") {
     withLine = "no fixed address"
   }
   // Nobody marked as living with the client and not alone: housing type only.

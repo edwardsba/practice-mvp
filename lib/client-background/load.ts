@@ -32,7 +32,6 @@ import { sanitizeInterviewAnswers } from "@/lib/client-background/interview-answ
 import { toBlockAnswers, toClientRelationshipStatus, toEvent, toHistoryIssue, toRelationship, toRelationshipBlock } from "@/lib/client-background/map"
 import {
   demographicsFromStored,
-  sanitizeRisk,
   sanitizeStressors,
 } from "@/lib/client-background/sanitize"
 import {
@@ -44,7 +43,6 @@ import {
 import {
   emptyDemographics,
   emptyClientRelationshipStatus,
-  emptyRisk,
   emptyStressors,
   type ClientBackgroundData,
 } from "@/lib/client-background/types"
@@ -142,7 +140,6 @@ export async function loadClientBackground(
     blockAnswers: toBlockAnswers(background ?? null),
     events: eventRows.map((row) => settleEventDates(toEvent(row), client.dateOfBirth)),
     issues: issueRows.map(toHistoryIssue),
-    risk: background?.riskJson ? sanitizeRisk(background.riskJson) : emptyRisk(),
   }
 }
 

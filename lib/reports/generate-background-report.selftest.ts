@@ -6,7 +6,6 @@ import {
   emptyClientRelationshipStatus,
   emptyDemographics,
   emptyEvent,
-  emptyRisk,
   emptyStressors,
   type ClientBackgroundData,
   type EventRecord,
@@ -230,7 +229,6 @@ function benSource(): BackgroundReportSource {
         displayOrder: 6,
       }),
     ],
-    risk: emptyRisk(),
   }
 
   const screening: ScreeningAnswers = {
@@ -494,7 +492,6 @@ function emptySource(): BackgroundReportSource {
       stressors: emptyStressors(),
       relationships: [],
       events: [],
-      risk: emptyRisk(),
     },
     screening: null,
     interviews: [],

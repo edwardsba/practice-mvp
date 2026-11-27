@@ -15,7 +15,6 @@ import {
   dependantTickFromDependency,
   dependencyAfterDependantTick,
   emptyOtherInHome,
-  householdFromLivesWith,
   householdPeopleFromRelationships,
   livingChoiceFromSituation,
   livingSituationFromChoice,
@@ -636,18 +635,7 @@ export function LivingFieldsEditor({
         value={value.household}
         client={
           livesWith ? (
-            <ClientAnswer
-              label={livesWith.label}
-              matches={
-                value.household === householdFromLivesWith(livesWith.apply.livesWith)
-              }
-              onUse={() =>
-                apply({
-                  ...value,
-                  household: householdFromLivesWith(livesWith.apply.livesWith),
-                })
-              }
-            />
+            <ClientAnswer label={livesWith.label} matches={false} />
           ) : undefined
         }
         onChange={(next) => setHousehold(next as Household | "")}

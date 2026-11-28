@@ -17,6 +17,8 @@ Notable Next 16 conventions already used here:
 
 > **Design guide first.** Before any UI work, read [`docs/design-guide.md`](./docs/design-guide.md), the single source of truth for how the app looks and behaves. It wins over anything in this file that disagrees. Cite its rule IDs (e.g. FM-3).
 
+> **Pages and the back arrow.** Every page has a type and a registry entry (design guide section 13, NV-1 to NV-9). Read NV before adding, moving or linking pages. The guard test `lib/navigation/page-registry-guard.selftest.ts` must pass.
+
 Australian mental-health **clinical practice management** app for practitioners: clients,
 appointments, psychometric assessments, session notes, treatment/crisis plans, reports,
 funding (Medicare/NDIS/insurer), contacts, and communications.
@@ -207,6 +209,18 @@ Do not add a second tree look, a second ⊕ control, a second side-panel shell, 
 ### Background interview: confirm by section
 
 > Rules: design guide section 12 (IV-1 to IV-8). Code map: lined rows `components/client-background/interview-lined-row.tsx`; client fields and comparisons `lib/client-background/interview-client-fields.ts`; row lines `interview-row-model.ts`; tree headings `lib/client-background/interview-tree-headings.ts`; confirm on the server `lib/client-background/mutations.ts` (`confirmInterviewSection`, `acceptInterviewClientChangesAndConfirm`), with presence read from the stored file (`interview-confirm-load.ts`, `interview-confirm-presence.ts`). Note: tree headings (5, 6, 8, 9) still have answer buttons until round AZ.
+
+### Navigation: one back arrow
+
+Rules: design guide section 13 (NV-1 to NV-9); this section is the code map.
+
+| Piece | Where |
+|-------|--------|
+| Page types and NV-2 parent rules | `lib/navigation/page-types.ts` |
+| Every page's route, type, default parent and label | `lib/navigation/page-registry.ts` |
+| Per-tab remembered parent (`sessionStorage`, NV-3) | `lib/navigation/parent-memory.ts` |
+| Shared back arrow (ghost, above header; no address/label props) | `components/ui/back-button.tsx` |
+| Guard: every page registered; no `router.back` / hand labels | `lib/navigation/page-registry-guard.selftest.ts` |
 
 Appointment automations: `lib/appointments/run-automations.ts` via daily cron (`08:00 UTC`).
 

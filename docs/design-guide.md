@@ -19,6 +19,7 @@
 | 10 | Client-facing pages | CP |
 | 11 | Assessments and results | AS |
 | 12 | Background interview and trees | IV |
+| 13 | Navigation and the back arrow | NV |
 | A | Appendix: Known gaps | — |
 | B | Appendix: Change log | — |
 
@@ -45,7 +46,7 @@ Every signed-in page uses `AppShell` and one of two shared headers, with content
 | One record | `EntityPageHeader`: small grey kicker (what it is), large name, one summary line, status badge and one action on the right | Client page, a report, an assessment result |
 | Create or edit | `EntityPageHeader` with the kicker "New …" or "Edit …" | New appointment type |
 
-- **PG-2 Back.** `BackButton` sits above the header, honours `returnTo`, and reads "← Back to …". Never a browser back.
+- **PG-2 Back.** `BackButton` sits above the header and follows section 13 (NV): it goes one step up the hierarchy and reads "← Back to …". Never a browser back.
 - **PG-3 Width.** The content column is `max-w-3xl`, centred. Wide tables and the calendar may go wider; nothing else does.
 - **PG-4 Sections.** A page is a stack of section cards (white, thin border, rounded, 16 px padding), 16 px apart. Each card has a short heading and, when relevant, a status pill on the right.
 - **PG-5 Actions.** One primary action per page, top right in the header. Actions for one section sit in that section's header or footer, never floating.
@@ -245,6 +246,165 @@ The interview fills in the client's record, one numbered section at a time, and 
 - **IV-7 Server values.** The server always reads values from the stored self-report and the stored file, never from the page.
 - **IV-8 A confirmed section** turns green and folds away.
 
+## 13. Navigation and the back arrow (NV)
+
+Every page has a type, and its type decides which pages its back arrow may return to: Back always goes one step up the hierarchy, to the parent that opened the page, or to the page's default parent.
+
+- **NV-1 Every page has a type.** A page that fits none of these is not built until Ben agrees a type (GU-5).
+
+| Type | What it is | Examples | Back arrow |
+| --- | --- | --- | --- |
+| Home | The dashboard | Home | None |
+| Main list | A practice-wide list, opened from the menu | Clients, Calendar, All appointments, Professionals, Appointment types | None |
+| Entity details | A person or organisation other records hang from | Client, Professional, Organisation | Yes |
+| Sub-list | One kind of record for one entity | The client's Appointments, Reports, Claims | Yes |
+| Section page | One part of an entity, too big for its details page | Background, Feedback over time | Yes |
+| Record details | One record or document | Appointment, Session note, Result, Report, Claim, Appointment type | Yes |
+| Record form | Any New or Edit page | Edit client, New appointment, Edit report type | Yes |
+| Guided form | A long, sectioned form on the shared form engine | Start assessment, New assessment, Background interview | Yes |
+
+Practice details and Practitioner profile are entity pages opened straight from the menu, so like Home and Main lists they have no back arrow. Login, client pages (CP) and redirect-only pages have no type and no back arrow.
+
+- **NV-2 Default and allowed parents.** Each type has one default parent, which always exists, plus the other types it may go back to. "Same client" means the parent belongs to the same client (or the same record family, for settings and contacts).
+
+| Type | Default parent | Also allowed |
+| --- | --- | --- |
+| Main list | — | — |
+| Entity details | Its Main list | Home, Calendar, any Record details that links to it |
+| Sub-list | Its Entity details | — |
+| Section page | The Entity details or Sub-list it belongs to | Record details for the same client |
+| Record details | Its Sub-list | Entity details, Section page and Record details for the same client; the matching Main list; Calendar; Home |
+| Record form (Edit) | The record it edits | — |
+| Record form (New) | The list it adds to | Any page allowed as a parent of the record it creates |
+| Guided form | Its Section page or Sub-list | Record details for the same client |
+
+Record forms and Guided forms are never a parent. Section 13B lists every page with its type and default parent.
+
+- **NV-3 Each page remembers one parent.**
+  1. When page A opens page B, B remembers A only if A's type is allowed for B (NV-2) and A belongs to the same client.
+  2. A form, or any page that isn't allowed, is ignored. B then keeps the parent it already remembers; if it has none, it takes the form's remembered parent when that is allowed for B; otherwise it uses its default parent.
+  3. The newest allowed opener replaces the old one.
+  4. Returning is not opening. If A's own remembered parent is B, nothing changes. This stops loops (session note → result → back to session note).
+  5. Back goes to the remembered parent. If there is none, or it no longer exists, Back goes to the default parent.
+  6. The memory lives in the browser tab. A new tab, a bookmark or a pasted link starts with the default parent.
+  7. Never use browser history (`router.back`, `history.back`) for the back arrow.
+- **NV-4 Forms.** A form's back arrow does the same as its Cancel: it goes to the form's parent, and if the form has changes it asks "Discard changes?" first (PN-2, PN-4). Save never returns to the form: Edit → Save shows the record; New → Save shows the new record.
+- **NV-5 The label** always says where Back goes, worked out from the same parent as the address. It is never typed separately on a page.
+
+| Destination type | Label | Example |
+| --- | --- | --- |
+| Home | Back to home | ← Back to home |
+| Main list | Its menu name, lower case | ← Back to all appointments · ← Back to clients · ← Back to calendar |
+| Entity details | The entity's name | ← Back to Sasha Tumasovs · ← Back to Woollahra Medical |
+| Sub-list | Its list name | ← Back to appointments · ← Back to session notes |
+| Section page | Its page name | ← Back to background |
+| Record details (dated) | The record kind, then its date (DT-1) | ← Back to session note, 12 Nov 2026 |
+| Record details (undated) | The record kind, or the item's own name for settings | ← Back to treatment plan · ← Back to Standard session |
+| Record form | The form name | ← Back to edit appointment |
+
+- **NV-5 continued.**
+  - Never a bare "← Back". A Main list says "all …" where the menu does, so it can't be confused with the client's own list.
+  - Sentence case, Australian spelling (TX-5). Names longer than 32 characters are cut with "…".
+  - While the page loads, show the default parent's label, never a blank or disabled button.
+- **NV-6 Look and place.** The back arrow is the shared `BackButton`, a ghost button above the header, on the left (PG-2, BT-1). Side panels have × instead (PN-2).
+- **NV-7 Links between pages.** A page may link to another page only if the destination allows the linking page's type as a parent (NV-2). A link that breaks this is a gap: raise it with Ben to add the type to NV-2, or remove the link.
+- **NV-8 Every page is registered.** Every `app/**/page.tsx` has one entry in the page registry, `lib/navigation/page-registry.ts`, giving its route, type, how to find its default parent from its data, and its label. The guard test `lib/navigation/page-registry-guard.selftest.ts` fails when a page has no entry, or when an entry's default parent breaks NV-2. Pages never pass their own back address or label.
+- **NV-9 Building or changing a page.** Cursor follows these steps every time:
+  1. Pick the page's type from NV-1. If none fits, stop and ask Ben.
+  2. Add or update its registry entry (NV-8): type, default parent, label.
+  3. Put the shared `BackButton` above the header (unless the type has none), with no address or label passed in.
+  4. Check every link into and out of the page against NV-2 and NV-7, and flag any that breaks them.
+  5. For forms, make Back and Cancel go to the form's parent, and make Save show the record (NV-4).
+  6. Run the registry guard test.
+  7. In the final message, state the page's type, default parent and allowed parents.
+
+### 13B. Page map
+
+Every page, with its type and default parent. Pages marked † are known gaps (Appendix A).
+
+| Page | Route | Type | Default parent |
+| --- | --- | --- | --- |
+| Home | `/dashboard` | Home | — |
+| Calendar | `/calendar` | Main list | — |
+| Clients | `/clients` | Main list | — |
+| All appointments | `/appointments` | Main list | — |
+| All session notes | `/session-notes` | Main list | — |
+| All reports | `/reports` | Main list | — |
+| All claims | `/funding/claims` | Main list | — |
+| All funding approvals | `/funding/approvals` | Main list | — |
+| Professionals | `/contacts/professionals` | Main list | — |
+| Organisations | `/contacts/organisations` | Main list | — |
+| Professions | `/settings/professions` | Main list | — |
+| Appointment types | `/settings/appointment-types` | Main list | — |
+| Email templates | `/settings/email-templates` | Main list | — |
+| Email variables | `/settings/email-variables` | Main list | — |
+| Report types | `/settings/report-types` | Main list | — |
+| Assessments (settings) | `/settings/assessments` | Main list | — |
+| Claim types | `/funding/claim-types` | Main list | — |
+| Funding approval types | `/funding/approval-types` | Main list | — |
+| Practice details | `/practice` | Entity details (menu) | — |
+| Practitioner profile | `/practitioner` | Entity details (menu) | — |
+| Client | `/clients/[client_id]` | Entity details | Clients |
+| Professional | `/contacts/professionals/[professional_id]` | Entity details | Professionals |
+| Organisation | `/contacts/organisations/[organisation_id]` | Entity details | Organisations |
+| Edit client | `/clients/[client_id]/edit` | Record form | Client |
+| Edit emergency contact | `/clients/[client_id]/emergency-contacts/[contact_id]/edit` | Record form | Client |
+| New professional | `/contacts/professionals/new` | Record form | Professionals |
+| Edit professional | `/contacts/professionals/[professional_id]/edit` | Record form | Professional |
+| New organisation | `/contacts/organisations/new` | Record form | Organisations |
+| Edit organisation | `/contacts/organisations/[organisation_id]/edit` | Record form | Organisation |
+| Edit practice details | `/practice/edit` | Record form | Practice details |
+| Edit practitioner profile | `/practitioner/edit` | Record form | Practitioner profile |
+| New membership | `/practitioner/memberships/new` | Record form | Practitioner profile |
+| Edit membership | `/practitioner/memberships/[membership_id]/edit` | Record form | Practitioner profile |
+| Appointments (client) | `/clients/[client_id]/appointments` | Sub-list | Client |
+| Session notes (client) | `/clients/[client_id]/session-notes` | Sub-list | Client |
+| Assessments (client) | `/clients/[client_id]/assessments` | Sub-list | Client |
+| Reports (client) | `/clients/[client_id]/reports` | Sub-list | Client |
+| Claims (client) | `/clients/[client_id]/claims` | Sub-list | Client |
+| Communications | `/clients/[client_id]/communications` | Sub-list | Client |
+| Background | `/clients/[client_id]/background` | Section page | Client |
+| Feedback over time | `/clients/[client_id]/assessments/feedback` | Section page | Assessments (client) |
+| Background interview | `/clients/[client_id]/background/interview` | Guided form | Background |
+| Start assessment | `/clients/[client_id]/assessments/start` | Guided form | Assessments (client) |
+| New assessment | `/clients/[client_id]/assessments/new/[assessment_code]` | Guided form | Assessments (client) |
+| Edit assessment | `/clients/[client_id]/assessments/edit/[instance_id]` | Guided form | Assessments (client) |
+| Appointment | `/appointments/[appointment_id]` | Record details | Appointments (client) |
+| Session note | `/session-notes/[session_note_id]` | Record details | Session notes (client) |
+| Result | `/clients/[client_id]/results/[result_id]` | Record details | Assessments (client) |
+| Report | `/clients/[client_id]/reports/[report_id]` | Record details | Reports (client) |
+| SAGE-SR report | `/clients/[client_id]/reports/sage-sr/[report_id]` | Record details | Reports (client) |
+| Treatment plan † | `/clients/[client_id]/treatment-plan/[plan_id]` | Record details | Client |
+| Crisis plan † | `/clients/[client_id]/crisis-plan/[plan_id]` | Record details | Client |
+| Claim | `/funding/claims/[claim_id]` | Record details | Claims (client) |
+| Funding approval † | `/funding/approvals/[approval_id]` | Record details | Claim |
+| Appointment type | `/settings/appointment-types/[type_id]` | Record details | Appointment types |
+| Report type | `/settings/report-types/[type_id]` | Record details | Report types |
+| Assessment (settings) | `/settings/assessments/[assessment_code]` | Record details | Assessments (settings) |
+| Funding approval type | `/funding/approval-types/[type_id]` | Record details | Funding approval types |
+| New appointment | `/appointments/new` | Record form | Appointments (client) |
+| Edit appointment | `/appointments/[appointment_id]/edit` | Record form | Appointment |
+| New report | `/clients/[client_id]/reports/new` | Record form | Reports (client) |
+| Edit report | `/clients/[client_id]/reports/[report_id]/edit` | Record form | Report |
+| New treatment plan † | `/clients/[client_id]/treatment-plan/new` | Record form | Client |
+| Edit treatment plan | `/clients/[client_id]/treatment-plan/[plan_id]/edit` | Record form | Treatment plan |
+| New crisis plan † | `/clients/[client_id]/crisis-plan/new` | Record form | Client |
+| Edit crisis plan | `/clients/[client_id]/crisis-plan/[plan_id]/edit` | Record form | Crisis plan |
+| New claim | `/funding/claims/new` | Record form | Claims (client) |
+| Edit claim | `/funding/claims/[claim_id]/edit` | Record form | Claim |
+| New funding approval | `/funding/approvals/new` | Record form | Claim |
+| Edit funding approval | `/funding/approvals/[approval_id]/edit` | Record form | Funding approval |
+| New appointment type | `/settings/appointment-types/new` | Record form | Appointment types |
+| Edit appointment type | `/settings/appointment-types/[type_id]/edit` | Record form | Appointment type |
+| New report type | `/settings/report-types/new` | Record form | Report types |
+| Edit report type | `/settings/report-types/[type_id]/edit` | Record form | Report type |
+| New funding approval type | `/funding/approval-types/new` | Record form | Funding approval types |
+| Edit funding approval type | `/funding/approval-types/[type_id]/edit` | Record form | Funding approval type |
+| New email template | `/settings/email-templates/new` | Record form | Email templates |
+| Edit email template | `/settings/email-templates/[template_id]/edit` | Record form | Email templates |
+
+Outside the map: `/` and `/clients/[client_id]/intake-interview` (redirects; the second is to be retired), `/login`, `/q/[token]` (client page, CP).
+
 ## Appendix A: Known gaps
 
 Where the system doesn't match the guide yet. Add a row when a gap is found; delete it when fixed, and note the fix in the Change log. Last checked 28 Nov 2026 against `main` (`fc97605`).
@@ -261,6 +421,10 @@ Where the system doesn't match the guide yet. Add a row when a gap is found; del
 | PN-1 | Dialogs | 16 dialogs and 4 side panels, chosen without a rule | Review each against PN-1 |
 | IV-2, IV-3, IV-5 | Interview trees | Tree headings still have Yes / No / N/A buttons; no tree client suggestions yet | Round AZ |
 | AS-6 | Background self-report | Its 42 element keys have no prefix (`sex`, `partner`, `employer`) | Rename to `bsr_` keys in a clean-up round |
+| NV-2 | Treatment plan, crisis plan | Record details with no Sub-list above them; default parent is the client for now | To decide with Ben: a versions Sub-list, or allow one-current-record pages under an entity |
+| NV-2 | Funding approvals | Hang off a Claim (Record details), not a Sub-list; default parent is the claim for now | To decide with Ben: treat Claim as an entity, or allow a record to own records |
+| NV-1 | Professionals, organisations | Entity details with no Sub-lists, unlike Client | To decide with Ben (e.g. clients referred) |
+| NV-3, NV-5, NV-8 | Back arrow | Built on returnTo with hand-set fallbacks; calendar, dashboard, appointments and contacts are rejected as return pages; labels often wrong; 4 bare "← Back"; 3 typed pages with no back arrow; no page registry | Round NV |
 
 ## Appendix B: Change log
 
@@ -268,6 +432,7 @@ One row per change to the guide, newest first. Retired rules are recorded here a
 
 | Date | Rules | Change | Agreed in |
 | --- | --- | --- | --- |
+| 28 Nov 2026 | NV-1 to NV-9, PG-2 | Added section 13 Navigation: page types, default and allowed parents, one remembered parent per page, back labels, page registry and guard test, page map (13B); PG-2 now points to NV | Chat with Ben |
 | 28 Nov 2026 | PH-5, FM-1 | Client-form footer not fixed; radio rows always outlined | Round AY.2 (phone testing) |
 | 28 Nov 2026 | GU-2, GU-3 | Committed to the repo as `docs/design-guide.md`; Cursor always-on rule added | Round DG |
 | 28 Nov 2026 | AS-6 | Added: element keys are unique across all assessments; new keys take the assessment's prefix | Review of round AY |

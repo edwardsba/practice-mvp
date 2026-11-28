@@ -49,17 +49,20 @@ export type InterviewAnswersJson = {
   clientDecisions: Record<string, InterviewClientDecision>
 }
 
-/** Yes/No/N/A and Yes/N/A items keep their own answer buttons. */
+/** Yes/No/N/A and Yes/N/A items keep their own answer buttons (tree headings). */
 export function isQuestionKind(kind: InterviewAnswerKind): boolean {
   return kind === "yna" || kind === "ya"
 }
 
-/** Confirmed/Not applicable (and per-record) items — signed off by Confirm section. */
+/**
+ * Details / presence items have no answer buttons — Confirm section signs them off.
+ * `cna` → confirmed | not_applicable; `presence` → yes | not_applicable (from data).
+ */
 export function isDetailsKind(kind: InterviewAnswerKind): boolean {
-  return kind === "cna"
+  return kind === "cna" || kind === "presence"
 }
 
-export type InterviewAnswerKind = "yna" | "cna" | "ya" | "living"
+export type InterviewAnswerKind = "yna" | "cna" | "ya" | "living" | "presence"
 
 export type InterviewSectionDef = {
   number: number
@@ -94,8 +97,17 @@ function numberedHistoryItems(
 export function allowedValuesForKind(kind: InterviewAnswerKind): readonly InterviewAnswerValue[] {
   if (kind === "yna") return ["yes", "no", "not_applicable"]
   if (kind === "cna") return ["confirmed", "not_applicable"]
-  if (kind === "ya") return ["yes", "not_applicable"]
+  if (kind === "ya" || kind === "presence") return ["yes", "not_applicable"]
   return ["lives_with_others", "lives_alone"]
+}
+
+/**
+ * Values accepted when reading stored answers for a kind. Presence items may still
+ * hold a legacy "no" from when they were yna questions (Round AR.1).
+ */
+export function readableValuesForKind(kind: InterviewAnswerKind): readonly InterviewAnswerValue[] {
+  if (kind === "presence") return ["yes", "no", "not_applicable"]
+  return allowedValuesForKind(kind)
 }
 
 export function isValueAllowedForKind(
@@ -127,9 +139,9 @@ export const INTERVIEW_SECTIONS: InterviewSectionDef[] = [
     title: "Funding details",
     nothingToRecord: false,
     items: [
-      { key: "s2_medicare", label: "Medicare", kind: "ya" },
-      { key: "s2_ndis", label: "NDIS", kind: "yna" },
-      { key: "s2_insurance", label: "Insurance or WorkCover", kind: "yna" },
+      { key: "s2_medicare", label: "Medicare", kind: "presence" },
+      { key: "s2_ndis", label: "NDIS", kind: "presence" },
+      { key: "s2_insurance", label: "Insurance or WorkCover", kind: "presence" },
     ],
   },
   {
@@ -139,10 +151,10 @@ export const INTERVIEW_SECTIONS: InterviewSectionDef[] = [
     nothingToRecord: false,
     items: [
       { key: "s3_identity", label: "Identity", kind: "cna" },
-      { key: "s3_disability", label: "Disability or access needs", kind: "yna" },
+      { key: "s3_disability", label: "Disability or access needs", kind: "presence" },
       { key: "s3_education", label: "Education", kind: "cna" },
       { key: "s3_occupation", label: "Occupation", kind: "cna" },
-      { key: "s3_financial", label: "Financial hardship", kind: "yna" },
+      { key: "s3_financial", label: "Financial hardship", kind: "presence" },
     ],
   },
   {
@@ -151,9 +163,9 @@ export const INTERVIEW_SECTIONS: InterviewSectionDef[] = [
     title: "Emergency contacts and treating professionals",
     nothingToRecord: true,
     items: [
-      { key: "s4_emergency", label: "Emergency contact", kind: "ya" },
-      { key: "s4_gp", label: "GP", kind: "yna" },
-      { key: "s4_other_professionals", label: "Other treating professionals", kind: "yna" },
+      { key: "s4_emergency", label: "Emergency contact", kind: "presence" },
+      { key: "s4_gp", label: "GP", kind: "presence" },
+      { key: "s4_other_professionals", label: "Other treating professionals", kind: "presence" },
     ],
   },
   {
@@ -310,7 +322,15 @@ export function confirmSectionAnswers(
   }
   const items = { ...answers.items }
   for (const item of [...section.items, ...extraItems]) {
-    if (isDetailsKind(item.kind)) {
+    if (item.kind === "presence") {
+      const hasValue = detailHasValue[item.key] === true
+      items[item.key] = {
+        value: hasValue ? "yes" : "not_applicable",
+        confirmed: true,
+      }
+      continue
+    }
+    if (item.kind === "cna") {
       const hasValue = detailHasValue[item.key] === true
       items[item.key] = {
         value: hasValue ? "confirmed" : "not_applicable",
@@ -360,8 +380,10 @@ function readAnswerEntry(
 ): InterviewItemAnswer | null {
   if (!entry || typeof entry !== "object" || Array.isArray(entry)) return null
   const row = entry as Record<string, unknown>
-  if (!isValueAllowedForKind(kind, row.value)) return null
-  return { value: row.value, confirmed: row.confirmed === true }
+  if (!(readableValuesForKind(kind) as readonly string[]).includes(row.value as string)) {
+    return null
+  }
+  return { value: row.value as InterviewAnswerValue, confirmed: row.confirmed === true }
 }
 
 function readSectionConfirm(entry: unknown): InterviewSectionConfirm | null {
@@ -564,6 +586,35 @@ export function section4ExtraItems(input: {
     extras.push({ key: `${S4_MC_PREFIX}${contact.id}`, label: contact.label, kind: "cna" })
   }
   return extras
+}
+
+/**
+ * Per-record rows under a section 4 parent. GP / Other treating professionals
+ * only take `s4_mc:` keys so emergency contacts never appear twice (Round AR.1).
+ */
+export function section4ExtrasAfterParent(
+  parentKey: string,
+  extras: readonly InterviewItemDef[],
+  gpMedicalIds: ReadonlySet<string>
+): InterviewItemDef[] {
+  if (parentKey === "s4_emergency") {
+    return extras.filter((item) => item.key.startsWith(S4_EC_PREFIX))
+  }
+  if (parentKey === "s4_gp") {
+    return extras.filter((item) => {
+      if (!item.key.startsWith(S4_MC_PREFIX)) return false
+      const id = perRecordContactId(item.key)
+      return id != null && gpMedicalIds.has(id)
+    })
+  }
+  if (parentKey === "s4_other_professionals") {
+    return extras.filter((item) => {
+      if (!item.key.startsWith(S4_MC_PREFIX)) return false
+      const id = perRecordContactId(item.key)
+      return id != null && !gpMedicalIds.has(id)
+    })
+  }
+  return []
 }
 
 /**

@@ -81,28 +81,44 @@ const done: InterviewAnswersJson = {
 check("section confirmed → done", interviewSectionStatus(section1, done).status, "done")
 
 const section4 = INTERVIEW_SECTIONS.find((s) => s.number === 4)!
+const section5 = INTERVIEW_SECTIONS.find((s) => s.number === 5)!
 const partial: InterviewAnswersJson = {
   version: 1,
   items: {
-    s4_emergency: { value: "yes", confirmed: true },
+    s5_current: { value: "yes", confirmed: true },
   },
   sections: {},
   clientDecisions: {},
 }
-const afterNothing = applyNothingToRecord(partial, 4)
-check("nothing to record keeps existing", afterNothing.items.s4_emergency, {
+const afterNothing = applyNothingToRecord(partial, 5)
+check("nothing to record keeps existing", afterNothing.items.s5_current, {
   value: "yes",
   confirmed: true,
 })
-check("nothing to record fills unanswered", afterNothing.items.s4_gp, {
+check("nothing to record fills unanswered tree questions", afterNothing.items.s5_previous, {
   value: "not_applicable",
   confirmed: true,
 })
-check("nothing to record fills remaining", afterNothing.items.s4_other_professionals, {
+check("nothing to record fills remaining tree questions", afterNothing.items.s5_children, {
   value: "not_applicable",
   confirmed: true,
 })
+const afterNothingS4 = applyNothingToRecord(
+  {
+    version: 1,
+    items: { s4_emergency: { value: "yes", confirmed: true } },
+    sections: {},
+    clientDecisions: {},
+  },
+  4
+)
+check(
+  "nothing to record leaves presence items alone",
+  afterNothingS4.items.s4_gp,
+  undefined
+)
 assert.equal(section4.items.length, 3)
+assert.equal(section5.items.length, 3)
 
 const source: InterviewAnswersJson = {
   version: 1,
@@ -205,7 +221,13 @@ check("validate wrong value for cna", validateItemAnswer("s1_name", "yes"), {
   ok: false,
   error: "That answer is not allowed for this item.",
 })
-check("validate ok ya", validateItemAnswer("s2_medicare", "yes"), { ok: true, value: "yes" })
+check("validate ok presence yes", validateItemAnswer("s2_medicare", "yes"), { ok: true, value: "yes" })
+check("validate presence rejects no on write", validateItemAnswer("s2_medicare", "no"), {
+  ok: false,
+  error: "That answer is not allowed for this item.",
+})
+check("presence kind allows yes", isValueAllowedForKind("presence", "yes"), true)
+check("presence kind rejects no on write", isValueAllowedForKind("presence", "no"), false)
 
 check("validate s4_ec allows confirmed", validateItemAnswer("s4_ec:abc", "confirmed"), {
   ok: true,
@@ -298,7 +320,7 @@ check(
   ["s4_ec:ec1", "s4_mc:gp1"]
 )
 check(
-  "section 4 left counts unanswered questions only (per-record rows are details)",
+  "section 4 has no questions (parents are presence; per-record rows are details)",
   interviewSectionStatus(
     section4,
     {
@@ -309,7 +331,7 @@ check(
     },
     section4Extras
   ).left,
-  2
+  0
 )
 
 const wrongSanitized = sanitizeInterviewAnswers({

@@ -4,7 +4,6 @@ import type { ClientBackgroundSuggestions } from "@/lib/background-questionnaire
 import {
   emptyInterviewAnswers,
   prefillAnswersForReview,
-  setItemAnswer,
   type InterviewAnswersJson,
 } from "@/lib/client-background/interview-answers"
 import {
@@ -113,11 +112,10 @@ check(
 )
 
 // --- Accept N client changes and confirm ---
-
-const section3Answered = setItemAnswer(setItemAnswer(answers, "s3_disability", "no"), "s3_financial", "yes")
+// Section 3 has no questions (disability / financial are presence details).
 
 check(
-  "accept refuses while a question is unanswered",
+  "section 3 accept is not blocked by unanswered questions",
   acceptClientChangesAndConfirm({
     answers,
     demographics: file,
@@ -125,14 +123,14 @@ check(
     relationships: [],
     sectionNumber: 3,
     detailHasValue: {},
-    expectedFieldKeys: ["identity.sex", "identity.pronouns", "occupation.necessities"],
+    expectedFieldKeys: ["identity.sex"],
     at: AT,
   }),
-  { ok: false, error: "Answer 2 questions first" }
+  { ok: false, error: CLIENT_CHANGES_CHANGED_ERROR }
 )
 
 const keptPronouns = decideClientField({
-  answers: section3Answered,
+  answers,
   demographics: file,
   suggestions,
   fieldKey: "identity.pronouns",
@@ -140,9 +138,13 @@ const keptPronouns = decideClientField({
   at: AT,
 })
 assert.ok(keptPronouns.ok)
+const fileWithDisability: Demographics = {
+  ...file,
+  identity: { ...file.identity, disability: true, disabilityDetail: "Hearing" },
+}
 const accepted = acceptClientChangesAndConfirm({
   answers: keptPronouns.answers,
-  demographics: file,
+  demographics: fileWithDisability,
   suggestions,
   relationships: [],
   sectionNumber: 3,
@@ -169,12 +171,20 @@ check(
   accepted.answers.items.s3_identity,
   { value: "confirmed", confirmed: true }
 )
+check("presence disability → yes from stored data", accepted.answers.items.s3_disability, {
+  value: "yes",
+  confirmed: true,
+})
+check("presence financial → n/a when concern is not yes", accepted.answers.items.s3_financial, {
+  value: "not_applicable",
+  confirmed: true,
+})
 check("nothing waits after accept", waitingKeys(accepted, 3), [])
 
 check(
   "accept refuses when the browser saw different waiting fields",
   acceptClientChangesAndConfirm({
-    answers: section3Answered,
+    answers,
     demographics: file,
     suggestions,
     relationships: [],
@@ -188,7 +198,7 @@ check(
 check(
   "accept refuses an extra field that isn't waiting",
   acceptClientChangesAndConfirm({
-    answers: section3Answered,
+    answers,
     demographics: file,
     suggestions,
     relationships: [],
@@ -202,7 +212,7 @@ check(
 check(
   "accept refuses values from the browser",
   acceptClientChangesAndConfirm({
-    answers: section3Answered,
+    answers,
     demographics: file,
     suggestions,
     relationships: [],

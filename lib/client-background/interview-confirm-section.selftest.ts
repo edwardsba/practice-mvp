@@ -21,6 +21,7 @@ function check(name: string, actual: unknown, expected: unknown) {
 const section1 = INTERVIEW_SECTIONS.find((s) => s.number === 1)!
 const section2 = INTERVIEW_SECTIONS.find((s) => s.number === 2)!
 const section4 = INTERVIEW_SECTIONS.find((s) => s.number === 4)!
+const section5 = INTERVIEW_SECTIONS.find((s) => s.number === 5)!
 
 // --- Section status ---
 check(
@@ -48,44 +49,74 @@ check(
   0
 )
 
-let partial = emptyInterviewAnswers()
-partial = setItemAnswer(partial, "s2_medicare", "yes")
+// Section 2 is all presence details — Confirm available (unanswered 0); pill not started until touched
 check(
-  "status some questions → to answer",
-  interviewSectionStatus(section2, partial).status,
-  "left"
+  "section 2 empty → not started (no questions to answer)",
+  interviewSectionStatus(section2, emptyInterviewAnswers()).status,
+  "not_started"
 )
 check(
-  "unanswered count for section 2",
-  unansweredQuestionCount(section2, partial),
-  2
+  "section 2 unanswered questions",
+  unansweredQuestionCount(section2, emptyInterviewAnswers()),
+  0
+)
+check(
+  "section 2 left is 0 so Confirm is available",
+  interviewSectionStatus(section2, emptyInterviewAnswers()).left,
+  0
 )
 
-let s2Ready = emptyInterviewAnswers()
-s2Ready = setItemAnswer(s2Ready, "s2_medicare", "yes")
-s2Ready = setItemAnswer(s2Ready, "s2_ndis", "no")
-s2Ready = setItemAnswer(s2Ready, "s2_insurance", "not_applicable")
+const s2Presence: InterviewAnswersJson = {
+  version: 1,
+  items: {
+    s2_medicare: { value: "yes", confirmed: true },
+    s2_ndis: { value: "not_applicable", confirmed: true },
+    s2_insurance: { value: "not_applicable", confirmed: true },
+  },
+  sections: {},
+  clientDecisions: {},
+}
 check(
-  "status all questions answered → ready",
-  interviewSectionStatus(section2, s2Ready).status,
+  "section 2 items signed but section not → ready",
+  interviewSectionStatus(section2, s2Presence).status,
   "to_confirm"
 )
 
 const done: InterviewAnswersJson = {
   version: 1,
-  items: s2Ready.items,
+  items: s2Presence.items,
   sections: { "2": { confirmed: true, confirmedAt: "2026-01-01T00:00:00.000Z" } },
   clientDecisions: {},
 }
 check("status confirmed → done", interviewSectionStatus(section2, done).status, "done")
 
-// --- Confirm section ---
-const refused = confirmSectionAnswers(emptyInterviewAnswers(), 2, {})
-assert.equal(refused.ok, false, "confirm refused while questions unanswered")
-if (!refused.ok) {
-  check("refuse unanswered count", refused.unanswered, 3)
-  assert.match(refused.error, /Answer 3 questions first/)
+// Tree section still refuses while questions unanswered
+const refusedTree = confirmSectionAnswers(emptyInterviewAnswers(), 5, {})
+assert.equal(refusedTree.ok, false, "confirm refused while tree questions unanswered")
+if (!refusedTree.ok) {
+  check("refuse unanswered count", refusedTree.unanswered, 3)
+  assert.match(refusedTree.error, /Answer 3 questions first/)
   console.log("ok — refuse error message")
+}
+
+// Section 2 confirms immediately; presence from data
+const confirmedS2 = confirmSectionAnswers(
+  emptyInterviewAnswers(),
+  2,
+  { s2_medicare: true, s2_ndis: false, s2_insurance: false },
+  [],
+  "2026-06-01T12:00:00.000Z"
+)
+assert.equal(confirmedS2.ok, true, "section 2 confirms with no questions")
+if (confirmedS2.ok) {
+  check("s2 medicare → yes", confirmedS2.answers.items.s2_medicare, {
+    value: "yes",
+    confirmed: true,
+  })
+  check("s2 ndis empty → n/a", confirmedS2.answers.items.s2_ndis, {
+    value: "not_applicable",
+    confirmed: true,
+  })
 }
 
 const extras = section4ExtraItems({
@@ -95,14 +126,13 @@ const extras = section4ExtraItems({
   otherMedicalContacts: [{ id: "mc1", label: "Physio" }],
 })
 
-let s4 = emptyInterviewAnswers()
-s4 = setItemAnswer(s4, "s4_emergency", "yes")
-s4 = setItemAnswer(s4, "s4_gp", "no")
-s4 = setItemAnswer(s4, "s4_other_professionals", "not_applicable")
 const confirmedS4 = confirmSectionAnswers(
-  s4,
+  emptyInterviewAnswers(),
   4,
   {
+    s4_emergency: true,
+    s4_gp: false,
+    s4_other_professionals: true,
     "s4_ec:ec1": true,
     "s4_mc:gp1": false,
     "s4_mc:mc1": true,
@@ -128,7 +158,15 @@ if (confirmedS4.ok) {
     confirmed: true,
     confirmedAt: "2026-06-01T12:00:00.000Z",
   })
-  check("questions stay confirmed", confirmedS4.answers.items.s4_emergency, {
+  check("presence emergency → yes from data", confirmedS4.answers.items.s4_emergency, {
+    value: "yes",
+    confirmed: true,
+  })
+  check("presence gp empty → n/a", confirmedS4.answers.items.s4_gp, {
+    value: "not_applicable",
+    confirmed: true,
+  })
+  check("presence other → yes", confirmedS4.answers.items.s4_other_professionals, {
     value: "yes",
     confirmed: true,
   })
@@ -158,6 +196,17 @@ if (confirmedS1.ok) {
   })
 }
 
+// Tree section still needs questions answered
+let s5 = emptyInterviewAnswers()
+s5 = setItemAnswer(s5, "s5_current", "yes")
+s5 = setItemAnswer(s5, "s5_previous", "no")
+s5 = setItemAnswer(s5, "s5_children", "not_applicable")
+check(
+  "section 5 all questions answered → ready",
+  interviewSectionStatus(section5, s5).status,
+  "to_confirm"
+)
+
 // --- Review prefill ---
 const source: InterviewAnswersJson = {
   version: 1,
@@ -177,7 +226,7 @@ check("review copies items unconfirmed", review.items.s1_name, {
   value: "confirmed",
   confirmed: false,
 })
-check("review copies question unconfirmed", review.items.s2_medicare, {
+check("review copies presence unconfirmed", review.items.s2_medicare, {
   value: "yes",
   confirmed: false,
 })
@@ -196,5 +245,9 @@ check("sanitize keeps section 2", sanitized.sections["2"], {
   confirmedAt: "2026-02-02T00:00:00.000Z",
 })
 check("sanitize drops bad section key", sanitized.sections["99"], undefined)
+check("sanitize keeps legacy presence no", sanitized.items.s2_ndis, {
+  value: "no",
+  confirmed: true,
+})
 
 console.log("interview-confirm-section.selftest.ts: ok")

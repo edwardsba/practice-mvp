@@ -18,6 +18,8 @@ import { clientSuggestionRowClass, clientUseButtonClass, statusColours } from "@
 import { cn } from "@/lib/utils"
 
 const NOT_RECORDED = "Not recorded"
+/** Empty value for presence items (claims / contacts / yes-concerns) — Round AR.1. */
+export const NONE_RECORDED = "None recorded"
 const EMPTY_MODEL: InterviewRowModel = { choices: [], value: [] }
 
 const valueLineClass = "underline decoration-muted-foreground/50 decoration-1 underline-offset-4"
@@ -45,6 +47,7 @@ export function InterviewLinedRow({
   busy = false,
   contradictionNote,
   error,
+  emptyLabel = NOT_RECORDED,
   children,
 }: {
   /** Anchor for Worth checking jumps. */
@@ -61,6 +64,8 @@ export function InterviewLinedRow({
   contradictionNote?: string | null
   /** A Use client's / Keep that didn't save. */
   error?: string | null
+  /** Empty file value text (default "Not recorded"; presence items use "None recorded"). */
+  emptyLabel?: string
   /** Rows within this question (contacts, claims), shown instead of this row's own value. */
   children?: ReactNode
 }) {
@@ -93,7 +98,12 @@ export function InterviewLinedRow({
       {children ? (
         <div className="divide-y border-t pl-3">{children}</div>
       ) : model.value.length > 0 || !pairsShowFile ? (
-        <InterviewValueLink rowLabel={label} parts={model.value} onEdit={onEdit} />
+        <InterviewValueLink
+          rowLabel={label}
+          parts={model.value}
+          emptyText={emptyLabel}
+          onEdit={onEdit}
+        />
       ) : null}
       {contradictionNote ? (
         <p className={cn("px-2 py-1.5 text-sm", statusColours.attention.soft)}>{contradictionNote}</p>

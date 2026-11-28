@@ -38,7 +38,7 @@ import {
   InterviewMedicalContactsEditor,
   InterviewMedicareEditor,
 } from "@/components/client-background/interview-item-editors"
-import { InterviewLinedRow } from "@/components/client-background/interview-lined-row"
+import { InterviewLinedRow, NONE_RECORDED } from "@/components/client-background/interview-lined-row"
 import { InterviewNumberedSection } from "@/components/client-background/interview-numbered-section"
 import {
   readSectionOpenState,
@@ -83,6 +83,7 @@ import {
   S4_EC_PREFIX,
   S4_MC_PREFIX,
   section4ExtraItems,
+  section4ExtrasAfterParent,
   sectionsNotConfirmed,
   unansweredQuestionCount,
   type BlockAnswerMirrorKey,
@@ -574,6 +575,13 @@ export function InterviewPage({
         phone: line.phone,
         isMain: line.isMain,
       })),
+      medicareClaimExists: medicareClaim != null,
+      ndisClaimCount: interviewClaims.filter((c) => isNdisClaim(c.claimTypeCode)).length,
+      insurerClaimCount: interviewClaims.filter((c) => isInsurerClaim(c.claimTypeCode)).length,
+      gpCount: medicalContactLines.filter((line) => isGpProfession(line.professionName)).length,
+      otherProfessionalCount: medicalContactLines.filter(
+        (line) => !isGpProfession(line.professionName)
+      ).length,
     })
   }
 
@@ -728,7 +736,7 @@ export function InterviewPage({
     clientDisplayName: clientName,
   })
 
-  const medicareClaim = useMemo(() => pickMedicareClaim(interviewClaims), [interviewClaims])
+  const medicareClaim = pickMedicareClaim(interviewClaims)
 
   const section3Lines = useMemo(() => section3ValueLines(demographics), [demographics])
   const section7Lines = useMemo(
@@ -737,22 +745,7 @@ export function InterviewPage({
   )
 
   function extraItemsAfterParent(parentKey: string): InterviewItemDef[] {
-    if (parentKey === "s4_emergency") {
-      return section4Extras.filter((item) => item.key.startsWith(S4_EC_PREFIX))
-    }
-    if (parentKey === "s4_gp") {
-      return section4Extras.filter((item) => {
-        const id = perRecordContactId(item.key)
-        return id != null && gpMedicalIds.has(id)
-      })
-    }
-    if (parentKey === "s4_other_professionals") {
-      return section4Extras.filter((item) => {
-        const id = perRecordContactId(item.key)
-        return id != null && !gpMedicalIds.has(id)
-      })
-    }
-    return []
+    return section4ExtrasAfterParent(parentKey, section4Extras, gpMedicalIds)
   }
 
   function factsIfAny(lines: string[]): string[] | null {
@@ -897,7 +890,12 @@ export function InterviewPage({
   }
 
   /** One lined row; its value opens the item's editor. */
-  function renderRow(item: InterviewItemDef, model?: InterviewRowModel, subRows?: ReactNode[] | null) {
+  function renderRow(
+    item: InterviewItemDef,
+    model?: InterviewRowModel,
+    subRows?: ReactNode[] | null,
+    emptyLabel?: string
+  ) {
     return (
       <InterviewLinedRow
         key={item.key}
@@ -920,6 +918,7 @@ export function InterviewPage({
         busy={decidingClientAnswer || confirmingSection != null}
         contradictionNote={contradictionByKey[item.key] ?? null}
         error={clientAnswerErrors[item.key] ?? null}
+        emptyLabel={emptyLabel}
       >
         {subRows && subRows.length > 0 ? subRows : null}
       </InterviewLinedRow>
@@ -977,15 +976,38 @@ export function InterviewPage({
     ))
   }
 
-  /** Sections 1–4 and 7: one lined row per item; questions keep their answer buttons. */
+  /** Sections 1–4 and 7: one lined row per item (presence items use "None recorded"). */
   function renderItemRows(section: InterviewSectionDef) {
     return (
       <div className="divide-y">
         {section.items.flatMap((item) => {
           if (section.number === 1) return [renderRow(item, fileModel(section1Facts[item.key] ?? []))]
-          if (section.number === 2) return [renderRow(item, undefined, claimRows(item))]
-          if (section.number === 3) return [renderRow(item, rowModel(item.key, section3Lines[item.key] ?? []))]
-          if (section.number === 4) return [renderRow(item, undefined, contactRows(item))]
+          if (section.number === 2) {
+            const claims = claimRows(item)
+            return [
+              renderRow(
+                item,
+                claims.length === 0 ? fileModel([]) : undefined,
+                claims.length > 0 ? claims : null,
+                NONE_RECORDED
+              ),
+            ]
+          }
+          if (section.number === 3) {
+            const empty = item.kind === "presence" ? NONE_RECORDED : undefined
+            return [renderRow(item, rowModel(item.key, section3Lines[item.key] ?? []), null, empty)]
+          }
+          if (section.number === 4) {
+            const contacts = contactRows(item)
+            return [
+              renderRow(
+                item,
+                contacts.length === 0 ? fileModel([]) : undefined,
+                contacts.length > 0 ? contacts : null,
+                NONE_RECORDED
+              ),
+            ]
+          }
           const row = renderRow(item, rowModel(item.key, section7Lines[item.key] ?? []))
           return item.key === "s7_who" ? [row, ...householdMemberRows()] : [row]
         })}

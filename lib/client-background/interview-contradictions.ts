@@ -41,60 +41,8 @@ export function interviewContradictionNotes(input: ContradictionInput): Contradi
   const notes: ContradictionNote[] = []
   const a = input.answers
 
-  if (isNegative(a.s2_medicare?.value) && input.medicareClaimExists) {
-    notes.push({
-      itemKey: "s2_medicare",
-      message: "A Medicare claim is on file.",
-      target: "funding",
-    })
-  }
-  if (isNegative(a.s2_ndis?.value) && input.ndisClaimCount > 0) {
-    notes.push({
-      itemKey: "s2_ndis",
-      message:
-        input.ndisClaimCount === 1
-          ? "An NDIS claim is on file. Check this answer."
-          : `${input.ndisClaimCount} NDIS claims are on file. Check this answer.`,
-      target: "funding",
-    })
-  }
-  if (isNegative(a.s2_insurance?.value) && input.insurerClaimCount > 0) {
-    notes.push({
-      itemKey: "s2_insurance",
-      message:
-        input.insurerClaimCount === 1
-          ? "An insurance or WorkCover claim is on file. Check this answer."
-          : `${input.insurerClaimCount} insurance or WorkCover claims are on file. Check this answer.`,
-      target: "funding",
-    })
-  }
-
-  if (isNegative(a.s4_emergency?.value) && input.emergencyContactCount > 0) {
-    const n = input.emergencyContactCount
-    notes.push({
-      itemKey: "s4_emergency",
-      message: n === 1 ? "1 emergency contact is on file." : `${n} emergency contacts are on file.`,
-      target: "emergency",
-    })
-  }
-  if (isNegative(a.s4_gp?.value) && input.gpCount > 0) {
-    notes.push({
-      itemKey: "s4_gp",
-      message: input.gpCount === 1 ? "A GP is on file." : `${input.gpCount} GPs are on file.`,
-      target: "emergency",
-    })
-  }
-  if (isNegative(a.s4_other_professionals?.value) && input.otherProfessionalCount > 0) {
-    const n = input.otherProfessionalCount
-    notes.push({
-      itemKey: "s4_other_professionals",
-      message:
-        n === 1
-          ? "A treating professional is on file."
-          : `${n} treating professionals are on file.`,
-      target: "emergency",
-    })
-  }
+  // Sections 2 and 4 no longer have Yes/No answers (Round AR.1) — no contradictions there.
+  // Tree sections 5, 6, 8, 9 keep theirs.
 
   const relationshipPairs: Array<[string, string]> = [
     ["s5_current", "Current relationship entries are on file."],

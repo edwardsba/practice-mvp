@@ -17,8 +17,7 @@ export default async function NewOrganisationPage({
     <AppShell>
       <div className="mb-6">
         <BackButton
-          fallbackHref="/contacts/organisations"
-          label="← Back to organisations"
+          page="/contacts/organisations/new"
         />
       </div>
       <ListPageHeader heading="Add organisation" />

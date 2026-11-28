@@ -35,7 +35,6 @@ import {
 import { formatReportType } from "@/lib/reports/snapshot"
 import { BackButton } from "@/components/ui/back-button"
 import { EntityPageHeader } from "@/components/ui/entity-page-header"
-import { safeReturnTo } from "@/lib/navigation/safe-return-to"
 
 function displayValue(value: string | null | undefined) {
   return value?.trim() || "—"
@@ -43,26 +42,17 @@ function displayValue(value: string | null | undefined) {
 
 export default async function ClaimDetailPage({
   params,
-  searchParams,
 }: {
   params: Promise<{ claim_id: string }>
-  searchParams: Promise<{ returnTo?: string }>
 }) {
   const { claim_id: claimId } = await params
-  const { returnTo: returnToRaw } = await searchParams
-  const returnTo = safeReturnTo(returnToRaw)
   const claim = await getClaimById(claimId)
 
   if (!claim) {
     notFound()
   }
 
-  const claimUrl = returnTo
-    ? `/funding/claims/${claimId}?returnTo=${encodeURIComponent(returnTo)}`
-    : `/funding/claims/${claimId}`
-  const editHref = returnTo
-    ? `/funding/claims/${claimId}/edit?returnTo=${encodeURIComponent(returnTo)}`
-    : `/funding/claims/${claimId}/edit`
+  const editHref = `/funding/claims/${claimId}/edit`
 
   const showMedicare = isMedicareClaim(claim.claimTypeCode)
   const showInsurance = isInsurerClaim(claim.claimTypeCode)
@@ -76,7 +66,10 @@ export default async function ClaimDetailPage({
   return (
     <AppShell>
       <div className="mb-6">
-        <BackButton fallbackHref="/funding/claims" label="← Back to claims" />
+        <BackButton
+          page="/funding/claims/[claim_id]"
+          data={{ clientId: claim.clientId, claimId }}
+        />
       </div>
       <EntityPageHeader
         kicker="Claim"
@@ -172,7 +165,7 @@ export default async function ClaimDetailPage({
           <CardTitle>Funding approvals</CardTitle>
           <Button variant="outline" size="sm" asChild>
             <Link
-              href={`/funding/approvals/new?claimId=${claimId}&returnTo=/funding/claims/${claimId}`}
+              href={`/funding/approvals/new?claimId=${claimId}`}
             >
               Add Funding Approval
             </Link>
@@ -204,7 +197,7 @@ export default async function ClaimDetailPage({
                     <TableRow key={approval.fundingApprovalId}>
                       <TableCell>
                         <Link
-                          href={`/funding/approvals/${approval.fundingApprovalId}?returnTo=${encodeURIComponent(claimUrl)}`}
+                          href={`/funding/approvals/${approval.fundingApprovalId}`}
                           className="text-primary hover:underline"
                         >
                           {formatDisplayDate(approval.startDate)}
@@ -262,7 +255,7 @@ export default async function ClaimDetailPage({
                     <TableRow key={appointment.appointmentId}>
                       <TableCell>
                         <Link
-                          href={`/appointments/${appointment.appointmentId}?returnTo=${encodeURIComponent(claimUrl)}`}
+                          href={`/appointments/${appointment.appointmentId}`}
                           className="text-primary hover:underline"
                         >
                           {formatAppointmentDate(appointment.appointmentDate)}
@@ -278,7 +271,7 @@ export default async function ClaimDetailPage({
                       <TableCell>
                         {appointment.fundingApprovalId ? (
                           <Link
-                            href={`/funding/approvals/${appointment.fundingApprovalId}?returnTo=${encodeURIComponent(claimUrl)}`}
+                            href={`/funding/approvals/${appointment.fundingApprovalId}`}
                             className="text-primary hover:underline"
                           >
                             {approvalNameById.get(appointment.fundingApprovalId) ??

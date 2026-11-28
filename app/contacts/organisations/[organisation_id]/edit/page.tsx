@@ -33,8 +33,8 @@ export default async function EditOrganisationPage({
     <AppShell>
       <div className="mb-6">
         <BackButton
-          fallbackHref={`/contacts/organisations/${organisationId}`}
-          label="← Back to organisation"
+          page="/contacts/organisations/[organisation_id]/edit"
+          data={{ organisationId, organisationName: organisation.organisationName }}
         />
       </div>
       <EntityPageHeader

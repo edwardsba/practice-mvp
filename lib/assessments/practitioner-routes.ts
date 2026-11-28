@@ -70,23 +70,18 @@ export function buildPractitionerStartHref(params: {
   clientId: string
   assessmentCode: string
   sessionNoteId: string | null
-  returnTo: string
 }): string {
-  const { clientId, assessmentCode, sessionNoteId, returnTo } = params
+  const { clientId, assessmentCode, sessionNoteId } = params
   const query = new URLSearchParams()
   if (sessionNoteId) query.set("session_note_id", sessionNoteId)
-  query.set("returnTo", returnTo)
   const qs = query.toString()
-
-  return `/clients/${clientId}/assessments/new/${encodeURIComponent(assessmentCode)}?${qs}`
+  const path = `/clients/${clientId}/assessments/new/${encodeURIComponent(assessmentCode)}`
+  return qs ? `${path}?${qs}` : path
 }
 
 export function buildPractitionerEditHref(params: {
   clientId: string
   instanceId: string
-  returnTo: string
 }): string {
-  const query = new URLSearchParams()
-  query.set("returnTo", params.returnTo)
-  return `/clients/${params.clientId}/assessments/edit/${params.instanceId}?${query.toString()}`
+  return `/clients/${params.clientId}/assessments/edit/${params.instanceId}`
 }

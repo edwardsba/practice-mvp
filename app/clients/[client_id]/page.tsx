@@ -32,7 +32,6 @@ import {
 } from "@/lib/crisis-plans/load"
 import { requirePractitionerContext } from "@/lib/auth"
 import { db } from "@/lib/db"
-import { appendReturnTo } from "@/lib/navigation/back"
 import { buildTemplateVariablesFromLinkResponse } from "@/lib/email/link-response"
 import { getQuestionnaireEmailContext } from "@/lib/email/practitioner-context"
 import { loadActiveTreatmentPlanSummary } from "@/lib/treatment-plans/load"
@@ -182,19 +181,23 @@ export default async function ClientDetailPage({
     : `/clients/${clientId}/treatment-plan/new`
 
   const smartGoalsCount = activeTreatmentPlan?.smartGoalItems.length ?? 0
+  const clientName = formatClientDisplayName(
+    client.firstName,
+    client.preferredName,
+    client.lastName
+  )
 
   return (
     <AppShell>
       <div className="mb-6">
-        <BackButton fallbackHref="/clients" label="← Back to clients" />
+        <BackButton
+          page="/clients/[client_id]"
+          data={{ clientId, clientName }}
+        />
       </div>
       <EntityPageHeader
         kicker="Client details"
-        name={formatClientDisplayName(
-          client.firstName,
-          client.preferredName,
-          client.lastName
-        )}
+        name={clientName}
         subheading={`Date of birth: ${formatDate(client.dateOfBirth)}`}
         badge={
           <StatusBadge
@@ -223,10 +226,8 @@ export default async function ClientDetailPage({
             <ClientPanelField label="Next appointment">
               {nextAppointment ? (
                 <Link
-                  href={appendReturnTo(
-                    `/appointments/${nextAppointment.appointmentId}`,
-                    `/clients/${clientId}`
-                  )}
+                  href={
+                    `/appointments/${nextAppointment.appointmentId}`}
                   className="text-primary hover:underline"
                 >
                   {formatAppointmentDate(nextAppointment.appointmentDate)} at{" "}
@@ -376,7 +377,6 @@ export default async function ClientDetailPage({
           <ReferralFundingQuickView
             clientId={clientId}
             lines={referralQuickViewLines}
-            returnTo={`/clients/${clientId}`}
           />
         </ClientPanel>
 

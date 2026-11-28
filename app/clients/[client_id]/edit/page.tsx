@@ -140,8 +140,8 @@ export default async function EditClientPage({
     <AppShell>
       <div className="mb-6">
         <BackButton
-          fallbackHref={`/clients/${clientId}`}
-          label="← Back to client"
+          page="/clients/[client_id]/edit"
+          data={{ clientId, clientName }}
         />
       </div>
       <EntityPageHeader kicker="Edit details" name={clientName} />

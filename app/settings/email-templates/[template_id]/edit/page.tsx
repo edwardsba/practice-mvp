@@ -24,8 +24,8 @@ export default async function EditEmailTemplatePage({
     <AppShell>
       <div className="mb-6">
         <BackButton
-          fallbackHref="/settings/email-templates"
-          label="← Back to email templates"
+          page="/settings/email-templates/[template_id]/edit"
+          data={{ templateId }}
         />
       </div>
       <EntityPageHeader kicker="Email template edit" name={template.name} />

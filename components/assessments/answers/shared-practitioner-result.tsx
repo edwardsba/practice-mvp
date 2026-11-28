@@ -3,6 +3,7 @@ import Link from "next/link"
 import { AnswerSections } from "@/components/assessments/answers/answer-sections"
 import { ResultSummaryBox } from "@/components/assessments/answers/result-summary-box"
 import { AppShell } from "@/components/app-shell"
+import { BackButton } from "@/components/ui/back-button"
 import { Button } from "@/components/ui/button"
 import { buildAnswerSections } from "@/lib/assessments/answer-rows"
 import type { FormAnswers, FormElement } from "@/lib/assessments/form-rules"
@@ -46,8 +47,7 @@ export function SharedPractitionerResultView({
   sessionNoteId,
   sessionDate,
   instanceId,
-  backHref,
-  editReturnTo,
+  resultId,
   summaryRows,
   elements,
   answers,
@@ -61,8 +61,7 @@ export function SharedPractitionerResultView({
   sessionNoteId: string | null
   sessionDate: string | null
   instanceId: string
-  backHref: string
-  editReturnTo: string
+  resultId: string
   summaryRows: ResultSummaryLine[] | null
   elements: FormElement[]
   answers: FormAnswers
@@ -71,16 +70,21 @@ export function SharedPractitionerResultView({
   const editHref = buildPractitionerEditHref({
     clientId,
     instanceId,
-    returnTo: editReturnTo,
   })
 
   return (
     <AppShell>
       <div className="mx-auto w-full max-w-3xl space-y-6">
         <div>
-          <Button variant="ghost" size="sm" className="mb-2 -ml-2" asChild>
-            <Link href={backHref}>← Back</Link>
-          </Button>
+          <BackButton
+            page="/clients/[client_id]/results/[result_id]"
+            data={{
+              clientId,
+              clientName,
+              resultId,
+              resultDate: assessmentDate,
+            }}
+          />
 
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="space-y-1">

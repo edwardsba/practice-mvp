@@ -39,8 +39,8 @@ export default async function FundingApprovalTypeDetailPage({
     <AppShell>
       <div className="mb-6">
         <BackButton
-          fallbackHref="/funding/approval-types"
-          label="← Back to approval types"
+          page="/funding/approval-types/[type_id]"
+          data={{ typeId, typeName: type.name }}
         />
       </div>
       <EntityPageHeader

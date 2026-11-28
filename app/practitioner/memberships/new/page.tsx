@@ -12,7 +12,9 @@ export default async function NewMembershipPage() {
   return (
     <AppShell>
       <div className="mb-6">
-        <BackButton fallbackHref="/practitioner" label="← Back to profile" />
+        <BackButton
+          page="/practitioner/memberships/new"
+        />
       </div>
       <ListPageHeader heading="Add practice" />
 

@@ -26,7 +26,6 @@ import {
 } from "@/lib/appointments/format"
 import { loadAppointmentsForClient } from "@/lib/appointments/load"
 import { requirePractitionerContext } from "@/lib/auth"
-import { appendReturnTo } from "@/lib/navigation/back"
 import { db } from "@/lib/db"
 import { APPOINTMENT_STATUS_CONFIG, SESSION_NOTE_STATUS_CONFIG } from "@/lib/status"
 
@@ -68,8 +67,8 @@ export default async function ClientAppointmentsPage({
     <AppShell>
       <div className="mb-6">
         <BackButton
-          fallbackHref={`/clients/${clientId}`}
-          label={`← ${clientName}`}
+          page="/clients/[client_id]/appointments"
+          data={{ clientId, clientName }}
         />
       </div>
       <EntityPageHeader
@@ -78,7 +77,7 @@ export default async function ClientAppointmentsPage({
         subheading={`${appointments.length} appointment${appointments.length === 1 ? "" : "s"}`}
         action={
           <Button asChild>
-            <Link href={appendReturnTo(`/appointments/new?clientId=${clientId}`, returnTo)}>
+            <Link href={`/appointments/new?clientId=${clientId}`}>
               Add Appointment
             </Link>
           </Button>
@@ -109,10 +108,8 @@ export default async function ClientAppointmentsPage({
               </TableRow>
             ) : (
               appointments.map((appointment) => {
-                const appointmentHref = appendReturnTo(
-                  `/appointments/${appointment.appointmentId}`,
-                  returnTo
-                )
+                const appointmentHref = 
+                  `/appointments/${appointment.appointmentId}`
                 return (
                   <TableRow
                     key={appointment.appointmentId}

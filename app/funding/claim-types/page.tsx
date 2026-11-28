@@ -1,4 +1,5 @@
 import { AppShell } from "@/components/app-shell"
+import { RecordPageVisit } from "@/components/ui/back-button"
 import { ListPageHeader } from "@/components/ui/list-page-header"
 import { ClaimTypesManager } from "@/components/funding/claim-types-manager"
 import { getClaimTypes } from "@/lib/actions/funding"
@@ -10,6 +11,7 @@ export default async function ClaimTypesPage() {
 
   return (
     <AppShell>
+      <RecordPageVisit page="/funding/claim-types" />
       <ListPageHeader heading="Claim types" />
 
       <ClaimTypesManager

@@ -17,21 +17,16 @@ import { getProfessions, getProfessionalOrganisations } from "@/lib/actions/cont
 import { requirePractitionerContext } from "@/lib/auth"
 import { EntityDeleteSection } from "@/components/entity-delete-section"
 import { PRIVATE_CLAIM_TYPE_NAME } from "@/lib/funding/referral"
-import { safeReturnTo } from "@/lib/navigation/safe-return-to"
 import { and, eq } from "drizzle-orm"
 import { claimTypes } from "@/db/schema"
 import { db } from "@/lib/db"
 
 export default async function EditFundingApprovalPage({
   params,
-  searchParams,
 }: {
   params: Promise<{ approval_id: string }>
-  searchParams: Promise<{ returnTo?: string }>
 }) {
   const { approval_id: approvalId } = await params
-  const { returnTo: returnToRaw } = await searchParams
-  const returnTo = safeReturnTo(returnToRaw) ?? undefined
   const context = await requirePractitionerContext()
   const approval = await getFundingApprovalById(approvalId)
 
@@ -39,9 +34,7 @@ export default async function EditFundingApprovalPage({
     notFound()
   }
 
-  const detailHref = returnTo
-    ? `/funding/approvals/${approvalId}?returnTo=${encodeURIComponent(returnTo)}`
-    : `/funding/approvals/${approvalId}`
+  const detailHref = `/funding/approvals/${approvalId}`
 
   const [
     clients,
@@ -77,8 +70,12 @@ export default async function EditFundingApprovalPage({
     <AppShell>
       <div className="mb-6">
         <BackButton
-          fallbackHref={detailHref}
-          label="← Back to funding approval"
+          page="/funding/approvals/[approval_id]/edit"
+          data={{
+            clientId: approval.clientId,
+            approvalId,
+            claimId: approval.claimId ?? undefined,
+          }}
         />
       </div>
       <EntityPageHeader
@@ -112,7 +109,7 @@ export default async function EditFundingApprovalPage({
           fundingApprovalId: approval.fundingApprovalId,
           clientId: approval.clientId,
           fundingApprovalTypeId: approval.fundingApprovalTypeId,
-          claimId: approval.claimId,
+          claimId: approval.claimId ?? undefined,
           referrerId: approval.referrerId,
           referralDate: approval.referralDate,
           referrerComments: approval.referrerComments,
@@ -127,7 +124,6 @@ export default async function EditFundingApprovalPage({
           linkedAppointments: approval.linkedAppointments,
         }}
         cancelHref={detailHref}
-        returnTo={returnTo}
       />
 
       <EntityDeleteSection

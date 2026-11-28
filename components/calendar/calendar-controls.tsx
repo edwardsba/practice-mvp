@@ -24,12 +24,10 @@ export function CalendarControls({
   view,
   anchorDate,
   clientId,
-  returnTo,
 }: {
   view: CalendarView
   anchorDate: string
   clientId?: string
-  returnTo?: string
 }) {
   const previousDate = shiftAnchorDate(anchorDate, view, -1)
   const nextDate = shiftAnchorDate(anchorDate, view, 1)
@@ -44,20 +42,20 @@ export function CalendarControls({
           <div className="flex shrink-0 items-center gap-1">
             <Button variant="outline" size="icon-sm" asChild>
               <Link
-                href={buildCalendarUrl(view, previousDate, "week", clientId, returnTo)}
+                href={buildCalendarUrl(view, previousDate, "week", clientId)}
                 aria-label="Previous period"
               >
                 <ChevronLeft />
               </Link>
             </Button>
             <Button variant="outline" size="sm" asChild>
-              <Link href={buildCalendarUrl(view, today, "week", clientId, returnTo)}>
+              <Link href={buildCalendarUrl(view, today, "week", clientId)}>
                 Today
               </Link>
             </Button>
             <Button variant="outline" size="icon-sm" asChild>
               <Link
-                href={buildCalendarUrl(view, nextDate, "week", clientId, returnTo)}
+                href={buildCalendarUrl(view, nextDate, "week", clientId)}
                 aria-label="Next period"
               >
                 <ChevronRight />
@@ -73,7 +71,7 @@ export function CalendarControls({
               return (
                 <Link
                   key={option}
-                  href={buildCalendarUrl(option, anchorDate, "week", clientId, returnTo)}
+                  href={buildCalendarUrl(option, anchorDate, "week", clientId)}
                   className={cn(
                     "rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
                     isActive
@@ -88,7 +86,7 @@ export function CalendarControls({
           </div>
           <Button size="icon-sm" asChild>
             <Link
-              href={newAppointmentUrl(anchorDate, undefined, clientId, returnTo)}
+              href={newAppointmentUrl(anchorDate, undefined, clientId)}
               aria-label="New appointment"
             >
               <Plus />
@@ -111,7 +109,7 @@ export function CalendarControls({
                   className={cn(!isActive && "bg-background")}
                 >
                   <Link
-                    href={buildCalendarUrl(option, anchorDate, "week", clientId, returnTo)}
+                    href={buildCalendarUrl(option, anchorDate, "week", clientId)}
                   >
                     {VIEW_LABELS[option]}
                   </Link>
@@ -122,17 +120,17 @@ export function CalendarControls({
 
           <div className="flex flex-wrap items-center gap-2">
             <Button variant="outline" size="sm" asChild>
-              <Link href={buildCalendarUrl(view, previousDate, "week", clientId, returnTo)}>
+              <Link href={buildCalendarUrl(view, previousDate, "week", clientId)}>
                 Previous
               </Link>
             </Button>
             <Button variant="outline" size="sm" asChild>
-              <Link href={buildCalendarUrl(view, today, "week", clientId, returnTo)}>
+              <Link href={buildCalendarUrl(view, today, "week", clientId)}>
                 Today
               </Link>
             </Button>
             <Button variant="outline" size="sm" asChild>
-              <Link href={buildCalendarUrl(view, nextDate, "week", clientId, returnTo)}>
+              <Link href={buildCalendarUrl(view, nextDate, "week", clientId)}>
                 Next
               </Link>
             </Button>

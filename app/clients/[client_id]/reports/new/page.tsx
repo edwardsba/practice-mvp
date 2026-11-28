@@ -138,8 +138,8 @@ export default async function NewReportPage({
     <AppShell>
       <div className="mb-6 no-print">
         <BackButton
-          fallbackHref={`/clients/${clientId}`}
-          label="← Back to client"
+          page="/clients/[client_id]/reports/new"
+          data={{ clientId, clientName }}
         />
       </div>
       <div className="no-print">

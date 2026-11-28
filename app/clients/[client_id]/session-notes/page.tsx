@@ -21,7 +21,6 @@ import {
 } from "@/components/ui/table"
 import { clients } from "@/db/schema"
 import { requirePractitionerContext } from "@/lib/auth"
-import { appendReturnTo } from "@/lib/navigation/back"
 import { db } from "@/lib/db"
 import {
   formatSessionNoteDate,
@@ -63,14 +62,13 @@ export default async function ClientSessionNotesPage({
     clientId
   )
   const clientName = `${client.firstName} ${client.lastName}`
-  const returnTo = `/clients/${clientId}/session-notes`
 
   return (
     <AppShell>
       <div className="mb-6">
         <BackButton
-          fallbackHref={`/clients/${clientId}`}
-          label={`← ${clientName}`}
+          page="/clients/[client_id]/session-notes"
+          data={{ clientId, clientName }}
         />
       </div>
       <EntityPageHeader
@@ -79,7 +77,7 @@ export default async function ClientSessionNotesPage({
         subheading={`${notes.length} session note${notes.length === 1 ? "" : "s"}`}
         action={
           <form
-            action={createDraftSessionNote.bind(null, clientId, null, returnTo)}
+            action={createDraftSessionNote.bind(null, clientId, null)}
           >
             <Button type="submit">New Session Note</Button>
           </form>
@@ -110,10 +108,8 @@ export default async function ClientSessionNotesPage({
               </TableRow>
             ) : (
               notes.map((note) => {
-                const noteHref = appendReturnTo(
-                  `/session-notes/${note.sessionNoteId}`,
-                  returnTo
-                )
+                const noteHref = 
+                  `/session-notes/${note.sessionNoteId}`
                 return (
                   <TableRow
                     key={note.sessionNoteId}

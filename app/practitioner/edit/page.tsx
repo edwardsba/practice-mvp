@@ -24,7 +24,9 @@ export default async function EditPractitionerPage() {
   return (
     <AppShell>
       <div className="mb-6">
-        <BackButton fallbackHref="/practitioner" label="← Back to profile" />
+        <BackButton
+          page="/practitioner/edit"
+        />
       </div>
       <EntityPageHeader
         kicker="Profile edit"

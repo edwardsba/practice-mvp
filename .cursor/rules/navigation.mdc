@@ -1,0 +1,17 @@
+---
+description: Page types and the back arrow. Applies to every page you create, move or change.
+alwaysApply: true
+---
+
+Every page in `app/**/page.tsx` follows design guide section 13 (NV). Before you create, move or change a page, or add a link between pages, read NV-1 to NV-9 and the page map (13B).
+
+Every time, without being asked:
+1. Pick the page's type from NV-1. If none fits, stop and ask Ben. Never invent a type.
+2. Add or update its entry in `lib/navigation/page-registry.ts` (type, default parent, label). No page ships without one.
+3. Use the shared `BackButton` above the header (unless the type has none). Never pass it an address or a label. Never use `router.back` or `history.back`.
+4. Check every link into and out of the page against NV-2 and NV-7, and flag any that breaks them.
+5. For forms, make Back and Cancel go to the form's parent, and make Save show the record (NV-4).
+6. Run `lib/navigation/page-registry-guard.selftest.ts`. It must pass.
+7. In your final message, state the page's type, default parent and allowed parents.
+
+If a page or link doesn't fit the rules, follow the rules for new work and list the gap in your final message. Don't copy the old `returnTo` pattern.

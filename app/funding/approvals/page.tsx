@@ -1,6 +1,7 @@
 import Link from "next/link"
 
 import { AppShell } from "@/components/app-shell"
+import { RecordPageVisit } from "@/components/ui/back-button"
 import { StatusBadge } from "@/components/ui/status-badge"
 import { Button } from "@/components/ui/button"
 import { ListPageHeader } from "@/components/ui/list-page-header"
@@ -23,6 +24,7 @@ export default async function FundingApprovalsPage() {
 
   return (
     <AppShell>
+      <RecordPageVisit page="/funding/approvals" />
       <ListPageHeader
         heading="Funding approvals"
         action={

@@ -46,8 +46,8 @@ export default async function NewTreatmentPlanPage({
     <AppShell>
       <div className="mb-6">
         <BackButton
-          fallbackHref={`/clients/${clientId}`}
-          label="← Back to client"
+          page="/clients/[client_id]/treatment-plan/new"
+          data={{ clientId, clientName }}
         />
       </div>
       <EntityPageHeader

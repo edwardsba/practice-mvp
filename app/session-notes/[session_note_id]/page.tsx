@@ -51,13 +51,10 @@ import "@/components/session-notes/session-note-print.css"
 
 export default async function SessionNoteViewPage({
   params,
-  searchParams,
 }: {
   params: Promise<{ session_note_id: string }>
-  searchParams: Promise<{ returnTo?: string }>
 }) {
   const { session_note_id: sessionNoteId } = await params
-  const { returnTo } = await searchParams
   const context = await requirePractitionerContext()
 
   const note = await loadSessionNoteForPractice(sessionNoteId, context.practiceId)
@@ -77,17 +74,18 @@ export default async function SessionNoteViewPage({
     note.clientLastName
   )
   const isFinalised = note.status === "finalised"
-  const sessionNoteUrl = returnTo
-    ? `/session-notes/${sessionNoteId}?returnTo=${encodeURIComponent(returnTo)}`
-    : `/session-notes/${sessionNoteId}`
-  const cancelHref = returnTo ?? `/clients/${note.clientId}/session-notes`
+  const cancelHref = `/clients/${note.clientId}/session-notes`
 
   return (
     <AppShell>
       <div className="mb-6 no-print">
         <BackButton
-          fallbackHref={`/clients/${note.clientId}`}
-          label="← Back to client"
+          page="/session-notes/[session_note_id]"
+          data={{
+            clientId: note.clientId,
+            sessionNoteId,
+            sessionNoteDate: note.sessionDate,
+          }}
         />
       </div>
       <EntityPageHeader
@@ -111,7 +109,6 @@ export default async function SessionNoteViewPage({
           <>
             <SessionNoteActions
               sessionNoteId={sessionNoteId}
-              sessionNoteUrl={sessionNoteUrl}
               clientId={note.clientId}
               clientName={clientName}
               status={note.status}
@@ -139,7 +136,7 @@ export default async function SessionNoteViewPage({
                       <MseStatusBadge instance={viewContext.mseInstance} />
                       {viewContext.mseInstance.assessmentResultId ? (
                         <Link
-                          href={`/clients/${note.clientId}/results/${viewContext.mseInstance.assessmentResultId}?returnTo=${encodeURIComponent(sessionNoteUrl)}`}
+                          href={`/clients/${note.clientId}/results/${viewContext.mseInstance.assessmentResultId}`}
                           className="text-sm font-medium text-primary hover:underline"
                         >
                           View MSE
@@ -150,7 +147,6 @@ export default async function SessionNoteViewPage({
                           clientId: note.clientId,
                           instanceId:
                             viewContext.mseInstance.assessmentInstanceId,
-                          returnTo: sessionNoteUrl,
                         })}
                         className="text-sm font-medium text-primary hover:underline"
                       >
@@ -169,7 +165,6 @@ export default async function SessionNoteViewPage({
                       clientId: note.clientId,
                       assessmentCode: "mse",
                       sessionNoteId,
-                      returnTo: sessionNoteUrl,
                     })}
                     className="text-sm font-medium text-primary hover:underline"
                   >
@@ -203,7 +198,7 @@ export default async function SessionNoteViewPage({
                       </p>
                       {viewContext.lrampInstance.assessmentResultId ? (
                         <Link
-                          href={`/clients/${note.clientId}/results/${viewContext.lrampInstance.assessmentResultId}?returnTo=${encodeURIComponent(sessionNoteUrl)}`}
+                          href={`/clients/${note.clientId}/results/${viewContext.lrampInstance.assessmentResultId}`}
                           className="text-sm font-medium text-primary hover:underline"
                         >
                           View
@@ -214,7 +209,6 @@ export default async function SessionNoteViewPage({
                           clientId: note.clientId,
                           instanceId:
                             viewContext.lrampInstance.assessmentInstanceId,
-                          returnTo: sessionNoteUrl,
                         })}
                         className="text-sm font-medium text-primary hover:underline"
                       >
@@ -233,7 +227,7 @@ export default async function SessionNoteViewPage({
                       Not completed for this session
                     </p>
                     <Link
-                      href={`/clients/${note.clientId}/assessments/new/LRAMP?session_note_id=${sessionNoteId}&returnTo=${encodeURIComponent(sessionNoteUrl)}`}
+                      href={`/clients/${note.clientId}/assessments/new/LRAMP?session_note_id=${sessionNoteId}`}
                       className="text-sm font-medium text-primary hover:underline"
                     >
                       Start LRAMP
@@ -256,7 +250,6 @@ export default async function SessionNoteViewPage({
                 <OngoingAssessmentsTable
                   assessments={viewContext.assessments}
                   clientId={note.clientId}
-                  returnTo={sessionNoteUrl}
                 />
               </CardContent>
             </Card>
@@ -279,18 +272,16 @@ export default async function SessionNoteViewPage({
                         clientId: note.clientId,
                         assessmentCode: "ASQ",
                         sessionNoteId,
-                        returnTo: sessionNoteUrl,
                       }),
                     } satisfies RiskAssessmentRow,
                   ]}
                   clientId={note.clientId}
-                  returnTo={sessionNoteUrl}
                 />
                 <div>
                   <p className="mb-1 text-sm font-medium">Crisis plan</p>
                   {viewContext.crisisPlan ? (
                     <Link
-                      href={`/clients/${note.clientId}/crisis-plan/${viewContext.crisisPlan.crisisPlanId}?returnTo=${encodeURIComponent(sessionNoteUrl)}`}
+                      href={`/clients/${note.clientId}/crisis-plan/${viewContext.crisisPlan.crisisPlanId}`}
                       className="text-sm text-primary hover:underline"
                     >
                       v{viewContext.crisisPlan.versionNumber} (
@@ -310,7 +301,7 @@ export default async function SessionNoteViewPage({
               <CardContent className="space-y-4">
                 {viewContext.treatmentPlan ? (
                   <Link
-                    href={`/clients/${note.clientId}/treatment-plan/${viewContext.treatmentPlan.treatmentPlanId}?returnTo=${encodeURIComponent(sessionNoteUrl)}`}
+                    href={`/clients/${note.clientId}/treatment-plan/${viewContext.treatmentPlan.treatmentPlanId}`}
                     className="mb-3 block text-sm font-medium text-primary hover:underline"
                   >
                     v.{viewContext.treatmentPlan.versionNumber} created:{" "}
@@ -367,7 +358,6 @@ export default async function SessionNoteViewPage({
                       } satisfies RiskAssessmentRow,
                     ]}
                     clientId={note.clientId}
-                    returnTo={sessionNoteUrl}
                     outcomeColumnLabel="Risk Level"
                   />
                 ) : null}

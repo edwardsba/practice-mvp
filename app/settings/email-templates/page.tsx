@@ -1,4 +1,5 @@
 import Link from "next/link"
+import { RecordPageVisit } from "@/components/ui/back-button"
 
 import { EmailTemplateForm } from "@/components/email-templates/email-template-form"
 import { AppShell } from "@/components/app-shell"
@@ -26,6 +27,7 @@ export default async function EmailTemplatesPage() {
 
   return (
     <AppShell>
+      <RecordPageVisit page="/settings/email-templates" />
       <ListPageHeader
         heading="Email Templates"
         action={

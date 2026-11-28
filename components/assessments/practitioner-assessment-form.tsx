@@ -1,15 +1,24 @@
 "use client"
 
-import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { useEffect, useMemo, useState, useTransition } from "react"
+import {
+  Suspense,
+  useEffect,
+  useMemo,
+  useState,
+  useTransition,
+  type ComponentProps,
+} from "react"
 
 import { AssessmentFormCore } from "@/components/assessments/form/assessment-form-core"
 import { DiscardChangesDialog } from "@/components/client-background/discard-changes-dialog"
 import { ConfirmPrefilledDialog } from "@/components/shared/confirm-prefilled-dialog"
 import { SectionProgressChips } from "@/components/shared/section-progress-chips"
 import { SectionNumberBadge, SectionStatusPill } from "@/components/shared/section-status-pill"
+import { BackButton } from "@/components/ui/back-button"
 import { Button } from "@/components/ui/button"
+import type { PageRegistryKey } from "@/lib/navigation/page-registry"
+import { useBackTarget } from "@/lib/navigation/use-back-target"
 import { Input } from "@/components/ui/input"
 import {
   clearAssessmentDraft,
@@ -25,14 +34,21 @@ import {
   type FormAnswers,
   type FormElement,
   type FormValidationError,
-  type SectionStatus,
 } from "@/lib/assessments/form-rules"
 import type { SavePractitionerAssessmentState } from "@/lib/assessments/save-practitioner-assessment"
 import { UNGROUPED_SECTION_KEY } from "@/lib/assessments/section-presentation"
 import { attentionSaveBannerClass } from "@/lib/ui/status-colours"
 import { cn } from "@/lib/utils"
 
-export function PractitionerAssessmentForm({
+export function PractitionerAssessmentForm(props: ComponentProps<typeof PractitionerAssessmentFormInner>) {
+  return (
+    <Suspense fallback={null}>
+      <PractitionerAssessmentFormInner {...props} />
+    </Suspense>
+  )
+}
+
+function PractitionerAssessmentFormInner({
   mode,
   clientId,
   clientName,
@@ -43,7 +59,6 @@ export function PractitionerAssessmentForm({
   initialAnswers,
   initialAssessmentDate,
   sessionNoteId,
-  returnTo,
   instanceId,
   saveAction,
 }: {
@@ -58,13 +73,19 @@ export function PractitionerAssessmentForm({
   initialAnswers: FormAnswers
   initialAssessmentDate: string
   sessionNoteId: string | null
-  returnTo: string
   instanceId?: string | null
   saveAction: (
     prev: SavePractitionerAssessmentState,
     formData: FormData
   ) => Promise<SavePractitionerAssessmentState>
 }) {
+  const page: PageRegistryKey =
+    mode === "edit"
+      ? "/clients/[client_id]/assessments/edit/[instance_id]"
+      : "/clients/[client_id]/assessments/new/[assessment_code]"
+  const navData = { clientId, clientName, assessmentCode }
+  const backTarget = useBackTarget(page, navData)
+  const cancelHref = backTarget?.href ?? `/clients/${clientId}/assessments`
   const router = useRouter()
   const [answers, setAnswers] = useState<FormAnswers>(initialAnswers)
   const [assessmentDate, setAssessmentDate] = useState(initialAssessmentDate)
@@ -195,7 +216,7 @@ export function PractitionerAssessmentForm({
   function confirmDiscard() {
     clearAssessmentDraft({ clientId, assessmentCode, instanceId })
     setDiscardOpen(false)
-    const href = pendingHref ?? returnTo
+    const href = pendingHref ?? cancelHref
     setPendingHref(null)
     setDirty(false)
     router.push(href)
@@ -208,8 +229,7 @@ export function PractitionerAssessmentForm({
     const formData = new FormData()
     formData.set("answers_json", JSON.stringify(finalAnswers))
     formData.set("assessment_date", assessmentDate)
-    formData.set("return_to", returnTo)
-    formData.set("assessment_code", assessmentCode)
+        formData.set("assessment_code", assessmentCode)
     if (sessionNoteId) formData.set("session_note_id", sessionNoteId)
 
     clearAssessmentDraft({ clientId, assessmentCode, instanceId })
@@ -301,13 +321,7 @@ export function PractitionerAssessmentForm({
   return (
     <div className="pb-28">
       <div className="mb-4 space-y-2">
-        <button
-          type="button"
-          className="text-sm text-primary hover:underline"
-          onClick={() => requestLeave(returnTo)}
-        >
-          ← Back
-        </button>
+        <BackButton page={page} data={navData} isDirty={dirty} />
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">
             {displayName}
@@ -425,7 +439,7 @@ export function PractitionerAssessmentForm({
               variant="outline"
               className="min-h-11"
               disabled={pending}
-              onClick={() => requestLeave(returnTo)}
+              onClick={() => requestLeave(cancelHref)}
             >
               Cancel
             </Button>
@@ -458,9 +472,6 @@ export function PractitionerAssessmentForm({
         onConfirmAndSave={handlePrefillConfirmAndSave}
       />
 
-      <Link href={returnTo} className="sr-only">
-        Back
-      </Link>
     </div>
   )
 }

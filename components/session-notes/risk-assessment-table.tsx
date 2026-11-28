@@ -25,12 +25,10 @@ export type RiskAssessmentRow = {
 export function RiskAssessmentTable({
   rows,
   clientId,
-  returnTo,
   outcomeColumnLabel = "Screen outcome",
 }: {
   rows: RiskAssessmentRow[]
   clientId: string
-  returnTo?: string
   outcomeColumnLabel?: string
 }) {
   const router = useRouter()
@@ -49,7 +47,7 @@ export function RiskAssessmentTable({
           {rows.map((row) => {
             const hasResult = Boolean(row.assessmentResultId)
             const clickHref = hasResult
-              ? `/clients/${clientId}/results/${row.assessmentResultId}${returnTo ? `?returnTo=${encodeURIComponent(returnTo)}` : ""}`
+              ? `/clients/${clientId}/results/${row.assessmentResultId}`
               : row.administerHref
 
             return (

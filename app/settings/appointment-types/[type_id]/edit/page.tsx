@@ -39,8 +39,8 @@ export default async function EditAppointmentTypePage({
     <AppShell>
       <div className="mb-6">
         <BackButton
-          fallbackHref={`/settings/appointment-types/${typeId}`}
-          label="← Back to appointment type"
+          page="/settings/appointment-types/[type_id]/edit"
+          data={{ typeId, typeName: type.nickname }}
         />
       </div>
       <EntityPageHeader kicker="Appointment type edit" name={type.nickname} />

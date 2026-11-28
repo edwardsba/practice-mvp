@@ -101,8 +101,8 @@ export default async function SavedSageSrDiagnosticReportPage({
     <AppShell>
       <div className="mb-6 no-print">
         <BackButton
-          fallbackHref={reportsListUrl}
-          label="← Back to client"
+          page="/clients/[client_id]/reports/sage-sr/[report_id]"
+          data={{ clientId, clientName, reportId }}
         />
       </div>
       <div className="no-print">

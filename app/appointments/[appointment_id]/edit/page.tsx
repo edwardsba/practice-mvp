@@ -14,13 +14,10 @@ import { requirePractitionerContext } from "@/lib/auth"
 
 export default async function EditAppointmentPage({
   params,
-  searchParams,
 }: {
   params: Promise<{ appointment_id: string }>
-  searchParams: Promise<{ returnTo?: string }>
 }) {
   const { appointment_id: appointmentId } = await params
-  const { returnTo } = await searchParams
   const context = await requirePractitionerContext()
 
   const [appointment, clients, memberships, profile] = await Promise.all([
@@ -38,6 +35,7 @@ export default async function EditAppointmentPage({
   const deleteStatus = await getAppointmentDeleteStatus(appointmentId)
 
   const clientName = `${appointment.clientFirstName} ${appointment.clientLastName}`
+  const detailHref = `/appointments/${appointmentId}`
 
   const availabilityBlocks = memberships.flatMap((membership) =>
     membership.availabilityBlocks.map((block) => ({
@@ -57,14 +55,18 @@ export default async function EditAppointmentPage({
     <AppShell>
       <div className="mb-6">
         <BackButton
-          fallbackHref={`/appointments/${appointmentId}`}
-          label="← Back to appointment"
+          page="/appointments/[appointment_id]/edit"
+          data={{
+            clientId: appointment.clientId,
+            appointmentId,
+            appointmentDate: appointment.appointmentDate,
+          }}
         />
       </div>
       <EntityPageHeader kicker="Appointment edit" name={clientName} />
 
       <AppointmentForm
-        action={updateAppointment.bind(null, appointmentId, returnTo)}
+        action={updateAppointment.bind(null, appointmentId)}
         clients={clients}
         practiceId={context.practiceId}
         availabilityBlocks={availabilityBlocks}
@@ -82,7 +84,7 @@ export default async function EditAppointmentPage({
           notes: appointment.notes,
         }}
         submitLabel="Save appointment"
-        cancelHref="/appointments"
+        cancelHref={detailHref}
       />
 
       <EntityDeleteSection

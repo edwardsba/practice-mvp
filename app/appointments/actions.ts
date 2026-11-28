@@ -132,7 +132,6 @@ async function verifyClientInPractice(clientId: string, practiceId: string) {
 }
 
 export async function createAppointment(
-  returnTo: string | undefined,
   _prevState: AppointmentFormState,
   formData: FormData
 ): Promise<AppointmentFormState> {
@@ -194,21 +193,18 @@ export async function createAppointment(
   revalidatePath("/calendar")
   revalidatePath(`/clients/${parsed.clientId}`)
 
-  // Same-day bookings bypass the normal returnTo destination — the
-  // scheduled reminder/pre-session sweep can never catch a same-day
-  // appointment (it only ever looks for "tomorrow"), so land on the new
-  // appointment's own page with the pre-session send dialog ready instead
-  // of returning to wherever the practitioner came from.
+  // Same-day bookings need the pre-session send dialog (the scheduled
+  // reminder/pre-session sweep only ever looks for "tomorrow").
   if (createdAppointmentId && parsed.appointmentDate === todayDateString()) {
     redirect(`/appointments/${createdAppointmentId}?promptPreSession=1`)
   }
 
-  redirect(returnTo ?? "/appointments")
+  // NV-4: New → Save shows the new record.
+  redirect(`/appointments/${createdAppointmentId}`)
 }
 
 export async function updateAppointment(
   appointmentId: string,
-  returnTo: string | undefined,
   _prevState: AppointmentFormState,
   formData: FormData
 ): Promise<AppointmentFormState> {
@@ -281,14 +277,8 @@ export async function updateAppointment(
     revalidatePath(`/clients/${existing.clientId}`)
   }
 
-  // Mirror System C's same-day safety net (see createAppointment above):
-  // if this edit reschedules the appointment onto today from a different
-  // day, the normal "tomorrow" pre-session sweep can never catch it
-  // either — same structural gap as a brand-new same-day booking, just
-  // reached via reschedule instead. Bypass returnTo the same way, and
-  // land on the appointment's own page with the send dialog prompted.
-  // The page itself already guards autoOpen on !preSessionBatterySentAt,
-  // so nothing pops up if it's already been sent.
+  // Mirror createAppointment: reschedule onto today needs the pre-session
+  // dialog. The page itself already guards autoOpen on !preSessionBatterySentAt.
   const movedToToday =
     existing.appointmentDate !== todayDateString() &&
     parsed.appointmentDate === todayDateString()
@@ -297,11 +287,8 @@ export async function updateAppointment(
     redirect(`/appointments/${appointmentId}?promptPreSession=1`)
   }
 
-  redirect(
-    returnTo
-      ? `/appointments/${appointmentId}?returnTo=${returnTo}`
-      : `/appointments/${appointmentId}`
-  )
+  // NV-4: Edit → Save shows the record.
+  redirect(`/appointments/${appointmentId}`)
 }
 
 export async function getAppointmentDeleteStatus(appointmentId: string) {

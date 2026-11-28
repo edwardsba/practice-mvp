@@ -35,8 +35,8 @@ export default async function EditFundingApprovalTypePage({
     <AppShell>
       <div className="mb-6">
         <BackButton
-          fallbackHref={`/funding/approval-types/${typeId}`}
-          label="← Back to approval type"
+          page="/funding/approval-types/[type_id]/edit"
+          data={{ typeId, typeName: type.name }}
         />
       </div>
       <EntityPageHeader kicker="Funding approval type edit" name={type.name} />

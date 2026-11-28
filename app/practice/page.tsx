@@ -1,4 +1,5 @@
 import Link from "next/link"
+import { RecordPageVisit } from "@/components/ui/back-button"
 
 import { getPractice } from "@/app/practice/actions"
 import { AppShell } from "@/components/app-shell"
@@ -22,6 +23,7 @@ export default async function PracticePage() {
   if (!practice) {
     return (
       <AppShell>
+      <RecordPageVisit page="/practice" />
         <h1 className="mb-6 text-2xl font-semibold tracking-tight">Practice</h1>
         <p className="text-muted-foreground">Practice record not found.</p>
       </AppShell>

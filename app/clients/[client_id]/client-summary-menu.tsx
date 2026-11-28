@@ -72,13 +72,8 @@ export function ClientSummaryPanel({
     }
   }
 
-  const newAppointmentHref = `/appointments/new?clientId=${clientId}&returnTo=${encodeURIComponent(`/clients/${clientId}`)}`
-  const addNoteAction = createDraftSessionNote.bind(
-    null,
-    clientId,
-    null,
-    `/clients/${clientId}`
-  )
+  const newAppointmentHref = `/appointments/new?clientId=${clientId}`
+  const addNoteAction = createDraftSessionNote.bind(null, clientId, null)
 
   const menuContent = (
     <>

@@ -110,7 +110,6 @@ export function ClientBackgroundPage({
             <ReferralFundingQuickView
               clientId={clientId}
               lines={referralQuickViewLines}
-              returnTo={`/clients/${clientId}/background`}
             />
           ) : null}
           {item.id === "demographics" ? (

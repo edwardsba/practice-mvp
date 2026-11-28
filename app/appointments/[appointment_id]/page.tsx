@@ -50,11 +50,10 @@ export default async function AppointmentDetailPage({
   searchParams,
 }: {
   params: Promise<{ appointment_id: string }>
-  searchParams: Promise<{ returnTo?: string; promptPreSession?: string }>
+  searchParams: Promise<{ promptPreSession?: string }>
 }) {
   const { appointment_id: appointmentId } = await params
-  const { returnTo: returnToParam, promptPreSession } = await searchParams
-  const returnTo = returnToParam?.trim() || undefined
+  const { promptPreSession } = await searchParams
   const context = await requirePractitionerContext()
 
   const [appointment, linkedSessionNote] = await Promise.all([
@@ -71,14 +70,18 @@ export default async function AppointmentDetailPage({
     appointment.clientLastName
   )
   const notes = appointment.notes?.trim() ?? ""
-  const appointmentUrl = returnTo
-    ? `/appointments/${appointmentId}?returnTo=${encodeURIComponent(returnTo)}`
-    : `/appointments/${appointmentId}`
 
   return (
     <AppShell>
       <div className="mb-6">
-        <BackButton fallbackHref="/appointments" label="← Back to appointments" />
+        <BackButton
+          page="/appointments/[appointment_id]"
+          data={{
+            clientId: appointment.clientId,
+            appointmentId,
+            appointmentDate: appointment.appointmentDate,
+          }}
+        />
       </div>
       <EntityPageHeader
         kicker="Appointment"
@@ -91,7 +94,7 @@ export default async function AppointmentDetailPage({
           linkedSessionNote ? (
             <Button asChild variant="default">
               <Link
-                href={`/session-notes/${linkedSessionNote.sessionNoteId}?returnTo=${encodeURIComponent(appointmentUrl)}`}
+                href={`/session-notes/${linkedSessionNote.sessionNoteId}`}
               >
                 View Session Note
               </Link>
@@ -101,8 +104,7 @@ export default async function AppointmentDetailPage({
               action={createDraftSessionNote.bind(
                 null,
                 appointment.clientId,
-                appointmentId,
-                appointmentUrl
+                appointmentId
               )}
             >
               <Button type="submit" variant="default">
@@ -117,9 +119,7 @@ export default async function AppointmentDetailPage({
         <CardHeader className="flex flex-row items-center justify-between gap-3">
           <CardTitle>Details</CardTitle>
           <Button asChild variant="outline" size="sm">
-            <Link
-              href={`/appointments/${appointmentId}/edit?returnTo=${encodeURIComponent(returnTo ?? "/appointments")}`}
-            >
+            <Link href={`/appointments/${appointmentId}/edit`}>
               Edit
             </Link>
           </Button>

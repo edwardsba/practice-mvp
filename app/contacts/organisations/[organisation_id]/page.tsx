@@ -41,8 +41,8 @@ export default async function OrganisationDetailPage({
     <AppShell>
       <div className="mb-6">
         <BackButton
-          fallbackHref="/contacts/organisations"
-          label="← Back to organisations"
+          page="/contacts/organisations/[organisation_id]"
+          data={{ organisationId, organisationName: organisation.organisationName }}
         />
       </div>
       <EntityPageHeader

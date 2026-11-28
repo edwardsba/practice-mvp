@@ -17,8 +17,7 @@ export default async function NewFundingApprovalTypePage() {
     <AppShell>
       <div className="mb-6">
         <BackButton
-          fallbackHref="/funding/approval-types"
-          label="← Back to approval types"
+          page="/funding/approval-types/new"
         />
       </div>
       <ListPageHeader heading="Add funding approval type" />

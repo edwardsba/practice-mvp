@@ -1,6 +1,7 @@
 import Link from "next/link"
 
 import { AppShell } from "@/components/app-shell"
+import { RecordPageVisit } from "@/components/ui/back-button"
 import { Button } from "@/components/ui/button"
 import { ListPageHeader } from "@/components/ui/list-page-header"
 import {
@@ -21,6 +22,7 @@ export default async function ClaimsPage() {
 
   return (
     <AppShell>
+      <RecordPageVisit page="/funding/claims" />
       <ListPageHeader
         heading="Claims"
         action={

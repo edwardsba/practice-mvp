@@ -7,23 +7,17 @@ import type { QuickViewLine } from "@/lib/funding/claims-page"
 import { attentionStatusBadgeClass } from "@/lib/ui/status-colours"
 import { cn } from "@/lib/utils"
 
-function approvalHref(
-  fundingApprovalId: string,
-  returnTo: string
-): string {
-  return `/funding/approvals/${fundingApprovalId}?returnTo=${encodeURIComponent(returnTo)}`
+function approvalHref(fundingApprovalId: string): string {
+  return `/funding/approvals/${fundingApprovalId}`
 }
 
 export function ReferralFundingQuickView({
   clientId,
   lines,
-  returnTo,
   footer,
 }: {
   clientId: string
   lines: QuickViewLine[]
-  /** Safe internal path for the funding approval back link. */
-  returnTo: string
   /** Optional footer under the lines (e.g. Interview add control). */
   footer?: React.ReactNode
 }) {
@@ -58,7 +52,7 @@ export function ReferralFundingQuickView({
             return (
               <li key={line.fundingApprovalId}>
                 <Link
-                  href={approvalHref(line.fundingApprovalId, returnTo)}
+                  href={approvalHref(line.fundingApprovalId)}
                   className={cn(
                     "flex min-h-11 items-start justify-between gap-3 rounded-md px-1 py-2 hover:bg-muted/40"
                   )}
@@ -81,7 +75,7 @@ export function ReferralFundingQuickView({
             const [claimType, ...rest] = line.title.split(" · ")
             const restName = rest.join(" · ")
             const href = line.fundingApprovalId
-              ? approvalHref(line.fundingApprovalId, returnTo)
+              ? approvalHref(line.fundingApprovalId)
               : claimsHref
             return (
               <li key={line.claimId}>
@@ -117,7 +111,7 @@ export function ReferralFundingQuickView({
           }
 
           const href = line.fundingApprovalId
-            ? approvalHref(line.fundingApprovalId, returnTo)
+            ? approvalHref(line.fundingApprovalId)
             : claimsHref
           return (
             <li key={line.claimId}>

@@ -50,8 +50,8 @@ export default async function ProfessionalDetailPage({
     <AppShell>
       <div className="mb-6">
         <BackButton
-          fallbackHref="/contacts/professionals"
-          label="← Back to professionals"
+          page="/contacts/professionals/[professional_id]"
+          data={{ professionalId, professionalName: displayName }}
         />
       </div>
       <EntityPageHeader

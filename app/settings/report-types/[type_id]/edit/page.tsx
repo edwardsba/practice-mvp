@@ -34,8 +34,8 @@ export default async function EditReportTypePage({
     <AppShell>
       <div className="mb-6">
         <BackButton
-          fallbackHref={`/settings/report-types/${typeId}`}
-          label="← Back to report type"
+          page="/settings/report-types/[type_id]/edit"
+          data={{ typeId, typeName: reportType.name }}
         />
       </div>
       <EntityPageHeader kicker="Report type edit" name={reportType.name} />

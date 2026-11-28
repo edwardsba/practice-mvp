@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation"
 import { and, eq } from "drizzle-orm"
 
+import { BackButton } from "@/components/ui/back-button"
 import { AppShell } from "@/components/app-shell"
 import { InterviewPage } from "@/components/client-background/interview-page"
 import { clients, sessionNotes } from "@/db/schema"
@@ -133,16 +134,27 @@ export default async function BackgroundInterviewRoute({
       )
     )
   const todaysNote = chooseTodaysSessionNote(notes, today)
-  const interviewReturnTo = `/clients/${clientId}/background/interview`
   const lrampStartHref = buildPractitionerStartHref({
     clientId,
     assessmentCode: "LRAMP",
     sessionNoteId: todaysNote?.sessionNoteId ?? null,
-    returnTo: interviewReturnTo,
   })
 
   return (
     <AppShell>
+      <div className="mb-6">
+        <BackButton
+          page="/clients/[client_id]/background/interview"
+          data={{
+            clientId,
+            clientName: formatClientDisplayName(
+              client.firstName,
+              client.preferredName,
+              client.lastName
+            ),
+          }}
+        />
+      </div>
       <InterviewPage
         clientId={clientId}
         practiceId={context.practiceId}

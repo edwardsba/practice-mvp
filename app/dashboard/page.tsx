@@ -3,6 +3,7 @@ import Link from "next/link"
 import { getPractitionerProfile } from "@/app/practitioner/actions"
 import { AppShell } from "@/components/app-shell"
 import { PsqStatusBadge } from "@/components/session-notes/psq-status-badge"
+import { RecordPageVisit } from "@/components/ui/back-button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   formatAppointmentTime,
@@ -43,6 +44,7 @@ export default async function DashboardPage() {
 
   return (
     <AppShell title={welcomeHeading}>
+      <RecordPageVisit page="/dashboard" />
       <div className="space-y-6">
         <Card>
           <CardHeader>
@@ -72,7 +74,7 @@ export default async function DashboardPage() {
                   return (
                     <li key={appt.appointmentId} className="py-3">
                       <Link
-                        href={`/appointments/${appt.appointmentId}?returnTo=${encodeURIComponent("/dashboard")}`}
+                        href={`/appointments/${appt.appointmentId}`}
                         className="flex flex-col gap-1 hover:underline"
                       >
                         <span className="flex flex-wrap items-center justify-between gap-2">

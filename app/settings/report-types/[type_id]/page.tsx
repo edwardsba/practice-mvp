@@ -32,8 +32,8 @@ export default async function ReportTypeDetailPage({
     <AppShell>
       <div className="mb-6">
         <BackButton
-          fallbackHref="/settings/report-types"
-          label="← Back to report types"
+          page="/settings/report-types/[type_id]"
+          data={{ typeId, typeName: reportType.name }}
         />
       </div>
       <EntityPageHeader

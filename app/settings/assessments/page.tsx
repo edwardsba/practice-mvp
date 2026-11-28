@@ -1,4 +1,5 @@
 import Link from "next/link"
+import { RecordPageVisit } from "@/components/ui/back-button"
 
 import { AppShell } from "@/components/app-shell"
 import { ListPageHeader } from "@/components/ui/list-page-header"
@@ -27,6 +28,7 @@ export default async function AssessmentDefinitionsPage() {
 
   return (
     <AppShell>
+      <RecordPageVisit page="/settings/assessments" />
       <ListPageHeader heading="Assessment Definitions" />
 
       <div className="rounded-lg border">

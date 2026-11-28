@@ -12,9 +12,9 @@
  * | attention | amber-950 on amber-50 ≈ 12.6:1           | amber-100 on amber-950 ≈ 11.8:1          |
  * | done      | emerald-900 on emerald-50 ≈ 8.6:1        | emerald-100 on emerald-950 ≈ 10.4:1      |
  * | problem   | red-900 on red-50 ≈ 8.3:1                | red-100 on red-950 ≈ 10.1:1              |
- * | client    | blue-900 on blue-50 ≈ 9.5:1              | blue-100 on blue-950 ≈ 10.8:1            |
+ * | client    | violet-950 on violet-50 ≈ 12.6:1         | violet-100 on violet-950 ≈ 11.6:1        |
  * Neutral vs attention also differ in lightness (neutral-800 vs amber-950 text;
- * cool grey vs warm amber backgrounds).
+ * cool grey vs warm amber backgrounds). Blue is reserved for links only.
  */
 
 export type StatusColourName = "neutral" | "attention" | "done" | "problem" | "client"
@@ -70,22 +70,22 @@ export const statusColours: Record<StatusColourName, StatusColourStyles> = {
     text: "text-red-900 dark:text-red-100",
   },
   client: {
-    soft: "rounded-md border border-blue-200 bg-blue-50 text-blue-900 dark:border-blue-700 dark:bg-blue-950 dark:text-blue-100",
-    pill: "rounded bg-blue-100 px-1.5 py-0.5 text-xs font-medium text-blue-900 dark:bg-blue-900 dark:text-blue-100",
-    chip: "border-blue-400 bg-blue-50 text-blue-900 dark:border-blue-700 dark:bg-blue-950 dark:text-blue-100",
+    soft: "rounded-md border border-violet-200 bg-violet-50 text-violet-950 dark:border-violet-700 dark:bg-violet-950 dark:text-violet-100",
+    pill: "rounded bg-violet-100 px-1.5 py-0.5 text-xs font-medium text-violet-950 dark:bg-violet-900 dark:text-violet-100",
+    chip: "border-violet-400 bg-violet-50 text-violet-950 dark:border-violet-700 dark:bg-violet-950 dark:text-violet-100",
     badge:
-      "border-blue-200 bg-blue-50 text-blue-900 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-100",
-    text: "text-blue-900 dark:text-blue-100",
+      "border-violet-200 bg-violet-50 text-violet-950 dark:border-violet-800 dark:bg-violet-950 dark:text-violet-100",
+    text: "text-violet-950 dark:text-violet-100",
   },
 }
 
-/** Client "Use" control on self-report suggestion rows. */
+/** Client "Use client's" / "Use" control on self-report suggestion rows. */
 export const clientUseButtonClass =
-  "min-h-11 shrink-0 rounded-md bg-blue-700 px-3 text-sm font-medium text-white hover:bg-blue-800 dark:bg-blue-600 dark:hover:bg-blue-500"
+  "min-h-11 shrink-0 rounded-md bg-violet-700 px-3 text-sm font-medium text-white hover:bg-violet-800 dark:bg-violet-600 dark:hover:bg-violet-500"
 
-/** Self-report suggestion row shell (Client: … + Use). */
+/** Self-report suggestion row shell (Client: … + Use client's / Keep). */
 export const clientSuggestionRowClass =
-  "flex items-center justify-between gap-2 rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1.5 dark:border-blue-700 dark:bg-blue-950"
+  "flex items-center justify-between gap-2 rounded-md border border-violet-200 bg-violet-50 px-2.5 py-1.5 dark:border-violet-700 dark:bg-violet-950"
 
 /** Border-only problem emphasis (e.g. alerts card). */
 export const problemBorderClass = "border-red-300 dark:border-red-700"

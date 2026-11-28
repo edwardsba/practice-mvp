@@ -144,9 +144,10 @@ Status and meaning colours are defined once in [`lib/ui/status-colours.ts`](./li
 | **attention** | amber | Needs your attention | Started but not finished; pre-filled answers to confirm; Worth checking; Not placed; needs badges; funding running low / ending / pending; Badge `warning` |
 | **done** | green (emerald) | Done or active | Sections done; confirmed; active claims and approvals; Badge `success` |
 | **problem** | red | Problem or risk | Errors, failed saves, Badge `destructive`, urgent risk items. Delete buttons keep the existing `destructive` theme colour. |
-| **client** | blue | The client's own words | Self-report "Client: …" lines and their "Use" button |
+| **client** | purple (violet) | The client's own words (self-report), always with the label "Client:" | Self-report "Client: …" lines and their Use client's / Keep controls |
+| **links** | blue | Navigation and actions that open something | Primary link / underline link styles (not a status-colours export) |
 
-Tree left-bar colours (`treeBarColours` / selected surface) also live in `lib/ui/status-colours.ts` — they are hierarchy tokens, not status meanings.
+Tree left-bar colours (`treeBarColours` / selected surface) also live in `lib/ui/status-colours.ts` — they are hierarchy tokens, not status meanings. Blue is for links only.
 
 ### Trees and panels: one look
 

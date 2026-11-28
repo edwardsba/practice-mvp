@@ -1,0 +1,11 @@
+---
+description: Practice MVP design guide. Read before any UI, form, assessment or interview work.
+alwaysApply: true
+---
+
+Before designing, mocking up or building anything that a practitioner or client sees, read `docs/design-guide.md`. It is the single source of truth for pages, fields, buttons, panels, dialogs, lists, trees, colours, dates, phone layout, client pages, assessments and the Background interview.
+
+- Follow its rules, and cite rule IDs (e.g. FM-3, IV-5) in commit messages when a change applies or touches a rule.
+- Colours only from `lib/ui/status-colours.ts` (CL-1). Run `lib/ui/status-colours-guard.selftest.ts` after UI changes.
+- If the code you're working in disagrees with the guide, follow the guide for new work, and mention the gap in your final message. Don't silently copy the old pattern.
+- Never edit `docs/design-guide.md` unless the prompt says exactly what to change.

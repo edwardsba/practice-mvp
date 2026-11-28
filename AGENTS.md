@@ -144,9 +144,10 @@ Status and meaning colours are defined once in [`lib/ui/status-colours.ts`](./li
 | **attention** | amber | Needs your attention | Started but not finished; pre-filled answers to confirm; Worth checking; Not placed; needs badges; funding running low / ending / pending; Badge `warning` |
 | **done** | green (emerald) | Done or active | Sections done; confirmed; active claims and approvals; Badge `success` |
 | **problem** | red | Problem or risk | Errors, failed saves, Badge `destructive`, urgent risk items. Delete buttons keep the existing `destructive` theme colour. |
-| **client** | blue | The client's own words | Self-report "Client: …" lines and their "Use" button |
+| **client** | purple (violet) | The client's own words (self-report), always with the label "Client:" | Self-report "Client: …" lines and their Use client's / Keep controls |
+| **links** | blue | Navigation and actions that open something | Primary link / underline link styles (not a status-colours export) |
 
-Tree left-bar colours (`treeBarColours` / selected surface) also live in `lib/ui/status-colours.ts` — they are hierarchy tokens, not status meanings.
+Tree left-bar colours (`treeBarColours` / selected surface) also live in `lib/ui/status-colours.ts` — they are hierarchy tokens, not status meanings. Blue is for links only.
 
 ### Trees and panels: one look
 
@@ -175,7 +176,8 @@ Do not add a second tree look, a second ⊕ control, a second side-panel shell, 
 
 Every interview section ends with **Nothing to record** (where the section has it) and **Confirm section**, disabled until each question (Yes/No/N/A or Yes/N/A) in the section is answered. Confirming writes `answers_json.sections[n]` and sets each details item to Confirmed or Not applicable from what is on file — details have no answer buttons of their own. Complete needs all nine sections confirmed.
 
-- Sections 1–4 and 7: details are overview rows (`interview-detail-row.tsx`) with **Edit**; questions keep `InterviewItemRow`. Edit opens that item's existing editor in the shared `SidePanel` (`interview-item-editors.tsx`).
+- Sections 1–4 and 7: every item is one shared lined row (`interview-lined-row.tsx`): small grey label → client lines → value. The value is the edit link (no **Edit** links; empty is grey italic "Not recorded") and opens that item's existing editor in the shared `SidePanel` (`interview-item-editors.tsx`). Questions show their answer buttons above the value. Claims (section 2), contacts (section 4) and people in the home (section 7) are rows within their item.
+- Client self-report answers (sections 3 and 7) are purple **Client:** lines on those rows, never inside the interview editors. Same as the file → the purple line replaces that file line; empty or different → purple line + **Use client's** above the file value + **Keep**. Use / Keep are server actions that read the value from the stored self-report (never from the browser), save it through the normal background save, and record `answers_json.clientDecisions[field]`. While answers are waiting, Confirm reads **Accept N client changes and confirm**. Fields, comparisons and apply rules: `lib/client-background/interview-client-fields.ts`; row lines: `interview-row-model.ts`.
 - Sections 5, 6, 8, 9: the shared trees render inline with each question answered under its heading (`renderHeadingAnswer`; headings map to items in `lib/client-background/interview-tree-headings.ts`). ⊕ under a heading answers that question Yes.
 
 Appointment automations: `lib/appointments/run-automations.ts` via daily cron (`08:00 UTC`).

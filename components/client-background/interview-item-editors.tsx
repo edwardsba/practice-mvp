@@ -25,7 +25,6 @@ import { FundingApprovalForm } from "@/components/funding/funding-approval-form"
 import { MedicareFields } from "@/components/funding/medicare-fields"
 import { MedicalContactsSection } from "@/components/medical-contacts/medical-contacts-section"
 import { SidePanel, SidePanelFooter } from "@/components/shared/side-panel"
-import type { ClientBackgroundSuggestions } from "@/lib/background-questionnaire/to-client-background"
 import type { LivingSituationFields, RelationshipRecord } from "@/lib/client-background/types"
 import type { ReferralFundingCardFormOptions } from "@/lib/funding/referral-funding-card-props"
 
@@ -342,13 +341,11 @@ function householdFieldsChanged(before: RelationshipRecord, after: RelationshipR
 export function InterviewLivingEditor({
   saved,
   relationships,
-  client,
   save,
   onClose,
 }: {
   saved: LivingSituationFields
   relationships: RelationshipRecord[]
-  client?: ClientBackgroundSuggestions["living"]
   save: (value: LivingSituationFields, changedPeople: RelationshipRecord[]) => Promise<{ error?: string }>
   onClose: () => void
 }) {
@@ -393,7 +390,6 @@ export function InterviewLivingEditor({
               current.map((row) => (row.relationshipRecordId === person.relationshipRecordId ? person : row))
             )
           }
-          client={client}
         />
         {error ? (
           <p className="text-sm text-destructive" role="alert">

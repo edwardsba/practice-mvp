@@ -19,10 +19,12 @@ import {
   type SaveRelationshipPersonDraftInput,
 } from "@/lib/client-background/block-mutations"
 import {
+  acceptInterviewClientChangesAndConfirm,
   completeBackgroundInterview,
   confirmInterviewSection,
   createEvent,
   createHistoryIssue,
+  decideInterviewClientAnswer,
   deleteEvent,
   saveDemographics,
   saveEducation,
@@ -255,20 +257,53 @@ export async function saveInterviewAnswersBulkAction(clientId: string, answers: 
   return result
 }
 
-export async function confirmInterviewSectionAction(
-  clientId: string,
-  sectionNumber: number,
-  detailHasValue: Record<string, boolean>,
-  extraItems?: import("@/lib/client-background/interview-answers").InterviewItemDef[]
-) {
+export async function confirmInterviewSectionAction(clientId: string, sectionNumber: number) {
   const context = await requirePractitionerContext()
   const result = await confirmInterviewSection({
     clientId,
     practiceId: context.practiceId,
     userId: context.userId,
     sectionNumber,
-    detailHasValue,
-    extraItems,
+  })
+  if (!result.error) refresh(clientId)
+  return result
+}
+
+/** Use client's / Keep on one interview row; the value always comes from the stored self-report. */
+export async function decideInterviewClientAnswerAction(
+  clientId: string,
+  fieldKey: string,
+  choice: "used" | "kept",
+  selfReportId: string | null
+) {
+  const context = await requirePractitionerContext()
+  const result = await decideInterviewClientAnswer({
+    clientId,
+    practiceId: context.practiceId,
+    userId: context.userId,
+    fieldKey,
+    choice,
+    selfReportId,
+  })
+  if (!result.error) refresh(clientId)
+  return result
+}
+
+/** Accept N client changes and confirm: field names from the page, values from the stored self-report. */
+export async function acceptInterviewClientChangesAction(
+  clientId: string,
+  sectionNumber: number,
+  fieldKeys: string[],
+  selfReportId: string | null
+) {
+  const context = await requirePractitionerContext()
+  const result = await acceptInterviewClientChangesAndConfirm({
+    clientId,
+    practiceId: context.practiceId,
+    userId: context.userId,
+    sectionNumber,
+    fieldKeys,
+    selfReportId,
   })
   if (!result.error) refresh(clientId)
   return result

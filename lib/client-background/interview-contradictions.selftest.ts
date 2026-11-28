@@ -22,73 +22,35 @@ const base = {
 check("no notes when empty", interviewContradictionNotes(base), [])
 
 check(
-  "medicare no + claim",
+  "section 2 presence items no longer contradict",
   interviewContradictionNotes({
     ...base,
-    answers: { s2_medicare: { value: "no" } },
+    answers: {
+      s2_medicare: { value: "no" },
+      s2_ndis: { value: "not_applicable" },
+      s2_insurance: { value: "no" },
+    },
     medicareClaimExists: true,
-  }).map((n) => n.message),
-  ["A Medicare claim is on file."]
-)
-
-check(
-  "ndis na + one claim",
-  interviewContradictionNotes({
-    ...base,
-    answers: { s2_ndis: { value: "not_applicable" } },
-    ndisClaimCount: 1,
-  }).map((n) => n.message),
-  ["An NDIS claim is on file. Check this answer."]
-)
-
-check(
-  "ndis no + two claims",
-  interviewContradictionNotes({
-    ...base,
-    answers: { s2_ndis: { value: "no" } },
     ndisClaimCount: 2,
-  }).map((n) => n.message),
-  ["2 NDIS claims are on file. Check this answer."]
-)
-
-check(
-  "insurance claim",
-  interviewContradictionNotes({
-    ...base,
-    answers: { s2_insurance: { value: "no" } },
     insurerClaimCount: 1,
-  }).map((n) => n.message),
-  ["An insurance or WorkCover claim is on file. Check this answer."]
+  }),
+  []
 )
 
 check(
-  "emergency contacts plural",
+  "section 4 presence items no longer contradict",
   interviewContradictionNotes({
     ...base,
-    answers: { s4_emergency: { value: "no" } },
+    answers: {
+      s4_emergency: { value: "no" },
+      s4_gp: { value: "not_applicable" },
+      s4_other_professionals: { value: "no" },
+    },
     emergencyContactCount: 2,
-  }).map((n) => n.message),
-  ["2 emergency contacts are on file."]
-)
-
-check(
-  "gp on file",
-  interviewContradictionNotes({
-    ...base,
-    answers: { s4_gp: { value: "not_applicable" } },
     gpCount: 1,
-  }).map((n) => n.message),
-  ["A GP is on file."]
-)
-
-check(
-  "other professionals",
-  interviewContradictionNotes({
-    ...base,
-    answers: { s4_other_professionals: { value: "no" } },
     otherProfessionalCount: 3,
-  }).map((n) => n.message),
-  ["3 treating professionals are on file."]
+  }),
+  []
 )
 
 check(
@@ -121,8 +83,8 @@ check(
   "yes answer does not contradict",
   interviewContradictionNotes({
     ...base,
-    answers: { s2_medicare: { value: "yes" } },
-    medicareClaimExists: true,
+    answers: { s5_current: { value: "yes" } },
+    relationshipHasEntries: { s5_current: true },
   }),
   []
 )

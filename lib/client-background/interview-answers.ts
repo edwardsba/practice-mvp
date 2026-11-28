@@ -34,24 +34,35 @@ export type InterviewSectionConfirm = {
   confirmedAt: string
 }
 
+/** Self-report Use client's / Keep decisions (Round AR). */
+export type InterviewClientDecision = {
+  choice: "used" | "kept"
+  at: string
+}
+
 export type InterviewAnswersJson = {
   version: 1
   items: Record<string, InterviewItemAnswer>
   /** Section confirmations — missing key means not confirmed. */
   sections: Record<string, InterviewSectionConfirm>
+  /** Per fine-grained self-report field key (e.g. identity.pronouns). */
+  clientDecisions: Record<string, InterviewClientDecision>
 }
 
-/** Yes/No/N/A and Yes/N/A items keep their own answer buttons. */
+/** Yes/No/N/A and Yes/N/A items keep their own answer buttons (tree headings). */
 export function isQuestionKind(kind: InterviewAnswerKind): boolean {
   return kind === "yna" || kind === "ya"
 }
 
-/** Confirmed/Not applicable (and per-record) items — signed off by Confirm section. */
+/**
+ * Details / presence items have no answer buttons — Confirm section signs them off.
+ * `cna` → confirmed | not_applicable; `presence` → yes | not_applicable (from data).
+ */
 export function isDetailsKind(kind: InterviewAnswerKind): boolean {
-  return kind === "cna"
+  return kind === "cna" || kind === "presence"
 }
 
-export type InterviewAnswerKind = "yna" | "cna" | "ya" | "living"
+export type InterviewAnswerKind = "yna" | "cna" | "ya" | "living" | "presence"
 
 export type InterviewSectionDef = {
   number: number
@@ -86,8 +97,17 @@ function numberedHistoryItems(
 export function allowedValuesForKind(kind: InterviewAnswerKind): readonly InterviewAnswerValue[] {
   if (kind === "yna") return ["yes", "no", "not_applicable"]
   if (kind === "cna") return ["confirmed", "not_applicable"]
-  if (kind === "ya") return ["yes", "not_applicable"]
+  if (kind === "ya" || kind === "presence") return ["yes", "not_applicable"]
   return ["lives_with_others", "lives_alone"]
+}
+
+/**
+ * Values accepted when reading stored answers for a kind. Presence items may still
+ * hold a legacy "no" from when they were yna questions (Round AR.1).
+ */
+export function readableValuesForKind(kind: InterviewAnswerKind): readonly InterviewAnswerValue[] {
+  if (kind === "presence") return ["yes", "no", "not_applicable"]
+  return allowedValuesForKind(kind)
 }
 
 export function isValueAllowedForKind(
@@ -119,9 +139,9 @@ export const INTERVIEW_SECTIONS: InterviewSectionDef[] = [
     title: "Funding details",
     nothingToRecord: false,
     items: [
-      { key: "s2_medicare", label: "Medicare", kind: "ya" },
-      { key: "s2_ndis", label: "NDIS", kind: "yna" },
-      { key: "s2_insurance", label: "Insurance or WorkCover", kind: "yna" },
+      { key: "s2_medicare", label: "Medicare", kind: "presence" },
+      { key: "s2_ndis", label: "NDIS", kind: "presence" },
+      { key: "s2_insurance", label: "Insurance or WorkCover", kind: "presence" },
     ],
   },
   {
@@ -131,10 +151,10 @@ export const INTERVIEW_SECTIONS: InterviewSectionDef[] = [
     nothingToRecord: false,
     items: [
       { key: "s3_identity", label: "Identity", kind: "cna" },
-      { key: "s3_disability", label: "Disability or access needs", kind: "yna" },
+      { key: "s3_disability", label: "Disability or access needs", kind: "presence" },
       { key: "s3_education", label: "Education", kind: "cna" },
       { key: "s3_occupation", label: "Occupation", kind: "cna" },
-      { key: "s3_financial", label: "Financial hardship", kind: "yna" },
+      { key: "s3_financial", label: "Financial hardship", kind: "presence" },
     ],
   },
   {
@@ -143,9 +163,9 @@ export const INTERVIEW_SECTIONS: InterviewSectionDef[] = [
     title: "Emergency contacts and treating professionals",
     nothingToRecord: true,
     items: [
-      { key: "s4_emergency", label: "Emergency contact", kind: "ya" },
-      { key: "s4_gp", label: "GP", kind: "yna" },
-      { key: "s4_other_professionals", label: "Other treating professionals", kind: "yna" },
+      { key: "s4_emergency", label: "Emergency contact", kind: "presence" },
+      { key: "s4_gp", label: "GP", kind: "presence" },
+      { key: "s4_other_professionals", label: "Other treating professionals", kind: "presence" },
     ],
   },
   {
@@ -237,7 +257,7 @@ export function interviewItemDef(key: string): InterviewItemDef | undefined {
 }
 
 export function emptyInterviewAnswers(): InterviewAnswersJson {
-  return { version: 1, items: {}, sections: {} }
+  return { version: 1, items: {}, sections: {}, clientDecisions: {} }
 }
 
 function sectionKey(sectionNumber: number): string {
@@ -302,7 +322,15 @@ export function confirmSectionAnswers(
   }
   const items = { ...answers.items }
   for (const item of [...section.items, ...extraItems]) {
-    if (isDetailsKind(item.kind)) {
+    if (item.kind === "presence") {
+      const hasValue = detailHasValue[item.key] === true
+      items[item.key] = {
+        value: hasValue ? "yes" : "not_applicable",
+        confirmed: true,
+      }
+      continue
+    }
+    if (item.kind === "cna") {
       const hasValue = detailHasValue[item.key] === true
       items[item.key] = {
         value: hasValue ? "confirmed" : "not_applicable",
@@ -324,6 +352,7 @@ export function confirmSectionAnswers(
         ...answers.sections,
         [sectionKey(sectionNumber)]: { confirmed: true, confirmedAt },
       },
+      clientDecisions: answers.clientDecisions,
     },
   }
 }
@@ -351,8 +380,10 @@ function readAnswerEntry(
 ): InterviewItemAnswer | null {
   if (!entry || typeof entry !== "object" || Array.isArray(entry)) return null
   const row = entry as Record<string, unknown>
-  if (!isValueAllowedForKind(kind, row.value)) return null
-  return { value: row.value, confirmed: row.confirmed === true }
+  if (!(readableValuesForKind(kind) as readonly string[]).includes(row.value as string)) {
+    return null
+  }
+  return { value: row.value as InterviewAnswerValue, confirmed: row.confirmed === true }
 }
 
 function readSectionConfirm(entry: unknown): InterviewSectionConfirm | null {
@@ -391,7 +422,20 @@ export function sanitizeInterviewAnswers(value: unknown): InterviewAnswersJson {
     const parsed = readSectionConfirm(sectionsRaw[key])
     if (parsed) sections[key] = parsed
   }
-  return { version: 1, items, sections }
+  const decisionsRaw =
+    raw.clientDecisions && typeof raw.clientDecisions === "object" && !Array.isArray(raw.clientDecisions)
+      ? (raw.clientDecisions as Record<string, unknown>)
+      : {}
+  const clientDecisions: Record<string, InterviewClientDecision> = {}
+  for (const [key, entry] of Object.entries(decisionsRaw)) {
+    if (!key.trim()) continue
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) continue
+    const row = entry as Record<string, unknown>
+    if (row.choice !== "used" && row.choice !== "kept") continue
+    if (typeof row.at !== "string" || !row.at.trim()) continue
+    clientDecisions[key] = { choice: row.choice, at: row.at }
+  }
+  return { version: 1, items, sections, clientDecisions }
 }
 
 /**
@@ -415,10 +459,15 @@ export function dropMissingPerRecordAnswers(
     }
     items[key] = answer
   }
-  return { version: 1, items, sections: answers.sections }
+  return {
+    version: 1,
+    items,
+    sections: answers.sections,
+    clientDecisions: answers.clientDecisions ?? {},
+  }
 }
 
-/** Copy prior interview item values unconfirmed; do not copy sections. */
+/** Copy prior interview item values unconfirmed; do not copy sections or clientDecisions. */
 export function prefillAnswersForReview(source: InterviewAnswersJson): InterviewAnswersJson {
   const items: Record<string, InterviewItemAnswer> = {}
   for (const [key, answer] of Object.entries(source.items)) {
@@ -427,7 +476,23 @@ export function prefillAnswersForReview(source: InterviewAnswersJson): Interview
     if (!isValueAllowedForKind(kind, answer.value)) continue
     items[key] = { value: answer.value, confirmed: false }
   }
-  return { version: 1, items, sections: {} }
+  return { version: 1, items, sections: {}, clientDecisions: {} }
+}
+
+export function setClientDecision(
+  answers: InterviewAnswersJson,
+  fieldKey: string,
+  choice: "used" | "kept",
+  at: string = new Date().toISOString()
+): InterviewAnswersJson {
+  if (!fieldKey.trim()) return answers
+  return {
+    ...answers,
+    clientDecisions: {
+      ...answers.clientDecisions,
+      [fieldKey]: { choice, at },
+    },
+  }
 }
 
 export function statusItemForAnswer(answer: InterviewItemAnswer | undefined): StatusItem {
@@ -440,19 +505,21 @@ export function interviewItemStatus(answer: InterviewItemAnswer | undefined) {
 }
 
 /**
- * Interview section status (Round AQ):
+ * Interview section status (Round AQ / AR):
  * - done when sections[n] is confirmed and every question is answered
  * - not started when nothing answered, nothing pre-filled, not confirmed
- * - otherwise in progress: "N to answer" (left) or "Ready to confirm" (to_confirm, toConfirm 0)
+ * - otherwise in progress: "N to answer" (left), "N client changes", or "Ready to confirm"
  */
 export function interviewSectionStatus(
   section: InterviewSectionDef,
   answers: InterviewAnswersJson,
-  extraItems: readonly InterviewItemDef[] = []
+  extraItems: readonly InterviewItemDef[] = [],
+  options?: { waitingClientChanges?: number }
 ): SectionStatus {
   const allItems = [...section.items, ...extraItems]
   const unanswered = unansweredQuestionCount(section, answers, extraItems)
   const confirmed = isSectionConfirmed(answers, section.number)
+  const waitingClientChanges = Math.max(0, options?.waitingClientChanges ?? 0)
   const anyPrefilled = allItems.some((item) => {
     const answer = answers.items[item.key]
     return Boolean(answer && !answer.confirmed)
@@ -469,13 +536,19 @@ export function interviewSectionStatus(
   let toConfirm = 0
   if (confirmed && unanswered === 0) {
     status = "done"
-  } else if (!anyQuestionAnswered && !anyPrefilled && !anyDetailsTouched && !confirmed) {
+  } else if (
+    !anyQuestionAnswered &&
+    !anyPrefilled &&
+    !anyDetailsTouched &&
+    waitingClientChanges === 0 &&
+    !confirmed
+  ) {
     status = "not_started"
     left = unanswered
   } else if (unanswered > 0) {
     status = "left"
   } else {
-    // Questions done (or none); waiting for Confirm section.
+    // Questions done (or none); waiting for Confirm section (and maybe client changes).
     status = "to_confirm"
     toConfirm = 0
   }
@@ -487,6 +560,7 @@ export function interviewSectionStatus(
     status,
     left,
     toConfirm,
+    clientChanges: waitingClientChanges > 0 && unanswered === 0 ? waitingClientChanges : 0,
     hasDefaults: false,
   }
 }
@@ -515,6 +589,35 @@ export function section4ExtraItems(input: {
 }
 
 /**
+ * Per-record rows under a section 4 parent. GP / Other treating professionals
+ * only take `s4_mc:` keys so emergency contacts never appear twice (Round AR.1).
+ */
+export function section4ExtrasAfterParent(
+  parentKey: string,
+  extras: readonly InterviewItemDef[],
+  gpMedicalIds: ReadonlySet<string>
+): InterviewItemDef[] {
+  if (parentKey === "s4_emergency") {
+    return extras.filter((item) => item.key.startsWith(S4_EC_PREFIX))
+  }
+  if (parentKey === "s4_gp") {
+    return extras.filter((item) => {
+      if (!item.key.startsWith(S4_MC_PREFIX)) return false
+      const id = perRecordContactId(item.key)
+      return id != null && gpMedicalIds.has(id)
+    })
+  }
+  if (parentKey === "s4_other_professionals") {
+    return extras.filter((item) => {
+      if (!item.key.startsWith(S4_MC_PREFIX)) return false
+      const id = perRecordContactId(item.key)
+      return id != null && !gpMedicalIds.has(id)
+    })
+  }
+  return []
+}
+
+/**
  * Mark every unanswered question in the section Not applicable (confirmed).
  * Details items are left alone — Confirm section signs those off.
  */
@@ -531,7 +634,12 @@ export function applyNothingToRecord(
     if (!isValueAllowedForKind(item.kind, "not_applicable")) continue
     items[item.key] = { value: "not_applicable", confirmed: true }
   }
-  return { version: 1, items, sections: answers.sections }
+  return {
+    version: 1,
+    items,
+    sections: answers.sections,
+    clientDecisions: answers.clientDecisions ?? {},
+  }
 }
 
 export function setItemAnswer(
@@ -548,6 +656,7 @@ export function setItemAnswer(
       [key]: { value: validated.value, confirmed: true },
     },
     sections: answers.sections,
+    clientDecisions: answers.clientDecisions ?? {},
   }
 }
 

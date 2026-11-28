@@ -1,6 +1,6 @@
 /**
- * Whether each details (cna) interview item has living data on file.
- * Used when Confirm section sets confirmed vs not_applicable.
+ * Whether each details / presence interview item has living data on file.
+ * Used when Confirm section sets confirmed/yes vs not_applicable.
  * Pure — no database.
  */
 
@@ -33,6 +33,7 @@ function lineHasRecorded(lines: string[] | null | undefined): boolean {
     const trimmed = line.trim()
     if (!trimmed) return false
     if (trimmed === "Not recorded") return false
+    if (trimmed === "None recorded") return false
     if (trimmed.endsWith(": Not recorded")) return false
     return true
   })
@@ -64,9 +65,37 @@ export type DetailPresenceInput = {
     phone: string | null
     isMain: boolean
   }>
+  /** Section 2 claim presence (Round AR.1). */
+  medicareClaimExists?: boolean
+  ndisClaimCount?: number
+  insurerClaimCount?: number
+  /** Section 4 parent presence — GP vs other medical counts. */
+  gpCount?: number
+  otherProfessionalCount?: number
 }
 
-/** Map of details item key → has living value (for Confirm section). */
+/** Section 3 and 7 details / presence items → has a value in the demographics record. */
+export function demographicDetailPresence(
+  demographics: Demographics,
+  relationships: readonly RelationshipRecord[]
+): Record<string, boolean> {
+  const out: Record<string, boolean> = {}
+  for (const [key, lines] of Object.entries(formatSection3FactLines(demographics))) {
+    if (key === "s3_disability" || key === "s3_financial") continue
+    out[key] = lineHasRecorded(lines)
+  }
+  // Presence items: yes only when the concern answer is yes (Round AR.1).
+  out.s3_disability = demographics.identity.disability === true
+  out.s3_financial = demographics.occupation.financialConcerns === true
+
+  const living = demographics.livingSituation
+  out.s7_who = formatLivingWhoFactLines(living, [...relationships]).length > 0
+  out.s7_housing_type = formatLivingTypeLine(living).trim() !== "Not recorded"
+  out.s7_housing_security = formatLivingSecurityLine(living).trim() !== "Not recorded"
+  return out
+}
+
+/** Map of details / presence item key → has living value (for Confirm section). */
 export function detailPresenceForInterview(input: DetailPresenceInput): Record<string, boolean> {
   const s1 = section1FactLines({
     preferredName: input.preferredName,
@@ -78,24 +107,20 @@ export function detailPresenceForInterview(input: DetailPresenceInput): Record<s
     comms: input.comms,
     clientDisplayName: input.clientDisplayName,
   })
-  const s3 = formatSection3FactLines(input.demographics)
   const out: Record<string, boolean> = {}
 
   for (const [key, lines] of Object.entries(s1)) {
     out[key] = lineHasRecorded(lines)
   }
-  for (const [key, lines] of Object.entries(s3)) {
-    // s3_disability / s3_financial are questions (yna), not details.
-    if (key === "s3_disability" || key === "s3_financial") continue
-    out[key] = lineHasRecorded(lines)
-  }
+  Object.assign(out, demographicDetailPresence(input.demographics, input.relationships))
 
-  out.s7_who =
-    formatLivingWhoFactLines(input.demographics.livingSituation, input.relationships).length > 0
-  out.s7_housing_type =
-    formatLivingTypeLine(input.demographics.livingSituation).trim() !== "Not recorded"
-  out.s7_housing_security =
-    formatLivingSecurityLine(input.demographics.livingSituation).trim() !== "Not recorded"
+  out.s2_medicare = input.medicareClaimExists === true
+  out.s2_ndis = (input.ndisClaimCount ?? 0) > 0
+  out.s2_insurance = (input.insurerClaimCount ?? 0) > 0
+
+  out.s4_emergency = input.emergencyContacts.length > 0
+  out.s4_gp = (input.gpCount ?? 0) > 0
+  out.s4_other_professionals = (input.otherProfessionalCount ?? 0) > 0
 
   out.s6_biological_parents =
     formatBiologicalParentsFacts(input.blocks, input.relationships).length > 0

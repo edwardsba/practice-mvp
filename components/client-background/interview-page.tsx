@@ -5,8 +5,10 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { useRouter } from "next/navigation"
 
 import {
+  acceptInterviewClientChangesAction,
   completeBackgroundInterviewAction,
   confirmInterviewSectionAction,
+  decideInterviewClientAnswerAction,
   saveEducationAction,
   saveIdentityAction,
   saveInterviewAnswersBulkAction,
@@ -23,7 +25,6 @@ import {
 import { HistoryTreeSection } from "@/components/client-background/history-tree-section"
 import type { SavePhase } from "@/components/client-background/interview-autosave"
 import { InterviewConfirmSection } from "@/components/client-background/interview-confirm-section"
-import { InterviewDetailRow } from "@/components/client-background/interview-detail-row"
 import {
   headingAnswerHasContent,
   InterviewHeadingAnswer,
@@ -37,7 +38,7 @@ import {
   InterviewMedicalContactsEditor,
   InterviewMedicareEditor,
 } from "@/components/client-background/interview-item-editors"
-import { InterviewItemRow } from "@/components/client-background/interview-item-row"
+import { InterviewLinedRow, NONE_RECORDED } from "@/components/client-background/interview-lined-row"
 import { InterviewNumberedSection } from "@/components/client-background/interview-numbered-section"
 import {
   readSectionOpenState,
@@ -77,11 +78,12 @@ import {
   INTERVIEW_SECTIONS,
   interviewItemDef,
   interviewSectionStatus,
-  isDetailsKind,
+  isQuestionKind,
   perRecordContactId,
   S4_EC_PREFIX,
   S4_MC_PREFIX,
   section4ExtraItems,
+  section4ExtrasAfterParent,
   sectionsNotConfirmed,
   unansweredQuestionCount,
   type BlockAnswerMirrorKey,
@@ -91,14 +93,16 @@ import {
   type InterviewSectionDef,
 } from "@/lib/client-background/interview-answers"
 import {
+  clientFieldStates,
+  clientFieldStatesForItem,
+  waitingClientFieldsForSection,
+  type ClientFieldKey,
+} from "@/lib/client-background/interview-client-fields"
+import {
   householdAloneContradiction,
   interviewContradictionNotes,
 } from "@/lib/client-background/interview-contradictions"
-import {
-  detailPresenceForInterview,
-  detailPresenceForSection,
-  sectionByNumber,
-} from "@/lib/client-background/interview-detail-presence"
+import { sectionByNumber } from "@/lib/client-background/interview-detail-presence"
 import { personLivesWithClient } from "@/lib/client-background/household"
 import {
   claimGroupFactLines,
@@ -111,20 +115,25 @@ import {
   type InterviewClaimFactInput,
 } from "@/lib/client-background/interview-section-1-4-facts"
 import {
-  factLinesOrFallback,
+  clientFieldFileText,
   formatBiologicalParentsFacts,
   formatCaregiverFacts,
   formatChildrenFacts,
   formatCurrentRelationshipFacts,
   formatHistoryCategoryFacts,
-  formatLivingSecurityLine,
-  formatLivingTypeLine,
-  formatLivingWhoFactLines,
+  formatLivingMemberLines,
   formatParentOtherFacts,
   formatPreviousRelationshipFacts,
-  formatSection3FactLines,
   formatSiblingFacts,
+  section3ValueLines,
+  section7ValueLines,
+  type InterviewValueLine,
 } from "@/lib/client-background/interview-facts"
+import {
+  interviewRowModel,
+  plainValueLines,
+  type InterviewRowModel,
+} from "@/lib/client-background/interview-row-model"
 import {
   headingAddNeedsYes,
   interviewItemKeyForTreeHeading,
@@ -279,10 +288,19 @@ export function InterviewPage({
   const [worthChecks, setWorthChecks] = useState<BackgroundCheck[]>([])
   const [completing, setCompleting] = useState(false)
   const [completeError, setCompleteError] = useState<string | null>(null)
+  const [decidingClientAnswer, setDecidingClientAnswer] = useState(false)
+  const [clientAnswerErrors, setClientAnswerErrors] = useState<Record<string, string>>({})
   const answerToken = useRef(0)
 
   const age = clientAge(data.dateOfBirth)
-  const suggestions = selfReport ? backgroundAnswersToClientBackground(selfReport.answers) : null
+  const suggestions = useMemo(
+    () => (selfReport ? backgroundAnswersToClientBackground(selfReport.answers) : null),
+    [selfReport]
+  )
+  const clientStates = useMemo(
+    () => clientFieldStates(suggestions, demographics, interviewAnswers.clientDecisions),
+    [suggestions, demographics, interviewAnswers.clientDecisions]
+  )
   const received = selfReport ? formatReceived(selfReport.assessmentDate) : ""
   const clientFirstName = clientName.split(/\s+/)[0] || clientName
 
@@ -477,45 +495,42 @@ export function InterviewPage({
     onPhase("answers", "saved", null)
   }
 
-  function sectionExtraItems(sectionNumber: number): InterviewItemDef[] {
-    if (sectionNumber !== 4) return []
-    return section4ExtraItems(section4ExtraInput)
+  function applyDemographics(changed: Partial<Demographics> | undefined) {
+    if (!changed) return
+    if (changed.identity) identityRef.current = changed.identity
+    if (changed.education) educationRef.current = changed.education
+    if (changed.occupation) occupationRef.current = changed.occupation
+    if (changed.livingSituation) livingRef.current = changed.livingSituation
+    setDemographics((current) => ({ ...current, ...changed }))
   }
 
-  /** Details on file right now, read from refs so tree saves just flushed are included. */
-  function currentDetailPresence() {
-    return detailPresenceForInterview({
-      clientDisplayName: clientName,
-      preferredName: contactClient.preferredName,
-      dateOfBirth: contactClient.dateOfBirth,
-      ageLabel: age,
-      phone: contactClient.phone,
-      email: contactClient.email,
-      address: contactClient.address,
-      comms: contactComms,
-      demographics: {
-        identity: identityRef.current,
-        education: educationRef.current,
-        occupation: occupationRef.current,
-        livingSituation: livingRef.current,
-      },
-      relationships: relationshipsRef.current,
-      blocks: blocksRef.current,
-      emergencyContacts: emergencyContactRows.map((row) => ({
-        id: row.contactId,
-        name: row.name,
-        role: row.role,
-        phone: row.phone,
-        email: row.email,
-      })),
-      medicalContacts: medicalContactLines.map((line) => ({
-        id: line.id,
-        name: line.name,
-        organisationName: line.organisationName,
-        phone: line.phone,
-        isMain: line.isMain,
-      })),
+  /** Use client's / Keep on one row. The server reads the value from the stored self-report. */
+  async function decideClientAnswer(itemKey: string, fieldKey: ClientFieldKey, choice: "used" | "kept") {
+    if (!selfReport || decidingClientAnswer) return
+    setDecidingClientAnswer(true)
+    setClientAnswerErrors((current) => {
+      const next = { ...current }
+      delete next[itemKey]
+      return next
     })
+    onPhase("client-answers", "saving", null)
+    const result = await decideInterviewClientAnswerAction(clientId, fieldKey, choice, selfReport.resultId)
+    setDecidingClientAnswer(false)
+    if (result.error || !result.answers) {
+      onPhase("client-answers", "error", () => void decideClientAnswer(itemKey, fieldKey, choice))
+      setClientAnswerErrors((current) => ({
+        ...current,
+        [itemKey]: result.error ?? "Could not save your choice.",
+      }))
+      return
+    }
+    applyDemographics(result.demographics)
+    applyLocalMirrors(result.answers)
+    onPhase("client-answers", "saved", null)
+  }
+
+  function waitingFieldsFor(sectionNumber: number) {
+    return waitingClientFieldsForSection(clientStates, sectionNumber)
   }
 
   async function confirmSection(sectionNumber: number) {
@@ -528,10 +543,25 @@ export function InterviewPage({
       return next
     })
     await flushAll()
-    const extras = sectionExtraItems(sectionNumber)
-    const detailHasValue = detailPresenceForSection(section, currentDetailPresence(), extras)
+    // Waiting client answers are accepted with the confirm; the server takes their values from
+    // the stored self-report and only checks these names against what is still waiting.
+    // Presence / section 4 extras are computed on the server from the living file (Round AR.2).
+    const waiting = waitingFieldsFor(sectionNumber).map((state) => state.fieldKey)
     onPhase("answers", "saving", null)
-    const result = await confirmInterviewSectionAction(clientId, sectionNumber, detailHasValue, extras)
+    let changed: Partial<Demographics> | undefined
+    let result: { error?: string; answers?: InterviewAnswersJson; screening?: ScreeningAnswers }
+    if (waiting.length > 0 && selfReport) {
+      const accepted = await acceptInterviewClientChangesAction(
+        clientId,
+        sectionNumber,
+        waiting,
+        selfReport.resultId
+      )
+      changed = accepted.demographics
+      result = accepted
+    } else {
+      result = await confirmInterviewSectionAction(clientId, sectionNumber)
+    }
     setConfirmingSection(null)
     if (result.error || !result.answers) {
       onPhase("answers", "error", () => void confirmSection(sectionNumber))
@@ -541,6 +571,7 @@ export function InterviewPage({
       }))
       return
     }
+    applyDemographics(changed)
     applyLocalMirrors(result.answers, result.screening)
     onPhase("answers", "saved", null)
     setSection(String(sectionNumber), false)
@@ -626,7 +657,9 @@ export function InterviewPage({
 
   const sectionStatuses: SectionStatus[] = INTERVIEW_SECTIONS.map((section) => {
     const extras = section.number === 4 ? section4Extras : []
-    return interviewSectionStatus(section, interviewAnswers, extras)
+    return interviewSectionStatus(section, interviewAnswers, extras, {
+      waitingClientChanges: waitingFieldsFor(section.number).length,
+    })
   })
 
   const contactComms = {
@@ -649,60 +682,24 @@ export function InterviewPage({
     clientDisplayName: clientName,
   })
 
-  const medicareClaim = useMemo(() => pickMedicareClaim(interviewClaims), [interviewClaims])
+  const medicareClaim = pickMedicareClaim(interviewClaims)
 
-  const section3Facts = useMemo(() => formatSection3FactLines(demographics), [demographics])
+  const section3Lines = useMemo(() => section3ValueLines(demographics), [demographics])
+  const section7Lines = useMemo(
+    () => section7ValueLines(demographics.livingSituation),
+    [demographics.livingSituation]
+  )
 
   function extraItemsAfterParent(parentKey: string): InterviewItemDef[] {
-    if (parentKey === "s4_emergency") {
-      return section4Extras.filter((item) => item.key.startsWith(S4_EC_PREFIX))
-    }
-    if (parentKey === "s4_gp") {
-      return section4Extras.filter((item) => {
-        const id = perRecordContactId(item.key)
-        return id != null && gpMedicalIds.has(id)
-      })
-    }
-    if (parentKey === "s4_other_professionals") {
-      return section4Extras.filter((item) => {
-        const id = perRecordContactId(item.key)
-        return id != null && !gpMedicalIds.has(id)
-      })
-    }
-    return []
+    return section4ExtrasAfterParent(parentKey, section4Extras, gpMedicalIds)
   }
 
   function factsIfAny(lines: string[]): string[] | null {
     return lines.length > 0 ? lines : null
   }
 
-  function factLinesForItem(itemKey: string): string[] | null {
-    if (itemKey.startsWith("s1_")) {
-      return factLinesOrFallback(section1Facts[itemKey] ?? [], "Not recorded")
-    }
-    if (itemKey === "s2_medicare") {
-      return factsIfAny(medicareFactLines(medicareClaim))
-    }
-    if (itemKey === "s2_ndis") {
-      return factsIfAny(claimGroupFactLines(interviewClaims, "ndis"))
-    }
-    if (itemKey === "s2_insurance") {
-      return factsIfAny(claimGroupFactLines(interviewClaims, "insurer"))
-    }
-    if (itemKey === "s4_emergency") {
-      const count = emergencyContactRows.length
-      return count > 0 ? [`${count} emergency contact${count === 1 ? "" : "s"} recorded`] : null
-    }
-    if (itemKey === "s4_gp") {
-      const count = medicalContactLines.filter((line) => isGpProfession(line.professionName)).length
-      return count > 0 ? [`${count} GP${count === 1 ? "" : "s"} recorded`] : null
-    }
-    if (itemKey === "s4_other_professionals") {
-      const count = medicalContactLines.filter((line) => !isGpProfession(line.professionName)).length
-      return count > 0
-        ? [`${count} treating professional${count === 1 ? "" : "s"} recorded`]
-        : null
-    }
+  /** Section 4 per-contact rows: the contact's details on file. */
+  function contactFactLines(itemKey: string): string[] {
     if (itemKey.startsWith(S4_EC_PREFIX)) {
       const id = perRecordContactId(itemKey)
       const contact = emergencyContactRows.find((row) => row.contactId === id)
@@ -713,7 +710,7 @@ export function InterviewPage({
             phone: contact.phone,
             email: contact.email,
           })
-        : null
+        : []
     }
     if (itemKey.startsWith(S4_MC_PREFIX)) {
       const id = perRecordContactId(itemKey)
@@ -725,17 +722,13 @@ export function InterviewPage({
             phone: contact.phone,
             isMain: contact.isMain,
           })
-        : null
+        : []
     }
-    if (itemKey.startsWith("s3_")) {
-      return factLinesOrFallback(section3Facts[itemKey] ?? [], "Not recorded")
-    }
-    if (itemKey === "s7_who") {
-      return factsIfAny(formatLivingWhoFactLines(demographics.livingSituation, relationships))
-    }
-    if (itemKey === "s7_housing_type") return [formatLivingTypeLine(demographics.livingSituation)]
-    if (itemKey === "s7_housing_security") return [formatLivingSecurityLine(demographics.livingSituation)]
+    return []
+  }
 
+  /** Facts under the tree headings (sections 5, 6, 8 and 9). */
+  function treeFactLines(itemKey: string): string[] | null {
     if (itemKey === "s5_current") {
       return factsIfAny(formatCurrentRelationshipFacts(relationshipStatus, blocks, relationships))
     }
@@ -776,19 +769,19 @@ export function InterviewPage({
     (line) => !isGpProfession(line.professionName)
   ).length
   const relationshipHasEntries: Record<string, boolean> = {
-    s5_current: Boolean(factLinesForItem("s5_current")?.length),
-    s5_previous: Boolean(factLinesForItem("s5_previous")?.length),
-    s5_children: Boolean(factLinesForItem("s5_children")?.length),
-    s6_mother_other: Boolean(factLinesForItem("s6_mother_other")?.length),
-    s6_father_other: Boolean(factLinesForItem("s6_father_other")?.length),
-    s6_caregiver: Boolean(factLinesForItem("s6_caregiver")?.length),
-    s6_siblings: Boolean(factLinesForItem("s6_siblings")?.length),
+    s5_current: Boolean(treeFactLines("s5_current")?.length),
+    s5_previous: Boolean(treeFactLines("s5_previous")?.length),
+    s5_children: Boolean(treeFactLines("s5_children")?.length),
+    s6_mother_other: Boolean(treeFactLines("s6_mother_other")?.length),
+    s6_father_other: Boolean(treeFactLines("s6_father_other")?.length),
+    s6_caregiver: Boolean(treeFactLines("s6_caregiver")?.length),
+    s6_siblings: Boolean(treeFactLines("s6_siblings")?.length),
   }
   const historyHasEntries: Record<string, boolean> = {}
   for (const section of INTERVIEW_SECTIONS) {
     if (section.number !== 8 && section.number !== 9) continue
     for (const item of section.items) {
-      historyHasEntries[item.key] = Boolean(factLinesForItem(item.key)?.length)
+      historyHasEntries[item.key] = Boolean(treeFactLines(item.key)?.length)
     }
   }
   const contradictionNotes = interviewContradictionNotes({
@@ -821,66 +814,149 @@ export function InterviewPage({
     return item.label
   }
 
-  function renderDetailRow(item: InterviewItemDef) {
-    const editor = editorForItem(item.key)
-    const label = detailLabel(item)
-    const perRecord = item.key.startsWith(S4_EC_PREFIX) || item.key.startsWith(S4_MC_PREFIX)
-    return (
-      <div key={item.key} id={`check-contradiction-${item.key}`} className="scroll-mt-36">
-        <InterviewDetailRow
-          label={label}
-          answer={interviewAnswers.items[item.key]}
-          factLines={factLinesForItem(item.key)}
-          contradictionNote={contradictionByKey[item.key] ?? null}
-          onEdit={editor ? () => setOpenEditor(editor) : undefined}
-          editLabel={perRecord ? `Edit ${label}: ${item.label}` : undefined}
-        />
-      </div>
+  function editFor(itemKey: string) {
+    const editor = editorForItem(itemKey)
+    return editor ? () => setOpenEditor(editor) : undefined
+  }
+
+  function isPrefilled(itemKey: string) {
+    const answer = interviewAnswers.items[itemKey]
+    return Boolean(answer && !answer.confirmed)
+  }
+
+  /** On-file lines merged with this item's self-report answers (sections 3 and 7). */
+  function rowModel(itemKey: string, lines: readonly InterviewValueLine[]): InterviewRowModel {
+    return interviewRowModel(lines, clientFieldStatesForItem(clientStates, itemKey), (fieldKey) =>
+      clientFieldFileText(fieldKey, demographics)
     )
   }
 
-  function renderQuestionRow(item: InterviewItemDef) {
-    const editor = editorForItem(item.key)
+  function fileModel(lines: readonly string[]): InterviewRowModel {
+    return { choices: [], value: plainValueLines(lines).map((entry) => ({ kind: "file", text: entry.text })) }
+  }
+
+  /** One lined row; its value opens the item's editor. */
+  function renderRow(
+    item: InterviewItemDef,
+    model?: InterviewRowModel,
+    subRows?: ReactNode[] | null,
+    emptyLabel?: string
+  ) {
     return (
-      <div key={item.key} id={`check-contradiction-${item.key}`} className="scroll-mt-36">
-        <InterviewItemRow
-          label={item.label}
-          kind={item.kind}
-          answer={interviewAnswers.items[item.key]}
-          factLines={factLinesForItem(item.key)}
-          contradictionNote={contradictionByKey[item.key] ?? null}
-          showEdit={Boolean(editor)}
-          editing={editor != null && openEditor === editor}
-          onEdit={editor ? () => setOpenEditor(editor) : undefined}
-          onSelect={(value) => void selectAnswer(item.key, value)}
-        />
-      </div>
+      <InterviewLinedRow
+        key={item.key}
+        id={`check-contradiction-${item.key}`}
+        label={item.label}
+        prefilled={isPrefilled(item.key)}
+        question={
+          isQuestionKind(item.kind)
+            ? {
+                kind: item.kind,
+                value: interviewAnswers.items[item.key]?.value ?? null,
+                onSelect: (value) => void selectAnswer(item.key, value),
+              }
+            : undefined
+        }
+        model={model}
+        onEdit={editFor(item.key)}
+        onUse={(fieldKey) => void decideClientAnswer(item.key, fieldKey, "used")}
+        onKeep={(fieldKey) => void decideClientAnswer(item.key, fieldKey, "kept")}
+        busy={decidingClientAnswer || confirmingSection != null}
+        contradictionNote={contradictionByKey[item.key] ?? null}
+        error={clientAnswerErrors[item.key] ?? null}
+        emptyLabel={emptyLabel}
+      >
+        {subRows && subRows.length > 0 ? subRows : null}
+      </InterviewLinedRow>
     )
   }
 
-  /** Sections 1–4 and 7: details as overview rows (grouped), questions with their buttons. */
-  function renderItemRows(section: InterviewSectionDef) {
-    const rows =
-      section.number === 4
-        ? section.items.flatMap((item) => [item, ...extraItemsAfterParent(item.key)])
-        : section.items
-    const groups: InterviewItemDef[][] = []
-    for (const item of rows) {
-      const last = groups[groups.length - 1]
-      if (last && isDetailsKind(item.kind) && isDetailsKind(last[0].kind)) last.push(item)
-      else groups.push([item])
+  /** Section 2: each claim on file is a row within its question. */
+  function claimRows(item: InterviewItemDef): ReactNode[] {
+    const onEdit = editFor(item.key)
+    if (item.key === "s2_medicare") {
+      return medicareClaim
+        ? [
+            <InterviewLinedRow
+              key={medicareClaim.claimId}
+              label="Claim"
+              model={fileModel(medicareFactLines(medicareClaim))}
+              onEdit={onEdit}
+            />,
+          ]
+        : []
     }
+    const kind = item.key === "s2_ndis" ? "ndis" : "insurer"
+    return interviewClaims
+      .filter((claim) => (kind === "ndis" ? isNdisClaim(claim.claimTypeCode) : isInsurerClaim(claim.claimTypeCode)))
+      .map((claim) => (
+        <InterviewLinedRow
+          key={claim.claimId}
+          label="Claim"
+          model={fileModel(claimGroupFactLines([claim], kind))}
+          onEdit={onEdit}
+        />
+      ))
+  }
+
+  /** Section 4: each contact on file is a row within its question. */
+  function contactRows(item: InterviewItemDef): ReactNode[] {
+    return extraItemsAfterParent(item.key).map((record) => (
+      <InterviewLinedRow
+        key={record.key}
+        id={`check-contradiction-${record.key}`}
+        label={detailLabel(record)}
+        prefilled={isPrefilled(record.key)}
+        model={fileModel(contactFactLines(record.key))}
+        onEdit={editFor(record.key)}
+        contradictionNote={contradictionByKey[record.key] ?? null}
+      />
+    ))
+  }
+
+  /** Section 7 household: one row per person in the home, after the household row. */
+  function householdMemberRows(): ReactNode[] {
+    const onEdit = editFor("s7_who")
+    return formatLivingMemberLines(demographics.livingSituation, relationships).map((line, index) => (
+      <InterviewLinedRow key={`s7-member-${index}-${line}`} label="Lives in the home" model={fileModel([line])} onEdit={onEdit} />
+    ))
+  }
+
+  /** Sections 1–4 and 7: one lined row per item (presence items use "None recorded"). */
+  function renderItemRows(section: InterviewSectionDef) {
     return (
-      <div className="space-y-3">
-        {groups.map((group) =>
-          isDetailsKind(group[0].kind) ? (
-            <div key={group[0].key} className="divide-y rounded-md border">
-              {group.map(renderDetailRow)}
-            </div>
-          ) : (
-            renderQuestionRow(group[0])
-          )
-        )}
+      <div className="divide-y">
+        {section.items.flatMap((item) => {
+          if (section.number === 1) return [renderRow(item, fileModel(section1Facts[item.key] ?? []))]
+          if (section.number === 2) {
+            const claims = claimRows(item)
+            return [
+              renderRow(
+                item,
+                claims.length === 0 ? fileModel([]) : undefined,
+                claims.length > 0 ? claims : null,
+                NONE_RECORDED
+              ),
+            ]
+          }
+          if (section.number === 3) {
+            const empty = item.kind === "presence" ? NONE_RECORDED : undefined
+            return [renderRow(item, rowModel(item.key, section3Lines[item.key] ?? []), null, empty)]
+          }
+          if (section.number === 4) {
+            const contacts = contactRows(item)
+            return [
+              renderRow(
+                item,
+                contacts.length === 0 ? fileModel([]) : undefined,
+                contacts.length > 0 ? contacts : null,
+                NONE_RECORDED
+              ),
+            ]
+          }
+          const row = renderRow(item, rowModel(item.key, section7Lines[item.key] ?? []))
+          return item.key === "s7_who" ? [row, ...householdMemberRows()] : [row]
+        })}
       </div>
     )
   }
@@ -1012,15 +1088,16 @@ export function InterviewPage({
 
       {selfReport ? (
         <p className={cn("mt-4 px-3 py-2 text-sm", statusColours.client.soft)}>
-          Self-report received {received}. Blue lines show the client&apos;s answers; items without one aren&apos;t in
-          the self-report. &quot;Use&quot; copies an answer into the field; nothing is filled in automatically.
+          Self-report received {received}. Purple &quot;Client:&quot; lines show the client&apos;s answers; items
+          without one aren&apos;t in the self-report. Use client&apos;s (or Use) copies an answer onto the file and Keep
+          leaves the file as it is; nothing is filled in automatically.
         </p>
       ) : null}
 
       <div className="space-y-4 py-4">
-        {INTERVIEW_SECTIONS.map((section) => {
+        {INTERVIEW_SECTIONS.map((section, index) => {
           const sectionExtras = section.number === 4 ? section4Extras : []
-          const status = interviewSectionStatus(section, interviewAnswers, sectionExtras)
+          const status = sectionStatuses[index]
           return (
             <InterviewNumberedSection
               key={section.id}
@@ -1033,6 +1110,7 @@ export function InterviewPage({
                 : renderItemRows(section)}
               <InterviewConfirmSection
                 unansweredQuestions={unansweredQuestionCount(section, interviewAnswers, sectionExtras)}
+                waitingClientChanges={waitingFieldsFor(section.number).length}
                 showNothingToRecord={section.nothingToRecord}
                 confirming={confirmingSection === section.number}
                 error={confirmErrors[section.number] ?? null}
@@ -1079,9 +1157,7 @@ export function InterviewPage({
           }}
           onClose={closeEditor}
         >
-          {(value, onChange) => (
-            <IdentityFieldsEditor value={value} onChange={onChange} client={suggestions?.identity} />
-          )}
+          {(value, onChange) => <IdentityFieldsEditor value={value} onChange={onChange} />}
         </InterviewFieldsEditor>
       ) : null}
       {openEditor === "education" ? (
@@ -1099,9 +1175,7 @@ export function InterviewPage({
           }}
           onClose={closeEditor}
         >
-          {(value, onChange) => (
-            <EducationFieldsEditor value={value} onChange={onChange} client={suggestions?.education} />
-          )}
+          {(value, onChange) => <EducationFieldsEditor value={value} onChange={onChange} />}
         </InterviewFieldsEditor>
       ) : null}
       {openEditor === "occupation" ? (
@@ -1119,16 +1193,13 @@ export function InterviewPage({
           }}
           onClose={closeEditor}
         >
-          {(value, onChange) => (
-            <OccupationFieldsEditor value={value} onChange={onChange} client={suggestions?.occupation} />
-          )}
+          {(value, onChange) => <OccupationFieldsEditor value={value} onChange={onChange} />}
         </InterviewFieldsEditor>
       ) : null}
       {openEditor === "living" ? (
         <InterviewLivingEditor
           saved={demographics.livingSituation}
           relationships={relationships}
-          client={suggestions?.living}
           save={async (value, changedPeople) => {
             let nextPeople = relationshipsRef.current
             for (const person of changedPeople) {

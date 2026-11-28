@@ -30,7 +30,7 @@ export function SectionStatusPill({
   section,
   className,
 }: {
-  section: Pick<SectionStatus, "status" | "left" | "toConfirm" | "hasDefaults">
+  section: Pick<SectionStatus, "status" | "left" | "toConfirm" | "hasDefaults" | "clientChanges">
   className?: string
 }) {
   const tone =

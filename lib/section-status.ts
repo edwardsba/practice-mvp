@@ -23,6 +23,11 @@ export type SectionStatus = {
   /** Pre-filled answers the practitioner has not yet confirmed. */
   toConfirm: number
   /**
+   * Self-report client answers waiting for Use client's / Keep (interview Round AR).
+   * When > 0 and questions are done, the pill reads "N client changes".
+   */
+  clientChanges?: number
+  /**
    * True when any element in the section has a default-selection option
    * (used for "Confirmed" vs "Complete" done wording).
    */
@@ -85,13 +90,19 @@ export function aggregateSectionStatus(
 }
 
 /** Short pill text for a section header. */
-export function statusPillLabel(section: Pick<SectionStatus, "status" | "left" | "toConfirm" | "hasDefaults">): string {
+export function statusPillLabel(
+  section: Pick<SectionStatus, "status" | "left" | "toConfirm" | "hasDefaults" | "clientChanges">
+): string {
   if (section.status === "skipped") return "Skipped"
   if (section.status === "not_started") return "Not started"
   // Interview: unanswered questions → "N to answer"; all questions done → "Ready to confirm".
   // Assessment form still uses toConfirm > 0 for pre-filled counts.
   if (section.status === "left") return `${section.left} to answer`
   if (section.status === "to_confirm") {
+    const clientChanges = section.clientChanges ?? 0
+    if (clientChanges > 0) {
+      return clientChanges === 1 ? "1 client change" : `${clientChanges} client changes`
+    }
     if (section.toConfirm === 0) return "Ready to confirm"
     return `${section.toConfirm} to confirm`
   }
@@ -115,9 +126,15 @@ export function progressChipAriaLabel(section: SectionStatus): string {
     case "left":
       detail = `${section.left} to answer`
       break
-    case "to_confirm":
-      detail = section.toConfirm === 0 ? "ready to confirm" : `${section.toConfirm} to confirm`
+    case "to_confirm": {
+      const clientChanges = section.clientChanges ?? 0
+      if (clientChanges > 0) {
+        detail = clientChanges === 1 ? "1 client change" : `${clientChanges} client changes`
+      } else {
+        detail = section.toConfirm === 0 ? "ready to confirm" : `${section.toConfirm} to confirm`
+      }
       break
+    }
     case "done":
       detail = section.hasDefaults ? "confirmed" : "complete"
       break

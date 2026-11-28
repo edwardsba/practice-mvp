@@ -99,7 +99,7 @@ export function ChoiceButtons({
   )
 }
 
-/** Blue client line under a field label. Use writes through the field's onChange. */
+/** Purple client line under a field label. Use writes through the field's onChange. */
 export function ClientAnswer({
   label,
   matches,

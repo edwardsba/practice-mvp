@@ -48,6 +48,7 @@ const prefilled: InterviewAnswersJson = {
   version: 1,
   items: Object.fromEntries(section1.items.map((item) => [item.key, { value: "confirmed" as const, confirmed: false }])),
   sections: {},
+  clientDecisions: {},
 }
 check("pre-filled details → to_confirm", interviewSectionStatus(section1, prefilled).status, "to_confirm")
 check("pre-filled details → Ready to confirm (no count)", interviewSectionStatus(section1, prefilled).toConfirm, 0)
@@ -58,6 +59,7 @@ const mixed: InterviewAnswersJson = {
     [section1.items[0].key]: { value: "confirmed", confirmed: true },
   },
   sections: {},
+  clientDecisions: {},
 }
 check("one detail touched → to_confirm", interviewSectionStatus(section1, mixed).status, "to_confirm")
 
@@ -65,6 +67,7 @@ const allItemsConfirmed: InterviewAnswersJson = {
   version: 1,
   items: Object.fromEntries(section1.items.map((item) => [item.key, { value: "confirmed" as const, confirmed: true }])),
   sections: {},
+  clientDecisions: {},
 }
 check(
   "every item confirmed but section not signed off → to_confirm",
@@ -78,27 +81,44 @@ const done: InterviewAnswersJson = {
 check("section confirmed → done", interviewSectionStatus(section1, done).status, "done")
 
 const section4 = INTERVIEW_SECTIONS.find((s) => s.number === 4)!
+const section5 = INTERVIEW_SECTIONS.find((s) => s.number === 5)!
 const partial: InterviewAnswersJson = {
   version: 1,
   items: {
-    s4_emergency: { value: "yes", confirmed: true },
+    s5_current: { value: "yes", confirmed: true },
   },
   sections: {},
+  clientDecisions: {},
 }
-const afterNothing = applyNothingToRecord(partial, 4)
-check("nothing to record keeps existing", afterNothing.items.s4_emergency, {
+const afterNothing = applyNothingToRecord(partial, 5)
+check("nothing to record keeps existing", afterNothing.items.s5_current, {
   value: "yes",
   confirmed: true,
 })
-check("nothing to record fills unanswered", afterNothing.items.s4_gp, {
+check("nothing to record fills unanswered tree questions", afterNothing.items.s5_previous, {
   value: "not_applicable",
   confirmed: true,
 })
-check("nothing to record fills remaining", afterNothing.items.s4_other_professionals, {
+check("nothing to record fills remaining tree questions", afterNothing.items.s5_children, {
   value: "not_applicable",
   confirmed: true,
 })
+const afterNothingS4 = applyNothingToRecord(
+  {
+    version: 1,
+    items: { s4_emergency: { value: "yes", confirmed: true } },
+    sections: {},
+    clientDecisions: {},
+  },
+  4
+)
+check(
+  "nothing to record leaves presence items alone",
+  afterNothingS4.items.s4_gp,
+  undefined
+)
 assert.equal(section4.items.length, 3)
+assert.equal(section5.items.length, 3)
 
 const source: InterviewAnswersJson = {
   version: 1,
@@ -107,19 +127,26 @@ const source: InterviewAnswersJson = {
     s8_emotional_problems: { value: "yes", confirmed: true },
   },
   sections: { "1": { confirmed: true, confirmedAt: "2026-11-27T00:00:00.000Z" } },
+  clientDecisions: { "identity.sex": { choice: "used", at: "2026-11-27T00:00:00.000Z" } },
 }
 const review = prefillAnswersForReview(source)
-check("review prefill copies values with confirmed false, no section sign-off", review, {
+check("review prefill copies values with confirmed false, no section sign-off or client decisions", review, {
   version: 1,
   items: {
     s1_name: { value: "confirmed", confirmed: false },
     s8_emotional_problems: { value: "yes", confirmed: false },
   },
   sections: {},
+  clientDecisions: {},
 })
 
 const tapped = setItemAnswer(
-  { version: 1, items: { s2_medicare: { value: "yes", confirmed: false } }, sections: {} },
+  {
+    version: 1,
+    items: { s2_medicare: { value: "yes", confirmed: false } },
+    sections: {},
+    clientDecisions: {},
+  },
   "s2_medicare",
   "yes"
 )
@@ -147,6 +174,7 @@ const withHistory: InterviewAnswersJson = {
     s6_caregiver: { value: "no", confirmed: true },
   },
   sections: {},
+  clientDecisions: {},
 }
 check("screeningFromInterviewAnswers mapping", screeningFromInterviewAnswers(withHistory), {
   emotional_problems: "yes",
@@ -193,7 +221,13 @@ check("validate wrong value for cna", validateItemAnswer("s1_name", "yes"), {
   ok: false,
   error: "That answer is not allowed for this item.",
 })
-check("validate ok ya", validateItemAnswer("s2_medicare", "yes"), { ok: true, value: "yes" })
+check("validate ok presence yes", validateItemAnswer("s2_medicare", "yes"), { ok: true, value: "yes" })
+check("validate presence rejects no on write", validateItemAnswer("s2_medicare", "no"), {
+  ok: false,
+  error: "That answer is not allowed for this item.",
+})
+check("presence kind allows yes", isValueAllowedForKind("presence", "yes"), true)
+check("presence kind rejects no on write", isValueAllowedForKind("presence", "no"), false)
 
 check("validate s4_ec allows confirmed", validateItemAnswer("s4_ec:abc", "confirmed"), {
   ok: true,
@@ -223,6 +257,7 @@ check(
         "s4_mc:gone": { value: "not_applicable", confirmed: true },
       },
       sections: {},
+      clientDecisions: {},
     },
     { emergencyContactIds: ["live"], medicalContactIds: [] }
   ).items,
@@ -238,6 +273,7 @@ check(
       "s4_mc:mc1": { value: "not_applicable", confirmed: true },
     },
     sections: {},
+    clientDecisions: {},
   }),
   {
     version: 1,
@@ -246,6 +282,7 @@ check(
       "s4_mc:mc1": { value: "not_applicable", confirmed: false },
     },
     sections: {},
+    clientDecisions: {},
   }
 )
 
@@ -260,6 +297,7 @@ const section4Extras = section4ExtraItems({
       s4_gp: { value: "yes", confirmed: true },
     },
     sections: {},
+    clientDecisions: {},
   },
   emergencyContacts: [{ id: "ec1", label: "Parent" }],
   gpContacts: [{ id: "gp1", label: "Dr Smith" }],
@@ -282,13 +320,18 @@ check(
   ["s4_ec:ec1", "s4_mc:gp1"]
 )
 check(
-  "section 4 left counts unanswered questions only (per-record rows are details)",
+  "section 4 has no questions (parents are presence; per-record rows are details)",
   interviewSectionStatus(
     section4,
-    { version: 1, items: { s4_emergency: { value: "yes", confirmed: true } }, sections: {} },
+    {
+      version: 1,
+      items: { s4_emergency: { value: "yes", confirmed: true } },
+      sections: {},
+      clientDecisions: {},
+    },
     section4Extras
   ).left,
-  2
+  0
 )
 
 const wrongSanitized = sanitizeInterviewAnswers({
@@ -307,6 +350,7 @@ check("sanitize drops wrong-typed values (old JSON gets empty sections)", wrongS
     s3_identity: { value: "confirmed", confirmed: false },
   },
   sections: {},
+  clientDecisions: {},
 })
 
 const droppedLivingWho = sanitizeInterviewAnswers({
@@ -322,6 +366,7 @@ check("sanitize drops legacy living answers on s7_who", droppedLivingWho, {
     s7_housing_type: { value: "confirmed", confirmed: false },
   },
   sections: {},
+  clientDecisions: {},
 })
 
 const demo = emptyDemographics()
@@ -416,6 +461,7 @@ check("sanitize drops s8_other_treatment", droppedOtherTreatment, {
     s8_illness_injury: { value: "yes", confirmed: true },
   },
   sections: {},
+  clientDecisions: {},
 })
 
 console.log("\ninterview-answers.selftest.ts: ok")

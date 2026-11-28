@@ -257,20 +257,13 @@ export async function saveInterviewAnswersBulkAction(clientId: string, answers: 
   return result
 }
 
-export async function confirmInterviewSectionAction(
-  clientId: string,
-  sectionNumber: number,
-  detailHasValue: Record<string, boolean>,
-  extraItems?: import("@/lib/client-background/interview-answers").InterviewItemDef[]
-) {
+export async function confirmInterviewSectionAction(clientId: string, sectionNumber: number) {
   const context = await requirePractitionerContext()
   const result = await confirmInterviewSection({
     clientId,
     practiceId: context.practiceId,
     userId: context.userId,
     sectionNumber,
-    detailHasValue,
-    extraItems,
   })
   if (!result.error) refresh(clientId)
   return result
@@ -300,7 +293,6 @@ export async function decideInterviewClientAnswerAction(
 export async function acceptInterviewClientChangesAction(
   clientId: string,
   sectionNumber: number,
-  detailHasValue: Record<string, boolean>,
   fieldKeys: string[],
   selfReportId: string | null
 ) {
@@ -310,7 +302,6 @@ export async function acceptInterviewClientChangesAction(
     practiceId: context.practiceId,
     userId: context.userId,
     sectionNumber,
-    detailHasValue,
     fieldKeys,
     selfReportId,
   })

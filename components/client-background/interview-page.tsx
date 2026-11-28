@@ -102,11 +102,7 @@ import {
   householdAloneContradiction,
   interviewContradictionNotes,
 } from "@/lib/client-background/interview-contradictions"
-import {
-  detailPresenceForInterview,
-  detailPresenceForSection,
-  sectionByNumber,
-} from "@/lib/client-background/interview-detail-presence"
+import { sectionByNumber } from "@/lib/client-background/interview-detail-presence"
 import { personLivesWithClient } from "@/lib/client-background/household"
 import {
   claimGroupFactLines,
@@ -537,54 +533,6 @@ export function InterviewPage({
     return waitingClientFieldsForSection(clientStates, sectionNumber)
   }
 
-  function sectionExtraItems(sectionNumber: number): InterviewItemDef[] {
-    if (sectionNumber !== 4) return []
-    return section4ExtraItems(section4ExtraInput)
-  }
-
-  /** Details on file right now, read from refs so tree saves just flushed are included. */
-  function currentDetailPresence() {
-    return detailPresenceForInterview({
-      clientDisplayName: clientName,
-      preferredName: contactClient.preferredName,
-      dateOfBirth: contactClient.dateOfBirth,
-      ageLabel: age,
-      phone: contactClient.phone,
-      email: contactClient.email,
-      address: contactClient.address,
-      comms: contactComms,
-      demographics: {
-        identity: identityRef.current,
-        education: educationRef.current,
-        occupation: occupationRef.current,
-        livingSituation: livingRef.current,
-      },
-      relationships: relationshipsRef.current,
-      blocks: blocksRef.current,
-      emergencyContacts: emergencyContactRows.map((row) => ({
-        id: row.contactId,
-        name: row.name,
-        role: row.role,
-        phone: row.phone,
-        email: row.email,
-      })),
-      medicalContacts: medicalContactLines.map((line) => ({
-        id: line.id,
-        name: line.name,
-        organisationName: line.organisationName,
-        phone: line.phone,
-        isMain: line.isMain,
-      })),
-      medicareClaimExists: medicareClaim != null,
-      ndisClaimCount: interviewClaims.filter((c) => isNdisClaim(c.claimTypeCode)).length,
-      insurerClaimCount: interviewClaims.filter((c) => isInsurerClaim(c.claimTypeCode)).length,
-      gpCount: medicalContactLines.filter((line) => isGpProfession(line.professionName)).length,
-      otherProfessionalCount: medicalContactLines.filter(
-        (line) => !isGpProfession(line.professionName)
-      ).length,
-    })
-  }
-
   async function confirmSection(sectionNumber: number) {
     const section = sectionByNumber(sectionNumber)
     if (!section || confirmingSection != null) return
@@ -595,10 +543,9 @@ export function InterviewPage({
       return next
     })
     await flushAll()
-    const extras = sectionExtraItems(sectionNumber)
-    const detailHasValue = detailPresenceForSection(section, currentDetailPresence(), extras)
     // Waiting client answers are accepted with the confirm; the server takes their values from
     // the stored self-report and only checks these names against what is still waiting.
+    // Presence / section 4 extras are computed on the server from the living file (Round AR.2).
     const waiting = waitingFieldsFor(sectionNumber).map((state) => state.fieldKey)
     onPhase("answers", "saving", null)
     let changed: Partial<Demographics> | undefined
@@ -607,14 +554,13 @@ export function InterviewPage({
       const accepted = await acceptInterviewClientChangesAction(
         clientId,
         sectionNumber,
-        detailHasValue,
         waiting,
         selfReport.resultId
       )
       changed = accepted.demographics
       result = accepted
     } else {
-      result = await confirmInterviewSectionAction(clientId, sectionNumber, detailHasValue, extras)
+      result = await confirmInterviewSectionAction(clientId, sectionNumber)
     }
     setConfirmingSection(null)
     if (result.error || !result.answers) {

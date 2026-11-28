@@ -18,6 +18,11 @@ import {
   unansweredQuestionCount,
 } from "@/lib/client-background/interview-answers"
 import {
+  confirmDetailHasValue,
+  section4ExtrasFromConfirmFile,
+  type InterviewConfirmFile,
+} from "@/lib/client-background/interview-confirm-presence"
+import {
   demographicDetailPresence,
   detailPresenceForInterview,
 } from "@/lib/client-background/interview-detail-presence"
@@ -275,6 +280,131 @@ if (confirmedS3.ok) {
     confirmed: true,
   })
   check("confirm identity still cna confirmed", confirmedS3.answers.items.s3_identity, {
+    value: "confirmed",
+    confirmed: true,
+  })
+}
+
+// --- Round AR.2: Confirm presence from the stored file (not the browser) ---
+
+const emptyComms = {
+  commsOptOut: false,
+  reminderOptOut: false,
+  preSessionOptOut: false,
+  postSessionOptOut: false,
+  adminCommsOptOut: false,
+  onlineBookingPermitted: false,
+}
+
+function confirmFile(partial: Partial<InterviewConfirmFile> = {}): InterviewConfirmFile {
+  return {
+    clientDisplayName: "Ben",
+    preferredName: null,
+    dateOfBirth: null,
+    ageLabel: "",
+    phone: null,
+    email: null,
+    address: null,
+    comms: emptyComms,
+    demographics: emptyDemographics(),
+    relationships: [],
+    blocks: [],
+    emergencyContacts: [],
+    medicalContacts: [],
+    claimTypeCodes: [],
+    ...partial,
+  }
+}
+
+const withMedicare = confirmDetailHasValue(2, confirmFile({ claimTypeCodes: ["medicare"] }), emptyInterviewAnswers())
+const confirmedMedicare = confirmSectionAnswers(
+  emptyInterviewAnswers(),
+  2,
+  withMedicare.detailHasValue,
+  withMedicare.extraItems,
+  "2026-11-28T02:00:00.000Z"
+)
+assert.equal(confirmedMedicare.ok, true, "section 2 with Medicare claim confirms")
+if (confirmedMedicare.ok) {
+  check("AR.2 stored Medicare → s2_medicare yes", confirmedMedicare.answers.items.s2_medicare, {
+    value: "yes",
+    confirmed: true,
+  })
+  check("AR.2 no NDIS → n/a", confirmedMedicare.answers.items.s2_ndis, {
+    value: "not_applicable",
+    confirmed: true,
+  })
+}
+
+const withoutClaims = confirmDetailHasValue(2, confirmFile(), emptyInterviewAnswers())
+const confirmedEmpty = confirmSectionAnswers(
+  emptyInterviewAnswers(),
+  2,
+  withoutClaims.detailHasValue,
+  withoutClaims.extraItems,
+  "2026-11-28T02:00:00.000Z"
+)
+assert.equal(confirmedEmpty.ok, true, "section 2 with no claims confirms")
+if (confirmedEmpty.ok) {
+  check("AR.2 no Medicare stored → not_applicable", confirmedEmpty.answers.items.s2_medicare, {
+    value: "not_applicable",
+    confirmed: true,
+  })
+}
+
+const contactsFile = confirmFile({
+  emergencyContacts: [
+    { id: "jane", name: "Jane", role: "Sister", phone: "0400", email: null },
+    { id: "john", name: "John", role: null, phone: null, email: null },
+  ],
+  medicalContacts: [
+    {
+      id: "gp1",
+      name: "Dr GP — GP",
+      organisationName: null,
+      phone: null,
+      isMain: true,
+      professionName: "GP",
+    },
+    {
+      id: "physio",
+      name: "Physio — Physiotherapist",
+      organisationName: null,
+      phone: null,
+      isMain: false,
+      professionName: "Physiotherapist",
+    },
+  ],
+})
+const s4Built = confirmDetailHasValue(4, contactsFile, emptyInterviewAnswers())
+check(
+  "AR.2 section 4 extras from stored contacts",
+  s4Built.extraItems.map((item) => item.key).sort(),
+  ["s4_ec:jane", "s4_ec:john", "s4_mc:gp1", "s4_mc:physio"].sort()
+)
+check(
+  "AR.2 section4ExtrasFromConfirmFile matches confirmDetailHasValue",
+  section4ExtrasFromConfirmFile(contactsFile, emptyInterviewAnswers()).map((item) => item.key).sort(),
+  s4Built.extraItems.map((item) => item.key).sort()
+)
+const confirmedContacts = confirmSectionAnswers(
+  emptyInterviewAnswers(),
+  4,
+  s4Built.detailHasValue,
+  s4Built.extraItems,
+  "2026-11-28T02:00:00.000Z"
+)
+assert.equal(confirmedContacts.ok, true, "section 4 from stored contacts confirms")
+if (confirmedContacts.ok) {
+  check("AR.2 emergency presence yes", confirmedContacts.answers.items.s4_emergency, {
+    value: "yes",
+    confirmed: true,
+  })
+  check("AR.2 per-record Jane confirmed", confirmedContacts.answers.items["s4_ec:jane"], {
+    value: "confirmed",
+    confirmed: true,
+  })
+  check("AR.2 per-record GP confirmed", confirmedContacts.answers.items["s4_mc:gp1"], {
     value: "confirmed",
     confirmed: true,
   })

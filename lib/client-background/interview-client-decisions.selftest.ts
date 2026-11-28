@@ -15,7 +15,33 @@ import {
   clientFieldStates,
   waitingClientFieldsForSection,
 } from "@/lib/client-background/interview-client-fields"
+import type { InterviewConfirmFile } from "@/lib/client-background/interview-confirm-presence"
 import { emptyDemographics, emptyNecessities, type Demographics, type RelationshipRecord } from "@/lib/client-background/types"
+
+const emptyComms = {
+  commsOptOut: false,
+  reminderOptOut: false,
+  preSessionOptOut: false,
+  postSessionOptOut: false,
+  adminCommsOptOut: false,
+  onlineBookingPermitted: false,
+}
+
+/** Confirm file without demographics/relationships (those come from the accept path). */
+const emptyConfirmFile: Omit<InterviewConfirmFile, "demographics" | "relationships"> = {
+  clientDisplayName: "Test",
+  preferredName: null,
+  dateOfBirth: null,
+  ageLabel: "",
+  phone: null,
+  email: null,
+  address: null,
+  comms: emptyComms,
+  blocks: [],
+  emergencyContacts: [],
+  medicalContacts: [],
+  claimTypeCodes: [],
+}
 
 function check(name: string, actual: unknown, expected: unknown) {
   assert.deepEqual(actual, expected, name)
@@ -122,7 +148,7 @@ check(
     suggestions,
     relationships: [],
     sectionNumber: 3,
-    detailHasValue: {},
+    confirmFile: emptyConfirmFile,
     expectedFieldKeys: ["identity.sex"],
     at: AT,
   }),
@@ -148,7 +174,7 @@ const accepted = acceptClientChangesAndConfirm({
   suggestions,
   relationships: [],
   sectionNumber: 3,
-  detailHasValue: { s3_identity: false, s3_education: false, s3_occupation: false },
+  confirmFile: emptyConfirmFile,
   expectedFieldKeys: ["identity.sex", "occupation.necessities"],
   at: AT,
 })
@@ -189,7 +215,7 @@ check(
     suggestions,
     relationships: [],
     sectionNumber: 3,
-    detailHasValue: {},
+    confirmFile: emptyConfirmFile,
     expectedFieldKeys: ["identity.sex"],
     at: AT,
   }),
@@ -203,7 +229,7 @@ check(
     suggestions,
     relationships: [],
     sectionNumber: 3,
-    detailHasValue: {},
+    confirmFile: emptyConfirmFile,
     expectedFieldKeys: ["identity.sex", "identity.pronouns", "occupation.necessities", "identity.religion"],
     at: AT,
   }),
@@ -217,7 +243,7 @@ check(
     suggestions,
     relationships: [],
     sectionNumber: 3,
-    detailHasValue: {},
+    confirmFile: emptyConfirmFile,
     expectedFieldKeys: [
       { fieldKey: "identity.sex", value: "Female" },
       "identity.pronouns",
@@ -235,7 +261,7 @@ check(
     suggestions,
     relationships: [],
     sectionNumber: 1,
-    detailHasValue: {},
+    confirmFile: emptyConfirmFile,
     expectedFieldKeys: [],
     at: AT,
   }),
@@ -249,7 +275,7 @@ const section7 = acceptClientChangesAndConfirm({
   suggestions,
   relationships: [] as RelationshipRecord[],
   sectionNumber: 7,
-  detailHasValue: { s7_who: false, s7_housing_type: false, s7_housing_security: true },
+  confirmFile: emptyConfirmFile,
   expectedFieldKeys: ["living.livesWith", "living.housingType"],
   at: AT,
 })

@@ -9,7 +9,6 @@ import type { ClientBackgroundSuggestions } from "@/lib/background-questionnaire
 import {
   answerQuestionsFirstLabel,
   confirmSectionAnswers,
-  detailsItemsInSection,
   INTERVIEW_SECTIONS,
   setClientDecision,
   unansweredQuestionCount,
@@ -25,7 +24,10 @@ import {
   type ClientFieldKey,
   type ClientFieldSection,
 } from "@/lib/client-background/interview-client-fields"
-import { demographicDetailPresence } from "@/lib/client-background/interview-detail-presence"
+import {
+  confirmDetailHasValue,
+  type InterviewConfirmFile,
+} from "@/lib/client-background/interview-confirm-presence"
 import type { Demographics, RelationshipRecord } from "@/lib/client-background/types"
 
 export const SELF_REPORT_CHANGED_ERROR =
@@ -91,6 +93,7 @@ export type AcceptClientChangesResult =
 /**
  * Use client's for every field still waiting in the section, then confirm it. Refuses while a
  * question is unanswered, and when the waiting fields aren't the ones the browser showed.
+ * Presence is derived from `confirmFile` after client values are applied (Round AR.2).
  */
 export function acceptClientChangesAndConfirm(input: {
   answers: InterviewAnswersJson
@@ -98,8 +101,8 @@ export function acceptClientChangesAndConfirm(input: {
   suggestions: ClientBackgroundSuggestions | null
   relationships: readonly RelationshipRecord[]
   sectionNumber: number
-  /** From the browser, for details outside the demographics record. */
-  detailHasValue: Readonly<Record<string, boolean>>
+  /** Living file for Confirm presence (contacts, claims, client). Demographics applied first. */
+  confirmFile: Omit<InterviewConfirmFile, "demographics" | "relationships">
   /** Field names the browser showed as waiting. Never values. */
   expectedFieldKeys: readonly unknown[]
   at: string
@@ -135,11 +138,15 @@ export function acceptClientChangesAndConfirm(input: {
     answers = setClientDecision(answers, fieldKey, "used", input.at)
   }
 
-  const onRecord = demographicDetailPresence(demographics, input.relationships)
-  const detailHasValue: Record<string, boolean> = { ...input.detailHasValue }
-  for (const item of detailsItemsInSection(section)) {
-    if (item.key in onRecord) detailHasValue[item.key] = onRecord[item.key]
-  }
+  const { detailHasValue } = confirmDetailHasValue(
+    section.number,
+    {
+      ...input.confirmFile,
+      demographics,
+      relationships: input.relationships,
+    },
+    answers
+  )
   const confirmed = confirmSectionAnswers(answers, section.number, detailHasValue, [], input.at)
   if (!confirmed.ok) return { ok: false, error: confirmed.error }
   return {

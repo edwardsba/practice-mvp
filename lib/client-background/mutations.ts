@@ -53,7 +53,6 @@ import {
   validateItemAnswer,
   type InterviewAnswerValue,
   type InterviewAnswersJson,
-  type InterviewItemDef,
 } from "@/lib/client-background/interview-answers"
 import {
   acceptClientChangesAndConfirm,
@@ -61,6 +60,8 @@ import {
   SELF_REPORT_CHANGED_ERROR,
 } from "@/lib/client-background/interview-client-decisions"
 import type { ClientFieldSection } from "@/lib/client-background/interview-client-fields"
+import { loadInterviewConfirmFile } from "@/lib/client-background/interview-confirm-load"
+import { confirmDetailHasValue } from "@/lib/client-background/interview-confirm-presence"
 import {
   finalScreeningAnswers,
   sanitizeScreening,
@@ -1421,50 +1422,16 @@ async function verifiedSelfReportId(
   return row?.id ?? null
 }
 
-/**
- * Extra items arrive from the browser. Only section 4's per-record contact rows may be
- * added, always as details items, and only for this client's own contacts.
- */
-async function ownedSection4ExtraItems(input: {
-  clientId: string
-  practiceId: string
-  sectionNumber: number
-  extraItems: unknown
-}): Promise<InterviewItemDef[]> {
-  if (input.sectionNumber !== 4 || !Array.isArray(input.extraItems)) return []
-  const keys = new Set<string>()
-  for (const item of input.extraItems) {
-    const key = item && typeof item === "object" ? (item as { key?: unknown }).key : null
-    if (typeof key === "string" && isPerRecordContactKey(key) && perRecordContactId(key)) keys.add(key)
-  }
-  const owned: InterviewItemDef[] = []
-  for (const key of keys) {
-    const ownership = await assertPerRecordContactBelongsToClient({
-      clientId: input.clientId,
-      practiceId: input.practiceId,
-      itemKey: key,
-    })
-    if (ownership.ok) owned.push({ key, label: key, kind: "cna" })
-  }
-  return owned
-}
-
 export async function confirmInterviewSection(input: {
   clientId: string
   practiceId: string
   userId: string
   sectionNumber: number
-  detailHasValue: Record<string, boolean>
-  extraItems?: InterviewItemDef[]
 }): Promise<{ error?: string; answers?: InterviewAnswersJson; screening?: ScreeningAnswers }> {
   const client = await assertClient(input.clientId, input.practiceId)
   if (!client) return { error: "Client was not found." }
-  const extraItems = await ownedSection4ExtraItems({
-    clientId: input.clientId,
-    practiceId: input.practiceId,
-    sectionNumber: input.sectionNumber,
-    extraItems: input.extraItems,
-  })
+  const confirmFile = await loadInterviewConfirmFile(input.clientId, input.practiceId)
+  if (!confirmFile) return { error: "Client was not found." }
   try {
     return await db.transaction(async (tx) => {
       const [existing] = await tx
@@ -1484,10 +1451,18 @@ export async function confirmInterviewSection(input: {
         .limit(1)
       if (!existing) return { error: "There is no background interview in progress." }
       const current = sanitizeInterviewAnswers(existing.answersJson)
+      // Presence from the stored file (not the browser). Demographics refreshed in this tx.
+      const family = await loadFamily(tx, input.clientId, input.practiceId)
+      const file = {
+        ...confirmFile,
+        demographics: await demographicsInTx(tx, input.clientId, input.practiceId),
+        relationships: family.people,
+      }
+      const { detailHasValue, extraItems } = confirmDetailHasValue(input.sectionNumber, file, current)
       const confirmed = confirmSectionAnswers(
         current,
         input.sectionNumber,
-        input.detailHasValue,
+        detailHasValue,
         extraItems,
         new Date().toISOString()
       )
@@ -1643,7 +1618,6 @@ export async function acceptInterviewClientChangesAndConfirm(input: {
   practiceId: string
   userId: string
   sectionNumber: number
-  detailHasValue: Record<string, boolean>
   fieldKeys: unknown
   selfReportId: unknown
 }): Promise<{
@@ -1656,9 +1630,8 @@ export async function acceptInterviewClientChangesAndConfirm(input: {
   if (!client) return { error: "Client was not found." }
   const suggestions = await shownSelfReportSuggestions(input.clientId, input.practiceId, input.selfReportId)
   if (!suggestions) return { error: SELF_REPORT_CHANGED_ERROR }
-  const detailHasValue = Object.fromEntries(
-    Object.entries(input.detailHasValue ?? {}).filter(([, value]) => typeof value === "boolean")
-  )
+  const confirmFile = await loadInterviewConfirmFile(input.clientId, input.practiceId)
+  if (!confirmFile) return { error: "Client was not found." }
   try {
     return await db
       .transaction(async (tx) => {
@@ -1671,7 +1644,20 @@ export async function acceptInterviewClientChangesAndConfirm(input: {
           suggestions,
           relationships: family.people,
           sectionNumber: input.sectionNumber,
-          detailHasValue,
+          confirmFile: {
+            clientDisplayName: confirmFile.clientDisplayName,
+            preferredName: confirmFile.preferredName,
+            dateOfBirth: confirmFile.dateOfBirth,
+            ageLabel: confirmFile.ageLabel,
+            phone: confirmFile.phone,
+            email: confirmFile.email,
+            address: confirmFile.address,
+            comms: confirmFile.comms,
+            blocks: confirmFile.blocks,
+            emergencyContacts: confirmFile.emergencyContacts,
+            medicalContacts: confirmFile.medicalContacts,
+            claimTypeCodes: confirmFile.claimTypeCodes,
+          },
           expectedFieldKeys: Array.isArray(input.fieldKeys) ? input.fieldKeys : [],
           at: new Date().toISOString(),
         })

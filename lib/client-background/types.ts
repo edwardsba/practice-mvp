@@ -258,9 +258,9 @@ export const EDUCATION_LEVEL_OPTIONS = [
 ]
 export const CLIENT_RELATIONSHIP_STATUSES = [
   "single",
+  "dating",
   "in_relationship_not_living_together",
   "engaged",
-  "dating",
   "defacto",
   "married",
   "separated",
@@ -272,9 +272,9 @@ export type ClientRelationshipStatus = (typeof CLIENT_RELATIONSHIP_STATUSES)[num
 
 export const CLIENT_RELATIONSHIP_STATUS_LABELS: Record<ClientRelationshipStatus, string> = {
   single: "Single",
+  dating: "Dating",
   in_relationship_not_living_together: "In a relationship (not living together)",
   engaged: "Engaged",
-  dating: "Dating",
   defacto: "De facto",
   married: "Married",
   separated: "Separated",

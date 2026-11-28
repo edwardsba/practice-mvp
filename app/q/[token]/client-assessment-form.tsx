@@ -6,6 +6,7 @@ import { AssessmentFormCore } from "@/components/assessments/form/assessment-for
 import { SectionProgressChips } from "@/components/shared/section-progress-chips"
 import { SectionNumberBadge } from "@/components/shared/section-status-pill"
 import { Button } from "@/components/ui/button"
+import { applyClientVisitSectionStatuses } from "@/lib/assessments/client-section-status"
 import {
   clearAssessmentDraft,
   readAssessmentDraft,
@@ -20,11 +21,14 @@ import {
   type FormValidationError,
 } from "@/lib/assessments/form-rules"
 import { UNGROUPED_SECTION_KEY } from "@/lib/assessments/section-presentation"
-import { attentionSaveBannerClass, problemBorderClass } from "@/lib/ui/status-colours"
+import { problemBorderClass } from "@/lib/ui/status-colours"
 import { cn } from "@/lib/utils"
 
 const THANK_YOU =
   "Thank you. Your responses have been sent to your psychologist."
+
+const SAVE_ON_DEVICE_NOTE =
+  "Your answers are saved on this device until you send them."
 
 type SubmitResponse = {
   success?: boolean
@@ -64,8 +68,9 @@ export function ClientAssessmentForm({
   const [hydrated, setHydrated] = useState(false)
   const [dirty, setDirty] = useState(false)
   const [sectionIndex, setSectionIndex] = useState(0)
+  const [visitedSectionKeys, setVisitedSectionKeys] = useState<string[]>([])
 
-  const sections = useMemo(
+  const baseSections = useMemo(
     () => sectionStatuses(elements, answers, new Set()),
     [elements, answers]
   )
@@ -76,11 +81,37 @@ export function ClientAssessmentForm({
 
   const safeIndex = Math.min(
     Math.max(sectionIndex, 0),
-    Math.max(sections.length - 1, 0)
+    Math.max(baseSections.length - 1, 0)
+  )
+  const currentBase = baseSections[safeIndex] ?? null
+  const sections = useMemo(
+    () =>
+      applyClientVisitSectionStatuses(baseSections, {
+        currentGroupLabel: currentBase?.groupLabel ?? null,
+        visitedGroupLabels: new Set(visitedSectionKeys),
+      }),
+    [baseSections, currentBase?.groupLabel, visitedSectionKeys]
   )
   const currentSection = sections[safeIndex] ?? null
   const isFirst = safeIndex <= 0
   const isLast = safeIndex >= sections.length - 1
+
+  function persistDraft(
+    nextAnswers: FormAnswers,
+    nextVisited: string[] = visitedSectionKeys
+  ) {
+    writeAssessmentDraft({
+      clientId,
+      assessmentCode,
+      instanceId,
+      draft: {
+        answers: nextAnswers,
+        assessmentDate: "",
+        savedAt: new Date().toISOString(),
+        visitedSectionKeys: nextVisited,
+      },
+    })
+  }
 
   useEffect(() => {
     const draft = readAssessmentDraft({
@@ -93,22 +124,20 @@ export function ClientAssessmentForm({
       setAnswers(draft.answers)
       setDirty(true)
     }
+    if (Array.isArray(draft?.visitedSectionKeys)) {
+      setVisitedSectionKeys(
+        draft.visitedSectionKeys.filter((key) => typeof key === "string")
+      )
+    }
     setHydrated(true)
   }, [clientId, assessmentCode, instanceId])
 
   useEffect(() => {
     if (!hydrated || !dirty) return
-    writeAssessmentDraft({
-      clientId,
-      assessmentCode,
-      instanceId,
-      draft: {
-        answers,
-        assessmentDate: "",
-        savedAt: new Date().toISOString(),
-      },
-    })
-  }, [answers, hydrated, dirty, clientId, assessmentCode, instanceId])
+    persistDraft(answers, visitedSectionKeys)
+    // persistDraft closes over ids; answers/visited/dirty drive writes
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional draft sync
+  }, [answers, visitedSectionKeys, hydrated, dirty, clientId, assessmentCode, instanceId])
 
   function updateAnswers(next: FormAnswers) {
     setAnswers(next)
@@ -119,27 +148,30 @@ export function ClientAssessmentForm({
     }
   }
 
+  function markVisited(groupLabel: string | undefined) {
+    if (!groupLabel) return visitedSectionKeys
+    if (visitedSectionKeys.includes(groupLabel)) return visitedSectionKeys
+    const next = [...visitedSectionKeys, groupLabel]
+    setVisitedSectionKeys(next)
+    return next
+  }
+
   function goToSection(index: number) {
+    const leaving = baseSections[safeIndex]
+    const nextVisited = markVisited(leaving?.groupLabel)
     setBanner(null)
     setErrors([])
     setFinishLaterMessage(null)
     setSectionIndex(index)
+    setDirty(true)
+    persistDraft(answers, nextVisited)
     requestAnimationFrame(() => {
       window.scrollTo({ top: 0, behavior: "smooth" })
     })
   }
 
   function handleSaveAndFinishLater() {
-    writeAssessmentDraft({
-      clientId,
-      assessmentCode,
-      instanceId,
-      draft: {
-        answers,
-        assessmentDate: "",
-        savedAt: new Date().toISOString(),
-      },
-    })
+    persistDraft(answers, visitedSectionKeys)
     setDirty(true)
     setFinishLaterMessage(
       "Saved on this device. You can close this page and come back to the same link later."
@@ -215,7 +247,7 @@ export function ClientAssessmentForm({
   const ungrouped = currentSection?.groupLabel === UNGROUPED_SECTION_KEY
 
   return (
-    <div className="mx-auto w-full max-w-lg px-4 py-8 pb-28">
+    <div className="mx-auto w-full max-w-lg px-4 py-8">
       <header className="mb-6 space-y-2">
         <p className="text-sm text-muted-foreground">{practiceName}</p>
         <h1 className="text-2xl font-semibold tracking-tight">
@@ -224,6 +256,7 @@ export function ClientAssessmentForm({
         <p className="text-base leading-relaxed text-muted-foreground">
           {introText}
         </p>
+        <p className="text-sm text-muted-foreground">{SAVE_ON_DEVICE_NOTE}</p>
       </header>
 
       {showProgress && sections.length > 0 ? (
@@ -237,15 +270,8 @@ export function ClientAssessmentForm({
               if (index >= 0) goToSection(index)
             }}
           />
-          <p className={cn(attentionSaveBannerClass, "mt-2")}>
-            Answers are kept on this device until you send them.
-          </p>
         </div>
-      ) : (
-        <p className={cn(attentionSaveBannerClass, "mb-4")}>
-          Answers are kept on this device until you send them.
-        </p>
-      )}
+      ) : null}
 
       {currentSection ? (
         <section
@@ -260,7 +286,7 @@ export function ClientAssessmentForm({
               </h2>
             </div>
           )}
-          <div className={cn("px-4 py-4", ungrouped ? null : null)}>
+          <div className="px-4 py-4">
             {currentSection.status === "skipped" ? (
               <p className="text-sm text-muted-foreground">
                 Not asked, because of an earlier answer.
@@ -297,48 +323,46 @@ export function ClientAssessmentForm({
         </p>
       ) : null}
 
-      <div className="fixed inset-x-0 bottom-0 z-30 border-t bg-background/95 px-4 py-3 backdrop-blur">
-        <div className="mx-auto flex max-w-lg flex-col gap-2">
-          <div className="flex gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              className="min-h-11 flex-1"
-              disabled={loading || isFirst}
-              onClick={() => goToSection(safeIndex - 1)}
-            >
-              Back
-            </Button>
-            {isLast ? (
-              <Button
-                type="button"
-                className="min-h-11 flex-1"
-                disabled={loading}
-                onClick={() => void handleSend()}
-              >
-                {loading ? "Sending…" : "Send to my psychologist"}
-              </Button>
-            ) : (
-              <Button
-                type="button"
-                className="min-h-11 flex-1"
-                disabled={loading}
-                onClick={() => goToSection(safeIndex + 1)}
-              >
-                Next
-              </Button>
-            )}
-          </div>
+      <div className="mt-4 flex flex-col gap-2">
+        <div className="flex gap-2">
           <Button
             type="button"
-            variant="ghost"
-            className="min-h-11 w-full"
-            disabled={loading}
-            onClick={handleSaveAndFinishLater}
+            variant="outline"
+            className="min-h-11 flex-1"
+            disabled={loading || isFirst}
+            onClick={() => goToSection(safeIndex - 1)}
           >
-            Save and finish later
+            Back
           </Button>
+          {isLast ? (
+            <Button
+              type="button"
+              className="min-h-11 flex-1"
+              disabled={loading}
+              onClick={() => void handleSend()}
+            >
+              {loading ? "Sending…" : "Send to my psychologist"}
+            </Button>
+          ) : (
+            <Button
+              type="button"
+              className="min-h-11 flex-1"
+              disabled={loading}
+              onClick={() => goToSection(safeIndex + 1)}
+            >
+              Next
+            </Button>
+          )}
         </div>
+        <Button
+          type="button"
+          variant="ghost"
+          className="min-h-11 w-full"
+          disabled={loading}
+          onClick={handleSaveAndFinishLater}
+        >
+          Save and finish later
+        </Button>
       </div>
     </div>
   )

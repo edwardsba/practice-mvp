@@ -51,14 +51,17 @@ export function RadioOptionList({
             "flex min-h-11 cursor-pointer items-start gap-3 rounded-lg border px-3 py-3 transition-colors",
             value === option.value
               ? "border-primary bg-primary/5"
-              : "border-transparent hover:bg-muted/60"
+              : "border-input hover:bg-muted/60"
           )}
           onClick={() => {
             if (disabled) return
             onOptionActivate?.(option.value)
           }}
         >
-          <RadioGroupItem value={option.value} className="mt-0.5" />
+          <RadioGroupItem
+            value={option.value}
+            className="mt-0.5 border-muted-foreground"
+          />
           <span className="text-sm leading-snug">{option.label}</span>
         </label>
       ))}

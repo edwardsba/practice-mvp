@@ -17,6 +17,11 @@ import {
   markBatteryInProgress,
   validateBatteryNextToken,
 } from "@/lib/assessments/battery-chain"
+import {
+  LINK_ALREADY_USED_MESSAGE,
+  LinkAlreadyUsedError,
+  assertAccessLinkClaimed,
+} from "@/lib/assessments/claim-access-link"
 import { evaluateAndAppendTriggers } from "@/lib/assessments/evaluate-triggers"
 import { scoreAssessment } from "@/lib/assessments/scoring/score-assessment"
 import { hashAssessmentToken } from "@/lib/assessments/token"
@@ -343,6 +348,28 @@ export async function POST(request: Request) {
             )
           )
       } else {
+        // Claim the active link first so a double tap cannot insert two results.
+        const claimed = await tx
+          .update(assessmentAccessLinks)
+          .set({
+            accessStatus: "submitted",
+            submittedAt: now,
+            updatedAt: now,
+          })
+          .where(
+            and(
+              eq(
+                assessmentAccessLinks.assessmentAccessLinkId,
+                accessLink.assessmentAccessLinkId
+              ),
+              eq(assessmentAccessLinks.accessStatus, "active")
+            )
+          )
+          .returning({
+            assessmentAccessLinkId: assessmentAccessLinks.assessmentAccessLinkId,
+          })
+        assertAccessLinkClaimed(claimed)
+
         await tx.insert(assessmentResponses).values(
           responseRows.map((row) => ({
             assessmentInstanceId: instance.assessmentInstanceId,
@@ -365,20 +392,6 @@ export async function POST(request: Request) {
             eq(
               assessmentInstances.assessmentInstanceId,
               instance.assessmentInstanceId
-            )
-          )
-
-        await tx
-          .update(assessmentAccessLinks)
-          .set({
-            accessStatus: "submitted",
-            submittedAt: now,
-            updatedAt: now,
-          })
-          .where(
-            eq(
-              assessmentAccessLinks.assessmentAccessLinkId,
-              accessLink.assessmentAccessLinkId
             )
           )
 
@@ -453,7 +466,13 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json({ success: true })
-  } catch {
+  } catch (error) {
+    if (error instanceof LinkAlreadyUsedError) {
+      return NextResponse.json(
+        { error: LINK_ALREADY_USED_MESSAGE },
+        { status: 400 }
+      )
+    }
     return NextResponse.json(
       { error: "Unable to submit your responses. Please try again." },
       { status: 500 }

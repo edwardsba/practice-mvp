@@ -420,13 +420,25 @@ const DRAFTS: ElementDraft[] = [
     requiredGroupKey: null,
     helpText: null,
     listConfig: {
-      addButtonLabel: "+ Add a relationship",
-      fields: ["firstName", "fromYear", "toYear", "howEnded"],
+      addButtonLabel: "+ Add a past relationship",
+      fields: ["firstName", "relationship", "fromYear", "toYear", "howEnded"],
       labels: {
+        relationship: "What kind of relationship was it?",
         fromYear: "From (year)",
         toYear: "To (year)",
         howEnded: "How did it end?",
       },
+      relationshipChoices: [
+        { label: "Married", value: "married" },
+        { label: "De facto (lived together)", value: "defacto" },
+        { label: "Engaged", value: "engaged" },
+        {
+          label: "Together, not living together",
+          value: "in_relationship_not_living_together",
+        },
+        { label: "Dating", value: "dating" },
+        { label: "Other", value: "other" },
+      ],
       howEndedChoices: [
         { label: "Separated", value: "separated" },
         { label: "Divorced", value: "divorced" },

@@ -217,7 +217,7 @@ What clients see (assessment links and, later, the pre-session form) is calm, pl
 - **CP-4 Wording speaks to the client** ("you"), at a reading age of about 12.
 - **CP-5 After sending:** one thank-you screen; the link can't be used again.
 - **CP-6 Colours:** only grey, amber and green for progress, and red for errors. Purple is never shown to clients.
-- **CP-7 People and history entries** on client forms open in a sheet over a greyed page: full height on phones, a centred dialog on desktop. Done adds the entry; Cancel, × or tapping outside discards a new one. When it closes, the page centres the entry and the "+ Add another …" button.
+- **CP-7 People and history entries** on client forms open in a sheet over a greyed page: full height on phones, a centred dialog on desktop. Done adds the entry; Cancel, × or tapping outside discards a new one. When it closes, the page centres the entry and the "+ Add another …" button. On phones, Done and Cancel sit at the end of the sheet's content, never in a fixed footer, so the keyboard never covers them.
 
 ## 11. Assessments and results (AS)
 
@@ -437,6 +437,7 @@ One row per change to the guide, newest first. Retired rules are recorded here a
 
 | Date | Rules | Change | Agreed in |
 | --- | --- | --- | --- |
+| 28 Nov 2026 | CP-7 | Sheet buttons sit in the content on phones, not a fixed footer | Round AY.4 (phone testing) |
 | 28 Nov 2026 | CP-7, FM-1, FM-5 | Client-form people and history entries open in a sheet; Age and Passed away share a line; year they passed away added | Round AY.3 (phone testing) |
 | 28 Nov 2026 | NV-2, NV-7, NV-10, 13B | Linked Entity details allowed as parents; links into pages with no back arrow always allowed; Edit form parent when the record has no page; added NV-10 Create and return; 13B parents without a client | Round NV.1 |
 | 28 Nov 2026 | NV-1 to NV-9, PG-2 | Added section 13 Navigation: page types, default and allowed parents, one remembered parent per page, back labels, page registry and guard test, page map (13B); PG-2 now points to NV | Chat with Ben |

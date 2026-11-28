@@ -145,6 +145,65 @@ check(
   { name: "Jo", details: "until 2011" }
 )
 
+const pastRelationshipConfig: FormListConfig = {
+  addButtonLabel: "+ Add a past relationship",
+  fields: ["firstName", "relationship", "fromYear", "toYear", "howEnded"],
+  relationshipChoices: [
+    { label: "Married", value: "married" },
+    { label: "De facto (lived together)", value: "defacto" },
+    { label: "Engaged", value: "engaged" },
+    {
+      label: "Together, not living together",
+      value: "in_relationship_not_living_together",
+    },
+    { label: "Dating", value: "dating" },
+    { label: "Other", value: "other" },
+  ],
+  howEndedChoices: [
+    { label: "Separated", value: "separated" },
+    { label: "Divorced", value: "divorced" },
+    { label: "Partner passed away", value: "partner_passed_away" },
+    { label: "Other", value: "other" },
+  ],
+}
+
+check(
+  "past relationship collapsed line includes type, years, how ended",
+  formatPersonListEntryLine(
+    {
+      firstName: "Sam",
+      relationship: "married",
+      fromYear: 2010,
+      toYear: 2018,
+      howEnded: "divorced",
+    },
+    pastRelationshipConfig,
+    "client"
+  ),
+  { name: "Sam", details: "Married · 2010–2018 · Divorced" }
+)
+
+check(
+  "past relationship parse keeps relationship type",
+  parsePersonListEntry(
+    JSON.stringify({
+      firstName: "Sam",
+      relationship: "defacto",
+      fromYear: 2010,
+      toYear: 2018,
+      howEnded: "separated",
+    }),
+    pastRelationshipConfig
+  ),
+  {
+    firstName: "Sam",
+    relationship: "defacto",
+    fromYear: 2010,
+    toYear: 2018,
+    howEnded: "separated",
+  }
+)
+
 check(
   "default livesWith label is Lives with you?",
   DEFAULT_LIST_FIELD_LABELS.livesWith,

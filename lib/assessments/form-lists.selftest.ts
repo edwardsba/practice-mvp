@@ -152,20 +152,23 @@ check(
 )
 
 check(
-  "setPersonPassedAway ticks and clears age",
+  "setPersonPassedAway ticks and keeps age",
   setPersonPassedAway({ firstName: "Pat", age: 72, relationship: "mother" }, true),
-  { firstName: "Pat", relationship: "mother", passedAway: true }
+  { firstName: "Pat", age: 72, relationship: "mother", passedAway: true }
 )
 
 check(
-  "setPersonPassedAway unticks and leaves age absent",
-  setPersonPassedAway({ firstName: "Pat", passedAway: true }, false),
-  { firstName: "Pat" }
+  "setPersonPassedAway unticks and clears deathYear",
+  setPersonPassedAway(
+    { firstName: "Pat", age: 72, passedAway: true, deathYear: 2012 },
+    false
+  ),
+  { firstName: "Pat", age: 72 }
 )
 
 const passedAwayConfig: FormListConfig = {
   addButtonLabel: "+ Add a parent",
-  fields: ["firstName", "age", "passedAway", "relationship"],
+  fields: ["firstName", "age", "passedAway", "deathYear", "relationship"],
   relationshipChoices: [
     { label: "Mother", value: "mother" },
     { label: "Father", value: "father" },
@@ -173,22 +176,71 @@ const passedAwayConfig: FormListConfig = {
 }
 
 check(
-  "person parse drops age when passedAway is true",
+  "person parse keeps age when passedAway is true",
   parsePersonListEntry(
-    JSON.stringify({ firstName: "Pat", age: 72, passedAway: true, relationship: "mother" }),
+    JSON.stringify({
+      firstName: "Pat",
+      age: 72,
+      passedAway: true,
+      deathYear: 2012,
+      relationship: "mother",
+    }),
+    passedAwayConfig
+  ),
+  { firstName: "Pat", age: 72, relationship: "mother", passedAway: true, deathYear: 2012 }
+)
+
+check(
+  "person parse keeps deathYear only with passedAway",
+  parsePersonListEntry(
+    JSON.stringify({ firstName: "Pat", deathYear: 2012, relationship: "mother" }),
+    passedAwayConfig
+  ),
+  { firstName: "Pat", relationship: "mother" }
+)
+
+check(
+  "person parse drops out-of-range deathYear",
+  parsePersonListEntry(
+    JSON.stringify({
+      firstName: "Pat",
+      passedAway: true,
+      deathYear: 1800,
+      relationship: "mother",
+    }),
     passedAwayConfig
   ),
   { firstName: "Pat", relationship: "mother", passedAway: true }
 )
 
 check(
-  "person collapsed line shows passed away instead of age",
+  "person collapsed line: passed away with year and age",
+  formatPersonListEntryLine(
+    { firstName: "Sarah", age: 58, passedAway: true, deathYear: 2012, relationship: "mother" },
+    passedAwayConfig,
+    "readonly"
+  ),
+  { name: "Sarah", details: "Mother · passed away in 2012 aged 58" }
+)
+
+check(
+  "person collapsed line: passed away aged only",
   formatPersonListEntryLine(
     { firstName: "Pat", age: 72, passedAway: true, relationship: "mother" },
     passedAwayConfig,
     "readonly"
   ),
-  { name: "Pat", details: "passed away · Mother" }
+  { name: "Pat", details: "Mother · passed away aged 72" }
+)
+
+check(
+  "person collapsed line: passed away in year only",
+  formatPersonListEntryLine(
+    { firstName: "Pat", passedAway: true, deathYear: 2012, relationship: "mother" },
+    passedAwayConfig,
+    "readonly"
+  ),
+  { name: "Pat", details: "Mother · passed away in 2012" }
 )
 
 check(

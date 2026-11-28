@@ -877,4 +877,117 @@ check("element count is 98", LRAMP_ELEMENTS.length, 98)
   )
 }
 
+// ---------------------------------------------------------------------------
+// List show_when: any / none on person_list entries
+// ---------------------------------------------------------------------------
+
+const parentsList: FormElement = {
+  elementKey: "parents",
+  elementType: "person_list",
+  questionText: "Parents",
+  groupLabel: null,
+  subgroupLabel: null,
+  displayOrder: 1,
+  isRequired: false,
+  parentElementKey: null,
+  showWhen: null,
+  requiredGroupKey: null,
+  helpText: null,
+  options: [],
+  listConfig: {
+    addButtonLabel: "+ Add a parent",
+    fields: ["firstName", "passedAway"],
+  },
+}
+
+const whenNonePassedAway: FormElement = {
+  elementKey: "parents_together",
+  elementType: "radio",
+  questionText: "Are your parents together?",
+  groupLabel: null,
+  subgroupLabel: null,
+  displayOrder: 2,
+  isRequired: false,
+  parentElementKey: null,
+  showWhen: { key: "parents", list: { none: { passedAway: true } } },
+  requiredGroupKey: null,
+  helpText: null,
+  options: [
+    { label: "Yes", value: "yes_still_together", displayOrder: 1, scoreValue: 0 },
+  ],
+}
+
+const whenAnyPassedAway: FormElement = {
+  elementKey: "bsr_parents_were_together",
+  elementType: "radio",
+  questionText: "Were your parents together?",
+  groupLabel: null,
+  subgroupLabel: null,
+  displayOrder: 3,
+  isRequired: false,
+  parentElementKey: null,
+  showWhen: { key: "parents", list: { any: { passedAway: true } } },
+  requiredGroupKey: null,
+  helpText: null,
+  options: [
+    {
+      label: "Together until one passed away",
+      value: "together_until_passed_away",
+      displayOrder: 1,
+      scoreValue: 0,
+    },
+  ],
+}
+
+const livingParent = JSON.stringify({ firstName: "Pat", relationship: "mother" })
+const deceasedParent = JSON.stringify({
+  firstName: "Sam",
+  relationship: "father",
+  passedAway: true,
+})
+
+check(
+  "list none: visible when no parent passedAway",
+  [...visibleElementKeys(
+    [parentsList, whenNonePassedAway, whenAnyPassedAway],
+    { parents: [livingParent] }
+  )].sort(),
+  ["parents", "parents_together"]
+)
+
+check(
+  "list any: visible when a parent passedAway",
+  [...visibleElementKeys(
+    [parentsList, whenNonePassedAway, whenAnyPassedAway],
+    { parents: [livingParent, deceasedParent] }
+  )].sort(),
+  ["bsr_parents_were_together", "parents"]
+)
+
+check(
+  "list none: empty parents list shows parents_together",
+  [...visibleElementKeys(
+    [parentsList, whenNonePassedAway, whenAnyPassedAway],
+    { parents: [] }
+  )].sort(),
+  ["parents", "parents_together"]
+)
+
+check(
+  "list show_when: hidden answers cleaned",
+  cleanAnswers(
+    [parentsList, whenNonePassedAway, whenAnyPassedAway],
+    {
+      parents: [deceasedParent],
+      parents_together: ["yes_still_together"],
+      bsr_parents_were_together: ["together_until_passed_away"],
+    }
+  ),
+  {
+    // relationship dropped: listConfig fields are only firstName + passedAway
+    parents: [JSON.stringify({ firstName: "Sam", passedAway: true })],
+    bsr_parents_were_together: ["together_until_passed_away"],
+  }
+)
+
 console.log("All form-rules self-tests passed.")

@@ -52,8 +52,31 @@ function parseShowWhen(value: unknown): FormShowWhen | null {
   if (!value || typeof value !== "object") return null
   const record = value as Record<string, unknown>
   const key = record.key
+  if (typeof key !== "string" || !key.trim()) return null
+
+  const listRaw = record.list
+  if (listRaw && typeof listRaw === "object" && !Array.isArray(listRaw)) {
+    const listRecord = listRaw as Record<string, unknown>
+    const list: NonNullable<FormShowWhen["list"]> = {}
+    if (
+      listRecord.any &&
+      typeof listRecord.any === "object" &&
+      !Array.isArray(listRecord.any)
+    ) {
+      list.any = listRecord.any as Record<string, unknown>
+    }
+    if (
+      listRecord.none &&
+      typeof listRecord.none === "object" &&
+      !Array.isArray(listRecord.none)
+    ) {
+      list.none = listRecord.none as Record<string, unknown>
+    }
+    if (list.any || list.none) return { key, list }
+  }
+
   const values = record.in
-  if (typeof key !== "string" || !Array.isArray(values)) return null
+  if (!Array.isArray(values)) return null
   if (!values.every((item) => typeof item === "string")) return null
   return { key, in: values as string[] }
 }

@@ -29,9 +29,9 @@ export type LivesWithSelfReportValue = (typeof LIVES_WITH_SELF_REPORT_VALUES)[nu
 
 export const PARENTS_TOGETHER_VALUES = [
   "yes_still_together",
+  "together_until_passed_away",
   "separated_or_divorced",
   "never_together",
-  "one_or_both_passed_away",
   "not_sure",
 ] as const
 export type ParentsTogetherValue = (typeof PARENTS_TOGETHER_VALUES)[number]

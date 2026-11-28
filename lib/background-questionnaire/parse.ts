@@ -368,13 +368,19 @@ export function parseBackgroundSelfReport(
   )
 
   report.parents = parsePersonList(valuesForKey(list, "parents"), "parents", droppedValues)
-  const parentsTogetherRaw = firstOrNull(valuesForKey(list, "parents_together"))
+  const parentsTogetherFromCurrent = firstOrNull(valuesForKey(list, "parents_together"))
+  const parentsTogetherFromWere = firstOrNull(
+    valuesForKey(list, "bsr_parents_were_together")
+  )
+  const parentsTogetherRaw = parentsTogetherFromCurrent ?? parentsTogetherFromWere
   if (parentsTogetherRaw != null) {
     report.parentsTogether = parseSingleChoice(
       parentsTogetherRaw,
       PARENTS_TOGETHER_VALUES as readonly ParentsTogetherValue[],
       droppedValues,
-      "parents_together"
+      parentsTogetherFromCurrent != null
+        ? "parents_together"
+        : "bsr_parents_were_together"
     )
   }
   report.siblings = parsePersonList(valuesForKey(list, "siblings"), "siblings", droppedValues)

@@ -41,9 +41,10 @@ export const assessmentDefinitions = pgTable('assessment_definitions', {
  *
  * parent_element_key: the element this one sits under, for indenting and
  * visibility. Null = top level.
- * show_when_json: when this element is shown. Shape:
- *   {"key": "<element_key>", "in": ["<value>", ...]}. Null = always shown
- *   (subject to its parent).
+ * show_when_json: when this element is shown. Shapes:
+ *   {"key": "<element_key>", "in": ["<value>", ...]}
+ *   {"key": "<person_list_key>", "list": {"any"|"none": {"passedAway": true}}}
+ *   Null = always shown (subject to its parent).
  * required_group_key: elements with the same key form an "at least one" group.
  * help_text: optional short guidance under a question.
  * allow_in_person: on yes_no / radio, append "I'd rather talk about it in person".
@@ -65,7 +66,11 @@ export const assessmentElements = pgTable('assessment_elements', {
   domainCode: text('domain_code'), // e.g. 'depression', 'anxiety', 'psychosis' — used by battery_trigger_rules to evaluate Level 1 XC domain flags. Null for non-diagnostic-battery assessments.
   isUrgentFlag: boolean('is_urgent_flag').notNull().default(false), // true only for the SI item (Level 1 XC #11) — drives the highlighted row in the Diagnostic Assessment Report
   parentElementKey: text('parent_element_key'),
-  showWhenJson: jsonb('show_when_json').$type<{ key: string; in: string[] } | null>(),
+  showWhenJson: jsonb('show_when_json').$type<{
+    key: string
+    in?: string[]
+    list?: { any?: Record<string, unknown>; none?: Record<string, unknown> }
+  } | null>(),
   requiredGroupKey: text('required_group_key'),
   helpText: text('help_text'),
   allowInPerson: boolean('allow_in_person').notNull().default(false),

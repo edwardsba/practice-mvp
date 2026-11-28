@@ -42,6 +42,14 @@ function show(key: string, ...values: string[]) {
   return { key, in: values }
 }
 
+function showListAny(key: string, match: Record<string, unknown>) {
+  return { key, list: { any: match } }
+}
+
+function showListNone(key: string, match: Record<string, unknown>) {
+  return { key, list: { none: match } }
+}
+
 const EDUCATION_WITH_FIELD = [
   "Trade apprenticeship",
   "Certificate / diploma",
@@ -442,7 +450,7 @@ const DRAFTS: ElementDraft[] = [
     helpText: null,
     listConfig: {
       addButtonLabel: "+ Add a parent or carer",
-      fields: ["firstName", "age", "relationship", "passedAway"],
+      fields: ["firstName", "age", "passedAway", "deathYear", "relationship"],
       labels: { relationship: "Who are they to you?" },
       relationshipChoices: [
         { label: "Mother", value: "mother" },
@@ -459,14 +467,34 @@ const DRAFTS: ElementDraft[] = [
     subgroupLabel: null,
     isRequired: false,
     parentElementKey: null,
-    showWhen: null,
+    showWhen: showListNone("parents", { passedAway: true }),
     requiredGroupKey: null,
     helpText: null,
     options: opts([
       { label: "Yes, still together", value: "yes_still_together" },
       { label: "Separated or divorced", value: "separated_or_divorced" },
       { label: "Never together", value: "never_together" },
-      { label: "One or both have passed away", value: "one_or_both_passed_away" },
+      { label: "Not sure", value: "not_sure" },
+    ]),
+  },
+  {
+    elementKey: "bsr_parents_were_together",
+    elementType: "radio",
+    questionText: "Were your parents together?",
+    groupLabel: "The family you grew up with",
+    subgroupLabel: null,
+    isRequired: false,
+    parentElementKey: null,
+    showWhen: showListAny("parents", { passedAway: true }),
+    requiredGroupKey: null,
+    helpText: null,
+    options: opts([
+      {
+        label: "Together until one passed away",
+        value: "together_until_passed_away",
+      },
+      { label: "Separated or divorced", value: "separated_or_divorced" },
+      { label: "Never together", value: "never_together" },
       { label: "Not sure", value: "not_sure" },
     ]),
   },
@@ -483,7 +511,7 @@ const DRAFTS: ElementDraft[] = [
     helpText: null,
     listConfig: {
       addButtonLabel: "+ Add a brother or sister",
-      fields: ["firstName", "age", "relationship"],
+      fields: ["firstName", "age", "passedAway", "deathYear", "relationship"],
       labels: { relationship: "Brother or sister?" },
       relationshipChoices: [
         { label: "Brother", value: "brother" },

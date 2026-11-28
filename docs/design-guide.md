@@ -106,7 +106,7 @@ There are two kinds of form, each with one shared look: assessment forms (the sh
 | `checkbox`, `tick` | The same rows, with square ticks |
 | `short_text`, `long_text`, `date` | Full-width boxes, 44 px tall (long text taller) |
 | `text_list` | Growing boxes; an empty one always trails |
-| `person_list`, `history_list` | Saved entries collapse to one line with Edit; the open entry shows its fields one per line, with Remove and Done; a dashed "+ Add …" below; field wording set by the form |
+| `person_list`, `history_list` | Saved entries collapse to one line with Edit; the open entry shows its fields one per line, with Remove and Done; a dashed "+ Add …" below; field wording set by the form; on client forms the entry opens in a sheet (CP-7) |
 | In-person option | "I'd rather talk about it in person", always the last row, when switched on |
 
 - **FM-2 Follow-up questions** sit under their answer, indented, with a 2 px grey line.
@@ -115,7 +115,7 @@ There are two kinds of form, each with one shared look: assessment forms (the sh
 
 ### 4B. Record forms (people, events, contacts, claims) open in the side panel
 
-- **FM-5 One field per line**, full width, grouped exactly as on the info page.
+- **FM-5 One field per line**, full width, grouped exactly as on the info page. Exception: Age and its Passed away tick share one line; the year they passed away sits on the next line.
 - **FM-6 Choices:** four or fewer are tap buttons (`ChoiceButtons`); more are a dropdown.
 - **FM-7 Dates** use Year / Month / Day on one line (`PartialDatePicker`), the only side-by-side exception.
 - **FM-8 Manual save.** Nothing saves until Save is pressed. No autosave, no background updates.
@@ -217,6 +217,7 @@ What clients see (assessment links and, later, the pre-session form) is calm, pl
 - **CP-4 Wording speaks to the client** ("you"), at a reading age of about 12.
 - **CP-5 After sending:** one thank-you screen; the link can't be used again.
 - **CP-6 Colours:** only grey, amber and green for progress, and red for errors. Purple is never shown to clients.
+- **CP-7 People and history entries** on client forms open in a sheet over a greyed page: full height on phones, a centred dialog on desktop. Done adds the entry; Cancel, × or tapping outside discards a new one. When it closes, the page centres the entry and the "+ Add another …" button.
 
 ## 11. Assessments and results (AS)
 
@@ -436,6 +437,7 @@ One row per change to the guide, newest first. Retired rules are recorded here a
 
 | Date | Rules | Change | Agreed in |
 | --- | --- | --- | --- |
+| 28 Nov 2026 | CP-7, FM-1, FM-5 | Client-form people and history entries open in a sheet; Age and Passed away share a line; year they passed away added | Round AY.3 (phone testing) |
 | 28 Nov 2026 | NV-2, NV-7, NV-10, 13B | Linked Entity details allowed as parents; links into pages with no back arrow always allowed; Edit form parent when the record has no page; added NV-10 Create and return; 13B parents without a client | Round NV.1 |
 | 28 Nov 2026 | NV-1 to NV-9, PG-2 | Added section 13 Navigation: page types, default and allowed parents, one remembered parent per page, back labels, page registry and guard test, page map (13B); PG-2 now points to NV | Chat with Ben |
 | 28 Nov 2026 | PH-5, FM-1 | Client-form footer not fixed; radio rows always outlined | Round AY.2 (phone testing) |

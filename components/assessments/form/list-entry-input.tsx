@@ -15,7 +15,6 @@ import { Input } from "@/components/ui/input"
 import {
   Sheet,
   SheetContent,
-  SheetFooter,
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet"
@@ -562,7 +561,8 @@ export function ListEntryInput({
     return mode === "person" ? renderPersonFields() : renderHistoryFields()
   }
 
-  function sheetFooter() {
+  /** Desktop dialog footer: Remove · Cancel · Done (BT-3). */
+  function dialogFooter() {
     return (
       <>
         {isEditingExisting && !disabled ? (
@@ -589,6 +589,40 @@ export function ListEntryInput({
           </Button>
         ) : null}
       </>
+    )
+  }
+
+  /**
+   * Phone sheet actions live in the scrolling content (CP-7, PH-5): Done full
+   * width first, Cancel under it — never fixed/sticky at the bottom.
+   */
+  function phoneSheetActions() {
+    return (
+      <div className="space-y-2 pt-2">
+        {!disabled ? (
+          <Button type="button" className="min-h-11 w-full" onClick={commitOpen}>
+            Done
+          </Button>
+        ) : null}
+        <Button
+          type="button"
+          variant="outline"
+          className="min-h-11 w-full"
+          onClick={discardOpen}
+        >
+          Cancel
+        </Button>
+        {isEditingExisting && !disabled ? (
+          <Button
+            type="button"
+            variant="destructive"
+            className="min-h-11 w-full"
+            onClick={removeOpen}
+          >
+            Remove
+          </Button>
+        ) : null}
+      </div>
     )
   }
 
@@ -652,7 +686,7 @@ export function ListEntryInput({
             </DialogHeader>
             <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">{editorBody()}</div>
             <DialogFooter className="shrink-0 flex-row flex-wrap items-center gap-2 border-t px-4 py-3 sm:justify-end">
-              {sheetFooter()}
+              {dialogFooter()}
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -673,10 +707,12 @@ export function ListEntryInput({
             <SheetHeader className="shrink-0 border-b px-4 py-3 pr-12 text-left">
               <SheetTitle>{sheetTitle}</SheetTitle>
             </SheetHeader>
-            <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">{editorBody()}</div>
-            <SheetFooter className="shrink-0 flex-row flex-wrap items-center gap-2 border-t">
-              {sheetFooter()}
-            </SheetFooter>
+            <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+              <div className="space-y-3">
+                {editorBody()}
+                {phoneSheetActions()}
+              </div>
+            </div>
           </SheetContent>
         </Sheet>
       ) : null}

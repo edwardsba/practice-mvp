@@ -25,6 +25,7 @@ const partner = serializePersonListEntry({ firstName: "Alex", fromYear: 2018 })
 const child = serializePersonListEntry({ firstName: "Sam", age: 7, livesWith: "yes" })
 const prev = serializePersonListEntry({
   firstName: "Jo",
+  relationship: "married",
   fromYear: 2005,
   toYear: 2011,
   howEnded: "divorced",
@@ -152,7 +153,15 @@ check("relationships", [
   "married",
   [{ firstName: "Alex", fromYear: 2018 }],
   [{ firstName: "Sam", age: 7, livesWith: "yes" }],
-  [{ firstName: "Jo", fromYear: 2005, toYear: 2011, howEnded: "divorced" }],
+  [
+    {
+      firstName: "Jo",
+      relationship: "married",
+      fromYear: 2005,
+      toYear: 2011,
+      howEnded: "divorced",
+    },
+  ],
 ])
 check("family of origin", [
   parsed.report.parents,

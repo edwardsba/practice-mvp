@@ -3,7 +3,7 @@ description: Page types and the back arrow. Applies to every page you create, mo
 alwaysApply: true
 ---
 
-Every page in `app/**/page.tsx` follows design guide section 13 (NV). Before you create, move or change a page, or add a link between pages, read NV-1 to NV-9 and the page map (13B).
+Every page in `app/**/page.tsx` follows design guide section 13 (NV). Before you create, move or change a page, or add a link between pages, read NV-1 to NV-10 and the page map (13B).
 
 Every time, without being asked:
 1. Pick the page's type from NV-1. If none fits, stop and ask Ben. Never invent a type.

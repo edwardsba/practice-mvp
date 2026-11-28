@@ -184,7 +184,13 @@ export function resolveRememberedParentOnMount(
     menuEntity: page.menuEntity ?? destEntry.menuEntity,
   })
 
+  // Entity→entity skips the family rule (NV-2 / NV.1): a professional and a
+  // client are different families, but linked entity details may still parent.
+  const entityToEntity =
+    page.type === "entity" && opener.type === "entity"
+
   const sameFamily =
+    entityToEntity ||
     familiesMatch(page.family, opener.family) ||
     opener.type === "home" ||
     opener.type === "main-list"

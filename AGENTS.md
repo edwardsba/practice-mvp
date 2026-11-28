@@ -17,7 +17,7 @@ Notable Next 16 conventions already used here:
 
 > **Design guide first.** Before any UI work, read [`docs/design-guide.md`](./docs/design-guide.md), the single source of truth for how the app looks and behaves. It wins over anything in this file that disagrees. Cite its rule IDs (e.g. FM-3).
 
-> **Pages and the back arrow.** Every page has a type and a registry entry (design guide section 13, NV-1 to NV-9). Read NV before adding, moving or linking pages. The guard test `lib/navigation/page-registry-guard.selftest.ts` must pass.
+> **Pages and the back arrow.** Every page has a type and a registry entry (design guide section 13, NV-1 to NV-10). Read NV before adding, moving or linking pages. The guard test `lib/navigation/page-registry-guard.selftest.ts` must pass.
 
 Australian mental-health **clinical practice management** app for practitioners: clients,
 appointments, psychometric assessments, session notes, treatment/crisis plans, reports,
@@ -212,7 +212,7 @@ Do not add a second tree look, a second ⊕ control, a second side-panel shell, 
 
 ### Navigation: one back arrow
 
-Rules: design guide section 13 (NV-1 to NV-9); this section is the code map.
+Rules: design guide section 13 (NV-1 to NV-10); this section is the code map.
 
 | Piece | Where |
 |-------|--------|

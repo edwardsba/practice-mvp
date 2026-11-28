@@ -3,6 +3,12 @@
 import Link from "next/link"
 import { useActionState, useCallback, useEffect, useRef, useState, useTransition } from "react"
 
+import type {
+  PageNavData,
+  PageRegistryKey,
+} from "@/lib/navigation/page-registry"
+import { useBackTarget } from "@/lib/navigation/use-back-target"
+
 import {
   fetchReportResultsForAppointments,
   fetchReportResultsForRange,
@@ -95,6 +101,8 @@ export function ReportForm({
   assistEnabled = false,
   suicideAttempts = [],
   crisisPlanDate = null,
+  navPage,
+  navData,
   cancelHref,
   backgroundCheckInput = null,
   showBackgroundNotice = true,
@@ -141,12 +149,17 @@ export function ReportForm({
   assistEnabled?: boolean
   suicideAttempts?: ReportSnapshot["suicideAttempts"]
   crisisPlanDate?: string | null
+  /** Registry page for Cancel = Back (NV-4). */
+  navPage: PageRegistryKey
+  navData?: PageNavData
   cancelHref: string
   /** Current Client Background. Checks use this; omissions stay the stored list. */
   backgroundCheckInput?: BackgroundCheckInput | null
   /** Draft background reports only. A finalised report keeps this off. */
   showBackgroundNotice?: boolean
 }) {
+  const backTarget = useBackTarget(navPage, navData ?? { clientId })
+  const resolvedCancelHref = backTarget?.href ?? cancelHref
   const validInitialApprovalId =
     initialFundingApprovalId &&
     fundingApprovals.some(
@@ -1059,7 +1072,7 @@ export function ReportForm({
 
           <div className="no-print flex flex-wrap gap-3">
             <Button type="button" variant="outline" asChild>
-              <Link href={cancelHref}>Cancel</Link>
+              <Link href={resolvedCancelHref}>Cancel</Link>
             </Button>
             <Button
               type="submit"
@@ -1098,7 +1111,7 @@ export function ReportForm({
 
           <div className="no-print flex flex-wrap gap-3">
             <Button type="button" variant="outline" asChild>
-              <Link href={cancelHref}>Cancel</Link>
+              <Link href={resolvedCancelHref}>Cancel</Link>
             </Button>
             <Button
               type="submit"
@@ -1167,7 +1180,7 @@ export function ReportForm({
 
           <div className="no-print flex flex-wrap gap-3">
             <Button type="button" variant="outline" asChild>
-              <Link href={cancelHref}>Cancel</Link>
+              <Link href={resolvedCancelHref}>Cancel</Link>
             </Button>
             <Button
               type="submit"

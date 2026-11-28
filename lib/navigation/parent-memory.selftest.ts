@@ -297,4 +297,169 @@ function entryMount(
   assert.equal(recordBack?.href, "/calendar")
 }
 
+// 8. Professional → its Organisation → Back returns to the professional (NV-2 entity→entity).
+{
+  const store = createMemoryStore()
+  const proHref = "/contacts/professionals/pro-1"
+  const orgHref = "/contacts/organisations/org-1"
+  mount(
+    store,
+    entryMount(store, "/contacts/professionals", "/contacts/professionals", {})
+  )
+  mount(
+    store,
+    entryMount(
+      store,
+      "/contacts/professionals/[professional_id]",
+      proHref,
+      { professionalId: "pro-1", professionalName: "Dr Referrer" }
+    )
+  )
+  mount(
+    store,
+    entryMount(
+      store,
+      "/contacts/organisations/[organisation_id]",
+      orgHref,
+      { organisationId: "org-1", organisationName: "Woollahra Medical" }
+    )
+  )
+  const back = resolveBackTarget(store, orgHref, {
+    href: "/contacts/organisations",
+    label: "← Back to organisations",
+  })
+  assert.equal(back?.href, proHref)
+  assert.match(back?.label ?? "", /Dr Referrer/)
+}
+
+// 9. Organisation → one of its Professionals → Back returns to the organisation.
+{
+  const store = createMemoryStore()
+  const orgHref = "/contacts/organisations/org-2"
+  const proHref = "/contacts/professionals/pro-2"
+  mount(
+    store,
+    entryMount(store, "/contacts/organisations", "/contacts/organisations", {})
+  )
+  mount(
+    store,
+    entryMount(
+      store,
+      "/contacts/organisations/[organisation_id]",
+      orgHref,
+      { organisationId: "org-2", organisationName: "Sample Clinic" }
+    )
+  )
+  mount(
+    store,
+    entryMount(
+      store,
+      "/contacts/professionals/[professional_id]",
+      proHref,
+      { professionalId: "pro-2", professionalName: "Dr Member" }
+    )
+  )
+  const back = resolveBackTarget(store, proHref, {
+    href: "/contacts/professionals",
+    label: "← Back to professionals",
+  })
+  assert.equal(back?.href, orgHref)
+  assert.match(back?.label ?? "", /Sample Clinic/)
+}
+
+// 10. Professional → a Client they referred → Back returns to the professional (cross-family).
+{
+  const store = createMemoryStore()
+  const proHref = "/contacts/professionals/pro-3"
+  const clientHref = `/clients/${CLIENT_A}`
+  mount(
+    store,
+    entryMount(store, "/contacts/professionals", "/contacts/professionals", {})
+  )
+  mount(
+    store,
+    entryMount(
+      store,
+      "/contacts/professionals/[professional_id]",
+      proHref,
+      { professionalId: "pro-3", professionalName: "Dr GP" }
+    )
+  )
+  mount(
+    store,
+    entryMount(store, "/clients/[client_id]", clientHref, {
+      clientId: CLIENT_A,
+      clientName: "Ada Client",
+    })
+  )
+  const back = resolveBackTarget(store, clientHref, {
+    href: "/clients",
+    label: "← Back to clients",
+  })
+  assert.equal(back?.href, proHref)
+  assert.match(back?.label ?? "", /Dr GP/)
+}
+
+// 11. NV-10 Create and return: Edit professional → New organisation → Save →
+// Edit professional → Save → professional → Back still goes to Professionals.
+{
+  const store = createMemoryStore()
+  const proHref = "/contacts/professionals/pro-handoff"
+  const editHref = "/contacts/professionals/pro-handoff/edit"
+  const newOrgHref = "/contacts/organisations/new?returnTo=" + encodeURIComponent(editHref)
+
+  mount(
+    store,
+    entryMount(store, "/contacts/professionals", "/contacts/professionals", {})
+  )
+  mount(
+    store,
+    entryMount(
+      store,
+      "/contacts/professionals/[professional_id]",
+      proHref,
+      { professionalId: "pro-handoff", professionalName: "Dr Handoff" }
+    )
+  )
+  mount(
+    store,
+    entryMount(
+      store,
+      "/contacts/professionals/[professional_id]/edit",
+      editHref,
+      { professionalId: "pro-handoff", professionalName: "Dr Handoff" }
+    )
+  )
+  // Handoff form (NV-10): parent memory ignores the form opener.
+  mount(
+    store,
+    entryMount(store, "/contacts/organisations/new", newOrgHref, {})
+  )
+  // Save → back to Edit professional via safeReturnTo (not via Back).
+  mount(
+    store,
+    entryMount(
+      store,
+      "/contacts/professionals/[professional_id]/edit",
+      editHref,
+      { professionalId: "pro-handoff", professionalName: "Dr Handoff" }
+    )
+  )
+  // Save → the professional.
+  mount(
+    store,
+    entryMount(
+      store,
+      "/contacts/professionals/[professional_id]",
+      proHref,
+      { professionalId: "pro-handoff", professionalName: "Dr Handoff" }
+    )
+  )
+  const back = resolveBackTarget(store, proHref, {
+    href: "/contacts/professionals",
+    label: "← Back to professionals",
+  })
+  assert.equal(back?.href, "/contacts/professionals")
+}
+
 console.log("parent-memory.selftest.ts: ok")

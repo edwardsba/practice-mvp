@@ -270,11 +270,11 @@ Practice details and Practitioner profile are entity pages opened straight from 
 | Type | Default parent | Also allowed |
 | --- | --- | --- |
 | Main list | — | — |
-| Entity details | Its Main list | Home, Calendar, any Record details that links to it |
+| Entity details | Its Main list | Home, Calendar, any Record details that links to it, any Entity details that links to it (e.g. a professional's organisation, the professional who referred a client) |
 | Sub-list | Its Entity details | — |
 | Section page | The Entity details or Sub-list it belongs to | Record details for the same client |
 | Record details | Its Sub-list | Entity details, Section page and Record details for the same client; the matching Main list; Calendar; Home |
-| Record form (Edit) | The record it edits | — |
+| Record form (Edit) | The record it edits, or its Entity details when the record has no page of its own (e.g. an emergency contact) | — |
 | Record form (New) | The list it adds to | Any page allowed as a parent of the record it creates |
 | Guided form | Its Section page or Sub-list | Record details for the same client |
 
@@ -307,7 +307,7 @@ Record forms and Guided forms are never a parent. Section 13B lists every page w
   - Sentence case, Australian spelling (TX-5). Names longer than 32 characters are cut with "…".
   - While the page loads, show the default parent's label, never a blank or disabled button.
 - **NV-6 Look and place.** The back arrow is the shared `BackButton`, a ghost button above the header, on the left (PG-2, BT-1). Side panels have × instead (PN-2).
-- **NV-7 Links between pages.** A page may link to another page only if the destination allows the linking page's type as a parent (NV-2). A link that breaks this is a gap: raise it with Ben to add the type to NV-2, or remove the link.
+- **NV-7 Links between pages.** A page may link to another page only if the destination allows the linking page's type as a parent (NV-2). A link that breaks this is a gap: raise it with Ben to add the type to NV-2, or remove the link. Links into a page with no back arrow (Home, Main lists, Practice details, Practitioner profile) are always allowed.
 - **NV-8 Every page is registered.** Every `app/**/page.tsx` has one entry in the page registry, `lib/navigation/page-registry.ts`, giving its route, type, how to find its default parent from its data, and its label. The guard test `lib/navigation/page-registry-guard.selftest.ts` fails when a page has no entry, or when an entry's default parent breaks NV-2. Pages never pass their own back address or label.
 - **NV-9 Building or changing a page.** Cursor follows these steps every time:
   1. Pick the page's type from NV-1. If none fits, stop and ask Ben.
@@ -317,6 +317,7 @@ Record forms and Guided forms are never a parent. Section 13B lists every page w
   5. For forms, make Back and Cancel go to the form's parent, and make Save show the record (NV-4).
   6. Run the registry guard test.
   7. In the final message, state the page's type, default parent and allowed parents.
+- **NV-10 Create and return.** A form may open a New form for a record it needs (Edit professional → New organisation; Funding approval → New claim). That form's Cancel and Save go back to the form that opened it, and Save brings the new record back already selected. These handoffs are the only use of `safeReturnTo`, and parent memory ignores them.
 
 ### 13B. Page map
 
@@ -382,7 +383,7 @@ Every page, with its type and default parent. Pages marked † are known gaps (A
 | Report type | `/settings/report-types/[type_id]` | Record details | Report types |
 | Assessment (settings) | `/settings/assessments/[assessment_code]` | Record details | Assessments (settings) |
 | Funding approval type | `/funding/approval-types/[type_id]` | Record details | Funding approval types |
-| New appointment | `/appointments/new` | Record form | Appointments (client) |
+| New appointment | `/appointments/new` | Record form | Appointments (client), or All appointments when opened without a client |
 | Edit appointment | `/appointments/[appointment_id]/edit` | Record form | Appointment |
 | New report | `/clients/[client_id]/reports/new` | Record form | Reports (client) |
 | Edit report | `/clients/[client_id]/reports/[report_id]/edit` | Record form | Report |
@@ -390,7 +391,7 @@ Every page, with its type and default parent. Pages marked † are known gaps (A
 | Edit treatment plan | `/clients/[client_id]/treatment-plan/[plan_id]/edit` | Record form | Treatment plan |
 | New crisis plan † | `/clients/[client_id]/crisis-plan/new` | Record form | Client |
 | Edit crisis plan | `/clients/[client_id]/crisis-plan/[plan_id]/edit` | Record form | Crisis plan |
-| New claim | `/funding/claims/new` | Record form | Claims (client) |
+| New claim | `/funding/claims/new` | Record form | Claims (client), or All claims when opened without a client |
 | Edit claim | `/funding/claims/[claim_id]/edit` | Record form | Claim |
 | New funding approval | `/funding/approvals/new` | Record form | Claim |
 | Edit funding approval | `/funding/approvals/[approval_id]/edit` | Record form | Funding approval |
@@ -407,7 +408,9 @@ Outside the map: `/` and `/clients/[client_id]/intake-interview` (redirects; the
 
 ## Appendix A: Known gaps
 
-Where the system doesn't match the guide yet. Add a row when a gap is found; delete it when fixed, and note the fix in the Change log. Last checked 28 Nov 2026 against `main` (`fc97605`).
+This is where the system doesn't match the guide yet. Add a row when a gap is found; delete it when fixed, and note the fix in the Change log. Last checked 28 Nov 2026 against `main` (`618765a`).
+
+**Under ongoing review:** NV (section 13, Navigation). It's checked in every round's review and by the monthly health audit. Any back arrow that lands somewhere unexpected becomes a new parent-memory selftest.
 
 | Rule | Area | Gap | Planned fix |
 | --- | --- | --- | --- |
@@ -424,7 +427,8 @@ Where the system doesn't match the guide yet. Add a row when a gap is found; del
 | NV-2 | Treatment plan, crisis plan | Record details with no Sub-list above them; default parent is the client for now | To decide with Ben: a versions Sub-list, or allow one-current-record pages under an entity |
 | NV-2 | Funding approvals | Hang off a Claim (Record details), not a Sub-list; default parent is the claim for now | To decide with Ben: treat Claim as an entity, or allow a record to own records |
 | NV-1 | Professionals, organisations | Entity details with no Sub-lists, unlike Client | To decide with Ben (e.g. clients referred) |
-| NV-3, NV-5, NV-8 | Back arrow | Built on returnTo with hand-set fallbacks; calendar, dashboard, appointments and contacts are rejected as return pages; labels often wrong; 4 bare "← Back"; 3 typed pages with no back arrow; no page registry | Round NV |
+| NV-7 | Background interview | Has its own LRAMP button, but the interview is one assessment in a battery | A battery page that launches each assessment (to design with Ben) |
+| NV-7 | Session note | "Schedule appointment" opens the Calendar | Show the next appointment on the note; book in a side panel (mockup first) |
 
 ## Appendix B: Change log
 
@@ -432,6 +436,7 @@ One row per change to the guide, newest first. Retired rules are recorded here a
 
 | Date | Rules | Change | Agreed in |
 | --- | --- | --- | --- |
+| 28 Nov 2026 | NV-2, NV-7, NV-10, 13B | Linked Entity details allowed as parents; links into pages with no back arrow always allowed; Edit form parent when the record has no page; added NV-10 Create and return; 13B parents without a client | Round NV.1 |
 | 28 Nov 2026 | NV-1 to NV-9, PG-2 | Added section 13 Navigation: page types, default and allowed parents, one remembered parent per page, back labels, page registry and guard test, page map (13B); PG-2 now points to NV | Chat with Ben |
 | 28 Nov 2026 | PH-5, FM-1 | Client-form footer not fixed; radio rows always outlined | Round AY.2 (phone testing) |
 | 28 Nov 2026 | GU-2, GU-3 | Committed to the repo as `docs/design-guide.md`; Cursor always-on rule added | Round DG |

@@ -134,6 +134,30 @@ Assessment instruments are data-driven (definitions/elements/options). Seed via 
 
 Every assessment, client-facing or practitioner-facing, is defined as data (definitions, elements, options) and is completed in the shared form (`components/assessments/form/`) and shown in the shared results view (`components/assessments/answers/`). Never build an assessment-specific page, form, answer control or results layout, and never lay out answer options differently. If an assessment needs something the shared form can't do, add it to the shared form as a general, data-driven rule. Each assessment may add only its own scoring rule (`lib/assessments/scoring/`) and summary box (`lib/assessments/result-summaries.ts`).
 
+### Assessment form elements: one look
+
+Every assessment — practitioner or client — uses only these shared element types (`components/assessments/form/`, `lib/assessments/form-rules.ts`). Do not invent a parallel control.
+
+| Type | Look |
+|------|------|
+| **yes_no** | Vertical radio rows (Yes / No), full-width bordered rows via `RadioOptionList` |
+| **radio** | Same radio rows; option labels from `assessment_options` |
+| **checkbox** | Bordered tick rows; multi-select |
+| **tick** | Single bordered tick row; answer value `ticked` |
+| **short_text** | One-line input (`min-h-11`) |
+| **long_text** | Multi-line textarea |
+| **date** | Date input (`YYYY-MM-DD`) |
+| **text_list** | Growing short-text boxes; trailing empty row; blanks ignored |
+| **person_list** | Collapsed bordered lines (name + muted " · " facts + Edit); open editor "Person N" / Remove / Done; dashed "+ Add …" from `list_config_json` |
+| **history_list** | Same list pattern; collapsed "What · from when"; fields `what` / `when` |
+
+Shared chrome (all types):
+
+- **In-person option:** on `yes_no` / `radio` when `allow_in_person` is true, last row is "I'd rather talk about it in person" (`in_person`). Counts as answered; scoring and `show_when` / triggers ignore it unless they list that value.
+- **Follow-up indent:** child elements sit under a **2px grey** left border (`border-l-2 border-muted`) with left padding.
+- **Pre-filled tag:** grey "Pre-filled" chip beside the question when the answer is still the default selection and unconfirmed.
+- **Error state:** destructive outline on the question block, destructive border on the control where applicable, and a red alert line under the control.
+
 ### Colours: one meaning each
 
 Status and meaning colours are defined once in [`lib/ui/status-colours.ts`](./lib/ui/status-colours.ts). Use those exports; never write Tailwind palette colour classes (`amber-`, `orange-`, `emerald-`, `blue-`, `red-`, `sky-`, `indigo-`, etc.) elsewhere under `app/`, `components/`, or `lib/`. Orange is not used. Links keep existing link / primary styles and are outside this palette. Guard: `lib/ui/status-colours-guard.selftest.ts`.

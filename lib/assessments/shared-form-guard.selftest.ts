@@ -19,6 +19,8 @@ const RADIO_ALLOWLIST: Record<string, string> = {
     "Shared assessment radio list",
   "components/assessments/form/element-control.tsx":
     "Shared form control (delegates to radio-option-list)",
+  "components/assessments/form/list-entry-input.tsx":
+    "Shared person_list / history_list entry editor (uses radio-option-list)",
   "components/ui/radio-group.tsx": "shadcn RadioGroup primitive",
   "components/ui/dropdown-menu.tsx":
     "shadcn DropdownMenuRadioGroup primitive (non-assessment)",

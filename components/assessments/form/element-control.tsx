@@ -1,10 +1,15 @@
 "use client"
 
+import { ListEntryInput } from "@/components/assessments/form/list-entry-input"
 import { RadioOptionList } from "@/components/assessments/form/radio-option-list"
 import { TextListInput } from "@/components/assessments/form/text-list-input"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import { TICK_VALUE, type FormElement } from "@/lib/assessments/form-rules"
+import {
+  optionsForElement,
+  TICK_VALUE,
+  type FormElement,
+} from "@/lib/assessments/form-rules"
 import { cn } from "@/lib/utils"
 
 export function ElementControl({
@@ -30,7 +35,7 @@ export function ElementControl({
     case "radio":
       return (
         <RadioOptionList
-          options={element.options}
+          options={optionsForElement(element)}
           value={values[0]}
           onValueChange={(next) => onChange([next])}
           onOptionActivate={() => onActivate?.()}
@@ -107,6 +112,32 @@ export function ElementControl({
           id={id}
           values={values}
           onChange={onChange}
+          disabled={disabled}
+          error={error}
+        />
+      )
+
+    case "person_list":
+      return (
+        <ListEntryInput
+          id={id}
+          mode="person"
+          values={values}
+          onChange={onChange}
+          config={element.listConfig}
+          disabled={disabled}
+          error={error}
+        />
+      )
+
+    case "history_list":
+      return (
+        <ListEntryInput
+          id={id}
+          mode="history"
+          values={values}
+          onChange={onChange}
+          config={element.listConfig}
           disabled={disabled}
           error={error}
         />

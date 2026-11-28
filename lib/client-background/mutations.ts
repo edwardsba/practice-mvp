@@ -19,6 +19,10 @@ import {
   clientRelationshipRecords,
   clients,
 } from "@/db/schema"
+import {
+  backgroundAnswersToClientBackground,
+  type ClientBackgroundSuggestions,
+} from "@/lib/background-questionnaire/to-client-background"
 import { BACKGROUND_ASSESSMENT_CODE } from "@/lib/background-questionnaire/types"
 import { db } from "@/lib/db"
 import { settleEventDates } from "@/lib/client-background/age"
@@ -52,10 +56,17 @@ import {
   type InterviewItemDef,
 } from "@/lib/client-background/interview-answers"
 import {
+  acceptClientChangesAndConfirm,
+  decideClientField,
+  SELF_REPORT_CHANGED_ERROR,
+} from "@/lib/client-background/interview-client-decisions"
+import type { ClientFieldSection } from "@/lib/client-background/interview-client-fields"
+import {
   finalScreeningAnswers,
   sanitizeScreening,
   type ScreeningAnswers,
 } from "@/lib/client-background/interview-history"
+import { loadLatestBackgroundSelfReport } from "@/lib/client-background/load"
 import {
   demographicsFromStored,
   sanitizeClientRelationshipStatus,
@@ -69,6 +80,7 @@ import {
 import {
   emptyDemographics,
   type ClientRelationshipStatusValue,
+  type Demographics,
   type EducationFields,
   type EventRecord,
   type IdentityFields,
@@ -324,66 +336,75 @@ export async function ensureFamilyOfOrigin(input: {
   }
 }
 
+type BackgroundColumnPatch = Partial<{
+  identityJson: IdentityFields
+  livingSituationJson: LivingSituationFields
+  educationJson: EducationFields
+  occupationJson: OccupationFields
+  stressorsJson: StressorsRecord
+}>
+
+async function upsertBackgroundColumnInTx(
+  tx: Tx,
+  clientId: string,
+  practiceId: string,
+  userId: string,
+  patch: BackgroundColumnPatch
+) {
+  const now = new Date()
+  let entityId = ""
+  const [existing] = await tx
+    .select({
+      clientBackgroundId: clientBackgrounds.clientBackgroundId,
+      practiceId: clientBackgrounds.practiceId,
+    })
+    .from(clientBackgrounds)
+    .where(eq(clientBackgrounds.clientId, clientId))
+    .limit(1)
+
+  if (existing && existing.practiceId !== practiceId) {
+    throw new Error("practice_mismatch")
+  }
+
+  if (!existing) {
+    const [created] = await tx
+      .insert(clientBackgrounds)
+      .values({
+        clientId,
+        practiceId,
+        ...patch,
+        updatedAt: now,
+      })
+      .returning({ clientBackgroundId: clientBackgrounds.clientBackgroundId })
+    entityId = created.clientBackgroundId
+  } else {
+    entityId = existing.clientBackgroundId
+    await tx
+      .update(clientBackgrounds)
+      .set({ ...patch, updatedAt: now })
+      .where(eq(clientBackgrounds.clientBackgroundId, existing.clientBackgroundId))
+  }
+
+  await writeAudit(tx, {
+    practiceId,
+    userId,
+    clientId,
+    eventType: "client_background.updated",
+    entityType: "client_background",
+    entityId,
+  })
+}
+
 async function upsertBackgroundColumn(
   clientId: string,
   practiceId: string,
   userId: string,
-  patch: Partial<{
-    identityJson: IdentityFields
-    livingSituationJson: LivingSituationFields
-    educationJson: EducationFields
-    occupationJson: OccupationFields
-    stressorsJson: StressorsRecord
-  }>
+  patch: BackgroundColumnPatch
 ) {
   const client = await assertClient(clientId, practiceId)
   if (!client) return { error: "Client was not found." }
 
-  const now = new Date()
-  let entityId = ""
-
-  await db.transaction(async (tx) => {
-    const [existing] = await tx
-      .select({
-        clientBackgroundId: clientBackgrounds.clientBackgroundId,
-        practiceId: clientBackgrounds.practiceId,
-      })
-      .from(clientBackgrounds)
-      .where(eq(clientBackgrounds.clientId, clientId))
-      .limit(1)
-
-    if (existing && existing.practiceId !== practiceId) {
-      throw new Error("practice_mismatch")
-    }
-
-    if (!existing) {
-      const [created] = await tx
-        .insert(clientBackgrounds)
-        .values({
-          clientId,
-          practiceId,
-          ...patch,
-          updatedAt: now,
-        })
-        .returning({ clientBackgroundId: clientBackgrounds.clientBackgroundId })
-      entityId = created.clientBackgroundId
-    } else {
-      entityId = existing.clientBackgroundId
-      await tx
-        .update(clientBackgrounds)
-        .set({ ...patch, updatedAt: now })
-        .where(eq(clientBackgrounds.clientBackgroundId, existing.clientBackgroundId))
-    }
-
-    await writeAudit(tx, {
-      practiceId,
-      userId,
-      clientId,
-      eventType: "client_background.updated",
-      entityType: "client_background",
-      entityId,
-    })
-  })
+  await db.transaction((tx) => upsertBackgroundColumnInTx(tx, clientId, practiceId, userId, patch))
 
   return { error: undefined }
 }
@@ -1495,6 +1516,194 @@ export async function confirmInterviewSection(input: {
       }
       return result
     })
+  } catch {
+    return { error: "Could not confirm the interview section." }
+  }
+}
+
+async function inProgressInterviewInTx(tx: Tx, clientId: string, practiceId: string) {
+  const [row] = await tx
+    .select({
+      clientBackgroundInterviewId: clientBackgroundInterviews.clientBackgroundInterviewId,
+      answersJson: clientBackgroundInterviews.answersJson,
+      screeningJson: clientBackgroundInterviews.screeningJson,
+    })
+    .from(clientBackgroundInterviews)
+    .where(
+      and(
+        eq(clientBackgroundInterviews.clientId, clientId),
+        eq(clientBackgroundInterviews.practiceId, practiceId),
+        eq(clientBackgroundInterviews.status, "in_progress")
+      )
+    )
+    .limit(1)
+  return row ?? null
+}
+
+async function demographicsInTx(tx: Tx, clientId: string, practiceId: string): Promise<Demographics> {
+  const [background] = await tx
+    .select()
+    .from(clientBackgrounds)
+    .where(and(eq(clientBackgrounds.clientId, clientId), eq(clientBackgrounds.practiceId, practiceId)))
+    .limit(1)
+  return background ? demographicsFromStored(background) : emptyDemographics()
+}
+
+/** Suggestions from the client's latest self-report, only when it is the one the page showed. */
+async function shownSelfReportSuggestions(
+  clientId: string,
+  practiceId: string,
+  selfReportId: unknown
+): Promise<ClientBackgroundSuggestions | null> {
+  if (typeof selfReportId !== "string" || !selfReportId) return null
+  const selfReport = await loadLatestBackgroundSelfReport(clientId, practiceId)
+  if (!selfReport || selfReport.resultId !== selfReportId) return null
+  return backgroundAnswersToClientBackground(selfReport.answers)
+}
+
+function demographicsPatch(demographics: Demographics, sections: readonly ClientFieldSection[]) {
+  const patch: BackgroundColumnPatch = {}
+  const changed: Partial<Demographics> = {}
+  if (sections.includes("identity")) {
+    patch.identityJson = changed.identity = demographics.identity
+  }
+  if (sections.includes("education")) {
+    patch.educationJson = changed.education = demographics.education
+  }
+  if (sections.includes("occupation")) {
+    patch.occupationJson = changed.occupation = demographics.occupation
+  }
+  if (sections.includes("livingSituation")) {
+    patch.livingSituationJson = changed.livingSituation = demographics.livingSituation
+  }
+  return { patch, changed }
+}
+
+/**
+ * Interview sections 3 and 7: Use client's (copy the stored self-report answer onto the file) or
+ * Keep (leave the file) for one field, and record the choice on the interview.
+ */
+export async function decideInterviewClientAnswer(input: {
+  clientId: string
+  practiceId: string
+  userId: string
+  fieldKey: unknown
+  choice: unknown
+  selfReportId: unknown
+}): Promise<{ error?: string; answers?: InterviewAnswersJson; demographics?: Partial<Demographics> }> {
+  const client = await assertClient(input.clientId, input.practiceId)
+  if (!client) return { error: "Client was not found." }
+  const suggestions = await shownSelfReportSuggestions(input.clientId, input.practiceId, input.selfReportId)
+  if (!suggestions) return { error: SELF_REPORT_CHANGED_ERROR }
+  try {
+    return await db.transaction(async (tx) => {
+      const interview = await inProgressInterviewInTx(tx, input.clientId, input.practiceId)
+      if (!interview) return { error: "There is no background interview in progress." }
+      const decided = decideClientField({
+        answers: sanitizeInterviewAnswers(interview.answersJson),
+        demographics: await demographicsInTx(tx, input.clientId, input.practiceId),
+        suggestions,
+        fieldKey: input.fieldKey,
+        choice: input.choice,
+        at: new Date().toISOString(),
+      })
+      if (!decided.ok) return { error: decided.error }
+      const { patch, changed } = demographicsPatch(decided.demographics, decided.changedSections)
+      if (decided.changedSections.length > 0) {
+        await upsertBackgroundColumnInTx(tx, input.clientId, input.practiceId, input.userId, patch)
+      }
+      await tx
+        .update(clientBackgroundInterviews)
+        .set({ answersJson: decided.answers, updatedAt: new Date() })
+        .where(eq(clientBackgroundInterviews.clientBackgroundInterviewId, interview.clientBackgroundInterviewId))
+      await writeAudit(tx, {
+        practiceId: input.practiceId,
+        userId: input.userId,
+        clientId: input.clientId,
+        eventType:
+          input.choice === "used"
+            ? "client_background_interview.client_answer_used"
+            : "client_background_interview.client_answer_kept",
+        entityType: "client_background_interview",
+        entityId: interview.clientBackgroundInterviewId,
+      })
+      return { answers: decided.answers, demographics: changed }
+    })
+  } catch {
+    return { error: "Could not save your choice." }
+  }
+}
+
+/**
+ * "Accept N client changes and confirm": Use client's for every field still waiting in section 3
+ * or 7 (values from the stored self-report), then confirm the section, in one transaction.
+ */
+export async function acceptInterviewClientChangesAndConfirm(input: {
+  clientId: string
+  practiceId: string
+  userId: string
+  sectionNumber: number
+  detailHasValue: Record<string, boolean>
+  fieldKeys: unknown
+  selfReportId: unknown
+}): Promise<{
+  error?: string
+  answers?: InterviewAnswersJson
+  screening?: ScreeningAnswers
+  demographics?: Partial<Demographics>
+}> {
+  const client = await assertClient(input.clientId, input.practiceId)
+  if (!client) return { error: "Client was not found." }
+  const suggestions = await shownSelfReportSuggestions(input.clientId, input.practiceId, input.selfReportId)
+  if (!suggestions) return { error: SELF_REPORT_CHANGED_ERROR }
+  const detailHasValue = Object.fromEntries(
+    Object.entries(input.detailHasValue ?? {}).filter(([, value]) => typeof value === "boolean")
+  )
+  try {
+    return await db
+      .transaction(async (tx) => {
+        const interview = await inProgressInterviewInTx(tx, input.clientId, input.practiceId)
+        if (!interview) return { error: "There is no background interview in progress." }
+        const family = await loadFamily(tx, input.clientId, input.practiceId)
+        const accepted = acceptClientChangesAndConfirm({
+          answers: sanitizeInterviewAnswers(interview.answersJson),
+          demographics: await demographicsInTx(tx, input.clientId, input.practiceId),
+          suggestions,
+          relationships: family.people,
+          sectionNumber: input.sectionNumber,
+          detailHasValue,
+          expectedFieldKeys: Array.isArray(input.fieldKeys) ? input.fieldKeys : [],
+          at: new Date().toISOString(),
+        })
+        if (!accepted.ok) return { error: accepted.error }
+        const { patch, changed } = demographicsPatch(accepted.demographics, accepted.changedSections)
+        if (accepted.changedSections.length > 0) {
+          await upsertBackgroundColumnInTx(tx, input.clientId, input.practiceId, input.userId, patch)
+        }
+        const screening = mergeScreeningMirror(sanitizeScreening(interview.screeningJson), accepted.answers)
+        await tx
+          .update(clientBackgroundInterviews)
+          .set({ answersJson: accepted.answers, screeningJson: screening, updatedAt: new Date() })
+          .where(eq(clientBackgroundInterviews.clientBackgroundInterviewId, interview.clientBackgroundInterviewId))
+        const audit = {
+          practiceId: input.practiceId,
+          userId: input.userId,
+          clientId: input.clientId,
+          entityType: "client_background_interview",
+          entityId: interview.clientBackgroundInterviewId,
+        }
+        if (accepted.appliedFieldKeys.length > 0) {
+          await writeAudit(tx, { ...audit, eventType: "client_background_interview.client_changes_accepted" })
+        }
+        await writeAudit(tx, { ...audit, eventType: "client_background_interview.section_confirmed" })
+        return { answers: accepted.answers, screening, demographics: changed }
+      })
+      .then(async (result) => {
+        if (result.answers) {
+          await writeBlockAnswerMirrors(input.clientId, input.practiceId, result.answers)
+        }
+        return result
+      })
   } catch {
     return { error: "Could not confirm the interview section." }
   }

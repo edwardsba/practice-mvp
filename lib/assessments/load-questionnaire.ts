@@ -1,3 +1,13 @@
+/**
+ * Legacy radio-only client questionnaire loader.
+ *
+ * Known gap (design guide AS-1 / CP-2): scored client questionnaires (PHQ-9,
+ * GAD-7, batteries, …) still use this renderer and `/api/assessments/submit`.
+ * They should move to the shared form engine (`AssessmentFormCore` +
+ * `/api/assessments/submit-form`) in a later round. Mixed-element instruments
+ * such as BACKGROUND_SR already use the shared path via load-client-form.ts.
+ */
+
 import { and, asc, eq, inArray } from "drizzle-orm"
 
 import {

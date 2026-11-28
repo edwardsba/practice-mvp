@@ -48,6 +48,7 @@ const prefilled: InterviewAnswersJson = {
   version: 1,
   items: Object.fromEntries(section1.items.map((item) => [item.key, { value: "confirmed" as const, confirmed: false }])),
   sections: {},
+  clientDecisions: {},
 }
 check("pre-filled details → to_confirm", interviewSectionStatus(section1, prefilled).status, "to_confirm")
 check("pre-filled details → Ready to confirm (no count)", interviewSectionStatus(section1, prefilled).toConfirm, 0)
@@ -58,6 +59,7 @@ const mixed: InterviewAnswersJson = {
     [section1.items[0].key]: { value: "confirmed", confirmed: true },
   },
   sections: {},
+  clientDecisions: {},
 }
 check("one detail touched → to_confirm", interviewSectionStatus(section1, mixed).status, "to_confirm")
 
@@ -65,6 +67,7 @@ const allItemsConfirmed: InterviewAnswersJson = {
   version: 1,
   items: Object.fromEntries(section1.items.map((item) => [item.key, { value: "confirmed" as const, confirmed: true }])),
   sections: {},
+  clientDecisions: {},
 }
 check(
   "every item confirmed but section not signed off → to_confirm",
@@ -84,6 +87,7 @@ const partial: InterviewAnswersJson = {
     s4_emergency: { value: "yes", confirmed: true },
   },
   sections: {},
+  clientDecisions: {},
 }
 const afterNothing = applyNothingToRecord(partial, 4)
 check("nothing to record keeps existing", afterNothing.items.s4_emergency, {
@@ -107,19 +111,26 @@ const source: InterviewAnswersJson = {
     s8_emotional_problems: { value: "yes", confirmed: true },
   },
   sections: { "1": { confirmed: true, confirmedAt: "2026-11-27T00:00:00.000Z" } },
+  clientDecisions: { "identity.sex": { choice: "used", at: "2026-11-27T00:00:00.000Z" } },
 }
 const review = prefillAnswersForReview(source)
-check("review prefill copies values with confirmed false, no section sign-off", review, {
+check("review prefill copies values with confirmed false, no section sign-off or client decisions", review, {
   version: 1,
   items: {
     s1_name: { value: "confirmed", confirmed: false },
     s8_emotional_problems: { value: "yes", confirmed: false },
   },
   sections: {},
+  clientDecisions: {},
 })
 
 const tapped = setItemAnswer(
-  { version: 1, items: { s2_medicare: { value: "yes", confirmed: false } }, sections: {} },
+  {
+    version: 1,
+    items: { s2_medicare: { value: "yes", confirmed: false } },
+    sections: {},
+    clientDecisions: {},
+  },
   "s2_medicare",
   "yes"
 )
@@ -147,6 +158,7 @@ const withHistory: InterviewAnswersJson = {
     s6_caregiver: { value: "no", confirmed: true },
   },
   sections: {},
+  clientDecisions: {},
 }
 check("screeningFromInterviewAnswers mapping", screeningFromInterviewAnswers(withHistory), {
   emotional_problems: "yes",
@@ -223,6 +235,7 @@ check(
         "s4_mc:gone": { value: "not_applicable", confirmed: true },
       },
       sections: {},
+      clientDecisions: {},
     },
     { emergencyContactIds: ["live"], medicalContactIds: [] }
   ).items,
@@ -238,6 +251,7 @@ check(
       "s4_mc:mc1": { value: "not_applicable", confirmed: true },
     },
     sections: {},
+    clientDecisions: {},
   }),
   {
     version: 1,
@@ -246,6 +260,7 @@ check(
       "s4_mc:mc1": { value: "not_applicable", confirmed: false },
     },
     sections: {},
+    clientDecisions: {},
   }
 )
 
@@ -260,6 +275,7 @@ const section4Extras = section4ExtraItems({
       s4_gp: { value: "yes", confirmed: true },
     },
     sections: {},
+    clientDecisions: {},
   },
   emergencyContacts: [{ id: "ec1", label: "Parent" }],
   gpContacts: [{ id: "gp1", label: "Dr Smith" }],
@@ -285,7 +301,12 @@ check(
   "section 4 left counts unanswered questions only (per-record rows are details)",
   interviewSectionStatus(
     section4,
-    { version: 1, items: { s4_emergency: { value: "yes", confirmed: true } }, sections: {} },
+    {
+      version: 1,
+      items: { s4_emergency: { value: "yes", confirmed: true } },
+      sections: {},
+      clientDecisions: {},
+    },
     section4Extras
   ).left,
   2
@@ -307,6 +328,7 @@ check("sanitize drops wrong-typed values (old JSON gets empty sections)", wrongS
     s3_identity: { value: "confirmed", confirmed: false },
   },
   sections: {},
+  clientDecisions: {},
 })
 
 const droppedLivingWho = sanitizeInterviewAnswers({
@@ -322,6 +344,7 @@ check("sanitize drops legacy living answers on s7_who", droppedLivingWho, {
     s7_housing_type: { value: "confirmed", confirmed: false },
   },
   sections: {},
+  clientDecisions: {},
 })
 
 const demo = emptyDemographics()
@@ -416,6 +439,7 @@ check("sanitize drops s8_other_treatment", droppedOtherTreatment, {
     s8_illness_injury: { value: "yes", confirmed: true },
   },
   sections: {},
+  clientDecisions: {},
 })
 
 console.log("\ninterview-answers.selftest.ts: ok")

@@ -90,7 +90,9 @@ export function aggregateSectionStatus(
 }
 
 /** Short pill text for a section header. */
-export function statusPillLabel(section: Pick<SectionStatus, "status" | "left" | "toConfirm" | "hasDefaults">): string {
+export function statusPillLabel(
+  section: Pick<SectionStatus, "status" | "left" | "toConfirm" | "hasDefaults" | "clientChanges">
+): string {
   if (section.status === "skipped") return "Skipped"
   if (section.status === "not_started") return "Not started"
   // Interview: unanswered questions → "N to answer"; all questions done → "Ready to confirm".

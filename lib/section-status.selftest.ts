@@ -81,6 +81,7 @@ check("interview section with questions left → left", interviewSectionStatus(s
   status: "left",
   left: 2,
   toConfirm: 0,
+  clientChanges: 0,
   hasDefaults: false,
 })
 
@@ -90,6 +91,7 @@ const toConfirmAnswers = {
     section1.items.map((item) => [item.key, { value: "confirmed" as const, confirmed: false }])
   ),
   sections: {},
+  clientDecisions: {},
 }
 check(
   "interview section to_confirm",
@@ -103,6 +105,7 @@ const itemsConfirmed = {
     section1.items.map((item) => [item.key, { value: "confirmed" as const, confirmed: true }])
   ),
   sections: {},
+  clientDecisions: {},
 }
 check(
   "interview section needs Confirm section to be done",
@@ -128,6 +131,35 @@ check(
   "Ready to confirm"
 )
 check("pill done", statusPillLabel({ status: "done", left: 0, toConfirm: 0, hasDefaults: false }), "Done")
+check(
+  "pill client changes (plural)",
+  statusPillLabel({ status: "to_confirm", left: 0, toConfirm: 0, clientChanges: 2, hasDefaults: false }),
+  "2 client changes"
+)
+check(
+  "pill client change (singular)",
+  statusPillLabel({ status: "to_confirm", left: 0, toConfirm: 0, clientChanges: 1, hasDefaults: false }),
+  "1 client change"
+)
+
+const section3 = INTERVIEW_SECTIONS.find((section) => section.number === 3)!
+const section7 = INTERVIEW_SECTIONS.find((section) => section.number === 7)!
+const section3Answered = setItemAnswer(
+  setItemAnswer(emptyInterviewAnswers(), "s3_disability", "no"),
+  "s3_financial",
+  "no"
+)
+const s3Waiting = interviewSectionStatus(section3, section3Answered, [], { waitingClientChanges: 2 })
+check("questions done + waiting client fields → to_confirm", s3Waiting.status, "to_confirm")
+check("questions done + waiting → pill N client changes", statusPillLabel(s3Waiting), "2 client changes")
+const s3Unanswered = interviewSectionStatus(section3, emptyInterviewAnswers(), [], { waitingClientChanges: 2 })
+check("questions left wins over client changes", statusPillLabel(s3Unanswered), "2 to answer")
+check("client changes only count once questions are done", s3Unanswered.clientChanges, 0)
+const s7Waiting = interviewSectionStatus(section7, emptyInterviewAnswers(), [], { waitingClientChanges: 1 })
+check("details-only section with a waiting client field is started", s7Waiting.status, "to_confirm")
+check("details-only section pill shows the client change", statusPillLabel(s7Waiting), "1 client change")
+assert.match(progressChipAriaLabel(s7Waiting), /1 client change/)
+console.log("ok — chip aria-label includes client changes")
 
 assert.equal(
   sectionProgressClass({ status: "not_started" }),

@@ -35,6 +35,7 @@ const prefilledDetails: InterviewAnswersJson = {
     section1.items.map((item) => [item.key, { value: "confirmed" as const, confirmed: false }])
   ),
   sections: {},
+  clientDecisions: {},
 }
 check(
   "status pre-filled details → ready to confirm",
@@ -74,6 +75,7 @@ const done: InterviewAnswersJson = {
   version: 1,
   items: s2Ready.items,
   sections: { "2": { confirmed: true, confirmedAt: "2026-01-01T00:00:00.000Z" } },
+  clientDecisions: {},
 }
 check("status confirmed → done", interviewSectionStatus(section2, done).status, "done")
 
@@ -168,6 +170,7 @@ const source: InterviewAnswersJson = {
     "1": { confirmed: true, confirmedAt: "2026-01-01T00:00:00.000Z" },
     "2": { confirmed: true, confirmedAt: "2026-01-01T00:00:00.000Z" },
   },
+  clientDecisions: {},
 }
 const review = prefillAnswersForReview(source)
 check("review copies items unconfirmed", review.items.s1_name, {

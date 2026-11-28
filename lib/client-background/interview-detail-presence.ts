@@ -66,6 +66,24 @@ export type DetailPresenceInput = {
   }>
 }
 
+/** Section 3 and 7 details items → has a value in the demographics record (and household people). */
+export function demographicDetailPresence(
+  demographics: Demographics,
+  relationships: readonly RelationshipRecord[]
+): Record<string, boolean> {
+  const out: Record<string, boolean> = {}
+  for (const [key, lines] of Object.entries(formatSection3FactLines(demographics))) {
+    // s3_disability / s3_financial are questions (yna), not details.
+    if (key === "s3_disability" || key === "s3_financial") continue
+    out[key] = lineHasRecorded(lines)
+  }
+  const living = demographics.livingSituation
+  out.s7_who = formatLivingWhoFactLines(living, [...relationships]).length > 0
+  out.s7_housing_type = formatLivingTypeLine(living).trim() !== "Not recorded"
+  out.s7_housing_security = formatLivingSecurityLine(living).trim() !== "Not recorded"
+  return out
+}
+
 /** Map of details item key → has living value (for Confirm section). */
 export function detailPresenceForInterview(input: DetailPresenceInput): Record<string, boolean> {
   const s1 = section1FactLines({
@@ -78,24 +96,12 @@ export function detailPresenceForInterview(input: DetailPresenceInput): Record<s
     comms: input.comms,
     clientDisplayName: input.clientDisplayName,
   })
-  const s3 = formatSection3FactLines(input.demographics)
   const out: Record<string, boolean> = {}
 
   for (const [key, lines] of Object.entries(s1)) {
     out[key] = lineHasRecorded(lines)
   }
-  for (const [key, lines] of Object.entries(s3)) {
-    // s3_disability / s3_financial are questions (yna), not details.
-    if (key === "s3_disability" || key === "s3_financial") continue
-    out[key] = lineHasRecorded(lines)
-  }
-
-  out.s7_who =
-    formatLivingWhoFactLines(input.demographics.livingSituation, input.relationships).length > 0
-  out.s7_housing_type =
-    formatLivingTypeLine(input.demographics.livingSituation).trim() !== "Not recorded"
-  out.s7_housing_security =
-    formatLivingSecurityLine(input.demographics.livingSituation).trim() !== "Not recorded"
+  Object.assign(out, demographicDetailPresence(input.demographics, input.relationships))
 
   out.s6_biological_parents =
     formatBiologicalParentsFacts(input.blocks, input.relationships).length > 0

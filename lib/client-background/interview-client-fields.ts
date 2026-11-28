@@ -5,8 +5,19 @@
  */
 
 import type { ClientBackgroundSuggestions } from "@/lib/background-questionnaire/to-client-background"
-import type { Demographics, NecessityAccess } from "@/lib/client-background/types"
+import {
+  EMPLOYED_WORK_STATUSES,
+  type Demographics,
+  type IdentityFields,
+  type NecessityAccess,
+} from "@/lib/client-background/types"
 import { householdFromLivesWith } from "@/lib/client-background/household"
+import {
+  sanitizeEducation,
+  sanitizeIdentity,
+  sanitizeLivingSituation,
+  sanitizeOccupation,
+} from "@/lib/client-background/sanitize"
 
 export type ClientDecisionChoice = "used" | "kept"
 
@@ -18,12 +29,17 @@ export type ClientFieldDecision = {
 export type ClientFieldStateKind = "same" | "empty" | "different" | "none"
 
 export type ClientFieldState = {
-  fieldKey: string
+  fieldKey: ClientFieldKey
   /** Text after "Client: " */
   label: string
+  /** How the client's answer compares with the file right now. */
   kind: ClientFieldStateKind
   /** Interview item that owns this field (for section grouping). */
   itemKey: string
+  /** Use client's / Keep already recorded for this field. */
+  decision: ClientDecisionChoice | null
+  /** Empty or different with no decision yet: shows Use client's / Keep and counts as a client change. */
+  waiting: boolean
 }
 
 /** Fine-grained fields the self-report can suggest for overview rows. */
@@ -75,11 +91,12 @@ const ITEM_FOR_FIELD: Record<ClientFieldKey, string> = {
   "living.housingStability": "s7_housing_security",
 }
 
+export function isClientFieldKey(value: unknown): value is ClientFieldKey {
+  return typeof value === "string" && (CLIENT_FIELD_KEYS as readonly string[]).includes(value)
+}
+
 export function interviewItemKeyForClientField(fieldKey: string): string | null {
-  if ((CLIENT_FIELD_KEYS as readonly string[]).includes(fieldKey)) {
-    return ITEM_FOR_FIELD[fieldKey as ClientFieldKey]
-  }
-  return null
+  return isClientFieldKey(fieldKey) ? ITEM_FOR_FIELD[fieldKey] : null
 }
 
 export function clientFieldsForItem(itemKey: string): ClientFieldKey[] {
@@ -293,11 +310,8 @@ export function compareClientField(
       const s = suggestions.living.livesWith
       if (!s) return null
       if (!living.household) return { label: s.label, kind: "empty" }
-      const suggestedHousehold = householdFromLivesWith(s.apply.livesWith)
-      const same =
-        living.household === suggestedHousehold &&
-        (s.apply.livesWith !== "other" ||
-          living.livesWithOther.trim() === s.apply.livesWithOther.trim())
+      // The file keeps only the household; who lives there comes from sections 5–6.
+      const same = living.household === householdFromLivesWith(s.apply.livesWith)
       return { label: s.label, kind: same ? "same" : "different" }
     }
     case "living.housingStability": {
@@ -317,40 +331,33 @@ export function clientFieldStates(
   demographics: Demographics,
   decisions: Readonly<Record<string, ClientFieldDecision>>
 ): ClientFieldState[] {
-  const out: ClientFieldState[] = []
-  for (const fieldKey of CLIENT_FIELD_KEYS) {
+  return CLIENT_FIELD_KEYS.map((fieldKey) => {
     const compared = compareClientField(fieldKey, suggestions, demographics)
-    if (!compared) {
-      out.push({
-        fieldKey,
-        label: "",
-        kind: "none",
-        itemKey: ITEM_FOR_FIELD[fieldKey],
-      })
-      continue
-    }
-    const decided = Boolean(decisions[fieldKey])
-    let kind = compared.kind
-    // After Use client's / Keep, the row stops counting as waiting.
-    if (decided && (kind === "empty" || kind === "different")) {
-      // Keep shows as same (only file value); used also becomes same after save.
-      kind = "same"
-    }
-    out.push({
+    const kind = compared?.kind ?? "none"
+    const decision = compared ? (decisions[fieldKey]?.choice ?? null) : null
+    return {
       fieldKey,
-      label: compared.label,
+      label: compared?.label ?? "",
       kind,
       itemKey: ITEM_FOR_FIELD[fieldKey],
-    })
-  }
-  return out
+      decision,
+      waiting: (kind === "empty" || kind === "different") && decision === null,
+    }
+  })
 }
 
 /** Fields still waiting for Use client's / Keep (empty or different, undecided). */
 export function waitingClientFields(
   states: readonly ClientFieldState[]
 ): ClientFieldState[] {
-  return states.filter((state) => state.kind === "empty" || state.kind === "different")
+  return states.filter((state) => state.waiting)
+}
+
+export function clientFieldStatesForItem(
+  states: readonly ClientFieldState[],
+  itemKey: string
+): ClientFieldState[] {
+  return states.filter((state) => state.itemKey === itemKey)
 }
 
 export function waitingClientFieldsForSection(
@@ -363,43 +370,231 @@ export function waitingClientFieldsForSection(
   return waitingClientFields(states).filter((state) => state.itemKey.startsWith(prefix))
 }
 
-/** Display label for a multi-field Client: line, e.g. "Pronouns · he/him". */
+/** Same wording as the interview fact lines ("Main language: …"). */
+const CLIENT_FIELD_TITLES: Record<ClientFieldKey, string> = {
+  "identity.sex": "Sex",
+  "identity.genderIdentity": "Gender",
+  "identity.pronouns": "Pronouns",
+  "identity.sexualOrientation": "Sexual orientation",
+  "identity.raceEthnicity": "Cultural or ethnic background",
+  "identity.religion": "Religion",
+  "identity.primaryLanguage": "Main language",
+  "identity.disability": "Disability",
+  "education.level": "Highest level",
+  "education.fieldOfStudy": "Field",
+  "education.currentlyStudying": "Currently studying",
+  "education.disruption": "Study interrupted",
+  "occupation.workStatus": "Work status",
+  "occupation.role": "Role",
+  "occupation.employer": "Employer",
+  "occupation.previousJob": "Previous job",
+  "occupation.necessities": "Hard to afford",
+  "living.housingType": "Housing type",
+  "living.livesWith": "Who lives in the home",
+  "living.housingStability": "Housing security",
+}
+
+export function clientFieldTitle(fieldKey: ClientFieldKey): string {
+  return CLIENT_FIELD_TITLES[fieldKey]
+}
+
+/** The row's own label already names these fields, so their Client: line needs no title. */
+const PLAIN_LABEL_FIELDS: ReadonlySet<ClientFieldKey> = new Set([
+  "identity.disability",
+  "living.housingType",
+  "living.livesWith",
+  "living.housingStability",
+])
+
+export function isClientFieldNamedByRow(fieldKey: ClientFieldKey): boolean {
+  return PLAIN_LABEL_FIELDS.has(fieldKey)
+}
+
+/** Text after "Client: ", e.g. "Pronouns · he/him" in a multi-field row. */
 export function clientFieldDisplayLabel(fieldKey: ClientFieldKey, answerLabel: string): string {
-  const titles: Partial<Record<ClientFieldKey, string>> = {
-    "identity.sex": "Sex",
-    "identity.genderIdentity": "Gender identity",
-    "identity.pronouns": "Pronouns",
-    "identity.sexualOrientation": "Sexual orientation",
-    "identity.raceEthnicity": "Race / ethnicity",
-    "identity.religion": "Religion",
-    "identity.primaryLanguage": "Primary language",
-    "identity.disability": "Disability or access needs",
-    "education.level": "Level",
-    "education.fieldOfStudy": "Field of study",
-    "education.currentlyStudying": "Currently studying",
-    "education.disruption": "Education disruption",
-    "occupation.workStatus": "Work status",
-    "occupation.role": "Role",
-    "occupation.employer": "Employer",
-    "occupation.previousJob": "Previous job",
-    "occupation.necessities": "Basic necessities",
-    "living.housingType": "Housing type",
-    "living.livesWith": "Who lives in the home",
-    "living.housingStability": "Housing security",
+  if (PLAIN_LABEL_FIELDS.has(fieldKey)) return answerLabel
+  return `${CLIENT_FIELD_TITLES[fieldKey]} · ${answerLabel}`
+}
+
+/** Demographics section a client field is saved through. */
+export type ClientFieldSection = "identity" | "education" | "occupation" | "livingSituation"
+
+export function clientFieldSection(fieldKey: ClientFieldKey): ClientFieldSection {
+  if (fieldKey.startsWith("identity.")) return "identity"
+  if (fieldKey.startsWith("education.")) return "education"
+  if (fieldKey.startsWith("occupation.")) return "occupation"
+  return "livingSituation"
+}
+
+export type ApplyClientFieldResult =
+  | { ok: true; demographics: Demographics; section: ClientFieldSection }
+  | { ok: false; error: string }
+
+function employedStatus(workStatus: string): boolean {
+  return (EMPLOYED_WORK_STATUSES as readonly string[]).includes(workStatus)
+}
+
+function withIdentity(demographics: Demographics, patch: Partial<IdentityFields>): Demographics {
+  return { ...demographics, identity: sanitizeIdentity({ ...demographics.identity, ...patch }) }
+}
+
+/**
+ * The record after Use client's for one field: the self-report answer written in, and the changed
+ * section sanitized the way its save path does. Fails when there is no client answer, or when the
+ * answer can't be kept (role / employer need an employed work status on file).
+ */
+export function applyClientField(
+  fieldKey: ClientFieldKey,
+  suggestions: ClientBackgroundSuggestions | null | undefined,
+  demographics: Demographics
+): ApplyClientFieldResult {
+  const noAnswer = { ok: false as const, error: "The client didn't answer this in the self-report." }
+  if (!suggestions) return noAnswer
+  const { identity, education, occupation, living } = suggestions
+  const section = clientFieldSection(fieldKey)
+  let next: Demographics | null = null
+
+  switch (fieldKey) {
+    case "identity.sex":
+      if (identity.sex) next = withIdentity(demographics, { sex: identity.sex.apply })
+      break
+    case "identity.genderIdentity":
+      if (identity.genderIdentity) {
+        next = withIdentity(demographics, { genderIdentity: identity.genderIdentity.apply })
+      }
+      break
+    case "identity.pronouns":
+      if (identity.pronouns) next = withIdentity(demographics, { pronouns: identity.pronouns.apply })
+      break
+    case "identity.sexualOrientation":
+      if (identity.sexualOrientation) {
+        next = withIdentity(demographics, {
+          sexualOrientation: identity.sexualOrientation.apply
+            .sexualOrientation as IdentityFields["sexualOrientation"],
+          sexualOrientationOther: identity.sexualOrientation.apply.sexualOrientationOther,
+        })
+      }
+      break
+    case "identity.raceEthnicity":
+      if (identity.raceEthnicity) {
+        next = withIdentity(demographics, { raceEthnicity: identity.raceEthnicity.apply })
+      }
+      break
+    case "identity.religion":
+      if (identity.religion) next = withIdentity(demographics, { religion: identity.religion.apply })
+      break
+    case "identity.primaryLanguage":
+      if (identity.primaryLanguage) {
+        next = withIdentity(demographics, { primaryLanguage: identity.primaryLanguage.apply })
+      }
+      break
+    case "identity.disability":
+      if (identity.disability) {
+        next = withIdentity(demographics, {
+          disability: identity.disability.apply.value,
+          disabilityDetail: identity.disability.apply.detail,
+        })
+      }
+      break
+    case "education.level":
+    case "education.fieldOfStudy":
+    case "education.currentlyStudying":
+    case "education.disruption": {
+      const current = demographics.education
+      let patch: Partial<Demographics["education"]> | null = null
+      if (fieldKey === "education.level" && education.level) patch = { level: education.level.apply }
+      if (fieldKey === "education.fieldOfStudy" && education.fieldOfStudy) {
+        patch = { fieldOfStudy: education.fieldOfStudy.apply }
+      }
+      if (fieldKey === "education.currentlyStudying" && education.currentlyStudying) {
+        patch = {
+          currentlyStudying: education.currentlyStudying.apply.value,
+          currentlyStudyingDetail: education.currentlyStudying.apply.detail,
+        }
+      }
+      if (fieldKey === "education.disruption" && education.disruption) {
+        patch = {
+          disruption: education.disruption.apply.value,
+          disruptionDetail: education.disruption.apply.detail,
+        }
+      }
+      if (patch) next = { ...demographics, education: sanitizeEducation({ ...current, ...patch }) }
+      break
+    }
+    case "occupation.workStatus":
+    case "occupation.role":
+    case "occupation.employer":
+    case "occupation.previousJob":
+    case "occupation.necessities": {
+      const current = demographics.occupation
+      let patch: Partial<Demographics["occupation"]> | null = null
+      if (fieldKey === "occupation.workStatus" && occupation.workStatus) {
+        patch = {
+          workStatus: occupation.workStatus.apply.workStatus,
+          workStatusOther: occupation.workStatus.apply.workStatusOther,
+        }
+      }
+      if (fieldKey === "occupation.role" && occupation.role) patch = { role: occupation.role.apply }
+      if (fieldKey === "occupation.employer" && occupation.employer) {
+        patch = { employer: occupation.employer.apply }
+      }
+      if (fieldKey === "occupation.previousJob" && occupation.previousJob) {
+        patch = {
+          previousJobs: [
+            ...current.previousJobs,
+            {
+              id: crypto.randomUUID(),
+              role: occupation.previousJob.apply.role,
+              employer: occupation.previousJob.apply.employer,
+              started: "",
+              ended: "",
+            },
+          ],
+        }
+      }
+      if (fieldKey === "occupation.necessities" && occupation.necessities) {
+        patch = { necessities: { ...occupation.necessities.apply } }
+      }
+      if (
+        patch &&
+        (fieldKey === "occupation.role" || fieldKey === "occupation.employer") &&
+        !employedStatus(current.workStatus)
+      ) {
+        return {
+          ok: false,
+          error: `The work status on file isn't employed, so the client's ${clientFieldTitle(fieldKey).toLowerCase()} can't be saved. Use the client's work status first, or Keep this.`,
+        }
+      }
+      if (patch) next = { ...demographics, occupation: sanitizeOccupation({ ...current, ...patch }) }
+      break
+    }
+    case "living.housingType":
+    case "living.livesWith":
+    case "living.housingStability": {
+      const current = demographics.livingSituation
+      let patch: Partial<Demographics["livingSituation"]> | null = null
+      if (fieldKey === "living.housingType" && living.housingType) {
+        patch = { housingType: living.housingType.apply }
+      }
+      if (fieldKey === "living.livesWith" && living.livesWith) {
+        const household = householdFromLivesWith(living.livesWith.apply.livesWith)
+        if (household) patch = { household }
+      }
+      if (fieldKey === "living.housingStability" && living.housingStability) {
+        patch = { housingStability: living.housingStability.apply }
+      }
+      if (patch) {
+        next = { ...demographics, livingSituation: sanitizeLivingSituation({ ...current, ...patch }) }
+      }
+      break
+    }
   }
-  const title = titles[fieldKey]
-  if (!title) return answerLabel
-  // Single-field interview items (disability, financial, housing) keep plain Client: label.
-  if (
-    fieldKey === "identity.disability" ||
-    fieldKey === "occupation.necessities" ||
-    fieldKey === "living.housingType" ||
-    fieldKey === "living.livesWith" ||
-    fieldKey === "living.housingStability"
-  ) {
-    return answerLabel
+
+  if (!next) return noAnswer
+  if (compareClientField(fieldKey, suggestions, next)?.kind !== "same") {
+    return { ok: false, error: "The client's answer couldn't be saved here. Edit this item instead." }
   }
-  return `${title} · ${answerLabel}`
+  return { ok: true, demographics: next, section }
 }
 
 export function acceptClientChangesButtonLabel(count: number): string {

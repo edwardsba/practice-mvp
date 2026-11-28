@@ -479,7 +479,7 @@ export function SendCommunicationModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
+      <DialogContent className="max-h-[90dvh] max-w-2xl overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Send communication</DialogTitle>
           <DialogDescription>
@@ -620,7 +620,8 @@ export function SendCommunicationModal({
           ) : null}
         </div>
 
-        <DialogFooter>
+        {/* PH-7: on phones DialogFooter is flex-col-reverse → Send on top, Cancel under; both full width */}
+        <DialogFooter className="[&>button]:w-full sm:[&>button]:w-auto">
           <Button
             type="button"
             variant="outline"

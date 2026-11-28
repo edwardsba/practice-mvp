@@ -46,8 +46,8 @@ export default async function AppointmentTypeDetailPage({
     <AppShell>
       <div className="mb-6">
         <BackButton
-          fallbackHref="/settings/appointment-types"
-          label="← Back to appointment types"
+          page="/settings/appointment-types/[type_id]"
+          data={{ typeId, typeName: type.nickname }}
         />
         <EntityPageHeader
           kicker="Appointment type"

@@ -30,7 +30,6 @@ import {
 import { requirePractitionerContext } from "@/lib/auth"
 import { practiceLocalToUtc } from "@/lib/dates/practice-time"
 import { db } from "@/lib/db"
-import { safeReturnTo } from "@/lib/navigation/safe-return-to"
 import { loadSessionNoteForPractice } from "@/lib/session-notes/load"
 
 /**
@@ -173,11 +172,10 @@ export async function saveNewPractitionerAssessment(
 
   const rows = toResponseRows(definition.elements, answers)
   const now = new Date()
-  const returnTo =
-    safeReturnTo(String(formData.get("return_to") ?? "")) ??
-    `/clients/${clientId}/assessments`
 
   const scored = scorePractitionerResponses(definition, rows)
+
+  let resultId: string | null = null
 
   await db.transaction(async (tx) => {
     const [instance] = await tx
@@ -242,6 +240,8 @@ export async function saveNewPractitionerAssessment(
         entityId: instance.assessmentInstanceId,
       })
 
+      resultId = result.assessmentResultId
+
       await tx.insert(auditEvents).values({
         practiceId: context.practiceId,
         userId: context.userId,
@@ -252,15 +252,22 @@ export async function saveNewPractitionerAssessment(
       })
     } else {
       // Unscored practitioner-only (LRAMP): status completed, no numeric score.
-      await tx.insert(assessmentResults).values({
-        assessmentInstanceId: instance.assessmentInstanceId,
-        clientId,
-        practiceId: context.practiceId,
-        score: null,
-        severity: null,
-        status: "completed",
-        assessmentDate,
-      })
+      const [result] = await tx
+        .insert(assessmentResults)
+        .values({
+          assessmentInstanceId: instance.assessmentInstanceId,
+          clientId,
+          practiceId: context.practiceId,
+          score: null,
+          severity: null,
+          status: "completed",
+          assessmentDate,
+        })
+        .returning({
+          assessmentResultId: assessmentResults.assessmentResultId,
+        })
+
+      resultId = result.assessmentResultId
 
       await tx.insert(auditEvents).values({
         practiceId: context.practiceId,
@@ -273,7 +280,11 @@ export async function saveNewPractitionerAssessment(
     }
   })
 
-  redirect(returnTo)
+  // NV-4: New → Save shows the new record (result).
+  if (!resultId) {
+    redirect(`/clients/${clientId}/assessments`)
+  }
+  redirect(`/clients/${clientId}/results/${resultId}`)
 }
 
 export async function saveEditPractitionerAssessment(
@@ -350,11 +361,10 @@ export async function saveEditPractitionerAssessment(
 
   const rows = toResponseRows(definition.elements, answers)
   const now = new Date()
-  const returnTo =
-    safeReturnTo(String(formData.get("return_to") ?? "")) ??
-    `/clients/${clientId}/assessments`
 
   const scored = scorePractitionerResponses(definition, rows)
+
+  let resultId: string | null = null
 
   await db.transaction(async (tx) => {
     await tx
@@ -382,7 +392,7 @@ export async function saveEditPractitionerAssessment(
     }
 
     if (scored) {
-      await tx
+      const [result] = await tx
         .update(assessmentResults)
         .set({
           score: scored.score,
@@ -391,11 +401,19 @@ export async function saveEditPractitionerAssessment(
           assessmentDate,
         })
         .where(eq(assessmentResults.assessmentInstanceId, instanceId))
+        .returning({
+          assessmentResultId: assessmentResults.assessmentResultId,
+        })
+      resultId = result?.assessmentResultId ?? null
     } else {
-      await tx
+      const [result] = await tx
         .update(assessmentResults)
         .set({ assessmentDate })
         .where(eq(assessmentResults.assessmentInstanceId, instanceId))
+        .returning({
+          assessmentResultId: assessmentResults.assessmentResultId,
+        })
+      resultId = result?.assessmentResultId ?? null
     }
 
     await tx
@@ -413,5 +431,19 @@ export async function saveEditPractitionerAssessment(
     })
   })
 
-  redirect(returnTo)
+  // NV-4: Edit → Save shows the record (result).
+  if (!resultId) {
+    const [existing] = await db
+      .select({
+        assessmentResultId: assessmentResults.assessmentResultId,
+      })
+      .from(assessmentResults)
+      .where(eq(assessmentResults.assessmentInstanceId, instanceId))
+      .limit(1)
+    resultId = existing?.assessmentResultId ?? null
+  }
+  if (!resultId) {
+    redirect(`/clients/${clientId}/assessments`)
+  }
+  redirect(`/clients/${clientId}/results/${resultId}`)
 }

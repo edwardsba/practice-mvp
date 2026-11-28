@@ -1,6 +1,7 @@
 import Link from "next/link"
 
 import { AppShell } from "@/components/app-shell"
+import { RecordPageVisit } from "@/components/ui/back-button"
 import { Badge } from "@/components/ui/badge"
 import { ListPageHeader } from "@/components/ui/list-page-header"
 import {
@@ -22,6 +23,7 @@ export default async function AllReportsPage() {
 
   return (
     <AppShell>
+      <RecordPageVisit page="/reports" />
       <ListPageHeader heading="Reports" />
 
       <div className="rounded-lg border">

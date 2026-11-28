@@ -45,8 +45,8 @@ export default async function EditProfessionalPage({
     <AppShell>
       <div className="mb-6">
         <BackButton
-          fallbackHref={`/contacts/professionals/${professionalId}`}
-          label="← Back to professional"
+          page="/contacts/professionals/[professional_id]/edit"
+          data={{ professionalId, professionalName: displayName }}
         />
       </div>
       <EntityPageHeader kicker="Professional edit" name={displayName} />

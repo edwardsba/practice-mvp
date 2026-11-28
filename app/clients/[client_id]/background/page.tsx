@@ -74,7 +74,10 @@ export default async function ClientBackgroundRoute({
   return (
     <AppShell>
       <div className="mb-6">
-        <BackButton fallbackHref={`/clients/${clientId}`} label={`← ${clientName}`} />
+        <BackButton
+          page="/clients/[client_id]/background"
+          data={{ clientId, clientName }}
+        />
       </div>
       <EntityPageHeader
         kicker="Client Background"

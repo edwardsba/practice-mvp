@@ -19,12 +19,10 @@ export function CalendarMonthView({
   anchorDate,
   appointments,
   clientId,
-  returnTo,
 }: {
   anchorDate: string
   appointments: CalendarAppointment[]
   clientId?: string
-  returnTo?: string
 }) {
   const gridDays = getMonthGridDays(anchorDate)
   const appointmentsByDate = groupAppointmentsByDate(appointments)
@@ -77,7 +75,7 @@ export function CalendarMonthView({
             return (
               <Link
                 key={date}
-                href={buildCalendarUrl("day", date, "week", clientId, returnTo)}
+                href={buildCalendarUrl("day", date, "week", clientId)}
                 className={cn(
                   "flex min-h-0 flex-col overflow-hidden border-b border-l p-1 hover:bg-muted/30 sm:p-2",
                   isFirstColumn && "border-l-0",

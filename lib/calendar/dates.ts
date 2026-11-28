@@ -171,8 +171,7 @@ export function buildCalendarUrl(
   view: CalendarView,
   date: string,
   defaultView: CalendarView = "week",
-  clientId?: string,
-  returnTo?: string
+  clientId?: string
 ): string {
   const params = new URLSearchParams()
   if (view !== defaultView) {
@@ -180,7 +179,6 @@ export function buildCalendarUrl(
   }
   params.set("date", date)
   if (clientId) params.set("clientId", clientId)
-  if (returnTo) params.set("returnTo", returnTo)
   const qs = params.toString()
   return `/calendar${qs ? `?${qs}` : ""}`
 }
@@ -188,10 +186,9 @@ export function buildCalendarUrl(
 export function newAppointmentUrl(
   date: string,
   time?: string,
-  clientId?: string,
-  returnTo?: string
+  clientId?: string
 ): string {
-  const params = new URLSearchParams({ date, returnTo: returnTo ?? "/calendar" })
+  const params = new URLSearchParams({ date })
   if (time) params.set("time", time)
   if (clientId) params.set("clientId", clientId)
   return `/appointments/new?${params.toString()}`

@@ -44,8 +44,8 @@ export default async function EditCrisisPlanPage({
     <AppShell>
       <div className="mb-6">
         <BackButton
-          fallbackHref={`/clients/${clientId}/crisis-plan/${planId}`}
-          label="← Back to crisis plan"
+          page="/clients/[client_id]/crisis-plan/[plan_id]/edit"
+          data={{ clientId, clientName, planId }}
         />
       </div>
       <EntityPageHeader

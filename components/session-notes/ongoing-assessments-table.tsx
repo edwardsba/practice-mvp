@@ -16,11 +16,9 @@ import { cn } from "@/lib/utils"
 export function OngoingAssessmentsTable({
   assessments,
   clientId,
-  returnTo,
 }: {
   assessments: SessionNoteAssessmentResult[]
   clientId: string
-  returnTo?: string
 }) {
   const router = useRouter()
 
@@ -46,7 +44,7 @@ export function OngoingAssessmentsTable({
                   hasResult
                     ? () =>
                         router.push(
-                          `/clients/${clientId}/results/${result.assessmentResultId}${returnTo ? `?returnTo=${encodeURIComponent(returnTo)}` : ""}`
+                          `/clients/${clientId}/results/${result.assessmentResultId}`
                         )
                     : undefined
                 }

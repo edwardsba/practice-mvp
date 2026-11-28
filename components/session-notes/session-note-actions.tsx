@@ -12,7 +12,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
-import { appendReturnTo } from "@/lib/navigation/back"
 import {
   formatSessionNoteDate,
   formatSessionNoteTime,
@@ -20,7 +19,6 @@ import {
 
 export function SessionNoteActions({
   sessionNoteId,
-  sessionNoteUrl,
   clientId,
   clientName,
   isFinalised,
@@ -36,7 +34,6 @@ export function SessionNoteActions({
   previousVersionId,
 }: {
   sessionNoteId: string
-  sessionNoteUrl: string
   clientId: string
   clientName: string
   status: string
@@ -124,10 +121,7 @@ export function SessionNoteActions({
             <dd className="mt-0.5 text-sm font-medium">
               {appointmentId ? (
                 <Link
-                  href={appendReturnTo(
-                    `/appointments/${appointmentId}`,
-                    sessionNoteUrl
-                  )}
+                  href={`/appointments/${appointmentId}`}
                   className="text-primary hover:underline"
                 >
                   {sessionDateTime}
@@ -145,17 +139,14 @@ export function SessionNoteActions({
             <dd className="mt-0.5 text-sm font-medium">
               {nextAppointment ? (
                 <Link
-                  href={appendReturnTo(
-                    `/appointments/${nextAppointment.appointmentId}`,
-                    sessionNoteUrl
-                  )}
+                  href={`/appointments/${nextAppointment.appointmentId}`}
                   className="text-primary hover:underline"
                 >
                   {nextAppointment.label}
                 </Link>
               ) : (
                 <Link
-                  href={`/calendar?view=month&clientId=${clientId}&returnTo=${encodeURIComponent(sessionNoteUrl)}`}
+                  href={`/calendar?view=month&clientId=${clientId}`}
                   className="text-primary hover:underline"
                 >
                   Schedule appointment →

@@ -23,7 +23,10 @@ export default async function EditMembershipPage({
   return (
     <AppShell>
       <div className="mb-6">
-        <BackButton fallbackHref="/practitioner" label="← Back to profile" />
+        <BackButton
+          page="/practitioner/memberships/[membership_id]/edit"
+          data={{ membershipId }}
+        />
       </div>
       <EntityPageHeader
         kicker="Practice membership edit"

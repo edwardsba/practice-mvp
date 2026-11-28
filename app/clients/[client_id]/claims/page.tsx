@@ -27,8 +27,8 @@ export default async function ClientClaimsPage({
     <AppShell>
       <div className="mb-6">
         <BackButton
-          fallbackHref={`/clients/${clientId}`}
-          label={`← ${loaded.clientName}`}
+          page="/clients/[client_id]/claims"
+          data={{ clientId, clientName: loaded.clientName }}
         />
       </div>
       <EntityPageHeader

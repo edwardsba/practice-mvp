@@ -10,8 +10,7 @@ export default async function NewReportTypePage() {
     <AppShell>
       <div className="mb-6">
         <BackButton
-          fallbackHref="/settings/report-types"
-          label="← Back to report types"
+          page="/settings/report-types/new"
         />
         <h1 className="text-2xl font-semibold tracking-tight">
           Add report type

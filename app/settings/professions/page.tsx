@@ -1,4 +1,5 @@
 import { AppShell } from "@/components/app-shell"
+import { RecordPageVisit } from "@/components/ui/back-button"
 import { ListPageHeader } from "@/components/ui/list-page-header"
 import { ProfessionsManager } from "@/components/contacts/professions-manager"
 import { getProfessions } from "@/lib/actions/contacts"
@@ -10,6 +11,7 @@ export default async function ProfessionsSettingsPage() {
 
   return (
     <AppShell>
+      <RecordPageVisit page="/settings/professions" />
       <ListPageHeader heading="Professions" />
 
       <ProfessionsManager

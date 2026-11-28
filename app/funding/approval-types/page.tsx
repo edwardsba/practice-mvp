@@ -1,4 +1,5 @@
 import Link from "next/link"
+import { RecordPageVisit } from "@/components/ui/back-button"
 
 import { AppShell } from "@/components/app-shell"
 import { Button } from "@/components/ui/button"
@@ -20,6 +21,7 @@ export default async function FundingApprovalTypesPage() {
 
   return (
     <AppShell>
+      <RecordPageVisit page="/funding/approval-types" />
       <ListPageHeader
         heading="Funding approval types"
         action={

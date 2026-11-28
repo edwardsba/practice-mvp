@@ -2,6 +2,7 @@ import Link from "next/link"
 
 import { SessionNotesFilter } from "@/app/session-notes/session-notes-filter"
 import { AppShell } from "@/components/app-shell"
+import { RecordPageVisit } from "@/components/ui/back-button"
 import { ListPageHeader } from "@/components/ui/list-page-header"
 import { AsqStatusBadge } from "@/components/session-notes/asq-status-badge"
 import { PsqStatusBadge } from "@/components/session-notes/psq-status-badge"
@@ -16,7 +17,6 @@ import {
 import { StatusBadge } from "@/components/ui/status-badge"
 import { formatClientNameLastFirst } from "@/lib/appointments/format"
 import { requirePractitionerContext } from "@/lib/auth"
-import { appendReturnTo } from "@/lib/navigation/back"
 import { SESSION_NOTE_STATUS_CONFIG } from "@/lib/status"
 import {
   SESSION_NOTE_FILTER_VALUES,
@@ -53,14 +53,9 @@ export default async function SessionNotesPage({
     filter,
     clientId
   )
-  const listReturnTo = clientId
-    ? `/session-notes?client_id=${encodeURIComponent(clientId)}${
-        filter !== "all" ? `&filter=${filter}` : ""
-      }`
-    : null
-
   return (
     <AppShell>
+      <RecordPageVisit page="/session-notes" />
       <ListPageHeader heading="Session Notes" />
 
       <div className="mb-6">
@@ -95,12 +90,7 @@ export default async function SessionNotesPage({
                   note.clientFirstName,
                   note.clientLastName
                 )
-                const noteHref = listReturnTo
-                  ? appendReturnTo(
-                      `/session-notes/${note.sessionNoteId}`,
-                      listReturnTo
-                    )
-                  : `/session-notes/${note.sessionNoteId}`
+                const noteHref = `/session-notes/${note.sessionNoteId}`
 
                 return (
                   <TableRow

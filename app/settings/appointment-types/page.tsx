@@ -1,4 +1,5 @@
 import Link from "next/link"
+import { RecordPageVisit } from "@/components/ui/back-button"
 
 import { AppShell } from "@/components/app-shell"
 import { Badge } from "@/components/ui/badge"
@@ -26,6 +27,7 @@ export default async function AppointmentTypesPage() {
 
   return (
     <AppShell>
+      <RecordPageVisit page="/settings/appointment-types" />
       <ListPageHeader
         heading="Appointment Types"
         action={

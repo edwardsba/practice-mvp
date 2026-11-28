@@ -23,7 +23,9 @@ export default async function EditPracticePage() {
   return (
     <AppShell>
       <div className="mb-6">
-        <BackButton fallbackHref="/practice" label="← Back to practice" />
+        <BackButton
+          page="/practice/edit"
+        />
       </div>
       <EntityPageHeader kicker="Practice edit" name={practice.practiceName} />
 

@@ -59,8 +59,8 @@ export default async function EditEmergencyContactPage({
     <AppShell>
       <div className="mb-6">
         <BackButton
-          fallbackHref={`/clients/${clientId}`}
-          label="← Back to client"
+          page="/clients/[client_id]/emergency-contacts/[contact_id]/edit"
+          data={{ clientId, clientName, contactId }}
         />
       </div>
       <EntityPageHeader

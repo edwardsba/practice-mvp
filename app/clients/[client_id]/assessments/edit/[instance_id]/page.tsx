@@ -12,18 +12,14 @@ import { saveEditPractitionerAssessment } from "@/lib/assessments/save-practitio
 import { requirePractitionerContext } from "@/lib/auth"
 import { todayDateInput } from "@/lib/dates/practice-time"
 import { db } from "@/lib/db"
-import { safeReturnTo } from "@/lib/navigation/safe-return-to"
 import { formatPractitionerPreferredName } from "@/lib/practitioner/format"
 
 export default async function EditPractitionerAssessmentPage({
   params,
-  searchParams,
 }: {
   params: Promise<{ client_id: string; instance_id: string }>
-  searchParams: Promise<{ returnTo?: string }>
 }) {
   const { client_id: clientId, instance_id: instanceId } = await params
-  const query = await searchParams
   const context = await requirePractitionerContext()
 
   const [client] = await db
@@ -50,7 +46,6 @@ export default async function EditPractitionerAssessmentPage({
   })
   if (!instance) notFound()
 
-  // Link-completed instances: clients' own answers must never be edited.
   if (await instanceHasAccessLink(instanceId)) notFound()
 
   const definition = await loadFormDefinitionByCode(instance.assessmentCode)
@@ -82,8 +77,6 @@ export default async function EditPractitionerAssessmentPage({
     )
     .limit(1)
 
-  const returnTo =
-    safeReturnTo(query.returnTo) ?? `/clients/${clientId}/assessments`
   const clientName = `${client.firstName} ${client.lastName}`
   const practitionerName = practitioner
     ? formatPractitionerPreferredName(practitioner)
@@ -110,7 +103,6 @@ export default async function EditPractitionerAssessmentPage({
           instance.assessmentDate || todayDateInput()
         }
         sessionNoteId={instance.sessionNoteId}
-        returnTo={returnTo}
         instanceId={instanceId}
         saveAction={saveAction}
       />

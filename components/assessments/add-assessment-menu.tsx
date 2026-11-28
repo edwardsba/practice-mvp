@@ -24,7 +24,6 @@ export function AddAssessmentMenu({
   practitionerProfileId,
   templateVariables,
   defaultAssessments,
-  returnTo,
 }: {
   clientId: string
   clientEmail: string | null
@@ -32,14 +31,13 @@ export function AddAssessmentMenu({
   practitionerProfileId: string
   templateVariables: QuestionnaireEmailTemplateVariables | null
   defaultAssessments: BatteryAssessmentChip[]
-  returnTo: string
 }) {
   const router = useRouter()
   const [sendOpen, setSendOpen] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
   const [statusMessage, setStatusMessage] = useState<string | null>(null)
 
-  const startHref = `/clients/${clientId}/assessments/start?returnTo=${encodeURIComponent(returnTo)}`
+  const startHref = `/clients/${clientId}/assessments/start`
 
   return (
     <div className="flex flex-col items-end gap-1">

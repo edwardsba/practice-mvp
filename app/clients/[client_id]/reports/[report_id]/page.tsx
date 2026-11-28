@@ -195,8 +195,8 @@ export default async function SavedReportPage({
     <AppShell>
       <div className="mb-6 no-print">
         <BackButton
-          fallbackHref={`/clients/${clientId}`}
-          label="← Back to client"
+          page="/clients/[client_id]/reports/[report_id]"
+          data={{ clientId, clientName, reportId }}
         />
       </div>
       <div className="no-print">

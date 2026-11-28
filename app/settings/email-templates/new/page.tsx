@@ -10,8 +10,7 @@ export default async function NewEmailTemplatePage() {
     <AppShell>
       <div className="mb-6">
         <BackButton
-          fallbackHref="/settings/email-templates"
-          label="← Back to email templates"
+          page="/settings/email-templates/new"
         />
         <h1 className="text-2xl font-semibold tracking-tight">
           Add email template

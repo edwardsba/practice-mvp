@@ -12,8 +12,7 @@ export default async function NewAppointmentTypePage() {
     <AppShell>
       <div className="mb-6">
         <BackButton
-          fallbackHref="/settings/appointment-types"
-          label="← Back to appointment types"
+          page="/settings/appointment-types/new"
         />
         <h1 className="text-2xl font-semibold tracking-tight">
           Add appointment type

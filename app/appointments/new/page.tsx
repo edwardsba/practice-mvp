@@ -7,7 +7,7 @@ import { BackButton } from "@/components/ui/back-button"
 import { ListPageHeader } from "@/components/ui/list-page-header"
 import { getMemberships } from "@/lib/actions/practitioner-practice"
 import { requirePractitionerContext } from "@/lib/auth"
-import { resolveBackNavigation } from "@/lib/navigation/back"
+import { getDefaultParent } from "@/lib/navigation/page-registry"
 
 export default async function NewAppointmentPage({
   searchParams,
@@ -15,17 +15,16 @@ export default async function NewAppointmentPage({
   searchParams: Promise<{
     date?: string
     time?: string
-    returnTo?: string
     clientId?: string
   }>
 }) {
   const context = await requirePractitionerContext()
-  const { date, time, returnTo, clientId } = await searchParams
-  const back = resolveBackNavigation(
-    returnTo,
-    "/appointments",
-    "← Back to appointments"
-  )
+  const { date, time, clientId } = await searchParams
+  const cancelHref =
+    getDefaultParent("/appointments/new", {
+      clientId,
+      queryClientId: clientId,
+    })?.href ?? "/appointments"
   const [clients, memberships, profile] = await Promise.all([
     getActiveClients(),
     getMemberships(context.practitionerProfileId),
@@ -52,12 +51,16 @@ export default async function NewAppointmentPage({
   return (
     <AppShell>
       <div className="mb-6">
-        <BackButton fallbackHref={back.href} label={back.label} />
+        <BackButton
+          page="/appointments/new"
+          data={{ clientId, queryClientId: clientId }}
+          identifyingSearchKeys={["clientId"]}
+        />
       </div>
       <ListPageHeader heading="Add appointment" />
 
       <AppointmentForm
-        action={createAppointment.bind(null, returnTo)}
+        action={createAppointment}
         clients={clients}
         practiceId={context.practiceId}
         availabilityBlocks={availabilityBlocks}
@@ -83,7 +86,7 @@ export default async function NewAppointmentPage({
               : undefined
         }
         submitLabel="Save appointment"
-        cancelHref={back.href}
+        cancelHref={cancelHref}
       />
     </AppShell>
   )

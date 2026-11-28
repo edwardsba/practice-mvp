@@ -48,7 +48,7 @@ function AppointmentBlock({
   if (!showExtraDetail) {
     return (
       <Link
-        href={`/appointments/${appointment.appointmentId}?returnTo=/calendar`}
+        href={`/appointments/${appointment.appointmentId}`}
         className={cn(
           "flex h-full min-h-0 flex-col justify-center truncate rounded-md border px-1 text-[10px] font-medium leading-tight sm:px-2 sm:text-xs",
           isCancelled
@@ -76,7 +76,7 @@ function AppointmentBlock({
 
   return (
     <Link
-      href={`/appointments/${appointment.appointmentId}?returnTo=/calendar`}
+      href={`/appointments/${appointment.appointmentId}`}
       className={cn(
         "flex h-full min-h-0 flex-col justify-center gap-1 truncate rounded-md border px-2 py-1.5 text-xs font-medium leading-tight",
         isCancelled
@@ -118,7 +118,6 @@ function TimedGridTable({
   intervalMinutes,
   availabilityBlocks,
   clientId,
-  returnTo,
 }: {
   days: string[]
   appointments: CalendarAppointment[]
@@ -127,7 +126,6 @@ function TimedGridTable({
   intervalMinutes: number
   availabilityBlocks: AvailabilityBlock[]
   clientId?: string
-  returnTo?: string
 }) {
   const today = todayDateString()
   const isDayView = days.length === 1
@@ -219,7 +217,7 @@ function TimedGridTable({
                     className="border-b border-l p-0 align-top"
                   >
                     <Link
-                      href={newAppointmentUrl(day, slot, clientId, returnTo)}
+                      href={newAppointmentUrl(day, slot, clientId)}
                       className={cn(
                         "block truncate",
                         available
@@ -246,14 +244,12 @@ export function CalendarTimedGrid({
   calendarSettings,
   availabilityBlocks,
   clientId,
-  returnTo,
 }: {
   days: string[]
   appointments: CalendarAppointment[]
   calendarSettings: CalendarSettings
   availabilityBlocks: AvailabilityBlock[]
   clientId?: string
-  returnTo?: string
 }) {
   const startMinutes = parseTimeStringToMinutes(calendarSettings.startTime)
   const mobileSlots = generateCalendarTimeSlotsFromSettings(
@@ -278,7 +274,6 @@ export function CalendarTimedGrid({
           intervalMinutes={MOBILE_INTERVAL_MINUTES}
           availabilityBlocks={availabilityBlocks}
           clientId={clientId}
-          returnTo={returnTo}
         />
       </div>
       <div className="hidden md:block">
@@ -290,7 +285,6 @@ export function CalendarTimedGrid({
           intervalMinutes={calendarSettings.intervalMinutes}
           availabilityBlocks={availabilityBlocks}
           clientId={clientId}
-          returnTo={returnTo}
         />
       </div>
     </>

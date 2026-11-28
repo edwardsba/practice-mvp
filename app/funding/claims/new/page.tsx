@@ -6,17 +6,18 @@ import { ListPageHeader } from "@/components/ui/list-page-header"
 import { getClaimTypes } from "@/lib/actions/funding"
 import { getProfessionalOrganisations } from "@/lib/actions/contacts"
 import { requirePractitionerContext } from "@/lib/auth"
-import { safeReturnTo } from "@/lib/navigation/safe-return-to"
 
 export default async function NewClaimPage({
   searchParams,
 }: {
-  searchParams: Promise<{ returnTo?: string; client_id?: string }>
+  searchParams: Promise<{ client_id?: string }>
 }) {
   const context = await requirePractitionerContext()
-  const { returnTo: returnToRaw, client_id: searchParamsClientId } =
-    await searchParams
-  const returnTo = safeReturnTo(returnToRaw) ?? undefined
+  const { client_id: searchParamsClientId } = await searchParams
+  const clientId = searchParamsClientId?.trim() || undefined
+  const cancelHref = clientId
+    ? `/clients/${clientId}/claims`
+    : "/funding/claims"
   const [clients, claimTypes, organisations] = await Promise.all([
     getActiveClients(),
     getClaimTypes(context.practiceId),
@@ -26,7 +27,11 @@ export default async function NewClaimPage({
   return (
     <AppShell>
       <div className="mb-6">
-        <BackButton fallbackHref="/funding/claims" label="← Back" />
+        <BackButton
+          page="/funding/claims/new"
+          data={{ clientId, queryClientId: clientId }}
+          identifyingSearchKeys={["client_id"]}
+        />
       </div>
       <ListPageHeader heading="Add claim" />
 
@@ -42,13 +47,10 @@ export default async function NewClaimPage({
           organisationName: org.organisationName,
         }))}
         initialValues={
-          searchParamsClientId
-            ? { clientId: searchParamsClientId }
-            : undefined
+          clientId ? { clientId } : undefined
         }
-        lockClient={Boolean(searchParamsClientId)}
-        cancelHref={returnTo ?? "/funding/claims"}
-        returnTo={returnTo}
+        lockClient={Boolean(clientId)}
+        cancelHref={cancelHref}
       />
     </AppShell>
   )

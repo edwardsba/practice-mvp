@@ -786,9 +786,20 @@ const PAGE_REGISTRY: Record<PageRegistryKey, PageRegistryEntry> = {
     route: "/appointments/new",
     type: "record-form",
     formMode: "new",
-    family: clientFamily,
+    // Main-list / calendar can open this without a client yet; fall back to all appointments.
+    family: (data) => {
+      const id = data.clientId ?? data.queryClientId
+      if (!id) return { kind: "area", area: "appointments" }
+      return { kind: "client", clientId: id }
+    },
     defaultParent: (data) => {
-      const clientId = requireClientId(data)
+      const clientId = data.clientId ?? data.queryClientId
+      if (!clientId) {
+        return {
+          href: "/appointments",
+          label: backLabel("all appointments"),
+        }
+      }
       return {
         href: `/clients/${clientId}/appointments`,
         label: backLabel("appointments"),
@@ -901,9 +912,20 @@ const PAGE_REGISTRY: Record<PageRegistryKey, PageRegistryEntry> = {
     route: "/funding/claims/new",
     type: "record-form",
     formMode: "new",
-    family: clientFamily,
+    // Main list can open this without a client yet; fall back to all claims.
+    family: (data) => {
+      const id = data.clientId ?? data.queryClientId
+      if (!id) return { kind: "area", area: "funding" }
+      return { kind: "client", clientId: id }
+    },
     defaultParent: (data) => {
-      const clientId = requireClientId(data)
+      const clientId = data.clientId ?? data.queryClientId
+      if (!clientId) {
+        return {
+          href: "/funding/claims",
+          label: backLabel("all claims"),
+        }
+      }
       return {
         href: `/clients/${clientId}/claims`,
         label: backLabel("claims"),
@@ -928,11 +950,23 @@ const PAGE_REGISTRY: Record<PageRegistryKey, PageRegistryEntry> = {
     type: "record-form",
     formMode: "new",
     knownGapDefaultParent: true,
-    family: clientFamily,
-    defaultParent: (data) => ({
-      href: `/funding/claims/${data.claimId}`,
-      label: backLabel("claim"),
-    }),
+    family: (data) => {
+      const id = data.clientId ?? data.queryClientId
+      if (!id) return { kind: "area", area: "funding" }
+      return { kind: "client", clientId: id }
+    },
+    defaultParent: (data) => {
+      if (data.claimId) {
+        return {
+          href: `/funding/claims/${data.claimId}`,
+          label: backLabel("claim"),
+        }
+      }
+      return {
+        href: "/funding/approvals",
+        label: backLabel("all funding approvals"),
+      }
+    },
     ownLabel: () => "new funding approval",
   },
   "/funding/approvals/[approval_id]/edit": {

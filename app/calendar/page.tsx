@@ -5,6 +5,7 @@ import { CalendarControls } from "@/components/calendar/calendar-controls"
 import { CalendarMonthView } from "@/components/calendar/calendar-month-view"
 import { CalendarTimedGrid } from "@/components/calendar/calendar-timed-grid"
 import { AppShell } from "@/components/app-shell"
+import { RecordPageVisit } from "@/components/ui/back-button"
 import { Button } from "@/components/ui/button"
 import { getMemberships } from "@/lib/actions/practitioner-practice"
 import { loadAppointmentsForPractitionerInRange } from "@/lib/appointments/load"
@@ -24,14 +25,12 @@ export default async function CalendarPage({
     view?: string
     date?: string
     clientId?: string
-    returnTo?: string
   }>
 }) {
   const {
     view: viewParam,
     date: dateParam,
     clientId,
-    returnTo,
   } = await searchParams
   const context = await requirePractitionerContext()
   const view = parseCalendarView(viewParam)
@@ -69,12 +68,11 @@ export default async function CalendarPage({
 
   return (
     <AppShell>
+      <RecordPageVisit page="/calendar" />
       <div className="mb-6 hidden sm:flex sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-2xl font-semibold tracking-tight">Calendar</h1>
         <Button asChild>
-          <Link href="/appointments/new?returnTo=/calendar">
-            New Appointment
-          </Link>
+          <Link href="/appointments/new">New Appointment</Link>
         </Button>
       </div>
 
@@ -83,7 +81,6 @@ export default async function CalendarPage({
           view={view}
           anchorDate={anchorDate}
           clientId={clientId}
-          returnTo={returnTo}
         />
       </div>
 
@@ -92,7 +89,6 @@ export default async function CalendarPage({
           anchorDate={anchorDate}
           appointments={appointments}
           clientId={clientId}
-          returnTo={returnTo}
         />
       ) : (
         <CalendarTimedGrid
@@ -101,7 +97,6 @@ export default async function CalendarPage({
           calendarSettings={calendarSettings}
           availabilityBlocks={availabilityBlocks}
           clientId={clientId}
-          returnTo={returnTo}
         />
       )}
     </AppShell>

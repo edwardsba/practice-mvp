@@ -20,17 +20,15 @@ import {
 import { requirePractitionerContext } from "@/lib/auth"
 import { todayDateString } from "@/lib/dates/practice-time"
 import { db } from "@/lib/db"
-import { safeReturnTo } from "@/lib/navigation/safe-return-to"
 
 export default async function StartAssessmentPage({
   params,
   searchParams,
 }: {
   params: Promise<{ client_id: string }>
-  searchParams: Promise<{ returnTo?: string }>
+  searchParams: Promise<Record<string, never>>
 }) {
   const { client_id: clientId } = await params
-  const query = await searchParams
   const context = await requirePractitionerContext()
 
   const [client] = await db
@@ -103,15 +101,12 @@ export default async function StartAssessmentPage({
     )
 
   const todaysNote = chooseTodaysSessionNote(notes, today)
-  const returnTo =
-    safeReturnTo(query.returnTo) ?? `/clients/${clientId}/assessments`
   const clientName = `${client.firstName} ${client.lastName}`
-  const startReturnTo = returnTo
 
   return (
     <AppShell>
       <div className="mb-6">
-        <BackButton fallbackHref={returnTo} label="← Back" />
+        <BackButton page="/clients/[client_id]/assessments/start" data={{ clientId, clientName }} />
       </div>
       <EntityPageHeader kicker="Assessments" name="Start assessment" />
 
@@ -132,7 +127,6 @@ export default async function StartAssessmentPage({
                 clientId,
                 assessmentCode: row.assessmentCode,
                 sessionNoteId: todaysNote?.sessionNoteId ?? null,
-                returnTo: startReturnTo,
               })}
             />
           ))}
@@ -153,7 +147,6 @@ export default async function StartAssessmentPage({
                   clientId,
                   assessmentCode: row.assessmentCode,
                   sessionNoteId: todaysNote?.sessionNoteId ?? null,
-                  returnTo: startReturnTo,
                 })}
               />
             ) : (

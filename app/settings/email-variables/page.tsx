@@ -1,4 +1,5 @@
 import { AppShell } from "@/components/app-shell"
+import { RecordPageVisit } from "@/components/ui/back-button"
 import { ListPageHeader } from "@/components/ui/list-page-header"
 import {
   Card,
@@ -22,6 +23,7 @@ export default async function EmailVariablesPage() {
 
   return (
     <AppShell>
+      <RecordPageVisit page="/settings/email-variables" />
       <ListPageHeader heading="Email Variables" />
 
       <Card>

@@ -205,8 +205,8 @@ export default async function EditReportPage({
     <AppShell>
       <div className="mb-6">
         <BackButton
-          fallbackHref={`/clients/${clientId}/reports/${reportId}`}
-          label="← Back to report"
+          page="/clients/[client_id]/reports/[report_id]/edit"
+          data={{ clientId, clientName, reportId }}
         />
       </div>
       <EntityPageHeader

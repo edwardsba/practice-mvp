@@ -11,7 +11,6 @@ import { saveNewPractitionerAssessment } from "@/lib/assessments/save-practition
 import { requirePractitionerContext } from "@/lib/auth"
 import { todayDateInput } from "@/lib/dates/practice-time"
 import { db } from "@/lib/db"
-import { safeReturnTo } from "@/lib/navigation/safe-return-to"
 import { formatPractitionerPreferredName } from "@/lib/practitioner/format"
 import { loadSessionNoteForPractice } from "@/lib/session-notes/load"
 
@@ -20,7 +19,7 @@ export default async function NewPractitionerAssessmentPage({
   searchParams,
 }: {
   params: Promise<{ client_id: string; assessment_code: string }>
-  searchParams: Promise<{ session_note_id?: string; returnTo?: string }>
+  searchParams: Promise<{ session_note_id?: string }>
 }) {
   const { client_id: clientId, assessment_code: assessmentCodeParam } =
     await params
@@ -83,8 +82,6 @@ export default async function NewPractitionerAssessmentPage({
     )
     .limit(1)
 
-  const returnTo =
-    safeReturnTo(query.returnTo) ?? `/clients/${clientId}/assessments`
   const clientName = `${client.firstName} ${client.lastName}`
   const practitionerName = practitioner
     ? formatPractitionerPreferredName(practitioner)
@@ -109,7 +106,6 @@ export default async function NewPractitionerAssessmentPage({
         initialAnswers={defaultAnswersFromElements(definition.elements)}
         initialAssessmentDate={todayDateInput()}
         sessionNoteId={sessionNoteId}
-        returnTo={returnTo}
         saveAction={saveAction}
       />
     </AppShell>

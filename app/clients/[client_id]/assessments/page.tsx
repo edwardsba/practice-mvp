@@ -71,14 +71,13 @@ export default async function ClientAssessmentsPage({
     activeTreatmentPlan?.ongoingAssessmentsJson,
     activeTreatmentPlan?.smartGoalItems ?? []
   )
-  const returnTo = `/clients/${clientId}/assessments`
 
   return (
     <AppShell>
       <div className="mb-6">
         <BackButton
-          fallbackHref={`/clients/${clientId}`}
-          label={`← ${clientName}`}
+          page="/clients/[client_id]/assessments"
+          data={{ clientId, clientName }}
         />
       </div>
       <EntityPageHeader
@@ -93,7 +92,6 @@ export default async function ClientAssessmentsPage({
             practitionerProfileId={context.practitionerProfileId}
             templateVariables={templateVariables}
             defaultAssessments={defaultAssessments}
-            returnTo={returnTo}
           />
         }
       />

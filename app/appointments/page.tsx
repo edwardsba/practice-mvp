@@ -3,6 +3,7 @@ import Link from "next/link"
 import { AppointmentsFilter } from "@/app/appointments/appointments-filter"
 import { TestAutomationsButton } from "@/app/appointments/test-automations-button"
 import { AppShell } from "@/components/app-shell"
+import { RecordPageVisit } from "@/components/ui/back-button"
 import { StatusBadge } from "@/components/ui/status-badge"
 import { Button } from "@/components/ui/button"
 import { ListPageHeader } from "@/components/ui/list-page-header"
@@ -51,6 +52,7 @@ export default async function AppointmentsPage({
 
   return (
     <AppShell>
+      <RecordPageVisit page="/appointments" />
       <ListPageHeader
         heading="Appointments"
         action={

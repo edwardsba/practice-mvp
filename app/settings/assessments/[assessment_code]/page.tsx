@@ -61,8 +61,8 @@ export default async function AssessmentDefinitionDetailPage({
     <AppShell>
       <div className="mb-6">
         <BackButton
-          fallbackHref="/settings/assessments"
-          label="← Back to assessments"
+          page="/settings/assessments/[assessment_code]"
+          data={{ assessmentCode, assessmentName: definition.assessmentName }}
         />
       </div>
       <EntityPageHeader

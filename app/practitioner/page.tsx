@@ -1,4 +1,5 @@
 import Link from "next/link"
+import { RecordPageVisit } from "@/components/ui/back-button"
 
 import { getPractitionerProfile } from "@/app/practitioner/actions"
 import { AppShell } from "@/components/app-shell"
@@ -37,6 +38,7 @@ export default async function PractitionerPage() {
   if (!profile) {
     return (
       <AppShell>
+      <RecordPageVisit page="/practitioner" />
         <h1 className="mb-6 text-2xl font-semibold tracking-tight">Profile</h1>
         <p className="text-muted-foreground">Practitioner profile not found.</p>
       </AppShell>

@@ -2,7 +2,13 @@
 
 import Link from "next/link"
 import { useRouter, usePathname, useSearchParams } from "next/navigation"
-import { Suspense, useEffect, useState, type MouseEvent } from "react"
+import {
+  Suspense,
+  startTransition,
+  useEffect,
+  useState,
+  type MouseEvent,
+} from "react"
 
 import { DiscardChangesDialog } from "@/components/client-background/discard-changes-dialog"
 import { Button } from "@/components/ui/button"
@@ -106,7 +112,6 @@ function BackButtonInner({
   const defaultKey = `${defaultParent.href}|${defaultParent.label}`
 
   useEffect(() => {
-    setTarget(defaultParent)
     const store = browserMemoryStore()
     if (!store) return
     const href = pageHrefFromLocation(
@@ -117,8 +122,10 @@ function BackButtonInner({
     const input = buildMountInput(page, href, data)
     input.ownLabel = getOwnLabel(page, data)
     mountPage(store, input)
-    const resolved = resolveBackTarget(store, href, defaultParent)
-    setTarget(resolved ?? defaultParent)
+    const resolved = resolveBackTarget(store, href, defaultParent) ?? defaultParent
+    startTransition(() => {
+      setTarget(resolved)
+    })
     // dataKey / defaultKey stand in for data and defaultParent identity.
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional stable deps
   }, [page, dataKey, defaultKey, pathname, searchParams, identifyingSearchKeys])

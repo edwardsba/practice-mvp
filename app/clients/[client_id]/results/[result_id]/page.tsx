@@ -53,7 +53,6 @@ import { getResultSummaryBuilder } from "@/lib/assessments/result-summaries"
 import { instanceHasAccessLink } from "@/lib/assessments/instance-access-link"
 import { requirePractitionerContext } from "@/lib/auth"
 import { db } from "@/lib/db"
-import { safeReturnTo } from "@/lib/navigation/safe-return-to"
 import { formatPractitionerPreferredName } from "@/lib/practitioner/format"
 import type { SageSrCoreResponseParsedResult } from "@/lib/sage-sr/parse-core-response"
 import type {
@@ -124,11 +123,10 @@ export default async function AssessmentResultDetailPage({
   searchParams,
 }: {
   params: Promise<{ client_id: string; result_id: string }>
-  searchParams: Promise<{ returnTo?: string }>
+  searchParams: Promise<Record<string, never>>
 }) {
   const { client_id: clientId, result_id: resultId } = await params
-  const { returnTo: returnToParam } = await searchParams
-  const returnTo = returnToParam?.trim() || null
+  await searchParams
   const context = await requirePractitionerContext()
 
   const [client] = await db
@@ -273,10 +271,6 @@ export default async function AssessmentResultDetailPage({
     }
 
     const assessmentsHref = `/clients/${clientId}/assessments`
-    const backHref = safeReturnTo(returnTo) ?? assessmentsHref
-    const resultsHref = returnTo
-      ? `/clients/${clientId}/results/${resultId}?returnTo=${encodeURIComponent(returnTo)}`
-      : `/clients/${clientId}/results/${resultId}`
 
     const summaryBuilder = getResultSummaryBuilder(result.assessmentCode)
     const summaryRows = summaryBuilder
@@ -300,8 +294,7 @@ export default async function AssessmentResultDetailPage({
         sessionNoteId={result.sessionNoteId}
         sessionDate={sessionDate}
         instanceId={result.assessmentInstanceId}
-        backHref={backHref}
-        editReturnTo={resultsHref}
+        resultId={resultId}
         summaryRows={summaryRows}
         elements={definition.elements}
         answers={answers}
@@ -358,9 +351,9 @@ export default async function AssessmentResultDetailPage({
       <AppShell>
         <div className="mb-6">
           <BackButton
-            fallbackHref={`/clients/${clientId}`}
-            label="← Back to client"
-          />
+          page="/clients/[client_id]/results/[result_id]"
+          data={{ clientId, clientName, resultId, resultDate: result.assessmentDate }}
+        />
         </div>
         <EntityPageHeader
           kicker={result.assessmentName}
@@ -575,9 +568,9 @@ export default async function AssessmentResultDetailPage({
       <AppShell>
         <div className="mb-6">
           <BackButton
-            fallbackHref={`/clients/${clientId}`}
-            label="← Back to client"
-          />
+          page="/clients/[client_id]/results/[result_id]"
+          data={{ clientId, clientName, resultId, resultDate: result.assessmentDate }}
+        />
         </div>
         <EntityPageHeader
           kicker={result.assessmentName}
@@ -692,9 +685,9 @@ export default async function AssessmentResultDetailPage({
       <AppShell>
         <div className="mb-6">
           <BackButton
-            fallbackHref={`/clients/${clientId}`}
-            label="← Back to client"
-          />
+          page="/clients/[client_id]/results/[result_id]"
+          data={{ clientId, clientName, resultId, resultDate: result.assessmentDate }}
+        />
         </div>
         <EntityPageHeader
           kicker={result.assessmentName}
@@ -926,9 +919,9 @@ export default async function AssessmentResultDetailPage({
       <AppShell>
         <div className="mb-6">
           <BackButton
-            fallbackHref={`/clients/${clientId}/assessments`}
-            label="← Back to assessments"
-          />
+          page="/clients/[client_id]/results/[result_id]"
+          data={{ clientId, clientName, resultId, resultDate: result.assessmentDate }}
+        />
         </div>
         <EntityPageHeader
           kicker={result.assessmentName}
@@ -1088,9 +1081,8 @@ export default async function AssessmentResultDetailPage({
     formDefinition != null
       ? buildAnswerSections(formDefinition.elements, formAnswers)
       : []
-
-  const resultsHref = returnTo
-    ? `/clients/${clientId}/results/${resultId}?returnTo=${encodeURIComponent(returnTo)}`
+  const resultsHref = `/clients/${clientId}/results/${resultId}`
+    ? `/clients/${clientId}/results/${resultId}`
     : `/clients/${clientId}/results/${resultId}`
 
   const canShowSharedEdit =
@@ -1108,7 +1100,6 @@ export default async function AssessmentResultDetailPage({
     ? buildPractitionerEditHref({
         clientId,
         instanceId: result.assessmentInstanceId,
-        returnTo: resultsHref,
       })
     : null
 
@@ -1116,8 +1107,8 @@ export default async function AssessmentResultDetailPage({
     <AppShell>
       <div className="mb-6">
         <BackButton
-          fallbackHref={`/clients/${clientId}`}
-          label="← Back to client"
+          page="/clients/[client_id]/results/[result_id]"
+          data={{ clientId, clientName, resultId, resultDate: result.assessmentDate }}
         />
       </div>
       <EntityPageHeader

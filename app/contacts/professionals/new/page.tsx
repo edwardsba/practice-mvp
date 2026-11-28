@@ -25,8 +25,7 @@ export default async function NewProfessionalPage({
     <AppShell>
       <div className="mb-6">
         <BackButton
-          fallbackHref={returnTo ?? "/contacts/professionals"}
-          label="← Back"
+          page="/contacts/professionals/new"
         />
       </div>
       <ListPageHeader heading="Add professional" />

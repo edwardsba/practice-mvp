@@ -172,8 +172,8 @@ export default async function ClientReportsPage({
     <AppShell>
       <div className="mb-6">
         <BackButton
-          fallbackHref={`/clients/${clientId}`}
-          label={`← ${clientName}`}
+          page="/clients/[client_id]/reports"
+          data={{ clientId, clientName }}
         />
       </div>
       <EntityPageHeader
@@ -183,7 +183,7 @@ export default async function ClientReportsPage({
         action={
           <Button asChild>
             <Link
-              href={`/clients/${clientId}/reports/new?returnTo=${encodeURIComponent(reportsListUrl)}`}
+              href={`/clients/${clientId}/reports/new`}
             >
               Create Report
             </Link>
@@ -217,7 +217,7 @@ export default async function ClientReportsPage({
                   report.kind === "sage_sr"
                     ? `/clients/${clientId}/reports/sage-sr/${report.id}`
                     : `/clients/${clientId}/reports/${report.id}`
-                const reportHref = `${reportPath}?returnTo=${encodeURIComponent(reportsListUrl)}`
+                const reportHref = `${reportPath}`
 
                 return (
                   <TableRow

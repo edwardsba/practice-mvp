@@ -14,7 +14,6 @@ import {
 import { getProfessions, getProfessionalOrganisations } from "@/lib/actions/contacts"
 import { requirePractitionerContext } from "@/lib/auth"
 import { PRIVATE_CLAIM_TYPE_NAME } from "@/lib/funding/referral"
-import { safeReturnTo } from "@/lib/navigation/safe-return-to"
 import { and, eq } from "drizzle-orm"
 import { claimTypes } from "@/db/schema"
 import { db } from "@/lib/db"
@@ -23,7 +22,6 @@ export default async function NewFundingApprovalPage({
   searchParams,
 }: {
   searchParams: Promise<{
-    returnTo?: string
     client_id?: string
     clientId?: string
     claim_id?: string
@@ -33,7 +31,6 @@ export default async function NewFundingApprovalPage({
 }) {
   const context = await requirePractitionerContext()
   const {
-    returnTo: returnToRaw,
     client_id: clientIdSnake,
     clientId: clientIdCamel,
     claim_id: claimIdSnake,
@@ -41,7 +38,6 @@ export default async function NewFundingApprovalPage({
     kind,
   } = await searchParams
 
-  const returnTo = safeReturnTo(returnToRaw) ?? undefined
   const claimIdParam = claimIdSnake ?? claimIdCamel
 
   const claimFromParam = claimIdParam
@@ -51,6 +47,9 @@ export default async function NewFundingApprovalPage({
   const initialClientId =
     clientIdSnake ?? clientIdCamel ?? claimFromParam?.clientId ?? undefined
   const initialClaimId = claimFromParam?.claimId ?? undefined
+  const cancelHref = initialClaimId
+    ? `/funding/claims/${initialClaimId}`
+    : "/funding/approvals"
 
   const [
     clients,
@@ -115,8 +114,13 @@ export default async function NewFundingApprovalPage({
     <AppShell>
       <div className="mb-6">
         <BackButton
-          fallbackHref="/funding/approvals"
-          label="← Back"
+          page="/funding/approvals/new"
+          data={{
+            clientId: initialClientId,
+            queryClientId: initialClientId,
+            claimId: initialClaimId,
+          }}
+          identifyingSearchKeys={["claimId", "claim_id", "clientId", "client_id"]}
         />
       </div>
       <ListPageHeader heading={heading} />
@@ -144,8 +148,7 @@ export default async function NewFundingApprovalPage({
               }
             : undefined
         }
-        cancelHref={returnTo ?? "/funding/approvals"}
-        returnTo={returnTo}
+        cancelHref={cancelHref}
       />
     </AppShell>
   )

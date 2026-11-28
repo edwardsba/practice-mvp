@@ -62,7 +62,7 @@ export function AttachToClaimPicker({
           This client has no claims yet.
         </p>
         <Link
-          href={`/funding/claims/new?client_id=${clientId}&returnTo=${encodeURIComponent(returnPath)}`}
+          href={`/funding/claims/new?client_id=${clientId}`}
           className="font-medium text-primary hover:underline"
         >
           + New claim

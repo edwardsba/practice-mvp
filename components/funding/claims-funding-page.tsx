@@ -74,7 +74,7 @@ function ProgressBar({ used, approved }: { used: number; approved: number }) {
 }
 
 function approvalDetailsHref(approvalId: string, returnPath: string) {
-  return `/funding/approvals/${approvalId}?returnTo=${encodeURIComponent(returnPath)}`
+  return `/funding/approvals/${approvalId}`
 }
 
 function newApprovalHref(opts: {
@@ -86,8 +86,7 @@ function newApprovalHref(opts: {
   const params = new URLSearchParams()
   params.set("client_id", opts.clientId)
   params.set("kind", opts.kind)
-  params.set("returnTo", opts.returnPath)
-  if (opts.claimId) params.set("claim_id", opts.claimId)
+    if (opts.claimId) params.set("claim_id", opts.claimId)
   return `/funding/approvals/new?${params.toString()}`
 }
 
@@ -344,7 +343,7 @@ function ClaimCard({
             </p>
           </div>
           <Link
-            href={`/funding/claims/${claim.claimId}?returnTo=${encodeURIComponent(returnPath)}`}
+            href={`/funding/claims/${claim.claimId}`}
             className="inline-block text-sm font-medium text-primary hover:underline"
           >
             Claim details ›
@@ -446,7 +445,7 @@ export function ClaimsFundingPage({
           <DropdownMenuContent align="end">
             <DropdownMenuItem asChild>
               <Link
-                href={`/funding/claims/new?client_id=${clientId}&returnTo=${encodeURIComponent(returnPath)}`}
+                href={`/funding/claims/new?client_id=${clientId}`}
               >
                 New claim
               </Link>

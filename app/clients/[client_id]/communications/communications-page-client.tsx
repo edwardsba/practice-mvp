@@ -138,8 +138,8 @@ export function CommunicationsPageClient({
     <>
       <div className="mb-6">
         <BackButton
-          fallbackHref={`/clients/${clientId}`}
-          label={`← ${clientName}`}
+          page="/clients/[client_id]/communications"
+          data={{ clientId, clientName }}
         />
       </div>
       <EntityPageHeader

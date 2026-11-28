@@ -1,4 +1,5 @@
 import Link from "next/link"
+import { RecordPageVisit } from "@/components/ui/back-button"
 
 import { AppShell } from "@/components/app-shell"
 import { Button } from "@/components/ui/button"
@@ -21,6 +22,7 @@ export default async function ProfessionalsPage() {
 
   return (
     <AppShell>
+      <RecordPageVisit page="/contacts/professionals" />
       <ListPageHeader
         heading="Professionals"
         action={

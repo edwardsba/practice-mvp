@@ -101,7 +101,7 @@ There are two kinds of form, each with one shared look: assessment forms (the sh
 
 | Element | Look |
 | --- | --- |
-| `yes_no`, `radio` | Full-width radio rows, one per line; the selected row gets a dark border and light fill |
+| `yes_no`, `radio` | Full-width rows, one per line, each with a light border; the selected row gets a dark border and light fill |
 | `checkbox`, `tick` | The same rows, with square ticks |
 | `short_text`, `long_text`, `date` | Full-width boxes, 44 px tall (long text taller) |
 | `text_list` | Growing boxes; an empty one always trails |
@@ -203,7 +203,7 @@ Every screen is designed for a 390 px phone first, then widened for desktop.
 - **PH-2 One column** on phones. Side-by-side fields only for Year / Month / Day.
 - **PH-3 Inputs** use 16 px text, so iOS doesn't zoom in.
 - **PH-4 Side panels** take about 88% of the width on a phone, and a fixed width on desktop.
-- **PH-5 Footers** with Save or Confirm stay visible at the bottom of a panel or long form.
+- **PH-5 Footers.** In side panels and practitioner forms, Save or Confirm stays visible at the bottom. On client forms, Back / Next sits directly under the section, never fixed, so it never rides on top of the keyboard.
 - **PH-6 Typing** never closes the keyboard or moves the page. Fields keep focus while typing.
 
 ## 10. Client-facing pages (CP)
@@ -251,6 +251,7 @@ Where the system doesn't match the guide yet. Add a row when a gap is found; del
 
 | Rule | Area | Gap | Planned fix |
 | --- | --- | --- | --- |
+| CP-2 | Scored client questionnaires | PHQ-9, GAD-7 and others still use the old radio-only client page | Move onto the shared client form |
 | PH-1, BT-1 | Buttons | The default button is 32 px tall, below the 44 px touch target | Raise the default size |
 | AS-1 | Results page | Special layouts for PSF, SAGE-SR (3 reports), PHQ-9 and GAD-7 | Move each onto the shared results view with a summary box |
 | PN-4 | Confirmations | `window.confirm` in the history tree, history section and funding approval form | Shared confirm dialog |
@@ -267,6 +268,7 @@ One row per change to the guide, newest first. Retired rules are recorded here a
 
 | Date | Rules | Change | Agreed in |
 | --- | --- | --- | --- |
+| 28 Nov 2026 | PH-5, FM-1 | Client-form footer not fixed; radio rows always outlined | Round AY.2 (phone testing) |
 | 28 Nov 2026 | GU-2, GU-3 | Committed to the repo as `docs/design-guide.md`; Cursor always-on rule added | Round DG |
 | 28 Nov 2026 | AS-6 | Added: element keys are unique across all assessments; new keys take the assessment's prefix | Review of round AY |
 | 28 Nov 2026 | All | First version: sections 0–12, rule IDs, Known gaps and Change log | Chat with Ben |

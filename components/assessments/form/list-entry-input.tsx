@@ -213,6 +213,7 @@ export function ListEntryInput({
                   checked={passedAway}
                   disabled={disabled}
                   onChange={() => setDraft(setPersonPassedAway(person, !passedAway))}
+                  className="size-4 shrink-0 rounded border border-muted-foreground"
                 />
                 <span className="text-sm font-medium">{listFieldLabel(config, "passedAway")}</span>
               </label>
@@ -225,11 +226,12 @@ export function ListEntryInput({
                 <p className="text-sm font-medium">{listFieldLabel(config, "age")}</p>
                 <Input
                   type="number"
+                  inputMode="numeric"
                   min={0}
                   max={120}
                   value={person.age ?? ""}
                   disabled={disabled}
-                  className="min-h-11 max-w-xs"
+                  className="min-h-11 max-w-32"
                   onChange={(event) => {
                     const raw = event.target.value
                     if (raw === "") {
@@ -286,11 +288,12 @@ export function ListEntryInput({
                 <p className="text-sm font-medium">{listFieldLabel(config, field)}</p>
                 <Input
                   type="number"
+                  inputMode="numeric"
                   min={1000}
                   max={9999}
                   value={current ?? ""}
                   disabled={disabled}
-                  className="min-h-11 max-w-xs"
+                  className="min-h-11 max-w-32"
                   onChange={(event) => {
                     const raw = event.target.value
                     if (raw === "") {

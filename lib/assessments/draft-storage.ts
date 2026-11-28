@@ -6,6 +6,8 @@ export type AssessmentDraft = {
   savedAt: string
   /** Element keys the practitioner has confirmed (pre-filled → confirmed). */
   confirmedKeys?: string[]
+  /** Client form: group labels left via Next / chip (survives Save and finish later). */
+  visitedSectionKeys?: string[]
 }
 
 function draftKey(params: {

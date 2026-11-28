@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm"
+import { and, eq } from "drizzle-orm"
 import { NextResponse } from "next/server"
 
 import {
@@ -9,6 +9,11 @@ import {
   assessmentResults,
   auditEvents,
 } from "@/db/schema"
+import {
+  LINK_ALREADY_USED_MESSAGE,
+  LinkAlreadyUsedError,
+  assertAccessLinkClaimed,
+} from "@/lib/assessments/claim-access-link"
 import type { FormAnswers } from "@/lib/assessments/form-rules"
 import { loadFormDefinitionByCode } from "@/lib/assessments/load-form-definition"
 import { definitionUsesSharedClientForm } from "@/lib/assessments/needs-shared-client-form"
@@ -178,6 +183,28 @@ export async function POST(request: Request) {
 
   try {
     await db.transaction(async (tx) => {
+      // Claim the active link first so a double tap cannot insert two results.
+      const claimed = await tx
+        .update(assessmentAccessLinks)
+        .set({
+          accessStatus: "submitted",
+          submittedAt: now,
+          updatedAt: now,
+        })
+        .where(
+          and(
+            eq(
+              assessmentAccessLinks.assessmentAccessLinkId,
+              accessLink.assessmentAccessLinkId
+            ),
+            eq(assessmentAccessLinks.accessStatus, "active")
+          )
+        )
+        .returning({
+          assessmentAccessLinkId: assessmentAccessLinks.assessmentAccessLinkId,
+        })
+      assertAccessLinkClaimed(claimed)
+
       if (responseValues.length > 0) {
         await tx.insert(assessmentResponses).values(
           responseValues.map((row) => ({
@@ -203,20 +230,6 @@ export async function POST(request: Request) {
           eq(
             assessmentInstances.assessmentInstanceId,
             instance.assessmentInstanceId
-          )
-        )
-
-      await tx
-        .update(assessmentAccessLinks)
-        .set({
-          accessStatus: "submitted",
-          submittedAt: now,
-          updatedAt: now,
-        })
-        .where(
-          eq(
-            assessmentAccessLinks.assessmentAccessLinkId,
-            accessLink.assessmentAccessLinkId
           )
         )
 
@@ -251,7 +264,13 @@ export async function POST(request: Request) {
     })
 
     return NextResponse.json({ success: true })
-  } catch {
+  } catch (error) {
+    if (error instanceof LinkAlreadyUsedError) {
+      return NextResponse.json(
+        { error: LINK_ALREADY_USED_MESSAGE },
+        { status: 400 }
+      )
+    }
     return NextResponse.json(
       { error: "Unable to submit your responses. Please try again." },
       { status: 500 }

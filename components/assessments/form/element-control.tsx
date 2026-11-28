@@ -48,7 +48,7 @@ export function ElementControl({
 
     case "checkbox":
       return (
-        <div className="space-y-2" role="group" aria-labelledby={`${id}-label`}>
+        <div className="flex flex-col gap-2" role="group" aria-labelledby={`${id}-label`}>
           {element.options.map((option) => {
             const optionId = `${id}-${option.value}`
             const checked = values.includes(option.value)
@@ -74,7 +74,7 @@ export function ElementControl({
                       onChange([...values, option.value])
                     }
                   }}
-                  className="mt-1"
+                  className="mt-1 size-4 shrink-0 rounded border border-muted-foreground"
                 />
                 <span className="text-sm leading-snug">{option.label}</span>
               </label>
@@ -100,6 +100,7 @@ export function ElementControl({
             checked={checked}
             disabled={disabled}
             onChange={() => onChange(checked ? [] : [TICK_VALUE])}
+            className="size-4 shrink-0 rounded border border-muted-foreground"
           />
           <span className="text-sm font-medium">{element.questionText}</span>
         </label>

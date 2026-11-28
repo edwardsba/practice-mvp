@@ -4,6 +4,7 @@ import {
   acceptClientChangesButtonLabel,
   applyClientField,
   clientFieldDisplayLabel,
+  CLIENT_FIELD_KEYS,
   clientFieldStates,
   clientFieldStatesForItem,
   compareClientField,
@@ -41,10 +42,8 @@ const suggestions: ClientBackgroundSuggestions = {
   },
   living: {
     housingType: { label: "Own home", apply: "Own home" },
+    whoLivesWithLabel: "a partner, children",
   },
-  history: {},
-  medication: {},
-  stressors: {},
 }
 
 check(
@@ -216,21 +215,12 @@ check(
   []
 )
 
-// Household: the file keeps only the household, so a matching household is the same answer.
-const livesWithPartner: ClientBackgroundSuggestions = {
-  ...suggestions,
-  living: { livesWith: { label: "Partner", apply: { livesWith: "with_partner", livesWithOther: "" } } },
-}
-const livesWithOther: ClientBackgroundSuggestions = {
-  ...suggestions,
-  living: { livesWith: { label: "Flatmates", apply: { livesWith: "other", livesWithOther: "Flatmates" } } },
-}
-const withOthers = { ...emptyDemo, livingSituation: { ...emptyDemo.livingSituation, household: "with_others" as const } }
-const alone = { ...emptyDemo, livingSituation: { ...emptyDemo.livingSituation, household: "alone" as const } }
-check("lives with: no household → empty", compareClientField("living.livesWith", livesWithPartner, emptyDemo)?.kind, "empty")
-check("lives with partner vs with others → same", compareClientField("living.livesWith", livesWithPartner, withOthers)?.kind, "same")
-check("lives with other (flatmates) vs with others → same", compareClientField("living.livesWith", livesWithOther, withOthers)?.kind, "same")
-check("lives with partner vs alone → different", compareClientField("living.livesWith", livesWithPartner, alone)?.kind, "different")
+// whoLivesWithLabel is display-only — not a Use client's / Keep field.
+check(
+  "who lives with is not a client field key",
+  (CLIENT_FIELD_KEYS as readonly string[]).includes("living.livesWith"),
+  false
+)
 
 // --- applyClientField: values come from the self-report; result matches the client ---
 
@@ -244,6 +234,7 @@ const full: ClientBackgroundSuggestions = {
     religion: { label: "Orthodox", apply: "Orthodox" },
     primaryLanguage: { label: "English", apply: "English" },
     disability: { label: "Yes — ADHD", apply: { value: true, detail: "ADHD" } },
+    accessibilityNeeds: { label: "Ramp", apply: "Ramp" },
   },
   education: {
     level: { label: "Bachelor degree", apply: "Bachelor degree" },
@@ -260,12 +251,9 @@ const full: ClientBackgroundSuggestions = {
   },
   living: {
     housingType: { label: "Private rental", apply: "Private rental" },
-    livesWith: { label: "Partner", apply: { livesWith: "with_partner", livesWithOther: "" } },
-    housingStability: { label: "Secure", apply: "Secure" },
+    housingStability: { label: "Stable", apply: "Stable" },
+    whoLivesWithLabel: "a partner",
   },
-  history: {},
-  medication: {},
-  stressors: {},
 }
 
 let applied: Demographics = emptyDemographics()
@@ -278,6 +266,7 @@ for (const fieldKey of [
   "identity.religion",
   "identity.primaryLanguage",
   "identity.disability",
+  "identity.accessibilityNeeds",
   "education.level",
   "education.fieldOfStudy",
   "education.currentlyStudying",
@@ -288,7 +277,6 @@ for (const fieldKey of [
   "occupation.previousJob",
   "occupation.necessities",
   "living.housingType",
-  "living.livesWith",
   "living.housingStability",
 ] as const) {
   const result = applyClientField(fieldKey, full, applied)
@@ -300,7 +288,8 @@ console.log("ok — every client field applies and then matches")
 check("apply writes the self-report value", applied.identity.pronouns, "they/them")
 check("apply gender keeps genderDiffersFromSex in step", applied.identity.genderDiffersFromSex, true)
 check("apply yes/no detail", [applied.identity.disability, applied.identity.disabilityDetail], [true, "ADHD"])
-check("apply household from lives-with", applied.livingSituation.household, "with_others")
+check("apply access needs", applied.identity.accessibilityNeeds, "Ramp")
+check("apply necessities also sets financial hardship", applied.occupation.financialConcerns, true)
 check("apply previous job appends", applied.occupation.previousJobs.map((job) => [job.role, job.employer]), [
   ["Barista", "Café"],
 ])

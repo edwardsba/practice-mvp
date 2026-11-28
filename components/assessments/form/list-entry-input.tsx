@@ -126,7 +126,7 @@ export function ListEntryInput({
     if (mode === "person") {
       const entry = parsePersonListEntry(raw, config)
       if (!entry) return null
-      const { name, details } = formatPersonListEntryLine(entry, config)
+      const { name, details } = formatPersonListEntryLine(entry, config, "client")
       return (
         <div
           key={`${id}-row-${index}`}

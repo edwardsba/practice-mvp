@@ -123,7 +123,7 @@ function displayAnswer(
         .map((raw) => parsePersonListEntry(raw, element.listConfig))
         .filter((entry): entry is NonNullable<typeof entry> => entry != null)
         .map((entry) => {
-          const { name, details } = formatPersonListEntryLine(entry, element.listConfig)
+          const { name, details } = formatPersonListEntryLine(entry, element.listConfig, "readonly")
           return details ? `${name} · ${details}` : name
         })
       if (lines.length === 0) return null

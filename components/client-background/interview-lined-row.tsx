@@ -194,8 +194,11 @@ function InterviewValueLink({
       <span className={cn("italic text-muted-foreground", onEdit && valueLineClass)}>{emptyText}</span>
     ) : (
       parts.map((part, index) =>
-        part.kind === "client" ? (
-          <span key={`${index}-${part.fieldKey}`} className={cn("px-2 py-1", statusColours.client.soft)}>
+        part.kind === "client" || part.kind === "client_info" ? (
+          <span
+            key={`${index}-${part.kind === "client" ? part.fieldKey : "info"}`}
+            className={cn("px-2 py-1", statusColours.client.soft)}
+          >
             <span className={cn(onEdit && valueLineClass)}>Client: {part.text}</span>
           </span>
         ) : (

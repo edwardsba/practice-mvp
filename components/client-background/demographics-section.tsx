@@ -597,7 +597,7 @@ export function LivingFieldsEditor({
     onCommit?.()
   }
   const housingType = client?.housingType
-  const livesWith = client?.livesWith
+  const whoLivesWithLabel = client?.whoLivesWithLabel
   const housingStability = client?.housingStability
   const householdPeople = householdPeopleFromRelationships(relationships)
   const showPeople = value.household === "with_others"
@@ -634,8 +634,8 @@ export function LivingFieldsEditor({
         label="Who lives in the home"
         value={value.household}
         client={
-          livesWith ? (
-            <ClientAnswer label={livesWith.label} matches={false} />
+          whoLivesWithLabel ? (
+            <ClientAnswer label={whoLivesWithLabel} matches={false} />
           ) : undefined
         }
         onChange={(next) => setHousehold(next as Household | "")}

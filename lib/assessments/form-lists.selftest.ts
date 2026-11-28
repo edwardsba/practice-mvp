@@ -96,12 +96,53 @@ check(
 )
 
 check(
-  "person collapsed line",
+  "person collapsed line (client audience)",
   formatPersonListEntryLine(
     { firstName: "Jane", age: 47, relationship: "sister", livesWith: "yes" },
-    siblingConfig
+    siblingConfig,
+    "client"
   ),
-  { name: "Jane", details: "47 · Sister · Yes" }
+  { name: "Jane", details: "47 · Sister · lives with you" }
+)
+
+check(
+  "person collapsed line (readonly audience)",
+  formatPersonListEntryLine(
+    { firstName: "Jane", age: 47, relationship: "sister", livesWith: "no" },
+    siblingConfig,
+    "readonly"
+  ),
+  { name: "Jane", details: "47 · Sister · doesn't live with client" }
+)
+
+check(
+  "person year range from–to",
+  formatPersonListEntryLine(
+    { firstName: "Jo", fromYear: 2005, toYear: 2011 },
+    { addButtonLabel: "+ Add", fields: ["firstName", "fromYear", "toYear"] },
+    "readonly"
+  ),
+  { name: "Jo", details: "2005–2011" }
+)
+
+check(
+  "person fromYear alone → since",
+  formatPersonListEntryLine(
+    { firstName: "Jo", fromYear: 1999 },
+    { addButtonLabel: "+ Add", fields: ["firstName", "fromYear"] },
+    "readonly"
+  ),
+  { name: "Jo", details: "since 1999" }
+)
+
+check(
+  "person toYear alone → until",
+  formatPersonListEntryLine(
+    { firstName: "Jo", toYear: 2011 },
+    { addButtonLabel: "+ Add", fields: ["firstName", "toYear"] },
+    "readonly"
+  ),
+  { name: "Jo", details: "until 2011" }
 )
 
 check(
@@ -144,7 +185,8 @@ check(
   "person collapsed line shows passed away instead of age",
   formatPersonListEntryLine(
     { firstName: "Pat", age: 72, passedAway: true, relationship: "mother" },
-    passedAwayConfig
+    passedAwayConfig,
+    "readonly"
   ),
   { name: "Pat", details: "passed away · Mother" }
 )
@@ -398,6 +440,26 @@ check(
     .filter((r) => r.kind === "answer")
     .map((r) => (r.kind === "answer" ? r.answer : null)),
   [{ kind: "list", values: ["Jane · Sister"] }]
+)
+
+const livesWithEl: FormElement = {
+  ...peopleEl,
+  elementKey: "kids",
+  listConfig: {
+    addButtonLabel: "+ Add a child",
+    fields: ["firstName", "livesWith"],
+  },
+}
+const livesWithAnswers: FormAnswers = {
+  kids: [serializePersonListEntry({ firstName: "Sam", livesWith: "yes" })],
+}
+const livesWithSections = buildAnswerSections([livesWithEl], livesWithAnswers)
+check(
+  "results person_list uses readonly livesWith wording",
+  livesWithSections[0]?.rows
+    .filter((r) => r.kind === "answer")
+    .map((r) => (r.kind === "answer" ? r.answer : null)),
+  [{ kind: "list", values: ["Sam · lives with client"] }]
 )
 check(
   "results history_list line",

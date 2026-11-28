@@ -4,7 +4,9 @@ import { and, asc, desc, eq, sql } from "drizzle-orm"
 
 import {
   assessmentDefinitions,
+  assessmentElements,
   assessmentInstances,
+  assessmentResponses,
   assessmentResults,
   clientBackgroundInterviews,
   clientBackgrounds,
@@ -18,7 +20,10 @@ import {
   professionals,
   professions,
 } from "@/db/schema"
-import { sanitizeBackgroundAnswers } from "@/lib/background-questionnaire/answers"
+import {
+  hasBackgroundSelfReportV2Rows,
+  parseBackgroundSelfReport,
+} from "@/lib/background-questionnaire/parse"
 import { BACKGROUND_ASSESSMENT_CODE, type BackgroundSelfReport } from "@/lib/background-questionnaire/types"
 import { db } from "@/lib/db"
 import { settleEventDates } from "@/lib/client-background/age"
@@ -323,18 +328,18 @@ export async function loadInProgressInterview(clientId: string, practiceId: stri
   }
 }
 
-/** The client's most recent BACKGROUND_SR result, or null when they have none. */
+/** The client's most recent BACKGROUND_SR v2 result, or null when they have none. */
 export async function loadLatestBackgroundSelfReport(
   clientId: string,
   practiceId: string
 ): Promise<BackgroundSelfReport | null> {
   const client = await clientInPractice(clientId, practiceId)
   if (!client) return null
-  const [row] = await db
+  const candidates = await db
     .select({
       resultId: assessmentResults.assessmentResultId,
       assessmentDate: assessmentResults.assessmentDate,
-      answers: assessmentResults.structuredScoreJson,
+      assessmentInstanceId: assessmentResults.assessmentInstanceId,
     })
     .from(assessmentResults)
     .innerJoin(
@@ -354,13 +359,42 @@ export async function loadLatestBackgroundSelfReport(
       )
     )
     .orderBy(desc(assessmentResults.assessmentDate), desc(assessmentResults.createdAt))
-    .limit(1)
-  if (!row) return null
-  return {
-    resultId: row.resultId,
-    assessmentDate: row.assessmentDate.toISOString(),
-    answers: sanitizeBackgroundAnswers(row.answers),
+
+  for (const row of candidates) {
+    const responseRows = await db
+      .select({
+        elementKey: assessmentElements.elementKey,
+        responseValue: assessmentResponses.responseValue,
+        responseOrder: assessmentResponses.responseOrder,
+      })
+      .from(assessmentResponses)
+      .innerJoin(
+        assessmentElements,
+        eq(assessmentResponses.assessmentElementId, assessmentElements.assessmentElementId)
+      )
+      .where(
+        and(
+          eq(assessmentResponses.assessmentInstanceId, row.assessmentInstanceId),
+          eq(assessmentResponses.clientId, clientId),
+          eq(assessmentResponses.practiceId, practiceId)
+        )
+      )
+      .orderBy(asc(assessmentElements.displayOrder), asc(assessmentResponses.responseOrder))
+
+    if (!hasBackgroundSelfReportV2Rows(responseRows)) continue
+    const { report } = parseBackgroundSelfReport(responseRows)
+    return {
+      resultId: row.resultId,
+      assessmentDate: row.assessmentDate.toISOString(),
+      report,
+      answers: {
+        familyHome: {
+          numberOfChildren: report.children.length > 0 ? report.children.length : null,
+        },
+      },
+    }
   }
+  return null
 }
 
 export type ReasonSupport = {

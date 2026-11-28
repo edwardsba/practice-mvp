@@ -1,6 +1,11 @@
+/**
+ * BACKGROUND_SR v2 typed model (Round AY).
+ * Built from shared-form response rows — not the old structuredScoreJson blob.
+ */
+
+import type { HistoryListEntry, PersonListEntry } from "@/lib/assessments/form-lists"
 import type {
   ClientRelationshipStatus,
-  LivesWith,
   NecessityKey,
   SexOption,
   WorkStatus,
@@ -8,96 +13,99 @@ import type {
 
 export const BACKGROUND_ASSESSMENT_CODE = "BACKGROUND_SR"
 
-export const HOUSING_TYPE_VALUES = [
-  "own_home",
-  "private_rental",
-  "social_housing",
-  "parents_home",
-  "shared_housing",
-  "temporary_housing",
-  "other",
+export type YesNoInPerson = "yes" | "no" | "in_person"
+
+export const LIVES_WITH_SELF_REPORT_VALUES = [
+  "partner",
+  "children",
+  "parents",
+  "siblings",
+  "other_family",
+  "flatmates_friends",
+  "someone_else",
+  "alone",
 ] as const
-export type HousingTypeValue = (typeof HOUSING_TYPE_VALUES)[number]
+export type LivesWithSelfReportValue = (typeof LIVES_WITH_SELF_REPORT_VALUES)[number]
 
-export const HOUSING_SECURITY_VALUES = ["secure", "some_concerns", "at_risk"] as const
-export type HousingSecurityValue = (typeof HOUSING_SECURITY_VALUES)[number]
+export const PARENTS_TOGETHER_VALUES = [
+  "yes_still_together",
+  "separated_or_divorced",
+  "never_together",
+  "one_or_both_passed_away",
+  "not_sure",
+] as const
+export type ParentsTogetherValue = (typeof PARENTS_TOGETHER_VALUES)[number]
 
-export type BackgroundAboutYou = {
+export type BackgroundSelfReportV2 = {
+  version: 2
+  // 1. About you
   sex: SexOption | null
+  genderDiffers: YesNoInPerson | null
   genderIdentity: string
   pronouns: string
-  sexualOrientation: string | null
-  sexualOrientationOther: string
-  raceEthnicity: string
+  culturalBackground: string
   religion: string
-  primaryLanguage: string
-  disability: boolean | null
+  language: string
+  disability: YesNoInPerson | null
   disabilityDetail: string
-}
-
-export type BackgroundStudyWork = {
-  level: string | null
+  accessNeeds: string
+  // 2. Study and work
+  educationLevel: string | null
   fieldOfStudy: string
-  currentlyStudying: boolean | null
-  currentlyStudyingDetail: string
-  disruption: boolean | null
-  disruptionDetail: string
+  currentlyStudying: YesNoInPerson | null
+  studyingDetail: string
+  studyInterrupted: YesNoInPerson | null
+  interruptedDetail: string
   workStatus: WorkStatus | null
-  workStatusOther: string
-  role: string
+  jobRole: string
   employer: string
-  recentJobRole: string
-  recentJobEmployer: string
-  necessities: NecessityKey[]
-}
-
-export type BackgroundFamilyHome = {
+  recentJob: string
+  workOther: string
+  hardToAfford: NecessityKey[]
+  // 3. Your relationships
   relationshipStatus: ClientRelationshipStatus | null
-  relationshipStatusOther: string
-  numberOfChildren: number | null
-  housingType: HousingTypeValue | null
-  housingTypeOther: string
-  livesWith: LivesWith | null
-  livesWithOther: string
-  housingSecurity: HousingSecurityValue | null
+  partner: PersonListEntry[]
+  children: PersonListEntry[]
+  previousRelationships: PersonListEntry[]
+  // 4. The family you grew up with
+  parents: PersonListEntry[]
+  parentsTogether: ParentsTogetherValue | null
+  siblings: PersonListEntry[]
+  // 5. Your home
+  livesWith: LivesWithSelfReportValue[]
+  livesWithOthers: string
+  housingType: string | null
+  housingSecurity: string | null
+  // 6. Your history
+  histPhysical: YesNoInPerson | null
+  histPhysicalList: HistoryListEntry[]
+  histSubstance: YesNoInPerson | null
+  histMental: YesNoInPerson | null
+  histMentalList: HistoryListEntry[]
+  histSelfharm: YesNoInPerson | null
+  histTrauma: YesNoInPerson | null
+  famMental: YesNoInPerson | null
+  famSubstance: YesNoInPerson | null
 }
 
-export type BackgroundTreatmentHistory = {
-  hospitalForEmotionalProblem: boolean | null
-  therapyForEmotionalIssues: boolean | null
-  currentMedication: boolean | null
-  everTakenMedication: boolean | null
-  familyEmotionalProblem: boolean | null
-  familyAlcoholOrDrugs: boolean | null
-  familyHospitalForEmotionalOrSubstance: boolean | null
-}
-
-export type BackgroundStressors = {
-  family: boolean | null
-  socialLife: boolean | null
-  intimateRelationships: boolean | null
-  workOrStudy: boolean | null
-  financial: boolean | null
-  yourHealth: boolean | null
-  healthOfSignificantOthers: boolean | null
-  lossOfLovedOne: boolean | null
-  legalMatters: boolean | null
-  mainReason: string
-}
-
-export type BackgroundAnswers = {
-  version: 1
-  aboutYou: BackgroundAboutYou
-  studyWork: BackgroundStudyWork
-  familyHome: BackgroundFamilyHome
-  treatmentHistory: BackgroundTreatmentHistory
-  stressors: BackgroundStressors
-}
-
-export type BackgroundPartKey = keyof Omit<BackgroundAnswers, "version">
-
+/**
+ * Latest submitted BACKGROUND_SR v2 result for a client.
+ * `answers.familyHome.numberOfChildren` is a thin compatibility shim so
+ * `lib/reports/load-background-report-source.ts` keeps compiling without edits.
+ */
 export type BackgroundSelfReport = {
   resultId: string
   assessmentDate: string
-  answers: BackgroundAnswers
+  report: BackgroundSelfReportV2
+  answers: {
+    familyHome: {
+      numberOfChildren: number | null
+    }
+  }
+}
+
+export type BackgroundResponseRow = {
+  elementKey: string
+  responseValue: string
+  responseOrder?: number | null
 }

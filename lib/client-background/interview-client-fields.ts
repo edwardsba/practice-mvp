@@ -7,11 +7,11 @@
 import type { ClientBackgroundSuggestions } from "@/lib/background-questionnaire/to-client-background"
 import {
   EMPLOYED_WORK_STATUSES,
+  NECESSITY_KEYS,
   type Demographics,
   type IdentityFields,
   type NecessityAccess,
 } from "@/lib/client-background/types"
-import { householdFromLivesWith } from "@/lib/client-background/household"
 import {
   sanitizeEducation,
   sanitizeIdentity,
@@ -52,6 +52,7 @@ export const CLIENT_FIELD_KEYS = [
   "identity.religion",
   "identity.primaryLanguage",
   "identity.disability",
+  "identity.accessibilityNeeds",
   "education.level",
   "education.fieldOfStudy",
   "education.currentlyStudying",
@@ -62,7 +63,6 @@ export const CLIENT_FIELD_KEYS = [
   "occupation.previousJob",
   "occupation.necessities",
   "living.housingType",
-  "living.livesWith",
   "living.housingStability",
 ] as const
 
@@ -77,6 +77,7 @@ const ITEM_FOR_FIELD: Record<ClientFieldKey, string> = {
   "identity.religion": "s3_identity",
   "identity.primaryLanguage": "s3_identity",
   "identity.disability": "s3_disability",
+  "identity.accessibilityNeeds": "s3_disability",
   "education.level": "s3_education",
   "education.fieldOfStudy": "s3_education",
   "education.currentlyStudying": "s3_education",
@@ -87,7 +88,6 @@ const ITEM_FOR_FIELD: Record<ClientFieldKey, string> = {
   "occupation.previousJob": "s3_occupation",
   "occupation.necessities": "s3_financial",
   "living.housingType": "s7_housing_type",
-  "living.livesWith": "s7_who",
   "living.housingStability": "s7_housing_security",
 }
 
@@ -215,6 +215,15 @@ export function compareClientField(
           : "different",
       }
     }
+    case "identity.accessibilityNeeds": {
+      const s = suggestions.identity.accessibilityNeeds
+      if (!s) return null
+      if (fileEmptyString(identity.accessibilityNeeds)) return { label: s.label, kind: "empty" }
+      return {
+        label: s.label,
+        kind: identity.accessibilityNeeds === s.apply ? "same" : "different",
+      }
+    }
     case "education.level": {
       const s = suggestions.education.level
       if (!s) return null
@@ -306,14 +315,6 @@ export function compareClientField(
       if (fileEmptyString(living.housingType)) return { label: s.label, kind: "empty" }
       return { label: s.label, kind: living.housingType === s.apply ? "same" : "different" }
     }
-    case "living.livesWith": {
-      const s = suggestions.living.livesWith
-      if (!s) return null
-      if (!living.household) return { label: s.label, kind: "empty" }
-      // The file keeps only the household; who lives there comes from sections 5–6.
-      const same = living.household === householdFromLivesWith(s.apply.livesWith)
-      return { label: s.label, kind: same ? "same" : "different" }
-    }
     case "living.housingStability": {
       const s = suggestions.living.housingStability
       if (!s) return null
@@ -380,6 +381,7 @@ const CLIENT_FIELD_TITLES: Record<ClientFieldKey, string> = {
   "identity.religion": "Religion",
   "identity.primaryLanguage": "Main language",
   "identity.disability": "Disability",
+  "identity.accessibilityNeeds": "Access needs",
   "education.level": "Highest level",
   "education.fieldOfStudy": "Field",
   "education.currentlyStudying": "Currently studying",
@@ -390,7 +392,6 @@ const CLIENT_FIELD_TITLES: Record<ClientFieldKey, string> = {
   "occupation.previousJob": "Previous job",
   "occupation.necessities": "Hard to afford",
   "living.housingType": "Housing type",
-  "living.livesWith": "Who lives in the home",
   "living.housingStability": "Housing security",
 }
 
@@ -401,8 +402,8 @@ export function clientFieldTitle(fieldKey: ClientFieldKey): string {
 /** The row's own label already names these fields, so their Client: line needs no title. */
 const PLAIN_LABEL_FIELDS: ReadonlySet<ClientFieldKey> = new Set([
   "identity.disability",
+  "identity.accessibilityNeeds",
   "living.housingType",
-  "living.livesWith",
   "living.housingStability",
 ])
 
@@ -496,6 +497,11 @@ export function applyClientField(
         })
       }
       break
+    case "identity.accessibilityNeeds":
+      if (identity.accessibilityNeeds) {
+        next = withIdentity(demographics, { accessibilityNeeds: identity.accessibilityNeeds.apply })
+      }
+      break
     case "education.level":
     case "education.fieldOfStudy":
     case "education.currentlyStudying":
@@ -553,7 +559,12 @@ export function applyClientField(
         }
       }
       if (fieldKey === "occupation.necessities" && occupation.necessities) {
-        patch = { necessities: { ...occupation.necessities.apply } }
+        const necessities = { ...occupation.necessities.apply }
+        const anyHard = NECESSITY_KEYS.some((key) => necessities[key])
+        patch = {
+          necessities,
+          ...(anyHard ? { financialConcerns: true as const } : {}),
+        }
       }
       if (
         patch &&
@@ -569,16 +580,11 @@ export function applyClientField(
       break
     }
     case "living.housingType":
-    case "living.livesWith":
     case "living.housingStability": {
       const current = demographics.livingSituation
       let patch: Partial<Demographics["livingSituation"]> | null = null
       if (fieldKey === "living.housingType" && living.housingType) {
         patch = { housingType: living.housingType.apply }
-      }
-      if (fieldKey === "living.livesWith" && living.livesWith) {
-        const household = householdFromLivesWith(living.livesWith.apply.livesWith)
-        if (household) patch = { household }
       }
       if (fieldKey === "living.housingStability" && living.housingStability) {
         patch = { housingStability: living.housingStability.apply }

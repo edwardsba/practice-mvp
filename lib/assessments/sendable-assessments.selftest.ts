@@ -50,21 +50,28 @@ check(
   false
 )
 
-check(
-  "BACKGROUND_SR excluded from send list",
+checkTrue(
+  "BACKGROUND_SR sendable when it has elements",
   qualifiesAsSendable({
     assessmentCode: "BACKGROUND_SR",
     isActive: true,
     clientCompletable: true,
     hasActiveElements: true,
+  })
+)
+
+check(
+  "BACKGROUND_SR refused without elements",
+  qualifiesAsSendable({
+    assessmentCode: "BACKGROUND_SR",
+    isActive: true,
+    clientCompletable: true,
+    hasActiveElements: false,
   }),
   false
 )
 
-checkTrue(
-  "exception reason documented",
-  Boolean(SEND_LIST_EXCEPTIONS.BACKGROUND_SR)
-)
+check("send list exceptions empty for now", Object.keys(SEND_LIST_EXCEPTIONS), [])
 
 checkTrue(
   "BTP sendable without static elements",
@@ -142,7 +149,7 @@ check(
 )
 
 check(
-  "link: BACKGROUND_SR still allowed (own template)",
+  "link: BACKGROUND_SR allowed",
   canCreateClientAssessmentLink({
     isActive: true,
     clientCompletable: true,

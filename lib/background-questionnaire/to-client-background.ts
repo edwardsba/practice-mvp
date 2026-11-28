@@ -1,23 +1,16 @@
-import { BACKGROUND_PARTS } from "@/lib/background-questionnaire/questions"
-import type { HistoryQuestionKey } from "@/lib/client-background/interview-history"
-import type {
-  BackgroundAnswers,
-  BackgroundPartKey,
-  HousingSecurityValue,
-  HousingTypeValue,
-} from "@/lib/background-questionnaire/types"
+/**
+ * Map BACKGROUND_SR v2 → interview pre-fill suggestions (sections 3 and 7).
+ * Sections 5, 6, 8, 9 are deferred — the v2 model still exposes those fields.
+ */
+
+import { HARD_TO_AFFORD_LABELS, LIVES_WITH_SELF_REPORT_LABELS } from "@/lib/assessments/definitions/background-sr"
+import type { BackgroundSelfReportV2 } from "@/lib/background-questionnaire/types"
 import {
   EMPLOYED_WORK_STATUSES,
   NECESSITY_KEYS,
-  SEXUAL_ORIENTATION_LABELS,
-  SEXUAL_ORIENTATIONS,
+  WORK_STATUS_LABELS,
   emptyNecessities,
-  type ClientRelationshipStatus,
-  type ClientRelationshipStatusValue,
-  type LivesWith,
   type NecessityAccess,
-  type NecessityKey,
-  type StressorKey,
   type WorkStatus,
 } from "@/lib/client-background/types"
 
@@ -41,11 +34,13 @@ export type ClientBackgroundSuggestions = {
     sex?: AppliedAnswer<string>
     genderIdentity?: AppliedAnswer<string>
     pronouns?: AppliedAnswer<string>
+    /** No longer suggested from BACKGROUND_SR v2; kept optional for typed Apply paths. */
     sexualOrientation?: AppliedAnswer<{ sexualOrientation: string; sexualOrientationOther: string }>
     raceEthnicity?: AppliedAnswer<string>
     religion?: AppliedAnswer<string>
     primaryLanguage?: AppliedAnswer<string>
     disability?: AppliedAnswer<YesNoDetailApply>
+    accessibilityNeeds?: AppliedAnswer<string>
   }
   education: {
     level?: AppliedAnswer<string>
@@ -60,59 +55,32 @@ export type ClientBackgroundSuggestions = {
     previousJob?: AppliedAnswer<{ role: string; employer: string }>
     necessities?: AppliedAnswer<NecessityAccess>
   }
-  relationshipStatus?: AppliedAnswer<ClientRelationshipStatusValue>
-  numberOfChildren?: { label: string; count: number }
   living: {
     housingType?: AppliedAnswer<string>
-    livesWith?: AppliedAnswer<{ livesWith: LivesWith; livesWithOther: string }>
     housingStability?: AppliedAnswer<string>
+    /** Display-only who-lives-with line — no Use client's / Keep. */
+    whoLivesWithLabel?: string
   }
-  history: Partial<Record<HistoryQuestionKey, AppliedAnswer<"yes" | "no">>>
-  medication: {
+  /**
+   * Deferred (sections 5/6/8/9) — not populated from v2 yet.
+   * Optional so existing UI prop types still compile.
+   */
+  relationshipStatus?: AppliedAnswer<{
+    relationshipStatus: string
+    relationshipStatusOther: string
+  }>
+  numberOfChildren?: { label: string; count: number }
+  history?: Partial<Record<string, AppliedAnswer<"yes" | "no">>>
+  medication?: {
     currentlyTaking?: AppliedAnswer<"yes" | "no">
     previouslyTaken?: AppliedAnswer<"yes" | "no">
     everAdmitted?: AppliedAnswer<"yes" | "no">
     previousTherapy?: AppliedAnswer<"yes" | "no">
     everMedication?: AppliedAnswer<"yes" | "no">
   }
-  stressors: Partial<Record<StressorKey, AppliedAnswer<"yes" | "no">>> & {
+  stressors?: Partial<Record<string, AppliedAnswer<"yes" | "no">>> & {
     mainReason?: AppliedAnswer<string>
   }
-}
-
-const HOUSING_TYPE_APPLY: Record<HousingTypeValue, string> = {
-  own_home: "Own home",
-  private_rental: "Private rental",
-  social_housing: "Social or community housing",
-  parents_home: "Parent's home",
-  shared_housing: "Shared housing",
-  temporary_housing: "Temporary housing",
-  other: "Other",
-}
-
-const HOUSING_SECURITY_APPLY: Record<HousingSecurityValue, string> = {
-  secure: "Stable",
-  some_concerns: "Some concern",
-  at_risk: "Unstable",
-}
-
-const STRESSOR_TARGETS: { source: keyof BackgroundAnswers["stressors"]; target: StressorKey }[] = [
-  { source: "family", target: "family" },
-  { source: "socialLife", target: "socialLife" },
-  { source: "intimateRelationships", target: "intimateRelationships" },
-  { source: "workOrStudy", target: "workStudy" },
-  { source: "financial", target: "financial" },
-  { source: "yourHealth", target: "ownHealth" },
-  { source: "healthOfSignificantOthers", target: "othersHealth" },
-  { source: "lossOfLovedOne", target: "lossOfLovedOne" },
-  { source: "legalMatters", target: "legalPoliceAccidents" },
-]
-
-function optionLabel(part: BackgroundPartKey, field: string, value: string): string {
-  const question = BACKGROUND_PARTS.find((item) => item.key === part)?.questions.find(
-    (item) => item.field === field
-  )
-  return question?.options?.find((option) => option.value === value)?.label ?? value
 }
 
 function textAnswer(value: string): AppliedAnswer<string> | undefined {
@@ -121,200 +89,127 @@ function textAnswer(value: string): AppliedAnswer<string> | undefined {
   return { label: text, apply: text }
 }
 
-function yesNo(value: boolean | null): AppliedAnswer<"yes" | "no"> | undefined {
-  if (value === true) return { label: "Yes", apply: "yes" }
-  if (value === false) return { label: "No", apply: "no" }
-  return undefined
-}
-
-function yesNoDetail(value: boolean | null, detail: string): AppliedAnswer<YesNoDetailApply> | undefined {
-  if (value === true) {
+function yesNoDetail(
+  value: "yes" | "no" | "in_person" | null,
+  detail: string
+): AppliedAnswer<YesNoDetailApply> | undefined {
+  if (value === "yes") {
     const text = detail.trim()
     return {
       label: text ? `Yes — ${text}` : "Yes",
       apply: { value: true, detail: text },
     }
   }
-  if (value === false) return { label: "No", apply: { value: false, detail: "" } }
+  if (value === "no") return { label: "No", apply: { value: false, detail: "" } }
   return undefined
-}
-
-export function childrenSelfReportLabel(count: number): string {
-  if (count === 0) return "no children"
-  if (count === 1) return "1 child"
-  return `${count} children (including step-children)`
 }
 
 function employed(status: WorkStatus | null): status is WorkStatus {
   return status !== null && (EMPLOYED_WORK_STATUSES as readonly string[]).includes(status)
 }
 
-export function backgroundAnswersToClientBackground(
-  answers: BackgroundAnswers
-): ClientBackgroundSuggestions {
-  const about = answers.aboutYou
-  const study = answers.studyWork
-  const home = answers.familyHome
-  const treatment = answers.treatmentHistory
-  const stressors = answers.stressors
-
-  const identity: ClientBackgroundSuggestions["identity"] = {}
-  const sex = textAnswer(about.sex ?? "")
-  if (sex) identity.sex = sex
-  const genderIdentity = textAnswer(about.genderIdentity)
-  if (genderIdentity) identity.genderIdentity = genderIdentity
-  const pronouns = textAnswer(about.pronouns)
-  if (pronouns) identity.pronouns = pronouns
-  if (about.sexualOrientation && (SEXUAL_ORIENTATIONS as readonly string[]).includes(about.sexualOrientation)) {
-    const other = about.sexualOrientation === "another" ? about.sexualOrientationOther.trim() : ""
-    identity.sexualOrientation = {
-      label:
-        about.sexualOrientation === "another"
-          ? other || "Another term"
-          : SEXUAL_ORIENTATION_LABELS[about.sexualOrientation as (typeof SEXUAL_ORIENTATIONS)[number]],
-      apply: { sexualOrientation: about.sexualOrientation, sexualOrientationOther: other },
+/** Build the display-only "who lives with you" client line. */
+export function formatWhoLivesWithClientLabel(
+  livesWith: BackgroundSelfReportV2["livesWith"],
+  livesWithOthers: string
+): string | undefined {
+  if (livesWith.length === 0) return undefined
+  const others = livesWithOthers.trim()
+  const parts = livesWith.map((key) => {
+    const base = LIVES_WITH_SELF_REPORT_LABELS[key] ?? key
+    if (
+      others &&
+      (key === "other_family" || key === "flatmates_friends" || key === "someone_else")
+    ) {
+      return `${base} (${others})`
     }
+    return base
+  })
+  return parts.join(", ")
+}
+
+export function backgroundSelfReportToClientBackground(
+  report: BackgroundSelfReportV2
+): ClientBackgroundSuggestions {
+  const identity: ClientBackgroundSuggestions["identity"] = {}
+  const sex = textAnswer(report.sex ?? "")
+  if (sex) identity.sex = sex
+  if (report.genderDiffers === "yes") {
+    const genderIdentity = textAnswer(report.genderIdentity)
+    if (genderIdentity) identity.genderIdentity = genderIdentity
+    const pronouns = textAnswer(report.pronouns)
+    if (pronouns) identity.pronouns = pronouns
   }
-  const raceEthnicity = textAnswer(about.raceEthnicity)
+  const raceEthnicity = textAnswer(report.culturalBackground)
   if (raceEthnicity) identity.raceEthnicity = raceEthnicity
-  const religion = textAnswer(about.religion)
+  const religion = textAnswer(report.religion)
   if (religion) identity.religion = religion
-  const primaryLanguage = textAnswer(about.primaryLanguage)
+  const primaryLanguage = textAnswer(report.language)
   if (primaryLanguage) identity.primaryLanguage = primaryLanguage
-  const disability = yesNoDetail(about.disability, about.disabilityDetail)
+  const disability = yesNoDetail(report.disability, report.disabilityDetail)
   if (disability) identity.disability = disability
+  const accessibilityNeeds = textAnswer(report.accessNeeds)
+  if (accessibilityNeeds) identity.accessibilityNeeds = accessibilityNeeds
 
   const education: ClientBackgroundSuggestions["education"] = {}
-  if (study.level) {
-    education.level = { label: optionLabel("studyWork", "level", study.level), apply: study.level }
+  if (report.educationLevel) {
+    education.level = { label: report.educationLevel, apply: report.educationLevel }
   }
-  const fieldOfStudy = textAnswer(study.fieldOfStudy)
+  const fieldOfStudy = textAnswer(report.fieldOfStudy)
   if (fieldOfStudy) education.fieldOfStudy = fieldOfStudy
-  const currentlyStudying = yesNoDetail(study.currentlyStudying, study.currentlyStudyingDetail)
+  const currentlyStudying = yesNoDetail(report.currentlyStudying, report.studyingDetail)
   if (currentlyStudying) education.currentlyStudying = currentlyStudying
-  const disruption = yesNoDetail(study.disruption, study.disruptionDetail)
+  const disruption = yesNoDetail(report.studyInterrupted, report.interruptedDetail)
   if (disruption) education.disruption = disruption
 
   const occupation: ClientBackgroundSuggestions["occupation"] = {}
-  if (study.workStatus) {
-    const other = study.workStatus === "other" ? study.workStatusOther.trim() : ""
+  if (report.workStatus) {
+    const other = report.workStatus === "other" ? report.workOther.trim() : ""
     occupation.workStatus = {
       label:
-        study.workStatus === "other"
+        report.workStatus === "other"
           ? other || "Other"
-          : optionLabel("studyWork", "workStatus", study.workStatus),
-      apply: { workStatus: study.workStatus, workStatusOther: other },
+          : WORK_STATUS_LABELS[report.workStatus],
+      apply: { workStatus: report.workStatus, workStatusOther: other },
     }
   }
-  if (employed(study.workStatus)) {
-    const role = textAnswer(study.role)
+  if (employed(report.workStatus)) {
+    const role = textAnswer(report.jobRole)
     if (role) occupation.role = role
-    const employer = textAnswer(study.employer)
+    const employer = textAnswer(report.employer)
     if (employer) occupation.employer = employer
   }
-  if (study.workStatus === "unemployed") {
-    const role = study.recentJobRole.trim()
-    const employer = study.recentJobEmployer.trim()
-    if (role || employer) {
+  if (report.workStatus === "unemployed" || report.workStatus === "unable_to_work") {
+    const role = report.recentJob.trim()
+    if (role) {
       occupation.previousJob = {
-        label: [role, employer].filter(Boolean).join(" · "),
-        apply: { role, employer },
+        label: role,
+        apply: { role, employer: "" },
       }
     }
   }
-  if (study.necessities.length > 0) {
-    const picked = new Set<NecessityKey>(study.necessities)
+  if (report.hardToAfford.length > 0) {
+    const picked = new Set(report.hardToAfford)
     const necessities = emptyNecessities()
     for (const key of NECESSITY_KEYS) necessities[key] = picked.has(key)
     occupation.necessities = {
-      label: study.necessities.map((key) => optionLabel("studyWork", "necessities", key)).join(", "),
+      label: report.hardToAfford.map((key) => HARD_TO_AFFORD_LABELS[key]).join(", "),
       apply: necessities,
     }
   }
 
-  let relationshipStatus: ClientBackgroundSuggestions["relationshipStatus"]
-  if (home.relationshipStatus) {
-    const other = home.relationshipStatus === "other" ? home.relationshipStatusOther.trim() : ""
-    relationshipStatus = {
-      label:
-        home.relationshipStatus === "other" && other
-          ? other
-          : optionLabel("familyHome", "relationshipStatus", home.relationshipStatus),
-      apply: {
-        relationshipStatus: home.relationshipStatus as ClientRelationshipStatus,
-        relationshipStatusOther: other,
-      },
-    }
-  }
-
-  const numberOfChildren =
-    home.numberOfChildren == null
-      ? undefined
-      : { label: childrenSelfReportLabel(home.numberOfChildren), count: home.numberOfChildren }
-
   const living: ClientBackgroundSuggestions["living"] = {}
-  if (home.housingType) {
-    const other = home.housingType === "other" ? home.housingTypeOther.trim() : ""
-    living.housingType = {
-      label: other || optionLabel("familyHome", "housingType", home.housingType),
-      apply: HOUSING_TYPE_APPLY[home.housingType],
-    }
+  if (report.housingType) {
+    living.housingType = { label: report.housingType, apply: report.housingType }
   }
-  if (home.livesWith) {
-    const other = home.livesWith === "other" ? home.livesWithOther.trim() : ""
-    living.livesWith = {
-      label:
-        home.livesWith === "other" && other
-          ? other
-          : optionLabel("familyHome", "livesWith", home.livesWith),
-      apply: { livesWith: home.livesWith, livesWithOther: other },
-    }
-  }
-  if (home.housingSecurity) {
+  if (report.housingSecurity) {
     living.housingStability = {
-      label: optionLabel("familyHome", "housingSecurity", home.housingSecurity),
-      apply: HOUSING_SECURITY_APPLY[home.housingSecurity],
+      label: report.housingSecurity,
+      apply: report.housingSecurity,
     }
   }
+  const whoLivesWithLabel = formatWhoLivesWithClientLabel(report.livesWith, report.livesWithOthers)
+  if (whoLivesWithLabel) living.whoLivesWithLabel = whoLivesWithLabel
 
-  const history: ClientBackgroundSuggestions["history"] = {}
-  const familyEmotional = yesNo(treatment.familyEmotionalProblem)
-  if (familyEmotional) history.family_emotional_problems = familyEmotional
-  const familySubstances = yesNo(treatment.familyAlcoholOrDrugs)
-  if (familySubstances) history.family_substance_use = familySubstances
-
-  const medication: ClientBackgroundSuggestions["medication"] = {}
-  const currentlyTaking = yesNo(treatment.currentMedication)
-  if (currentlyTaking) medication.currentlyTaking = currentlyTaking
-  const previouslyTaken = yesNo(treatment.everTakenMedication)
-  if (previouslyTaken) {
-    medication.previouslyTaken = previouslyTaken
-    medication.everMedication = previouslyTaken
-  }
-  const hospital = yesNo(treatment.hospitalForEmotionalProblem)
-  if (hospital) medication.everAdmitted = hospital
-  const therapy = yesNo(treatment.therapyForEmotionalIssues)
-  if (therapy) medication.previousTherapy = therapy
-
-  const stressorSuggestions: ClientBackgroundSuggestions["stressors"] = {}
-  for (const item of STRESSOR_TARGETS) {
-    const value = stressors[item.source]
-    if (typeof value === "string") continue
-    const answer = yesNo(value)
-    if (answer) stressorSuggestions[item.target] = answer
-  }
-  const mainReason = textAnswer(stressors.mainReason)
-  if (mainReason) stressorSuggestions.mainReason = mainReason
-
-  return {
-    identity,
-    education,
-    occupation,
-    relationshipStatus,
-    numberOfChildren,
-    living,
-    history,
-    medication,
-    stressors: stressorSuggestions,
-  }
+  return { identity, education, occupation, living }
 }

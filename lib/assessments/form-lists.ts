@@ -268,10 +268,14 @@ export function cleanHistoryListValues(values: string[] | undefined): string[] {
   return out
 }
 
+/** Who reads the collapsed person line — livesWith wording differs. */
+export type PersonListAudience = "client" | "readonly"
+
 /** Collapsed person line: name, then muted facts joined with " · ". */
 export function formatPersonListEntryLine(
   entry: PersonListEntry,
-  config: FormListConfig | null | undefined
+  config: FormListConfig | null | undefined,
+  audience: PersonListAudience = "readonly"
 ): { name: string; details: string } {
   const name = entry.firstName?.trim() || "Unnamed"
   const bits: string[] = []
@@ -279,10 +283,19 @@ export function formatPersonListEntryLine(
   else if (entry.age != null) bits.push(String(entry.age))
   const relationship = choiceLabel(entry.relationship, config?.relationshipChoices)
   if (relationship) bits.push(relationship)
-  if (entry.livesWith === "yes") bits.push("Yes")
-  if (entry.livesWith === "no") bits.push("No")
-  if (entry.fromYear != null) bits.push(`From ${entry.fromYear}`)
-  if (entry.toYear != null) bits.push(`To ${entry.toYear}`)
+  if (entry.livesWith === "yes") {
+    bits.push(audience === "client" ? "lives with you" : "lives with client")
+  }
+  if (entry.livesWith === "no") {
+    bits.push(audience === "client" ? "doesn't live with you" : "doesn't live with client")
+  }
+  if (entry.fromYear != null && entry.toYear != null) {
+    bits.push(`${entry.fromYear}–${entry.toYear}`)
+  } else if (entry.fromYear != null) {
+    bits.push(`since ${entry.fromYear}`)
+  } else if (entry.toYear != null) {
+    bits.push(`until ${entry.toYear}`)
+  }
   const howEnded = choiceLabel(entry.howEnded, config?.howEndedChoices)
   if (howEnded) bits.push(howEnded)
   return { name, details: bits.join(" · ") }

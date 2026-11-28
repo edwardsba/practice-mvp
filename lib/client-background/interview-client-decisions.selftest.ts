@@ -60,11 +60,8 @@ const suggestions: ClientBackgroundSuggestions = {
   },
   living: {
     housingType: { label: "Private rental", apply: "Private rental" },
-    livesWith: { label: "Partner", apply: { livesWith: "with_partner", livesWithOther: "" } },
+    whoLivesWithLabel: "a partner",
   },
-  history: {},
-  medication: {},
-  stressors: {},
 }
 
 const empty = emptyDemographics()
@@ -201,10 +198,11 @@ check("presence disability → yes from stored data", accepted.answers.items.s3_
   value: "yes",
   confirmed: true,
 })
-check("presence financial → n/a when concern is not yes", accepted.answers.items.s3_financial, {
-  value: "not_applicable",
+check("presence financial → yes when hard-to-afford applies financial hardship", accepted.answers.items.s3_financial, {
+  value: "yes",
   confirmed: true,
 })
+check("accept necessities sets financial hardship", accepted.demographics.occupation.financialConcerns, true)
 check("nothing waits after accept", waitingKeys(accepted, 3), [])
 
 check(
@@ -276,20 +274,20 @@ const section7 = acceptClientChangesAndConfirm({
   relationships: [] as RelationshipRecord[],
   sectionNumber: 7,
   confirmFile: emptyConfirmFile,
-  expectedFieldKeys: ["living.livesWith", "living.housingType"],
+  expectedFieldKeys: ["living.housingType"],
   at: AT,
 })
 assert.ok(section7.ok, section7.ok ? "" : section7.error)
-check("section 7 accept writes household and housing type", [
-  section7.demographics.livingSituation.household,
+check("section 7 accept writes housing type", [
   section7.demographics.livingSituation.housingType,
-], ["with_others", "Private rental"])
+], ["Private rental"])
 check("section 7 details follow the record", [
   section7.answers.items.s7_who,
   section7.answers.items.s7_housing_type,
   section7.answers.items.s7_housing_security,
 ], [
-  { value: "confirmed", confirmed: true },
+  // who-lives-with is display-only from the self-report; household stays empty → n/a
+  { value: "not_applicable", confirmed: true },
   { value: "confirmed", confirmed: true },
   { value: "not_applicable", confirmed: true },
 ])

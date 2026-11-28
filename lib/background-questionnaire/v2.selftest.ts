@@ -31,10 +31,18 @@ const prev = serializePersonListEntry({
 })
 const parent = serializePersonListEntry({
   firstName: "Pat",
+  age: 72,
   relationship: "mother",
   passedAway: true,
+  deathYear: 2012,
 })
-const sibling = serializePersonListEntry({ firstName: "Lee", age: 40, relationship: "brother" })
+const sibling = serializePersonListEntry({
+  firstName: "Lee",
+  age: 40,
+  relationship: "brother",
+  passedAway: true,
+  deathYear: 2001,
+})
 const physical = serializeHistoryListEntry({ what: "Asthma", when: "childhood" })
 const mental = serializeHistoryListEntry({ what: "Depression", when: "about age 25" })
 
@@ -64,7 +72,10 @@ const fullRows: BackgroundResponseRow[] = [
   { elementKey: "children", responseValue: child },
   { elementKey: "previous_relationships", responseValue: prev },
   { elementKey: "parents", responseValue: parent },
-  { elementKey: "parents_together", responseValue: "separated_or_divorced" },
+  {
+    elementKey: "bsr_parents_were_together",
+    responseValue: "together_until_passed_away",
+  },
   { elementKey: "siblings", responseValue: sibling },
   { elementKey: "lives_with", responseValue: "partner" },
   { elementKey: "lives_with", responseValue: "children", responseOrder: 1 },
@@ -148,10 +159,42 @@ check("family of origin", [
   parsed.report.parentsTogether,
   parsed.report.siblings,
 ], [
-  [{ firstName: "Pat", relationship: "mother", passedAway: true }],
-  "separated_or_divorced",
-  [{ firstName: "Lee", age: 40, relationship: "brother" }],
+  [
+    {
+      firstName: "Pat",
+      age: 72,
+      relationship: "mother",
+      passedAway: true,
+      deathYear: 2012,
+    },
+  ],
+  "together_until_passed_away",
+  [
+    {
+      firstName: "Lee",
+      age: 40,
+      relationship: "brother",
+      passedAway: true,
+      deathYear: 2001,
+    },
+  ],
 ])
+
+const livingParentsTogether = parseBackgroundSelfReport([
+  {
+    elementKey: "parents",
+    responseValue: serializePersonListEntry({
+      firstName: "Pat",
+      relationship: "mother",
+    }),
+  },
+  { elementKey: "parents_together", responseValue: "yes_still_together" },
+])
+check(
+  "parentsTogether reads parents_together when no death",
+  livingParentsTogether.report.parentsTogether,
+  "yes_still_together"
+)
 check("lives_with with others", [parsed.report.livesWith, parsed.report.livesWithOthers], [
   ["partner", "children", "flatmates_friends"],
   "2 flatmates",

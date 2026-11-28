@@ -23,11 +23,17 @@ function sqlNullableString(value: string | null): string {
 }
 
 function sqlShowWhen(
-  showWhen: { key: string; in: string[] } | null
+  showWhen: {
+    key: string
+    in?: string[]
+    list?: { any?: Record<string, unknown>; none?: Record<string, unknown> }
+  } | null
 ): string {
   if (!showWhen) return "NULL"
-  const json = JSON.stringify({ key: showWhen.key, in: showWhen.in })
-  return `${sqlString(json)}::jsonb`
+  const payload: Record<string, unknown> = { key: showWhen.key }
+  if (showWhen.list) payload.list = showWhen.list
+  else if (showWhen.in) payload.in = showWhen.in
+  return `${sqlString(JSON.stringify(payload))}::jsonb`
 }
 
 function dataTypeFor(elementType: string): string {

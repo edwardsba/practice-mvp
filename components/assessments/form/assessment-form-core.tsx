@@ -3,6 +3,7 @@
 import type { ReactNode } from "react"
 
 import { ElementControl } from "@/components/assessments/form/element-control"
+import type { ListEntryPresentation } from "@/components/assessments/form/list-entry-input"
 import { PrefilledTag } from "@/components/shared/prefilled-tag"
 import {
   questionDisplayLabel,
@@ -36,6 +37,8 @@ export function AssessmentFormCore({
   disabled,
   /** When set, only render elements in this group (visibility still uses all elements). */
   groupLabel,
+  /** person_list / history_list presentation; default inline (CP-7). */
+  listPresentation = "inline",
 }: {
   elements: FormElement[]
   answers: FormAnswers
@@ -47,6 +50,7 @@ export function AssessmentFormCore({
   errors?: FormValidationError[]
   disabled?: boolean
   groupLabel?: string | null
+  listPresentation?: ListEntryPresentation
 }) {
   const visible = visibleElementKeys(elements, answers)
   const errorByKey = new Map(errors.map((e) => [e.elementKey, e.message]))
@@ -168,6 +172,7 @@ export function AssessmentFormCore({
             onActivate={() => onElementActivate?.(element.elementKey)}
             error={Boolean(errorMessage)}
             disabled={disabled}
+            listPresentation={listPresentation}
           />
 
           {errorMessage ? (

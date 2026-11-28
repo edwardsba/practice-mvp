@@ -1,6 +1,9 @@
 "use client"
 
-import { ListEntryInput } from "@/components/assessments/form/list-entry-input"
+import {
+  ListEntryInput,
+  type ListEntryPresentation,
+} from "@/components/assessments/form/list-entry-input"
 import { RadioOptionList } from "@/components/assessments/form/radio-option-list"
 import { TextListInput } from "@/components/assessments/form/text-list-input"
 import { Input } from "@/components/ui/input"
@@ -19,6 +22,7 @@ export function ElementControl({
   onActivate,
   error,
   disabled,
+  listPresentation = "inline",
 }: {
   element: FormElement
   values: string[]
@@ -27,6 +31,8 @@ export function ElementControl({
   onActivate?: () => void
   error?: boolean
   disabled?: boolean
+  /** person_list / history_list presentation; default inline (CP-7). */
+  listPresentation?: ListEntryPresentation
 }) {
   const id = `el-${element.elementKey}`
 
@@ -128,6 +134,7 @@ export function ElementControl({
           config={element.listConfig}
           disabled={disabled}
           error={error}
+          presentation={listPresentation}
         />
       )
 
@@ -141,6 +148,7 @@ export function ElementControl({
           config={element.listConfig}
           disabled={disabled}
           error={error}
+          presentation={listPresentation}
         />
       )
 

@@ -30,9 +30,21 @@ export type FormElementType =
   | "person_list"
   | "history_list"
 
+/**
+ * Show-when condition. Either:
+ * - `in`: the referenced answer's value is one of these strings
+ * - `list`: for a person_list / history_list answer, match entry fields
+ *   (`any` = at least one entry matches; `none` = no entry matches)
+ */
+export type FormShowWhenListMatch = {
+  any?: Record<string, unknown>
+  none?: Record<string, unknown>
+}
+
 export type FormShowWhen = {
   key: string
-  in: string[]
+  in?: string[]
+  list?: FormShowWhenListMatch
 }
 
 export type FormOption = {
@@ -171,6 +183,31 @@ function hasAnswer(element: FormElement, answers: FormAnswers): boolean {
   }
 }
 
+function entryMatchesListFields(
+  raw: string,
+  match: Record<string, unknown>
+): boolean {
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(raw)
+  } catch {
+    return false
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return false
+  const entry = parsed as Record<string, unknown>
+  for (const [field, expected] of Object.entries(match)) {
+    if (entry[field] !== expected) return false
+  }
+  return true
+}
+
+function listHasMatchingEntry(
+  values: string[],
+  match: Record<string, unknown>
+): boolean {
+  return values.some((raw) => typeof raw === "string" && entryMatchesListFields(raw, match))
+}
+
 function showWhenHolds(
   condition: FormShowWhen,
   answers: FormAnswers,
@@ -178,7 +215,22 @@ function showWhenHolds(
 ): boolean {
   if (!visible.has(condition.key)) return false
   const values = answers[condition.key] ?? []
-  return values.some((v) => condition.in.includes(v))
+
+  if (condition.list) {
+    if (condition.list.any) {
+      return listHasMatchingEntry(values, condition.list.any)
+    }
+    if (condition.list.none) {
+      return !listHasMatchingEntry(values, condition.list.none)
+    }
+    return false
+  }
+
+  if (condition.in && condition.in.length > 0) {
+    return values.some((v) => condition.in!.includes(v))
+  }
+
+  return false
 }
 
 /**

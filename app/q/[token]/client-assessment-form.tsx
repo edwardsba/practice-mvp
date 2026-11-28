@@ -299,6 +299,7 @@ export function ClientAssessmentForm({
                 onAnswersChange={updateAnswers}
                 errors={errors}
                 disabled={loading}
+                listPresentation="sheet"
               />
             )}
           </div>

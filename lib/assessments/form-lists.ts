@@ -15,6 +15,7 @@ export const PERSON_LIST_FIELD_KEYS = [
   "toYear",
   "howEnded",
   "passedAway",
+  "deathYear",
 ] as const
 
 export type PersonListFieldKey = (typeof PERSON_LIST_FIELD_KEYS)[number]
@@ -39,6 +40,7 @@ export const DEFAULT_LIST_FIELD_LABELS: Record<FormListFieldLabelKey, string> = 
   toYear: "To year",
   howEnded: "How it ended",
   passedAway: "Passed away",
+  deathYear: "Year they passed away (if you know)",
   what: "What",
   when: "When",
 }
@@ -70,6 +72,8 @@ export type PersonListEntry = {
   howEnded?: string
   /** Present only when ticked; missing otherwise. */
   passedAway?: true
+  /** Year of death; kept only when passedAway is true. */
+  deathYear?: number
 }
 
 export type HistoryListEntry = {
@@ -121,6 +125,11 @@ const LABEL_KEYS = new Set<string>([
   ...(HISTORY_LIST_FIELD_KEYS as readonly string[]),
 ])
 
+/** Current calendar year (for deathYear upper bound). */
+export function currentCalendarYear(now: Date = new Date()): number {
+  return now.getFullYear()
+}
+
 /** Label for a list field: definition override, else the shared default. */
 export function listFieldLabel(
   config: FormListConfig | null | undefined,
@@ -132,17 +141,28 @@ export function listFieldLabel(
 }
 
 /**
- * Tick or untick passedAway. When ticked, age is cleared (hidden in the editor).
+ * Tick or untick passedAway. Age is kept when ticked (label becomes
+ * "Age when they passed away" in the editor). Unticking clears deathYear.
  */
 export function setPersonPassedAway(entry: PersonListEntry, passedAway: boolean): PersonListEntry {
   const next = { ...entry }
   if (passedAway) {
     next.passedAway = true
-    delete next.age
   } else {
     delete next.passedAway
+    delete next.deathYear
   }
   return next
+}
+
+/** Collapsed "passed away …" phrase for the one-line summary. */
+export function formatPassedAwayPhrase(entry: PersonListEntry): string {
+  const year = entry.deathYear
+  const age = entry.age
+  if (year != null && age != null) return `passed away in ${year} aged ${age}`
+  if (age != null) return `passed away aged ${age}`
+  if (year != null) return `passed away in ${year}`
+  return "passed away"
 }
 
 /** Parse one person_list JSON string; drop unknown keys and bad values. */
@@ -172,9 +192,13 @@ export function parsePersonListEntry(
   if (fields.has("passedAway") && parsed.passedAway === true) {
     entry.passedAway = true
   }
-  if (fields.has("age") && entry.passedAway !== true) {
+  if (fields.has("age")) {
     const age = asIntInRange(parsed.age, 0, 120)
     if (age !== undefined) entry.age = age
+  }
+  if (fields.has("deathYear") && entry.passedAway === true) {
+    const deathYear = asIntInRange(parsed.deathYear, 1900, currentCalendarYear())
+    if (deathYear !== undefined) entry.deathYear = deathYear
   }
   if (fields.has("relationship")) {
     const relationship = choiceValue(parsed.relationship, config?.relationshipChoices)
@@ -209,7 +233,8 @@ export function isPersonEntryBlank(entry: PersonListEntry): boolean {
     entry.fromYear == null &&
     entry.toYear == null &&
     entry.howEnded == null &&
-    entry.passedAway !== true
+    entry.passedAway !== true &&
+    entry.deathYear == null
   )
 }
 
@@ -279,10 +304,10 @@ export function formatPersonListEntryLine(
 ): { name: string; details: string } {
   const name = entry.firstName?.trim() || "Unnamed"
   const bits: string[] = []
-  if (entry.passedAway === true) bits.push("passed away")
-  else if (entry.age != null) bits.push(String(entry.age))
+  if (entry.passedAway !== true && entry.age != null) bits.push(String(entry.age))
   const relationship = choiceLabel(entry.relationship, config?.relationshipChoices)
   if (relationship) bits.push(relationship)
+  if (entry.passedAway === true) bits.push(formatPassedAwayPhrase(entry))
   if (entry.livesWith === "yes") {
     bits.push(audience === "client" ? "lives with you" : "lives with client")
   }
@@ -307,6 +332,35 @@ export function formatHistoryListEntryLine(entry: HistoryListEntry): string {
   const when = entry.when?.trim()
   if (!when) return what
   return `${what} · from ${when}`
+}
+
+/**
+ * "+ Add a parent or carer" → "+ Add another parent or carer" once the list
+ * already has an entry.
+ */
+export function addAnotherListButtonLabel(addButtonLabel: string): string {
+  const trimmed = addButtonLabel.trim()
+  if (/^\+\s*Add another\b/i.test(trimmed)) return trimmed
+  if (/^\+\s*Add an\b/i.test(trimmed)) {
+    return trimmed.replace(/^\+\s*Add an\b/i, "+ Add another")
+  }
+  if (/^\+\s*Add a\b/i.test(trimmed)) {
+    return trimmed.replace(/^\+\s*Add a\b/i, "+ Add another")
+  }
+  if (/^\+\s*Add\b/i.test(trimmed)) {
+    return trimmed.replace(/^\+\s*Add\b/i, "+ Add another")
+  }
+  return trimmed
+}
+
+/** Sheet / dialog title from the add-button label (without the leading "+"). */
+export function listEntrySheetTitle(addButtonLabel: string, editing: boolean): string {
+  const withoutPlus = addButtonLabel.trim().replace(/^\+\s*/, "")
+  if (!editing) return withoutPlus || "Add"
+  if (/^Add\b/i.test(withoutPlus)) {
+    return withoutPlus.replace(/^Add\b/i, "Edit")
+  }
+  return `Edit ${withoutPlus}`
 }
 
 export function parseFormListConfig(value: unknown): FormListConfig | null {

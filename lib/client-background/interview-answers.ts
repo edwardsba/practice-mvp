@@ -4,12 +4,7 @@
  * this JSON records what was checked on the interview.
  */
 
-import {
-  aggregateSectionStatus,
-  itemStatus,
-  type SectionStatus,
-  type StatusItem,
-} from "@/lib/section-status"
+import { itemStatus, type SectionStatus, type StatusItem } from "@/lib/section-status"
 import type { HistoryQuestionKey } from "@/lib/client-background/interview-history"
 import {
   HISTORY_QUESTION_GROUPS,
@@ -33,9 +28,27 @@ export type InterviewItemAnswer = {
   confirmed: boolean
 }
 
+/** Per-section sign-off in answers_json (Round AQ). Keys are "1"…"9". */
+export type InterviewSectionConfirm = {
+  confirmed: true
+  confirmedAt: string
+}
+
 export type InterviewAnswersJson = {
   version: 1
   items: Record<string, InterviewItemAnswer>
+  /** Section confirmations — missing key means not confirmed. */
+  sections: Record<string, InterviewSectionConfirm>
+}
+
+/** Yes/No/N/A and Yes/N/A items keep their own answer buttons. */
+export function isQuestionKind(kind: InterviewAnswerKind): boolean {
+  return kind === "yna" || kind === "ya"
+}
+
+/** Confirmed/Not applicable (and per-record) items — signed off by Confirm section. */
+export function isDetailsKind(kind: InterviewAnswerKind): boolean {
+  return kind === "cna"
 }
 
 export type InterviewAnswerKind = "yna" | "cna" | "ya" | "living"
@@ -224,7 +237,95 @@ export function interviewItemDef(key: string): InterviewItemDef | undefined {
 }
 
 export function emptyInterviewAnswers(): InterviewAnswersJson {
-  return { version: 1, items: {} }
+  return { version: 1, items: {}, sections: {} }
+}
+
+function sectionKey(sectionNumber: number): string {
+  return String(sectionNumber)
+}
+
+export function isSectionConfirmed(
+  answers: InterviewAnswersJson,
+  sectionNumber: number
+): boolean {
+  return answers.sections[sectionKey(sectionNumber)]?.confirmed === true
+}
+
+export function questionItemsInSection(
+  section: InterviewSectionDef,
+  extraItems: readonly InterviewItemDef[] = []
+): InterviewItemDef[] {
+  return [...section.items, ...extraItems].filter((item) => isQuestionKind(item.kind))
+}
+
+export function detailsItemsInSection(
+  section: InterviewSectionDef,
+  extraItems: readonly InterviewItemDef[] = []
+): InterviewItemDef[] {
+  return [...section.items, ...extraItems].filter((item) => isDetailsKind(item.kind))
+}
+
+/** "Answer 1 question first" / "Answer N questions first" (Confirm section helper). */
+export function answerQuestionsFirstLabel(unanswered: number): string {
+  return unanswered === 1 ? "Answer 1 question first" : `Answer ${unanswered} questions first`
+}
+
+/** Count of question items in the section that still have no answer. */
+export function unansweredQuestionCount(
+  section: InterviewSectionDef,
+  answers: InterviewAnswersJson,
+  extraItems: readonly InterviewItemDef[] = []
+): number {
+  return questionItemsInSection(section, extraItems).filter((item) => !answers.items[item.key])
+    .length
+}
+
+/**
+ * Confirm a section: refuse if any question is unanswered; set each details item
+ * to confirmed (has data) or not_applicable (empty); mark every item confirmed;
+ * set sections[n].
+ */
+export function confirmSectionAnswers(
+  answers: InterviewAnswersJson,
+  sectionNumber: number,
+  detailHasValue: Readonly<Record<string, boolean>>,
+  extraItems: readonly InterviewItemDef[] = [],
+  confirmedAt: string = new Date().toISOString()
+):
+  | { ok: true; answers: InterviewAnswersJson }
+  | { ok: false; error: string; unanswered: number } {
+  const section = INTERVIEW_SECTIONS.find((item) => item.number === sectionNumber)
+  if (!section) return { ok: false, error: "Unknown interview section.", unanswered: 0 }
+  const unanswered = unansweredQuestionCount(section, answers, extraItems)
+  if (unanswered > 0) {
+    return { ok: false, error: answerQuestionsFirstLabel(unanswered), unanswered }
+  }
+  const items = { ...answers.items }
+  for (const item of [...section.items, ...extraItems]) {
+    if (isDetailsKind(item.kind)) {
+      const hasValue = detailHasValue[item.key] === true
+      items[item.key] = {
+        value: hasValue ? "confirmed" : "not_applicable",
+        confirmed: true,
+      }
+      continue
+    }
+    const existing = items[item.key]
+    if (existing) {
+      items[item.key] = { value: existing.value, confirmed: true }
+    }
+  }
+  return {
+    ok: true,
+    answers: {
+      version: 1,
+      items,
+      sections: {
+        ...answers.sections,
+        [sectionKey(sectionNumber)]: { confirmed: true, confirmedAt },
+      },
+    },
+  }
 }
 
 /**
@@ -254,6 +355,14 @@ function readAnswerEntry(
   return { value: row.value, confirmed: row.confirmed === true }
 }
 
+function readSectionConfirm(entry: unknown): InterviewSectionConfirm | null {
+  if (!entry || typeof entry !== "object" || Array.isArray(entry)) return null
+  const row = entry as Record<string, unknown>
+  if (row.confirmed !== true) return null
+  if (typeof row.confirmedAt !== "string" || !row.confirmedAt.trim()) return null
+  return { confirmed: true, confirmedAt: row.confirmedAt }
+}
+
 export function sanitizeInterviewAnswers(value: unknown): InterviewAnswersJson {
   const raw = value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {}
   const itemsRaw =
@@ -272,7 +381,17 @@ export function sanitizeInterviewAnswers(value: unknown): InterviewAnswersJson {
     const parsed = readAnswerEntry(itemsRaw[key], "cna")
     if (parsed) items[key] = parsed
   }
-  return { version: 1, items }
+  const sectionsRaw =
+    raw.sections && typeof raw.sections === "object" && !Array.isArray(raw.sections)
+      ? (raw.sections as Record<string, unknown>)
+      : {}
+  const sections: Record<string, InterviewSectionConfirm> = {}
+  for (const n of INTERVIEW_SECTIONS.map((section) => section.number)) {
+    const key = sectionKey(n)
+    const parsed = readSectionConfirm(sectionsRaw[key])
+    if (parsed) sections[key] = parsed
+  }
+  return { version: 1, items, sections }
 }
 
 /**
@@ -296,10 +415,10 @@ export function dropMissingPerRecordAnswers(
     }
     items[key] = answer
   }
-  return { version: 1, items }
+  return { version: 1, items, sections: answers.sections }
 }
 
-/** Copy prior interview answers with every item marked to confirm. */
+/** Copy prior interview item values unconfirmed; do not copy sections. */
 export function prefillAnswersForReview(source: InterviewAnswersJson): InterviewAnswersJson {
   const items: Record<string, InterviewItemAnswer> = {}
   for (const [key, answer] of Object.entries(source.items)) {
@@ -308,7 +427,7 @@ export function prefillAnswersForReview(source: InterviewAnswersJson): Interview
     if (!isValueAllowedForKind(kind, answer.value)) continue
     items[key] = { value: answer.value, confirmed: false }
   }
-  return { version: 1, items }
+  return { version: 1, items, sections: {} }
 }
 
 export function statusItemForAnswer(answer: InterviewItemAnswer | undefined): StatusItem {
@@ -320,21 +439,54 @@ export function interviewItemStatus(answer: InterviewItemAnswer | undefined) {
   return itemStatus(statusItemForAnswer(answer))
 }
 
+/**
+ * Interview section status (Round AQ):
+ * - done when sections[n] is confirmed and every question is answered
+ * - not started when nothing answered, nothing pre-filled, not confirmed
+ * - otherwise in progress: "N to answer" (left) or "Ready to confirm" (to_confirm, toConfirm 0)
+ */
 export function interviewSectionStatus(
   section: InterviewSectionDef,
   answers: InterviewAnswersJson,
   extraItems: readonly InterviewItemDef[] = []
 ): SectionStatus {
   const allItems = [...section.items, ...extraItems]
-  const items = allItems.map((item) => statusItemForAnswer(answers.items[item.key]))
-  const agg = aggregateSectionStatus(items)
+  const unanswered = unansweredQuestionCount(section, answers, extraItems)
+  const confirmed = isSectionConfirmed(answers, section.number)
+  const anyPrefilled = allItems.some((item) => {
+    const answer = answers.items[item.key]
+    return Boolean(answer && !answer.confirmed)
+  })
+  const anyQuestionAnswered = questionItemsInSection(section, extraItems).some(
+    (item) => Boolean(answers.items[item.key])
+  )
+  const anyDetailsTouched = detailsItemsInSection(section, extraItems).some((item) =>
+    Boolean(answers.items[item.key])
+  )
+
+  let status: SectionStatus["status"]
+  let left = unanswered
+  let toConfirm = 0
+  if (confirmed && unanswered === 0) {
+    status = "done"
+  } else if (!anyQuestionAnswered && !anyPrefilled && !anyDetailsTouched && !confirmed) {
+    status = "not_started"
+    left = unanswered
+  } else if (unanswered > 0) {
+    status = "left"
+  } else {
+    // Questions done (or none); waiting for Confirm section.
+    status = "to_confirm"
+    toConfirm = 0
+  }
+
   return {
     groupLabel: section.id,
     letter: String(section.number),
     title: section.title,
-    status: agg.status,
-    left: agg.left,
-    toConfirm: agg.toConfirm,
+    status,
+    left,
+    toConfirm,
     hasDefaults: false,
   }
 }
@@ -363,48 +515,9 @@ export function section4ExtraItems(input: {
 }
 
 /**
- * Confirm all shown: set every Confirmed/Not applicable (cna) item in the section
- * that is unanswered or still to confirm to Confirmed + confirmed:true.
- * Never changes ya/yna/living items, already-confirmed rows, or Not applicable answers.
- * Includes section 4 per-record keys when passed in extraItems.
+ * Mark every unanswered question in the section Not applicable (confirmed).
+ * Details items are left alone — Confirm section signs those off.
  */
-export function confirmAllShownInSection(
-  answers: InterviewAnswersJson,
-  sectionNumber: number,
-  extraItems: readonly InterviewItemDef[] = []
-): InterviewAnswersJson {
-  const section = INTERVIEW_SECTIONS.find((item) => item.number === sectionNumber)
-  if (!section) return answers
-  const items = { ...answers.items }
-  for (const item of [...section.items, ...extraItems]) {
-    if (item.kind !== "cna") continue
-    const existing = items[item.key]
-    if (existing?.confirmed && existing.value === "confirmed") continue
-    if (existing?.value === "not_applicable") continue
-    items[item.key] = { value: "confirmed", confirmed: true }
-  }
-  return { version: 1, items }
-}
-
-/** True when confirmAllShownInSection would change at least one item. */
-export function sectionHasConfirmAllTargets(
-  answers: InterviewAnswersJson,
-  sectionNumber: number,
-  extraItems: readonly InterviewItemDef[] = []
-): boolean {
-  const section = INTERVIEW_SECTIONS.find((item) => item.number === sectionNumber)
-  if (!section) return false
-  for (const item of [...section.items, ...extraItems]) {
-    if (item.kind !== "cna") continue
-    const existing = answers.items[item.key]
-    if (existing?.confirmed && existing.value === "confirmed") continue
-    if (existing?.value === "not_applicable") continue
-    return true
-  }
-  return false
-}
-
-/** Mark every unanswered item in the section Not applicable (confirmed). Leaves existing answers alone. */
 export function applyNothingToRecord(
   answers: InterviewAnswersJson,
   sectionNumber: number
@@ -413,11 +526,12 @@ export function applyNothingToRecord(
   if (!section) return answers
   const items = { ...answers.items }
   for (const item of section.items) {
+    if (!isQuestionKind(item.kind)) continue
     if (items[item.key]) continue
     if (!isValueAllowedForKind(item.kind, "not_applicable")) continue
     items[item.key] = { value: "not_applicable", confirmed: true }
   }
-  return { version: 1, items }
+  return { version: 1, items, sections: answers.sections }
 }
 
 export function setItemAnswer(
@@ -433,28 +547,15 @@ export function setItemAnswer(
       ...answers.items,
       [key]: { value: validated.value, confirmed: true },
     },
+    sections: answers.sections,
   }
 }
 
-export function confirmAllAnswers(answers: InterviewAnswersJson): InterviewAnswersJson {
-  const items: Record<string, InterviewItemAnswer> = {}
-  for (const [key, answer] of Object.entries(answers.items)) {
-    items[key] = { value: answer.value, confirmed: true }
-  }
-  return { version: 1, items }
-}
-
-export function sectionsWithLeft(answers: InterviewAnswersJson): number[] {
-  return INTERVIEW_SECTIONS.filter((section) => {
-    const status = interviewSectionStatus(section, answers).status
-    return status === "left" || status === "not_started"
-  }).map((section) => section.number)
-}
-
-export function sectionsWithToConfirm(answers: InterviewAnswersJson): number[] {
-  return INTERVIEW_SECTIONS.filter(
-    (section) => interviewSectionStatus(section, answers).status === "to_confirm"
-  ).map((section) => section.number)
+/** Sections that are not yet confirmed (Complete uses this). */
+export function sectionsNotConfirmed(answers: InterviewAnswersJson): number[] {
+  return INTERVIEW_SECTIONS.filter((section) => !isSectionConfirmed(answers, section.number)).map(
+    (section) => section.number
+  )
 }
 
 /** Screening mirror: yes→yes, no→no, not_applicable→no. Missing → not written (finalise uses not_asked). */

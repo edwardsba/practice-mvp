@@ -171,6 +171,13 @@ Left bars are straight with square corners at every level; hover/selected soft f
 
 Do not add a second tree look, a second ⊕ control, a second side-panel shell, or a second info/form layout. Interview sections 5/6/8/9 and the Client Background page must use these.
 
+### Background interview: confirm by section
+
+Every interview section ends with **Nothing to record** (where the section has it) and **Confirm section**, disabled until each question (Yes/No/N/A or Yes/N/A) in the section is answered. Confirming writes `answers_json.sections[n]` and sets each details item to Confirmed or Not applicable from what is on file — details have no answer buttons of their own. Complete needs all nine sections confirmed.
+
+- Sections 1–4 and 7: details are overview rows (`interview-detail-row.tsx`) with **Edit**; questions keep `InterviewItemRow`. Edit opens that item's existing editor in the shared `SidePanel` (`interview-item-editors.tsx`).
+- Sections 5, 6, 8, 9: the shared trees render inline with each question answered under its heading (`renderHeadingAnswer`; headings map to items in `lib/client-background/interview-tree-headings.ts`). ⊕ under a heading answers that question Yes.
+
 Appointment automations: `lib/appointments/run-automations.ts` via daily cron (`08:00 UTC`).
 
 ## Naming

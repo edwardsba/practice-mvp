@@ -1,7 +1,7 @@
 "use client"
 
 import { useRouter } from "next/navigation"
-import { useActionState, useEffect } from "react"
+import { useActionState, useEffect, useLayoutEffect, useRef } from "react"
 
 import {
   updateClientContactDetails,
@@ -41,6 +41,9 @@ export function ContactDetailsForm({
   showNotes = false,
   showSaved = false,
   redirectPanel = "details",
+  hideSubmit = false,
+  onSaved,
+  onPendingChange,
 }: {
   clientId: string
   client: ContactDetailsClient
@@ -49,6 +52,11 @@ export function ContactDetailsForm({
   showSaved?: boolean
   /** Which Edit details panel to reopen after save (page mode only). */
   redirectPanel?: EditDetailsPanelId
+  /** Embedded in a panel whose own footer submits the form. */
+  hideSubmit?: boolean
+  /** Embedded mode: after each successful save. */
+  onSaved?: () => void
+  onPendingChange?: (pending: boolean) => void
 }) {
   const router = useRouter()
   const [state, formAction, pending] = useActionState(
@@ -61,12 +69,21 @@ export function ContactDetailsForm({
     ),
     initialState
   )
+  const callbacks = useRef({ onSaved, onPendingChange })
+  useLayoutEffect(() => {
+    callbacks.current = { onSaved, onPendingChange }
+  })
 
   useEffect(() => {
     if (mode === "embedded" && state.success) {
       router.refresh()
+      callbacks.current.onSaved?.()
     }
-  }, [mode, state.success, router])
+  }, [mode, state, router])
+
+  useEffect(() => {
+    callbacks.current.onPendingChange?.(pending)
+  }, [pending])
 
   const savedVisible =
     mode === "embedded"
@@ -122,15 +139,17 @@ export function ContactDetailsForm({
           {state.error}
         </p>
       ) : null}
-      {savedVisible ? (
+      {savedVisible && !hideSubmit ? (
         <p className="text-sm text-muted-foreground" role="status">
           Saved
         </p>
       ) : null}
 
-      <Button type="submit" disabled={pending}>
-        {pending ? "Saving…" : "Save"}
-      </Button>
+      {hideSubmit ? null : (
+        <Button type="submit" disabled={pending}>
+          {pending ? "Saving…" : "Save"}
+        </Button>
+      )}
     </form>
   )
 }

@@ -88,8 +88,13 @@ export function aggregateSectionStatus(
 export function statusPillLabel(section: Pick<SectionStatus, "status" | "left" | "toConfirm" | "hasDefaults">): string {
   if (section.status === "skipped") return "Skipped"
   if (section.status === "not_started") return "Not started"
-  if (section.status === "left") return `${section.left} left`
-  if (section.status === "to_confirm") return `${section.toConfirm} to confirm`
+  // Interview: unanswered questions → "N to answer"; all questions done → "Ready to confirm".
+  // Assessment form still uses toConfirm > 0 for pre-filled counts.
+  if (section.status === "left") return `${section.left} to answer`
+  if (section.status === "to_confirm") {
+    if (section.toConfirm === 0) return "Ready to confirm"
+    return `${section.toConfirm} to confirm`
+  }
   if (section.hasDefaults) return "Confirmed"
   return "Done"
 }
@@ -108,10 +113,10 @@ export function progressChipAriaLabel(section: SectionStatus): string {
       detail = "not started"
       break
     case "left":
-      detail = `${section.left} left`
+      detail = `${section.left} to answer`
       break
     case "to_confirm":
-      detail = `${section.toConfirm} to confirm`
+      detail = section.toConfirm === 0 ? "ready to confirm" : `${section.toConfirm} to confirm`
       break
     case "done":
       detail = section.hasDefaults ? "confirmed" : "complete"

@@ -20,6 +20,7 @@ import {
 } from "@/lib/client-background/block-mutations"
 import {
   completeBackgroundInterview,
+  confirmInterviewSection,
   createEvent,
   createHistoryIssue,
   deleteEvent,
@@ -254,10 +255,28 @@ export async function saveInterviewAnswersBulkAction(clientId: string, answers: 
   return result
 }
 
+export async function confirmInterviewSectionAction(
+  clientId: string,
+  sectionNumber: number,
+  detailHasValue: Record<string, boolean>,
+  extraItems?: import("@/lib/client-background/interview-answers").InterviewItemDef[]
+) {
+  const context = await requirePractitionerContext()
+  const result = await confirmInterviewSection({
+    clientId,
+    practiceId: context.practiceId,
+    userId: context.userId,
+    sectionNumber,
+    detailHasValue,
+    extraItems,
+  })
+  if (!result.error) refresh(clientId)
+  return result
+}
+
 export async function completeBackgroundInterviewAction(
   clientId: string,
-  selfReportId: string | null,
-  options?: { confirmAllItems?: boolean }
+  selfReportId: string | null
 ) {
   const context = await requirePractitionerContext()
   const result = await completeBackgroundInterview({
@@ -265,7 +284,6 @@ export async function completeBackgroundInterviewAction(
     practiceId: context.practiceId,
     userId: context.userId,
     selfReportId,
-    confirmAllItems: options?.confirmAllItems,
   })
   if (!result.error) refresh(clientId)
   return result

@@ -38,6 +38,7 @@ export function SidePanel({
   /** Element that opened the panel — focus returns here on close. */
   returnFocusRef?: React.RefObject<HTMLElement | null>
 }) {
+  const rootRef = useRef<HTMLDivElement>(null)
   const panelRef = useRef<HTMLElement>(null)
   const titleId = useId()
   const previousFocus = useRef<HTMLElement | null>(null)
@@ -69,6 +70,12 @@ export function SidePanel({
 
     function onKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
+        // Dialogs and menus opened from the panel are portalled outside it;
+        // let them take their own Escape instead of closing the panel under them.
+        const target = event.target
+        if (target instanceof Node && target !== document.body && !rootRef.current?.contains(target)) {
+          return
+        }
         event.stopPropagation()
         onDismissRef.current()
         return
@@ -101,7 +108,7 @@ export function SidePanel({
   }, [])
 
   return (
-    <div className="fixed inset-0 z-50">
+    <div ref={rootRef} className="fixed inset-0 z-50">
       <button
         type="button"
         className="absolute inset-0 bg-black/20"
@@ -152,6 +159,7 @@ export function SidePanel({
 
 /**
  * Form footer: Remove (left, existing only) · Cancel · Save.
+ * Without onCancel only the save button shows (e.g. "Done" for lists that save as they go).
  * Fixed at the bottom of the panel.
  */
 export function SidePanelFooter({
@@ -167,7 +175,7 @@ export function SidePanelFooter({
   saveDisabled?: boolean
   saveLabel?: string
   onRemove?: () => void
-  onCancel: () => void
+  onCancel?: () => void
   onSave: () => void
   className?: string
 }) {
@@ -184,14 +192,16 @@ export function SidePanelFooter({
         </button>
       ) : null}
       <span className="flex-1" />
-      <button
-        type="button"
-        className="inline-flex min-h-10 items-center rounded-md border px-3 text-sm"
-        disabled={saving}
-        onClick={onCancel}
-      >
-        Cancel
-      </button>
+      {onCancel ? (
+        <button
+          type="button"
+          className="inline-flex min-h-10 items-center rounded-md border px-3 text-sm"
+          disabled={saving}
+          onClick={onCancel}
+        >
+          Cancel
+        </button>
+      ) : null}
       <button
         type="button"
         className="inline-flex min-h-10 items-center rounded-md bg-primary px-3 text-sm text-primary-foreground disabled:opacity-60"

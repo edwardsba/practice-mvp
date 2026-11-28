@@ -83,6 +83,12 @@ import {
   countUnsavedRelationshipChanges,
   type RelationshipSectionSnapshot,
 } from "@/lib/client-background/unsaved-changes"
+import {
+  rebaseBlockAnswerDrafts,
+  rebaseBlockDrafts,
+  rebaseStatusDraft,
+} from "@/lib/client-background/relationship-draft-rebase"
+import type { RelationshipTreeHeading } from "@/lib/client-background/interview-tree-headings"
 import { relationshipDuration } from "@/lib/reports/relationship-block-report"
 import { todayDateString } from "@/lib/dates/practice-time"
 import {
@@ -337,6 +343,10 @@ export function RelationshipBlocksSection({
   embedWithoutChrome = false,
   /** Hide top-level Yes/None/Not asked radios owned by interview item rows. */
   hideTopLevelAnswers = false,
+  /** Interview: the heading's question answer, shown under that heading. */
+  renderHeadingAnswer,
+  /** Interview: ⊕ under a heading was used (answers that heading's question Yes). */
+  onHeadingAdd,
 }: {
   clientId: string
   relationships: RelationshipRecord[]
@@ -358,6 +368,8 @@ export function RelationshipBlocksSection({
   visibleSections?: Array<"intimate" | "caregivers">
   embedWithoutChrome?: boolean
   hideTopLevelAnswers?: boolean
+  renderHeadingAnswer?: (heading: RelationshipTreeHeading) => ReactNode
+  onHeadingAdd?: (heading: RelationshipTreeHeading) => void
 }) {
   const initialBlocks = blocks ?? []
   const initialAnswers = blockAnswers ?? emptyBlockAnswers()
@@ -381,14 +393,19 @@ export function RelationshipBlocksSection({
   const portalReady = typeof document !== "undefined"
   const inflight = useRef<Promise<void> | null>(null)
   const panelDirtyRef = useRef(false)
+  const syncedProps = useRef({ blocks: initialBlocks, answers: initialAnswers, status: relationshipStatus })
 
   useEffect(() => {
+    const previous = syncedProps.current
+    const nextBlocks = blocks ?? []
+    const nextAnswers = blockAnswers ?? emptyBlockAnswers()
+    syncedProps.current = { blocks: nextBlocks, answers: nextAnswers, status: relationshipStatus }
     setPeople(relationships)
-    setBlockList(blocks ?? [])
-    setAnswers(blockAnswers ?? emptyBlockAnswers())
-    setStatus(relationshipStatus)
-    setBaselineBlocks(blocks ?? [])
-    setBaselineAnswers(blockAnswers ?? emptyBlockAnswers())
+    setBlockList((draft) => rebaseBlockDrafts(draft, previous.blocks, nextBlocks))
+    setAnswers((draft) => rebaseBlockAnswerDrafts(draft, previous.answers, nextAnswers))
+    setStatus((draft) => rebaseStatusDraft(draft, previous.status, relationshipStatus))
+    setBaselineBlocks(nextBlocks)
+    setBaselineAnswers(nextAnswers)
     setBaselineStatus(relationshipStatus)
   }, [relationships, blocks, blockAnswers, relationshipStatus])
 
@@ -901,6 +918,17 @@ export function RelationshipBlocksSection({
         ? selection.blockId
         : null
 
+  function headingAnswer(heading: RelationshipTreeHeading): ReactNode {
+    return renderHeadingAnswer?.(heading) ?? null
+  }
+  const childrenHeadingAnswer = headingAnswer("children")
+  const siblingsHeadingAnswer = headingAnswer("siblings")
+  const childrenPromptLine = childrenPrompt ? (
+    <p className={cn("text-sm", statusColours.client.text)}>
+      Client: {childrenPrompt} · {recordedChildren} recorded
+    </p>
+  ) : null
+
   const intimateBody = (
     <div id="check-relationships" className="space-y-6">
       {error && !selection ? <p className="text-sm text-destructive">{error}</p> : null}
@@ -913,15 +941,15 @@ export function RelationshipBlocksSection({
             <TreeAddControl
               choices={relationshipTreeAddChoices({ type: "heading", section: "relationship" })!}
               aria-label="Add current relationship"
-              onSelect={() => openNewRelationship("client_current")}
+              onSelect={() => {
+                openNewRelationship("client_current")
+                onHeadingAdd?.("current")
+              }}
             />
           ) : null}
         </div>
-        {childrenPrompt ? (
-          <p className={cn("text-sm", statusColours.client.text)}>
-            Client: {childrenPrompt} · {recordedChildren} recorded
-          </p>
-        ) : null}
+        {headingAnswer("current")}
+        {childrenHeadingAnswer ? null : childrenPromptLine}
         {currentBlocks.length === 0 ? (
           <Layer2Band>
             <ClientStatusSelect
@@ -974,10 +1002,14 @@ export function RelationshipBlocksSection({
             <TreeAddControl
               choices={relationshipTreeAddChoices({ type: "heading", section: "relationship" })!}
               aria-label="Add previous relationship"
-              onSelect={() => openNewRelationship("client_previous")}
+              onSelect={() => {
+                openNewRelationship("client_previous")
+                onHeadingAdd?.("previous")
+              }}
             />
           ) : null}
         </div>
+        {headingAnswer("previous")}
         {(previous.length > 0 || answers.previousRelationships === "yes") &&
           previous.map((block) => (
             <PreviousBlockTree
@@ -1032,6 +1064,14 @@ export function RelationshipBlocksSection({
           ))}
       </section>
 
+      {childrenHeadingAnswer ? (
+        <section className="space-y-3">
+          <h3 className={treeLayer1ClassName}>Children</h3>
+          {childrenPromptLine}
+          {childrenHeadingAnswer}
+        </section>
+      ) : null}
+
       {unplacedIntimate.length > 0 ? (
         <UnplacedGroup people={unplacedIntimate} onOpenPerson={openPerson} onMove={(id) => setSelection({ type: "move", id })} />
       ) : null}
@@ -1061,6 +1101,7 @@ export function RelationshipBlocksSection({
           onSiblingsAnswer={(siblingsAnswer) =>
             patchBlock(biological.relationshipBlockId, { siblingsAnswer })
           }
+          headingAnswer={headingAnswer("biological_parents")}
         />
       ) : null}
 
@@ -1070,9 +1111,13 @@ export function RelationshipBlocksSection({
         answer={motherOther.length > 0 ? "yes" : answers.motherOtherRelationships || ""}
         locked={motherOther.length > 0}
         onAnswer={(value) => setAnswer("motherOtherRelationships", value)}
-        onAdd={() => openNewRelationship("parent_other", { parentSide: "mother" })}
+        onAdd={() => {
+          openNewRelationship("parent_other", { parentSide: "mother" })
+          onHeadingAdd?.("mother_other")
+        }}
         hideAdd={!relationshipHeadingAllowsAdd(answers.motherOtherRelationships)}
         hideAnswer={hideTopLevelAnswers}
+        headingAnswer={headingAnswer("mother_other")}
       >
         {motherOther.map((block) => (
           <ParentOtherTree
@@ -1098,9 +1143,13 @@ export function RelationshipBlocksSection({
         answer={fatherOther.length > 0 ? "yes" : answers.fatherOtherRelationships || ""}
         locked={fatherOther.length > 0}
         onAnswer={(value) => setAnswer("fatherOtherRelationships", value)}
-        onAdd={() => openNewRelationship("parent_other", { parentSide: "father" })}
+        onAdd={() => {
+          openNewRelationship("parent_other", { parentSide: "father" })
+          onHeadingAdd?.("father_other")
+        }}
         hideAdd={!relationshipHeadingAllowsAdd(answers.fatherOtherRelationships)}
         hideAnswer={hideTopLevelAnswers}
+        headingAnswer={headingAnswer("father_other")}
       >
         {fatherOther.map((block) => (
           <ParentOtherTree
@@ -1126,10 +1175,14 @@ export function RelationshipBlocksSection({
         answer={caregivers.length > 0 ? "yes" : answers.caregiverArrangements || ""}
         locked={caregivers.length > 0}
         onAnswer={(value) => setAnswer("caregiverArrangements", value)}
-        onAdd={() => openNewRelationship("caregiver_arrangement")}
+        onAdd={() => {
+          openNewRelationship("caregiver_arrangement")
+          onHeadingAdd?.("caregiver")
+        }}
         addSection="arrangement"
         hideAdd={!relationshipHeadingAllowsAdd(answers.caregiverArrangements)}
         hideAnswer={hideTopLevelAnswers}
+        headingAnswer={headingAnswer("caregiver")}
       >
         {caregivers.map((block) => (
           <CaregiverTree
@@ -1152,6 +1205,13 @@ export function RelationshipBlocksSection({
           />
         ))}
       </AnsweredSideSection>
+
+      {siblingsHeadingAnswer ? (
+        <section className="space-y-3">
+          <h3 className={treeLayer1ClassName}>Siblings</h3>
+          {siblingsHeadingAnswer}
+        </section>
+      ) : null}
 
       {unplacedCaregivers.length > 0 ? (
         <UnplacedGroup
@@ -2093,6 +2153,7 @@ function ParentsBlockTree({
   onStatus,
   onAddSibling,
   onSiblingsAnswer,
+  headingAnswer,
 }: {
   block: RelationshipBlock
   people: RelationshipRecord[]
@@ -2102,6 +2163,7 @@ function ParentsBlockTree({
   onStatus: (status: string) => void
   onAddSibling: () => void
   onSiblingsAnswer: (value: BlockAnswer) => void
+  headingAnswer?: ReactNode
 }) {
   const parents = membersOf(block, people, "parent").sort(
     (a, b) => parentRank(a) - parentRank(b) || a.displayOrder - b.displayOrder
@@ -2121,6 +2183,7 @@ function ParentsBlockTree({
   return (
     <section className="space-y-3">
       <h3 className={treeLayer1ClassName}>Biological parents</h3>
+      {headingAnswer}
       <Layer2Band>
         <div className="flex flex-wrap items-end gap-3">
           <div className="min-w-[12rem] flex-1">
@@ -2320,6 +2383,7 @@ function AnsweredSideSection({
   addSection = "relationship",
   hideAdd,
   hideAnswer = false,
+  headingAnswer,
   children,
 }: {
   id: string
@@ -2331,6 +2395,7 @@ function AnsweredSideSection({
   addSection?: "relationship" | "arrangement" | "other_children"
   hideAdd: boolean
   hideAnswer?: boolean
+  headingAnswer?: ReactNode
   children: import("react").ReactNode
 }) {
   const choices = relationshipTreeAddChoices({ type: "heading", section: addSection })
@@ -2348,6 +2413,7 @@ function AnsweredSideSection({
           <TreeAddControl choices={choices} aria-label={`Add under ${label}`} onSelect={onAdd} />
         ) : null}
       </div>
+      {headingAnswer}
       {children}
     </section>
   )

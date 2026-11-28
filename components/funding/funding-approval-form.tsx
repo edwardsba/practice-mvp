@@ -156,8 +156,10 @@ export function FundingApprovalForm({
   returnTo,
   lockClient = false,
   embedded = false,
+  hideActions = false,
   onSaved,
   onCancel,
+  onPendingChange,
   onPersonCreated,
 }: {
   practiceId: string
@@ -176,8 +178,11 @@ export function FundingApprovalForm({
   returnTo?: string
   lockClient?: boolean
   embedded?: boolean
+  /** Embedded in a panel whose own footer submits and cancels. */
+  hideActions?: boolean
   onSaved?: (fundingApprovalId: string) => void
   onCancel?: () => void
+  onPendingChange?: (pending: boolean) => void
   onPersonCreated?: (person: RelationshipOption) => void
 }) {
   const router = useRouter()
@@ -399,6 +404,10 @@ export function FundingApprovalForm({
       router.refresh()
     }
   }, [state.success, state.fundingApprovalId, returnTo, router, embedded, onSaved])
+
+  useEffect(() => {
+    onPendingChange?.(pending)
+  }, [pending, onPendingChange])
 
   const isReferral = formKind === "referral"
   const hasFundingValues = Boolean(
@@ -1006,20 +1015,22 @@ export function FundingApprovalForm({
         </p>
       ) : null}
 
-      <div className="flex flex-wrap gap-3">
-        <Button type="submit" disabled={pending}>
-          {pending ? "Saving…" : "Save"}
-        </Button>
-        {embedded ? (
-          <Button type="button" variant="outline" onClick={() => onCancel?.()}>
-            Cancel
+      {hideActions ? null : (
+        <div className="flex flex-wrap gap-3">
+          <Button type="submit" disabled={pending}>
+            {pending ? "Saving…" : "Save"}
           </Button>
-        ) : (
-          <Button type="button" variant="outline" asChild>
-            <Link href={cancelHref ?? "/funding/approvals"}>Cancel</Link>
-          </Button>
-        )}
-      </div>
+          {embedded ? (
+            <Button type="button" variant="outline" onClick={() => onCancel?.()}>
+              Cancel
+            </Button>
+          ) : (
+            <Button type="button" variant="outline" asChild>
+              <Link href={cancelHref ?? "/funding/approvals"}>Cancel</Link>
+            </Button>
+          )}
+        </div>
+      )}
 
       <Sheet open={addingProfessional} onOpenChange={setAddingProfessional}>
         <SheetContent className="h-full w-full overflow-y-auto sm:max-w-3xl">

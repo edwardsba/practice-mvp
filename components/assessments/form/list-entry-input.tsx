@@ -10,11 +10,13 @@ import {
   formatPersonListEntryLine,
   isHistoryEntryBlank,
   isPersonEntryBlank,
+  listFieldLabel,
   parseHistoryListEntry,
   parsePersonListEntry,
   PERSON_LIST_FIELD_KEYS,
   serializeHistoryListEntry,
   serializePersonListEntry,
+  setPersonPassedAway,
   type FormListConfig,
   type HistoryListEntry,
   type PersonListEntry,
@@ -175,13 +177,14 @@ export function ListEntryInput({
 
   function renderPersonFields() {
     const person = draft as PersonListEntry
+    const passedAway = person.passedAway === true
     return (
       <div className="space-y-3">
         {personFields.map((field) => {
           if (field === "firstName") {
             return (
               <div key={field} className="space-y-1.5">
-                <p className="text-sm font-medium">First name</p>
+                <p className="text-sm font-medium">{listFieldLabel(config, "firstName")}</p>
                 <Input
                   value={person.firstName ?? ""}
                   disabled={disabled}
@@ -193,10 +196,33 @@ export function ListEntryInput({
               </div>
             )
           }
+          if (field === "passedAway") {
+            const tickId = `${id}-passed-away`
+            return (
+              <label
+                key={field}
+                htmlFor={tickId}
+                className={cn(
+                  "flex min-h-11 cursor-pointer items-center gap-3 rounded-md border px-3 py-2",
+                  passedAway ? "border-primary bg-primary/5" : "border-input"
+                )}
+              >
+                <input
+                  id={tickId}
+                  type="checkbox"
+                  checked={passedAway}
+                  disabled={disabled}
+                  onChange={() => setDraft(setPersonPassedAway(person, !passedAway))}
+                />
+                <span className="text-sm font-medium">{listFieldLabel(config, "passedAway")}</span>
+              </label>
+            )
+          }
           if (field === "age") {
+            if (passedAway) return null
             return (
               <div key={field} className="space-y-1.5">
-                <p className="text-sm font-medium">Age</p>
+                <p className="text-sm font-medium">{listFieldLabel(config, "age")}</p>
                 <Input
                   type="number"
                   min={0}
@@ -228,7 +254,7 @@ export function ListEntryInput({
             }))
             return (
               <div key={field} className="space-y-1.5">
-                <p className="text-sm font-medium">Relationship</p>
+                <p className="text-sm font-medium">{listFieldLabel(config, "relationship")}</p>
                 <RadioOptionList
                   options={options}
                   value={person.relationship}
@@ -241,7 +267,7 @@ export function ListEntryInput({
           if (field === "livesWith") {
             return (
               <div key={field} className="space-y-1.5">
-                <p className="text-sm font-medium">Lives with the client</p>
+                <p className="text-sm font-medium">{listFieldLabel(config, "livesWith")}</p>
                 <RadioOptionList
                   options={LIVES_WITH_OPTIONS}
                   value={person.livesWith}
@@ -254,11 +280,10 @@ export function ListEntryInput({
             )
           }
           if (field === "fromYear" || field === "toYear") {
-            const label = field === "fromYear" ? "From year" : "To year"
             const current = field === "fromYear" ? person.fromYear : person.toYear
             return (
               <div key={field} className="space-y-1.5">
-                <p className="text-sm font-medium">{label}</p>
+                <p className="text-sm font-medium">{listFieldLabel(config, field)}</p>
                 <Input
                   type="number"
                   min={1000}
@@ -290,7 +315,7 @@ export function ListEntryInput({
             }))
             return (
               <div key={field} className="space-y-1.5">
-                <p className="text-sm font-medium">How it ended</p>
+                <p className="text-sm font-medium">{listFieldLabel(config, "howEnded")}</p>
                 <RadioOptionList
                   options={options}
                   value={person.howEnded}
@@ -311,7 +336,7 @@ export function ListEntryInput({
     return (
       <div className="space-y-3">
         <div className="space-y-1.5">
-          <p className="text-sm font-medium">What</p>
+          <p className="text-sm font-medium">{listFieldLabel(config, "what")}</p>
           <Input
             value={history.what ?? ""}
             disabled={disabled}
@@ -320,7 +345,7 @@ export function ListEntryInput({
           />
         </div>
         <div className="space-y-1.5">
-          <p className="text-sm font-medium">When</p>
+          <p className="text-sm font-medium">{listFieldLabel(config, "when")}</p>
           <Input
             value={history.when ?? ""}
             disabled={disabled}

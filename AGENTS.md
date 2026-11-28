@@ -148,14 +148,14 @@ Every assessment — practitioner or client — uses only these shared element t
 | **long_text** | Multi-line textarea |
 | **date** | Date input (`YYYY-MM-DD`) |
 | **text_list** | Growing short-text boxes; trailing empty row; blanks ignored |
-| **person_list** | Collapsed bordered lines (name + muted " · " facts + Edit); open editor "Person N" / Remove / Done; dashed "+ Add …" from `list_config_json` |
-| **history_list** | Same list pattern; collapsed "What · from when"; fields `what` / `when` |
+| **person_list** | Collapsed bordered lines (name + muted " · " facts + Edit); open editor "Person N" / Remove / Done; dashed "+ Add …" from `list_config_json`. Optional `labels` map for field wording; optional `passedAway` tick (hides/clears age; collapsed shows "passed away") |
+| **history_list** | Same list pattern; collapsed "What · from when"; fields `what` / `when`; optional `labels` for those keys |
 
 Shared chrome (all types):
 
 - **In-person option:** on `yes_no` / `radio` when `allow_in_person` is true, last row is "I'd rather talk about it in person" (`in_person`). Counts as answered; scoring and `show_when` / triggers ignore it unless they list that value.
 - **Follow-up indent:** child elements sit under a **2px grey** left border (`border-l-2 border-muted`) with left padding.
-- **Pre-filled tag:** grey "Pre-filled" chip beside the question when the answer is still the default selection and unconfirmed.
+- **Pre-filled tag:** amber text "Pre-filled" (`PrefilledTag`, `attentionPrefilledTagClass`) beside the question while the answer is pre-filled and not yet confirmed.
 - **Error state:** destructive outline on the question block, destructive border on the control where applicable, and a red alert line under the control.
 
 ### Colours: one meaning each

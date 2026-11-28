@@ -7,15 +7,18 @@ import { LRAMP_ELEMENTS } from "@/lib/assessments/definitions/lramp"
 import {
   cleanHistoryListValues,
   cleanPersonListValues,
+  DEFAULT_LIST_FIELD_LABELS,
   formatHistoryListEntryLine,
   formatPersonListEntryLine,
   IN_PERSON_LABEL,
   IN_PERSON_VALUE,
+  listFieldLabel,
   parseFormListConfig,
   parseHistoryListEntry,
   parsePersonListEntry,
   serializeHistoryListEntry,
   serializePersonListEntry,
+  setPersonPassedAway,
   type FormListConfig,
 } from "@/lib/assessments/form-lists"
 import { buildAnswerSections } from "@/lib/assessments/answer-rows"
@@ -98,7 +101,89 @@ check(
     { firstName: "Jane", age: 47, relationship: "sister", livesWith: "yes" },
     siblingConfig
   ),
-  { name: "Jane", details: "47 · Sister · Lives with client: Yes" }
+  { name: "Jane", details: "47 · Sister · Yes" }
+)
+
+check(
+  "default livesWith label is Lives with you?",
+  DEFAULT_LIST_FIELD_LABELS.livesWith,
+  "Lives with you?"
+)
+
+check(
+  "setPersonPassedAway ticks and clears age",
+  setPersonPassedAway({ firstName: "Pat", age: 72, relationship: "mother" }, true),
+  { firstName: "Pat", relationship: "mother", passedAway: true }
+)
+
+check(
+  "setPersonPassedAway unticks and leaves age absent",
+  setPersonPassedAway({ firstName: "Pat", passedAway: true }, false),
+  { firstName: "Pat" }
+)
+
+const passedAwayConfig: FormListConfig = {
+  addButtonLabel: "+ Add a parent",
+  fields: ["firstName", "age", "passedAway", "relationship"],
+  relationshipChoices: [
+    { label: "Mother", value: "mother" },
+    { label: "Father", value: "father" },
+  ],
+}
+
+check(
+  "person parse drops age when passedAway is true",
+  parsePersonListEntry(
+    JSON.stringify({ firstName: "Pat", age: 72, passedAway: true, relationship: "mother" }),
+    passedAwayConfig
+  ),
+  { firstName: "Pat", relationship: "mother", passedAway: true }
+)
+
+check(
+  "person collapsed line shows passed away instead of age",
+  formatPersonListEntryLine(
+    { firstName: "Pat", age: 72, passedAway: true, relationship: "mother" },
+    passedAwayConfig
+  ),
+  { name: "Pat", details: "passed away · Mother" }
+)
+
+check(
+  "list labels: custom used, unknown keys and non-strings dropped",
+  parseFormListConfig({
+    addButtonLabel: "+ Add another",
+    fields: ["firstName", "passedAway", "what"],
+    labels: {
+      firstName: "Given name",
+      passedAway: "Has died",
+      what: "Event",
+      when: "Around when",
+      nope: "Ignored",
+      age: 12,
+      livesWith: "  ",
+    },
+  }),
+  {
+    addButtonLabel: "+ Add another",
+    fields: ["firstName", "passedAway"],
+    labels: {
+      firstName: "Given name",
+      passedAway: "Has died",
+      what: "Event",
+      when: "Around when",
+    },
+  }
+)
+
+check(
+  "listFieldLabel falls back to defaults",
+  [
+    listFieldLabel(null, "livesWith"),
+    listFieldLabel({ addButtonLabel: "+ Add", labels: { what: "Event" } }, "what"),
+    listFieldLabel({ addButtonLabel: "+ Add", labels: { what: "Event" } }, "when"),
+  ],
+  ["Lives with you?", "Event", "When"]
 )
 
 // --- Parsing history_list ---

@@ -14,13 +14,33 @@ export const PERSON_LIST_FIELD_KEYS = [
   "fromYear",
   "toYear",
   "howEnded",
+  "passedAway",
 ] as const
 
 export type PersonListFieldKey = (typeof PERSON_LIST_FIELD_KEYS)[number]
 
+export const HISTORY_LIST_FIELD_KEYS = ["what", "when"] as const
+export type HistoryListFieldKey = (typeof HISTORY_LIST_FIELD_KEYS)[number]
+
+export type FormListFieldLabelKey = PersonListFieldKey | HistoryListFieldKey
+
 export type FormListChoice = {
   label: string
   value: string
+}
+
+/** Default field labels when the definition omits `labels`. */
+export const DEFAULT_LIST_FIELD_LABELS: Record<FormListFieldLabelKey, string> = {
+  firstName: "First name",
+  age: "Age",
+  relationship: "Relationship",
+  livesWith: "Lives with you?",
+  fromYear: "From year",
+  toYear: "To year",
+  howEnded: "How it ended",
+  passedAway: "Passed away",
+  what: "What",
+  when: "When",
 }
 
 /** Config for person_list / history_list on an assessment element. */
@@ -36,6 +56,8 @@ export type FormListConfig = {
   relationshipChoices?: FormListChoice[]
   /** Choices for howEnded (person_list). */
   howEndedChoices?: FormListChoice[]
+  /** Optional field labels (client vs practitioner wording). Unknown keys dropped. */
+  labels?: Partial<Record<FormListFieldLabelKey, string>>
 }
 
 export type PersonListEntry = {
@@ -46,6 +68,8 @@ export type PersonListEntry = {
   fromYear?: number
   toYear?: number
   howEnded?: string
+  /** Present only when ticked; missing otherwise. */
+  passedAway?: true
 }
 
 export type HistoryListEntry = {
@@ -92,6 +116,35 @@ function choiceLabel(
   return choices?.find((c) => c.value === value)?.label ?? value
 }
 
+const LABEL_KEYS = new Set<string>([
+  ...(PERSON_LIST_FIELD_KEYS as readonly string[]),
+  ...(HISTORY_LIST_FIELD_KEYS as readonly string[]),
+])
+
+/** Label for a list field: definition override, else the shared default. */
+export function listFieldLabel(
+  config: FormListConfig | null | undefined,
+  key: FormListFieldLabelKey
+): string {
+  const custom = config?.labels?.[key]
+  if (typeof custom === "string" && custom.trim()) return custom.trim()
+  return DEFAULT_LIST_FIELD_LABELS[key]
+}
+
+/**
+ * Tick or untick passedAway. When ticked, age is cleared (hidden in the editor).
+ */
+export function setPersonPassedAway(entry: PersonListEntry, passedAway: boolean): PersonListEntry {
+  const next = { ...entry }
+  if (passedAway) {
+    next.passedAway = true
+    delete next.age
+  } else {
+    delete next.passedAway
+  }
+  return next
+}
+
 /** Parse one person_list JSON string; drop unknown keys and bad values. */
 export function parsePersonListEntry(
   raw: string,
@@ -116,7 +169,10 @@ export function parsePersonListEntry(
     const firstName = asTrimmedString(parsed.firstName)
     if (firstName) entry.firstName = firstName
   }
-  if (fields.has("age")) {
+  if (fields.has("passedAway") && parsed.passedAway === true) {
+    entry.passedAway = true
+  }
+  if (fields.has("age") && entry.passedAway !== true) {
     const age = asIntInRange(parsed.age, 0, 120)
     if (age !== undefined) entry.age = age
   }
@@ -152,7 +208,8 @@ export function isPersonEntryBlank(entry: PersonListEntry): boolean {
     entry.livesWith == null &&
     entry.fromYear == null &&
     entry.toYear == null &&
-    entry.howEnded == null
+    entry.howEnded == null &&
+    entry.passedAway !== true
   )
 }
 
@@ -218,11 +275,12 @@ export function formatPersonListEntryLine(
 ): { name: string; details: string } {
   const name = entry.firstName?.trim() || "Unnamed"
   const bits: string[] = []
-  if (entry.age != null) bits.push(String(entry.age))
+  if (entry.passedAway === true) bits.push("passed away")
+  else if (entry.age != null) bits.push(String(entry.age))
   const relationship = choiceLabel(entry.relationship, config?.relationshipChoices)
   if (relationship) bits.push(relationship)
-  if (entry.livesWith === "yes") bits.push("Lives with client: Yes")
-  if (entry.livesWith === "no") bits.push("Lives with client: No")
+  if (entry.livesWith === "yes") bits.push("Yes")
+  if (entry.livesWith === "no") bits.push("No")
   if (entry.fromYear != null) bits.push(`From ${entry.fromYear}`)
   if (entry.toYear != null) bits.push(`To ${entry.toYear}`)
   const howEnded = choiceLabel(entry.howEnded, config?.howEndedChoices)
@@ -258,9 +316,9 @@ export function parseFormListConfig(value: unknown): FormListConfig | null {
       .map((item) => {
         if (!isRecord(item)) return null
         const label = asTrimmedString(item.label)
-        const choiceValue = asTrimmedString(item.value)
-        if (!label || !choiceValue) return null
-        return { label, value: choiceValue }
+        const choiceVal = asTrimmedString(item.value)
+        if (!label || !choiceVal) return null
+        return { label, value: choiceVal }
       })
       .filter((item): item is FormListChoice => item != null)
     if (choices.length > 0) config.relationshipChoices = choices
@@ -271,12 +329,24 @@ export function parseFormListConfig(value: unknown): FormListConfig | null {
       .map((item) => {
         if (!isRecord(item)) return null
         const label = asTrimmedString(item.label)
-        const choiceValue = asTrimmedString(item.value)
-        if (!label || !choiceValue) return null
-        return { label, value: choiceValue }
+        const choiceVal = asTrimmedString(item.value)
+        if (!label || !choiceVal) return null
+        return { label, value: choiceVal }
       })
       .filter((item): item is FormListChoice => item != null)
     if (choices.length > 0) config.howEndedChoices = choices
+  }
+
+  if (isRecord(value.labels)) {
+    const labels: Partial<Record<FormListFieldLabelKey, string>> = {}
+    for (const [key, label] of Object.entries(value.labels)) {
+      if (!LABEL_KEYS.has(key)) continue
+      if (typeof label !== "string") continue
+      const trimmed = label.trim()
+      if (!trimmed) continue
+      labels[key as FormListFieldLabelKey] = trimmed
+    }
+    if (Object.keys(labels).length > 0) config.labels = labels
   }
 
   return config

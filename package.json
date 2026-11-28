@@ -10,6 +10,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test:guards": "tsx lib/ui/status-colours-guard.selftest.ts && tsx lib/navigation/page-registry-guard.selftest.ts",
     "copy:pdf-worker": "node scripts/copy-pdf-worker.mjs",
     "postinstall": "node scripts/copy-pdf-worker.mjs",
     "seed:phq9": "tsx db/seed-phq9.ts",

@@ -1,0 +1,272 @@
+# Practice MVP: Design guide
+
+> **Read this before designing, mocking up or building anything.** It is the single source of truth for how every page, field and control in Practice MVP looks and behaves. Readable copy for review: the "Practice MVP: Design guide" doc on claude.ai, kept identical to this file.
+
+## 0. How to use this guide (GU)
+
+| # | Section | Code |
+| --- | --- | --- |
+| 0 | How to use this guide | GU |
+| 1 | Pages | PG |
+| 2 | Text and spacing | TX |
+| 3 | Buttons and links | BT |
+| 4 | Fields and forms | FM |
+| 5 | Panels, dialogs and confirmations | PN |
+| 6 | Lists, tables, trees and empty states | LS |
+| 7 | Colours and status | CL |
+| 8 | Dates, numbers and wording | DT |
+| 9 | Phone and touch | PH |
+| 10 | Client-facing pages | CP |
+| 11 | Assessments and results | AS |
+| 12 | Background interview and trees | IV |
+| A | Appendix: Known gaps | — |
+| B | Appendix: Change log | — |
+
+- **GU-1 Rule IDs.** Every rule has an ID: its section code and a number, e.g. FM-3. Prompts, mockups and reviews cite IDs ("follow FM-3"). An ID is never renumbered or reused. A retired rule is deleted here and recorded in the Change log.
+- **GU-2 Who reads it.** Every new Claude chat and every Cursor session reads this guide before starting. Cursor gets it through `.cursor/rules/design-guide.mdc` (always on) and the pointer at the top of `AGENTS.md`.
+- **GU-3 One master.** This file is the master. The claude.ai doc is its readable copy, and Claude keeps the two identical: every change lands in both in the same step.
+- **GU-4 Code holds the values.** Colours come from `lib/ui/status-colours.ts`, and shared parts from `components/ui` and `components/shared`. The guide names which to use and when; it never repeats hex codes or class strings.
+- **GU-5 Changing it.** A new pattern is agreed with Ben, added here with the next free ID and a Change log row, then built. If the code and the guide disagree, the guide wins, and the gap goes in Known gaps. Cursor never changes this file unless a prompt says exactly what to change.
+- **GU-6 Keeping it tidy.**
+  - A new topic becomes a new numbered section at the end (before the appendices), with its own code, added to the contents table. Existing sections are never renumbered.
+  - Each section opens with one sentence saying what it covers. A section that grows past about a screen is split into lettered parts (e.g. IV-A, IV-B), keeping its rule IDs.
+  - Feature-specific detail (one screen's exact layout) belongs in that feature's mockup board and code comments. The guide keeps the rule that applies everywhere.
+- **GU-7 Mockups** on the design canvas follow this guide. A mockup is never a source of truth on its own.
+
+## 1. Pages (PG)
+
+Every signed-in page uses `AppShell` and one of two shared headers, with content in a single centred column.
+
+- **PG-1 Headers.**
+
+| Page type | Header | Example |
+| --- | --- | --- |
+| List or hub | `ListPageHeader`: page title, one primary action on the right | Clients, Funding, Settings lists |
+| One record | `EntityPageHeader`: small grey kicker (what it is), large name, one summary line, status badge and one action on the right | Client page, a report, an assessment result |
+| Create or edit | `EntityPageHeader` with the kicker "New …" or "Edit …" | New appointment type |
+
+- **PG-2 Back.** `BackButton` sits above the header, honours `returnTo`, and reads "← Back to …". Never a browser back.
+- **PG-3 Width.** The content column is `max-w-3xl`, centred. Wide tables and the calendar may go wider; nothing else does.
+- **PG-4 Sections.** A page is a stack of section cards (white, thin border, rounded, 16 px padding), 16 px apart. Each card has a short heading and, when relevant, a status pill on the right.
+- **PG-5 Actions.** One primary action per page, top right in the header. Actions for one section sit in that section's header or footer, never floating.
+- **PG-6 Long forms** (assessments, the interview) use numbered, foldable sections, with progress chips at the top and one Save or Confirm per section.
+
+## 2. Text and spacing (TX)
+
+One font (Geist), five sizes, and muted grey for anything secondary.
+
+- **TX-1 Sizes.**
+
+| Use | Size and weight |
+| --- | --- |
+| Page title | 24 px, semibold |
+| Section heading | 15–16 px, semibold |
+| Body, field values, buttons | 14–15 px (16 px in inputs on phones, so iOS doesn't zoom) |
+| Field labels | 13–14 px, medium |
+| Hints, metadata, kickers | 12–13 px, muted grey |
+
+- **TX-2 Muted text** (`text-muted-foreground`) is for hints, summaries and "Not recorded". Never use colour to mean "secondary".
+- **TX-3 Empty values** are grey italic "Not recorded" (fields) or "None recorded" (lists and presence items).
+- **TX-4 Spacing** is in multiples of 4 px: 16 px between cards, 12–14 px inside them, 6–8 px between a label and its control.
+- **TX-5 Wording** is plain, short and in sentence case, with Australian spelling.
+
+## 3. Buttons and links (BT)
+
+A button does something; a link goes somewhere.
+
+- **BT-1 Variants.** Use the shared `Button` (`components/ui/button.tsx`) with one of these variants.
+
+| Variant | Use for | Where |
+| --- | --- | --- |
+| Primary (`default`, dark) | The one main action: Save, Confirm section, Send, Next | Right-most in a footer; header action |
+| Outline | Secondary actions: Cancel, Back, Edit, Keep | Left of the primary |
+| Ghost | Quiet actions in lists and headers: the Back button, icon buttons | Inline |
+| Destructive | Remove, Delete, Cancel appointment | Far left of a footer, away from Save |
+| Client purple | Only "Use client's" (`clientUseButtonClass`) | On a purple Client: line |
+
+- **BT-2 One primary per area.** Two dark buttons side by side is a mistake.
+- **BT-3 Footer order:** Remove (left) · Cancel · Save (right).
+- **BT-4 Disabled** buttons say why underneath, in muted text, e.g. "Decide 1 possible match first."
+- **BT-5 Links** are blue, underlined on hover, and only for navigation or opening something. Blue is never a status colour.
+- **BT-6 A value as a link.** In the interview and on info pages, the value itself opens its editor (black text, thin grey underline). There are no separate "Edit" links next to values.
+- **BT-7 Add buttons:** ⊕ in a circle on tree lines; a dashed "+ Add …" button below lists in forms.
+
+## 4. Fields and forms (FM)
+
+There are two kinds of form, each with one shared look: assessment forms (the shared form engine) and record forms (the side panel).
+
+### 4A. Assessment forms (client and practitioner)
+
+- **FM-1 Elements.** Only the form engine's elements are used. No one-off fields. Details: AGENTS.md, "Assessment form elements: one look".
+
+| Element | Look |
+| --- | --- |
+| `yes_no`, `radio` | Full-width radio rows, one per line; the selected row gets a dark border and light fill |
+| `checkbox`, `tick` | The same rows, with square ticks |
+| `short_text`, `long_text`, `date` | Full-width boxes, 44 px tall (long text taller) |
+| `text_list` | Growing boxes; an empty one always trails |
+| `person_list`, `history_list` | Saved entries collapse to one line with Edit; the open entry shows its fields one per line, with Remove and Done; a dashed "+ Add …" below; field wording set by the form |
+| In-person option | "I'd rather talk about it in person", always the last row, when switched on |
+
+- **FM-2 Follow-up questions** sit under their answer, indented, with a 2 px grey line.
+- **FM-3 Pre-filled** answers carry the amber "Pre-filled" tag until confirmed.
+- **FM-4 Errors:** a red outline on the question and one red line under it, e.g. "Please answer this question."
+
+### 4B. Record forms (people, events, contacts, claims) open in the side panel
+
+- **FM-5 One field per line**, full width, grouped exactly as on the info page.
+- **FM-6 Choices:** four or fewer are tap buttons (`ChoiceButtons`); more are a dropdown.
+- **FM-7 Dates** use Year / Month / Day on one line (`PartialDatePicker`), the only side-by-side exception.
+- **FM-8 Manual save.** Nothing saves until Save is pressed. No autosave, no background updates.
+
+## 5. Panels, dialogs and confirmations (PN)
+
+Use the side panel to look at or edit one item, and a dialog only to ask a short question.
+
+- **PN-1 Which to use.**
+
+| Need | Use |
+| --- | --- |
+| View or edit one person, event, contact or claim | Shared `SidePanel`: info page first, Edit opens the form |
+| Add a new item from a tree or list | Shared `SidePanel`, opening straight to the form |
+| Confirm something risky (delete, discard changes, send) | Small dialog (`components/ui/dialog.tsx`): title, one sentence, Cancel · action |
+| Send, choose, or pick from a short menu | Dialog or dropdown menu |
+| A whole new record with many sections | Its own page, not a dialog |
+
+- **PN-2 Side panel.** It slides in from the right over a dimmed page, with × top right. Tapping outside or Escape closes it; if the form has changes, it asks "Discard changes?" first. Details: AGENTS.md, "Trees and panels: one look".
+- **PN-3 Save** in the panel shows the item's info page. Close or tap outside to go back.
+- **PN-4 No browser pop-ups.** Never `window.confirm` or `window.alert`. They can't be styled, and they break on phones.
+
+## 6. Lists, tables, trees and empty states (LS)
+
+Pick the shape by what the reader does with it.
+
+- **LS-1 Shapes.**
+
+| Shape | When | Look |
+| --- | --- | --- |
+| Lined rows | A record's fields (interview sections 1–4 and 7, info pages) | Small grey label above; value below; thin rule between rows |
+| Table (`components/ui/table.tsx`) | Many records compared across the same columns (clients, appointments, results) | Header row; newest first; a row opens the record |
+| Tree | Relationships and history | Shared tree levels: left bars, 4 px dark at level 2, 2 px lighter at levels 3–4, square corners; ⊕ on lines that can hold something |
+| Card list | A handful of mixed items on a hub page | Section cards |
+
+- **LS-2 Empty states** say what's missing and offer the next step, e.g. "No claims yet." with the add action. Empty fields use grey italic "Not recorded".
+- **LS-3 Info pages** show every field, empty or not, in groups divided by a thin line, with Connected links last.
+- **LS-4 Results tables** show the question on the left and the answer on the right, in form order.
+
+## 7. Colours and status (CL)
+
+Every colour has one meaning and comes from `lib/ui/status-colours.ts`.
+
+- **CL-1 One file.** No colour classes or hex values anywhere else. The guard test `lib/ui/status-colours-guard.selftest.ts` enforces it.
+- **CL-2 Meanings.**
+
+| Colour | Meaning | Used for |
+| --- | --- | --- |
+| Grey (neutral) | Not started; nothing to flag | Untouched sections, empty states |
+| Amber (attention) | Needs your attention | In progress, Pre-filled, warnings, "to discuss" highlights, funding running low |
+| Green (done) | Done or active | Confirmed sections, active claims |
+| Red (problem) | Problem or risk | Errors, failed saves, urgent risk |
+| Purple (client) | The client's own words | "Client:" lines and the Use client's button, in the interview only |
+| Blue | Links only | Navigation |
+
+- **CL-3 Pills, chips and badges** take their colour from the same file (`pill`, `chip`, `badge`).
+- **CL-4 Tree lines** use `treeBarColours`. These are hierarchy shades, not statuses.
+- **CL-5 A new meaning** is added to the colour file first, with Ben's agreement, then used.
+- **CL-6 Mockups** copy their colour values from the colour file.
+
+## 8. Dates, numbers and wording (DT)
+
+All dates show in the practice's time zone, in one format, from one shared helper.
+
+- **DT-1 Formats.**
+
+| What | Format | Example |
+| --- | --- | --- |
+| A date | Day, short month, year | 28 Nov 2026 |
+| Date and time | Date, then 12-hour time | 28 Nov 2026, 2:30 pm |
+| A month | Short month, year | Nov 2026 |
+| A partial date (history) | Whatever is known | 2019 · Mar 2019 · about age 25 |
+| Age | A number; "aged … years" in sentences | 51 · aged 51 years |
+| Money | $ with cents | $1,234.50 |
+
+- **DT-2 Phone numbers** are shown in groups: 0412 345 678.
+- **DT-3 Labels** are questions or short nouns: "Date of birth", "Do they live with you?".
+- **DT-4 Messages** are one short sentence: "Saved.", "Couldn't save. Try again."
+- **DT-5 Voice.** Client-facing wording talks to the client ("you"); practitioner wording talks about the client ("client").
+
+## 9. Phone and touch (PH)
+
+Every screen is designed for a 390 px phone first, then widened for desktop.
+
+- **PH-1 Touch targets** are at least 44 × 44 px: buttons, radio rows, ⊕, value links and list rows.
+- **PH-2 One column** on phones. Side-by-side fields only for Year / Month / Day.
+- **PH-3 Inputs** use 16 px text, so iOS doesn't zoom in.
+- **PH-4 Side panels** take about 88% of the width on a phone, and a fixed width on desktop.
+- **PH-5 Footers** with Save or Confirm stay visible at the bottom of a panel or long form.
+- **PH-6 Typing** never closes the keyboard or moves the page. Fields keep focus while typing.
+
+## 10. Client-facing pages (CP)
+
+What clients see (assessment links and, later, the pre-session form) is calm, plain and the same for every assessment.
+
+- **CP-1 No app chrome:** no menu and no practitioner data. Just the practice name, the assessment title and a short intro.
+- **CP-2 The shared form engine only:** numbered sections with progress chips, Save and finish later, Back / Next, and a final "Send to my psychologist".
+- **CP-3 Nothing is required** unless clinically necessary. Every sensitive question offers "I'd rather talk about it in person".
+- **CP-4 Wording speaks to the client** ("you"), at a reading age of about 12.
+- **CP-5 After sending:** one thank-you screen; the link can't be used again.
+- **CP-6 Colours:** only grey, amber and green for progress, and red for errors. Purple is never shown to clients.
+
+## 11. Assessments and results (AS)
+
+Every assessment, client or practitioner, is data in the database, filled in on the shared form and shown on the shared results view.
+
+- **AS-1 No assessment-specific pages.** Adding an assessment means adding its definition, elements and options. It never gets its own page, form or results layout.
+- **AS-2 The only per-assessment code** allowed is a scoring rule (`lib/assessments/scoring/`) and a summary box (`lib/assessments/result-summaries.ts`).
+- **AS-3 Results page:** a summary box at the top with the result at a glance, then every answer in a question-left / answer-right table, in form order.
+- **AS-4 Practitioner forms** (MSE, LRAMP) use the same form, with lettered sections, progress chips and one Save.
+- **AS-5 Assessment lists** for a client show the name, date, status pill and result summary, newest first.
+- **AS-6 Element keys are unique across all assessments.** New keys start with the assessment's short code (e.g. `bsr_sex`), so a later assessment can never take over an existing question.
+
+## 12. Background interview and trees (IV)
+
+The interview fills in the client's record, one numbered section at a time, and every section ends with one Confirm.
+
+- **IV-1 Sections 1–4 and 7** are lined rows. The value is the edit link; empty shows grey italic "Not recorded" or "None recorded". There are no Yes / No / N/A boxes.
+- **IV-2 Sections 5, 6, 8 and 9** show the shared trees inline, with no Yes / No boxes on headings. ⊕ adds an item. Empty headings show "None recorded".
+- **IV-3 Client answers** are purple "Client:" lines:
+  - same as the file: the purple line only;
+  - file empty: the purple line with Use client's;
+  - different: the purple line, the file value, then Use client's and Keep;
+  - possible match (trees): the purple line, the file line, then Use client's, Keep, or Add as new person.
+- **IV-4 Use client's on a person or item** opens the full Add form, pre-filled. Save shows the info page.
+- **IV-5 Blank or "in person".** If the client left it blank or chose "in person", the heading is highlighted amber, with "Ask in session: add with ⊕, or Nothing to report". Confirm waits until each one is done.
+- **IV-6 Confirm** reads "Accept N client changes and confirm" while client answers are waiting. It creates the remaining entries from the client's details.
+- **IV-7 Server values.** The server always reads values from the stored self-report and the stored file, never from the page.
+- **IV-8 A confirmed section** turns green and folds away.
+
+## Appendix A: Known gaps
+
+Where the system doesn't match the guide yet. Add a row when a gap is found; delete it when fixed, and note the fix in the Change log. Last checked 28 Nov 2026 against `main` (`fc97605`).
+
+| Rule | Area | Gap | Planned fix |
+| --- | --- | --- | --- |
+| PH-1, BT-1 | Buttons | The default button is 32 px tall, below the 44 px touch target | Raise the default size |
+| AS-1 | Results page | Special layouts for PSF, SAGE-SR (3 reports), PHQ-9 and GAD-7 | Move each onto the shared results view with a summary box |
+| PN-4 | Confirmations | `window.confirm` in the history tree, history section and funding approval form | Shared confirm dialog |
+| CL-1 | Colours | Three relationship components hard-code hex colours | Use `treeBarColours` |
+| PG-1 | Page headers | Dashboard, calendar, communications, three "new" settings pages, assessment new / edit pages | Add the shared headers |
+| DT-1 | Dates | About 38 files format dates themselves; three separate `formatDisplayDate` helpers | One date helper in `lib/dates/` |
+| PN-1 | Dialogs | 16 dialogs and 4 side panels, chosen without a rule | Review each against PN-1 |
+| IV-2, IV-3, IV-5 | Interview trees | Tree headings still have Yes / No / N/A buttons; no tree client suggestions yet | Round AZ |
+| AS-6 | Background self-report | Its 42 element keys have no prefix (`sex`, `partner`, `employer`) | Rename to `bsr_` keys in a clean-up round |
+
+## Appendix B: Change log
+
+One row per change to the guide, newest first. Retired rules are recorded here and never reused.
+
+| Date | Rules | Change | Agreed in |
+| --- | --- | --- | --- |
+| 28 Nov 2026 | GU-2, GU-3 | Committed to the repo as `docs/design-guide.md`; Cursor always-on rule added | Round DG |
+| 28 Nov 2026 | AS-6 | Added: element keys are unique across all assessments; new keys take the assessment's prefix | Review of round AY |
+| 28 Nov 2026 | All | First version: sections 0–12, rule IDs, Known gaps and Change log | Chat with Ben |

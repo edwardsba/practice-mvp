@@ -15,6 +15,8 @@ Notable Next 16 conventions already used here:
 
 # practice-mvp — Agent Guide
 
+> **Design guide first.** Before any UI work, read [`docs/design-guide.md`](./docs/design-guide.md), the single source of truth for how the app looks and behaves. It wins over anything in this file that disagrees. Cite its rule IDs (e.g. FM-3).
+
 Australian mental-health **clinical practice management** app for practitioners: clients,
 appointments, psychometric assessments, session notes, treatment/crisis plans, reports,
 funding (Medicare/NDIS/insurer), contacts, and communications.
@@ -136,6 +138,8 @@ Every assessment, client-facing or practitioner-facing, is defined as data (defi
 
 ### Assessment form elements: one look
 
+Rules: design guide section 4; this section is the code map.
+
 Every assessment — practitioner or client — uses only these shared element types (`components/assessments/form/`, `lib/assessments/form-rules.ts`). Do not invent a parallel control.
 
 | Type | Look |
@@ -160,6 +164,8 @@ Shared chrome (all types):
 
 ### Colours: one meaning each
 
+Rules: design guide section 7; this section is the code map.
+
 Status and meaning colours are defined once in [`lib/ui/status-colours.ts`](./lib/ui/status-colours.ts). Use those exports; never write Tailwind palette colour classes (`amber-`, `orange-`, `emerald-`, `blue-`, `red-`, `sky-`, `indigo-`, etc.) elsewhere under `app/`, `components/`, or `lib/`. Orange is not used. Links keep existing link / primary styles and are outside this palette. Guard: `lib/ui/status-colours-guard.selftest.ts`.
 
 | Name | Colour | Means | Used for |
@@ -174,6 +180,8 @@ Status and meaning colours are defined once in [`lib/ui/status-colours.ts`](./li
 Tree left-bar colours (`treeBarColours` / selected surface) also live in `lib/ui/status-colours.ts` — they are hierarchy tokens, not status meanings. Blue is for links only.
 
 ### Trees and panels: one look
+
+Rules: design guide sections 5/6; this section is the code map.
 
 Relationship and history trees share one visual system and one add control:
 
@@ -198,11 +206,7 @@ Do not add a second tree look, a second ⊕ control, a second side-panel shell, 
 
 ### Background interview: confirm by section
 
-Every interview section ends with **Nothing to record** (where the section has it) and **Confirm section**, disabled until each question (Yes/No/N/A or Yes/N/A) in the section is answered. Confirming writes `answers_json.sections[n]` and sets each details item to Confirmed or Not applicable from what is on file — details have no answer buttons of their own. Complete needs all nine sections confirmed.
-
-- Sections 1–4 and 7: every item is one shared lined row (`interview-lined-row.tsx`): small grey label → client lines → value. The value is the edit link (no **Edit** links; empty is grey italic "Not recorded") and opens that item's existing editor in the shared `SidePanel` (`interview-item-editors.tsx`). Questions show their answer buttons above the value. Claims (section 2), contacts (section 4) and people in the home (section 7) are rows within their item.
-- Client self-report answers (sections 3 and 7) are purple **Client:** lines on those rows, never inside the interview editors. Same as the file → the purple line replaces that file line; empty or different → purple line + **Use client's** above the file value + **Keep**. Use / Keep are server actions that read the value from the stored self-report (never from the browser), save it through the normal background save, and record `answers_json.clientDecisions[field]`. While answers are waiting, Confirm reads **Accept N client changes and confirm**. Fields, comparisons and apply rules: `lib/client-background/interview-client-fields.ts`; row lines: `interview-row-model.ts`.
-- Sections 5, 6, 8, 9: the shared trees render inline with each question answered under its heading (`renderHeadingAnswer`; headings map to items in `lib/client-background/interview-tree-headings.ts`). ⊕ under a heading answers that question Yes.
+> Rules: design guide section 12 (IV-1 to IV-8). Code map: lined rows `components/client-background/interview-lined-row.tsx`; client fields and comparisons `lib/client-background/interview-client-fields.ts`; row lines `interview-row-model.ts`; tree headings `lib/client-background/interview-tree-headings.ts`; confirm on the server `lib/client-background/mutations.ts` (`confirmInterviewSection`, `acceptInterviewClientChangesAndConfirm`), with presence read from the stored file (`interview-confirm-load.ts`, `interview-confirm-presence.ts`). Note: tree headings (5, 6, 8, 9) still have answer buttons until round AZ.
 
 Appointment automations: `lib/appointments/run-automations.ts` via daily cron (`08:00 UTC`).
 

@@ -34,11 +34,19 @@ export type InterviewSectionConfirm = {
   confirmedAt: string
 }
 
+/** Self-report Use client's / Keep decisions (Round AR). */
+export type InterviewClientDecision = {
+  choice: "used" | "kept"
+  at: string
+}
+
 export type InterviewAnswersJson = {
   version: 1
   items: Record<string, InterviewItemAnswer>
   /** Section confirmations — missing key means not confirmed. */
   sections: Record<string, InterviewSectionConfirm>
+  /** Per fine-grained self-report field key (e.g. identity.pronouns). */
+  clientDecisions: Record<string, InterviewClientDecision>
 }
 
 /** Yes/No/N/A and Yes/N/A items keep their own answer buttons. */
@@ -237,7 +245,7 @@ export function interviewItemDef(key: string): InterviewItemDef | undefined {
 }
 
 export function emptyInterviewAnswers(): InterviewAnswersJson {
-  return { version: 1, items: {}, sections: {} }
+  return { version: 1, items: {}, sections: {}, clientDecisions: {} }
 }
 
 function sectionKey(sectionNumber: number): string {
@@ -324,6 +332,7 @@ export function confirmSectionAnswers(
         ...answers.sections,
         [sectionKey(sectionNumber)]: { confirmed: true, confirmedAt },
       },
+      clientDecisions: answers.clientDecisions,
     },
   }
 }
@@ -391,7 +400,20 @@ export function sanitizeInterviewAnswers(value: unknown): InterviewAnswersJson {
     const parsed = readSectionConfirm(sectionsRaw[key])
     if (parsed) sections[key] = parsed
   }
-  return { version: 1, items, sections }
+  const decisionsRaw =
+    raw.clientDecisions && typeof raw.clientDecisions === "object" && !Array.isArray(raw.clientDecisions)
+      ? (raw.clientDecisions as Record<string, unknown>)
+      : {}
+  const clientDecisions: Record<string, InterviewClientDecision> = {}
+  for (const [key, entry] of Object.entries(decisionsRaw)) {
+    if (!key.trim()) continue
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) continue
+    const row = entry as Record<string, unknown>
+    if (row.choice !== "used" && row.choice !== "kept") continue
+    if (typeof row.at !== "string" || !row.at.trim()) continue
+    clientDecisions[key] = { choice: row.choice, at: row.at }
+  }
+  return { version: 1, items, sections, clientDecisions }
 }
 
 /**
@@ -415,10 +437,15 @@ export function dropMissingPerRecordAnswers(
     }
     items[key] = answer
   }
-  return { version: 1, items, sections: answers.sections }
+  return {
+    version: 1,
+    items,
+    sections: answers.sections,
+    clientDecisions: answers.clientDecisions ?? {},
+  }
 }
 
-/** Copy prior interview item values unconfirmed; do not copy sections. */
+/** Copy prior interview item values unconfirmed; do not copy sections or clientDecisions. */
 export function prefillAnswersForReview(source: InterviewAnswersJson): InterviewAnswersJson {
   const items: Record<string, InterviewItemAnswer> = {}
   for (const [key, answer] of Object.entries(source.items)) {
@@ -427,7 +454,23 @@ export function prefillAnswersForReview(source: InterviewAnswersJson): Interview
     if (!isValueAllowedForKind(kind, answer.value)) continue
     items[key] = { value: answer.value, confirmed: false }
   }
-  return { version: 1, items, sections: {} }
+  return { version: 1, items, sections: {}, clientDecisions: {} }
+}
+
+export function setClientDecision(
+  answers: InterviewAnswersJson,
+  fieldKey: string,
+  choice: "used" | "kept",
+  at: string = new Date().toISOString()
+): InterviewAnswersJson {
+  if (!fieldKey.trim()) return answers
+  return {
+    ...answers,
+    clientDecisions: {
+      ...answers.clientDecisions,
+      [fieldKey]: { choice, at },
+    },
+  }
 }
 
 export function statusItemForAnswer(answer: InterviewItemAnswer | undefined): StatusItem {
@@ -440,19 +483,21 @@ export function interviewItemStatus(answer: InterviewItemAnswer | undefined) {
 }
 
 /**
- * Interview section status (Round AQ):
+ * Interview section status (Round AQ / AR):
  * - done when sections[n] is confirmed and every question is answered
  * - not started when nothing answered, nothing pre-filled, not confirmed
- * - otherwise in progress: "N to answer" (left) or "Ready to confirm" (to_confirm, toConfirm 0)
+ * - otherwise in progress: "N to answer" (left), "N client changes", or "Ready to confirm"
  */
 export function interviewSectionStatus(
   section: InterviewSectionDef,
   answers: InterviewAnswersJson,
-  extraItems: readonly InterviewItemDef[] = []
+  extraItems: readonly InterviewItemDef[] = [],
+  options?: { waitingClientChanges?: number }
 ): SectionStatus {
   const allItems = [...section.items, ...extraItems]
   const unanswered = unansweredQuestionCount(section, answers, extraItems)
   const confirmed = isSectionConfirmed(answers, section.number)
+  const waitingClientChanges = Math.max(0, options?.waitingClientChanges ?? 0)
   const anyPrefilled = allItems.some((item) => {
     const answer = answers.items[item.key]
     return Boolean(answer && !answer.confirmed)
@@ -469,13 +514,19 @@ export function interviewSectionStatus(
   let toConfirm = 0
   if (confirmed && unanswered === 0) {
     status = "done"
-  } else if (!anyQuestionAnswered && !anyPrefilled && !anyDetailsTouched && !confirmed) {
+  } else if (
+    !anyQuestionAnswered &&
+    !anyPrefilled &&
+    !anyDetailsTouched &&
+    waitingClientChanges === 0 &&
+    !confirmed
+  ) {
     status = "not_started"
     left = unanswered
   } else if (unanswered > 0) {
     status = "left"
   } else {
-    // Questions done (or none); waiting for Confirm section.
+    // Questions done (or none); waiting for Confirm section (and maybe client changes).
     status = "to_confirm"
     toConfirm = 0
   }
@@ -487,6 +538,7 @@ export function interviewSectionStatus(
     status,
     left,
     toConfirm,
+    clientChanges: waitingClientChanges > 0 && unanswered === 0 ? waitingClientChanges : 0,
     hasDefaults: false,
   }
 }
@@ -531,7 +583,12 @@ export function applyNothingToRecord(
     if (!isValueAllowedForKind(item.kind, "not_applicable")) continue
     items[item.key] = { value: "not_applicable", confirmed: true }
   }
-  return { version: 1, items, sections: answers.sections }
+  return {
+    version: 1,
+    items,
+    sections: answers.sections,
+    clientDecisions: answers.clientDecisions ?? {},
+  }
 }
 
 export function setItemAnswer(
@@ -548,6 +605,7 @@ export function setItemAnswer(
       [key]: { value: validated.value, confirmed: true },
     },
     sections: answers.sections,
+    clientDecisions: answers.clientDecisions ?? {},
   }
 }
 

@@ -5,6 +5,7 @@ import {
   assessmentElements,
   assessmentOptions,
 } from "@/db/schema"
+import { parseFormListConfig } from "@/lib/assessments/form-lists"
 import type {
   FormElement,
   FormElementType,
@@ -43,6 +44,8 @@ const ELEMENT_TYPES = new Set<FormElementType>([
   "long_text",
   "short_text",
   "date",
+  "person_list",
+  "history_list",
 ])
 
 function parseShowWhen(value: unknown): FormShowWhen | null {
@@ -104,6 +107,8 @@ export async function loadFormDefinitionByCode(
       showWhenJson: assessmentElements.showWhenJson,
       requiredGroupKey: assessmentElements.requiredGroupKey,
       helpText: assessmentElements.helpText,
+      allowInPerson: assessmentElements.allowInPerson,
+      listConfigJson: assessmentElements.listConfigJson,
       domainCode: assessmentElements.domainCode,
       dataType: assessmentElements.dataType,
     })
@@ -176,6 +181,8 @@ export async function loadFormDefinitionByCode(
       requiredGroupKey: row.requiredGroupKey,
       helpText: row.helpText,
       options: optionsByElementId.get(row.assessmentElementId) ?? [],
+      allowInPerson: row.allowInPerson === true,
+      listConfig: parseFormListConfig(row.listConfigJson),
     }
   })
 

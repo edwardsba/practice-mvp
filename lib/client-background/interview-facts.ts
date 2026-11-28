@@ -127,7 +127,7 @@ export function disabilityValueLines(identity: Demographics["identity"]): Interv
   const disability = yesNoDetail(identity.disability, identity.disabilityDetail)
   return [
     ...tagged(disability ? `Disability: ${disability}` : null, ["identity.disability"]),
-    ...tagged(line("Access needs", identity.accessibilityNeeds)),
+    ...tagged(line("Access needs", identity.accessibilityNeeds), ["identity.accessibilityNeeds"]),
   ]
 }
 
@@ -232,8 +232,8 @@ export function clientFieldFileText(fieldKey: ClientFieldKey, demographics: Demo
     }
     case "occupation.necessities":
       return only(financialValueLines(occupation))
-    case "living.livesWith":
-      return formatLivingWhoLine(livingSituation)
+    case "identity.accessibilityNeeds":
+      return only(disabilityValueLines(identity))
     case "living.housingType":
       return livingSituation.housingType.trim()
     case "living.housingStability":
@@ -292,7 +292,7 @@ export function formatLivingWhoFactLines(
 /** Section 7 value lines: the household row, housing type and housing security. */
 export function section7ValueLines(living: LivingSituationFields): Record<string, InterviewValueLine[]> {
   return {
-    s7_who: tagged(formatLivingWhoLine(living) || null, ["living.livesWith"]),
+    s7_who: tagged(formatLivingWhoLine(living) || null),
     s7_housing_type: tagged(living.housingType.trim() || null, ["living.housingType"]),
     s7_housing_security: tagged(living.housingStability.trim() || null, ["living.housingStability"]),
   }

@@ -19,6 +19,8 @@ const RADIO_ALLOWLIST: Record<string, string> = {
     "Shared assessment radio list",
   "components/assessments/form/element-control.tsx":
     "Shared form control (delegates to radio-option-list)",
+  "components/assessments/form/list-entry-input.tsx":
+    "Shared person_list / history_list entry editor (uses radio-option-list)",
   "components/ui/radio-group.tsx": "shadcn RadioGroup primitive",
   "components/ui/dropdown-menu.tsx":
     "shadcn DropdownMenuRadioGroup primitive (non-assessment)",
@@ -30,8 +32,6 @@ const RADIO_ALLOWLIST: Record<string, string> = {
     "Relationship panel radios (non-assessment)",
   "app/clients/[client_id]/reports/new/report-form.tsx":
     "Report form recipient radios (non-assessment)",
-  "app/q/[token]/background-questionnaire-form.tsx":
-    "Held: Background self-report moves later",
 }
 
 const RADIO_PATTERN =

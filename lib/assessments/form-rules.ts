@@ -3,9 +3,16 @@
  *
  * Answers shape: Record<elementKey, string[]>
  * - yes_no / radio / tick / short_text / long_text / date → one value
- * - checkbox / text_list → many values
+ * - checkbox / text_list / person_list / history_list → many values
  */
 
+import {
+  cleanHistoryListValues,
+  cleanPersonListValues,
+  IN_PERSON_LABEL,
+  IN_PERSON_VALUE,
+  type FormListConfig,
+} from "@/lib/assessments/form-lists"
 import {
   presentSectionLabels,
   UNGROUPED_SECTION_KEY,
@@ -20,6 +27,8 @@ export type FormElementType =
   | "long_text"
   | "short_text"
   | "date"
+  | "person_list"
+  | "history_list"
 
 export type FormShowWhen = {
   key: string
@@ -50,7 +59,17 @@ export type FormElement = {
   requiredGroupKey: string | null
   helpText: string | null
   options: FormOption[]
+  /**
+   * When true on yes_no / radio, append "I'd rather talk about it in person"
+   * (value `in_person`). Optional so existing definitions stay valid.
+   */
+  allowInPerson?: boolean
+  /** person_list / history_list field config. */
+  listConfig?: FormListConfig | null
 }
+
+export { IN_PERSON_LABEL, IN_PERSON_VALUE }
+export type { FormListConfig }
 
 export type FormAnswers = Record<string, string[]>
 
@@ -82,6 +101,30 @@ import { aggregateSectionStatus } from "@/lib/section-status"
 
 export const TICK_VALUE = "ticked"
 
+/** Options shown for yes_no / radio, including the optional in-person row last. */
+export function optionsForElement(element: FormElement): FormOption[] {
+  const options = element.options
+    .slice()
+    .sort((a, b) => a.displayOrder - b.displayOrder)
+  if (
+    element.allowInPerson !== true ||
+    (element.elementType !== "yes_no" && element.elementType !== "radio")
+  ) {
+    return options
+  }
+  if (options.some((o) => o.value === IN_PERSON_VALUE)) return options
+  const lastOrder = options.reduce((max, o) => Math.max(max, o.displayOrder), 0)
+  return [
+    ...options,
+    {
+      label: IN_PERSON_LABEL,
+      value: IN_PERSON_VALUE,
+      displayOrder: lastOrder + 1,
+      scoreValue: 0,
+    },
+  ]
+}
+
 /** Letter before the first "." in a group label (e.g. "A" from "A. Reason…"). */
 export function sectionLetter(groupLabel: string): string {
   if (!groupLabel) return "1"
@@ -111,6 +154,10 @@ function hasAnswer(element: FormElement, answers: FormAnswers): boolean {
     case "checkbox":
     case "text_list":
       return nonBlank(values).length > 0
+    case "person_list":
+      return cleanPersonListValues(values, element.listConfig).length > 0
+    case "history_list":
+      return cleanHistoryListValues(values).length > 0
     case "tick":
       return nonBlank(values).includes(TICK_VALUE)
     case "radio":
@@ -241,7 +288,7 @@ export function validateAnswers(
     }
   }
 
-  // Option validity for radio / yes_no / checkbox
+  // Option validity for radio / yes_no / checkbox (in_person allowed when flagged)
   for (const element of elements) {
     if (!visible.has(element.elementKey)) continue
     if (
@@ -251,7 +298,7 @@ export function validateAnswers(
     ) {
       continue
     }
-    const allowed = new Set(element.options.map((o) => o.value))
+    const allowed = new Set(optionsForElement(element).map((o) => o.value))
     const values = nonBlank(answers[element.elementKey])
     for (const value of values) {
       if (!allowed.has(value)) {
@@ -286,6 +333,18 @@ export function cleanAnswers(
     if (element.elementType === "text_list") {
       const trimmed = nonBlank(values)
       if (trimmed.length > 0) cleaned[key] = trimmed
+      continue
+    }
+
+    if (element.elementType === "person_list") {
+      const cleanedList = cleanPersonListValues(values, element.listConfig)
+      if (cleanedList.length > 0) cleaned[key] = cleanedList
+      continue
+    }
+
+    if (element.elementType === "history_list") {
+      const cleanedList = cleanHistoryListValues(values)
+      if (cleanedList.length > 0) cleaned[key] = cleanedList
       continue
     }
 
@@ -345,7 +404,12 @@ export function toResponseRows(
     if (!element) continue
     const values = cleaned[key] ?? []
 
-    if (element.elementType === "text_list") {
+    if (
+      element.elementType === "text_list" ||
+      element.elementType === "person_list" ||
+      element.elementType === "history_list" ||
+      element.elementType === "checkbox"
+    ) {
       values.forEach((value, index) => {
         rows.push({
           elementKey: key,
@@ -357,32 +421,21 @@ export function toResponseRows(
       continue
     }
 
-    if (element.elementType === "checkbox") {
-      values.forEach((value, index) => {
-        rows.push({
-          elementKey: key,
-          responseValue: value,
-          responseOrder: index + 1,
-          scoreValue: 0,
-        })
-      })
-      continue
-    }
-
-    if (element.elementType === "radio") {
+    if (element.elementType === "radio" || element.elementType === "yes_no") {
       const value = values[0]
       if (!value) continue
-      const option = element.options.find((o) => o.value === value)
+      // in_person scores 0 and never matches option-based scoring/triggers on yes/no.
+      const option = optionsForElement(element).find((o) => o.value === value)
       rows.push({
         elementKey: key,
         responseValue: value,
         responseOrder: null,
-        scoreValue: option?.scoreValue ?? 0,
+        scoreValue: value === IN_PERSON_VALUE ? 0 : (option?.scoreValue ?? 0),
       })
       continue
     }
 
-    // yes_no, tick, short_text, long_text, date
+    // tick, short_text, long_text, date
     const value = values[0]
     if (!value) continue
     rows.push({

@@ -20,7 +20,7 @@ import {
   clients,
 } from "@/db/schema"
 import {
-  backgroundAnswersToClientBackground,
+  backgroundSelfReportToClientBackground,
   type ClientBackgroundSuggestions,
 } from "@/lib/background-questionnaire/to-client-background"
 import { BACKGROUND_ASSESSMENT_CODE } from "@/lib/background-questionnaire/types"
@@ -1533,7 +1533,7 @@ async function shownSelfReportSuggestions(
   if (typeof selfReportId !== "string" || !selfReportId) return null
   const selfReport = await loadLatestBackgroundSelfReport(clientId, practiceId)
   if (!selfReport || selfReport.resultId !== selfReportId) return null
-  return backgroundAnswersToClientBackground(selfReport.answers)
+  return backgroundSelfReportToClientBackground(selfReport.report)
 }
 
 function demographicsPatch(demographics: Demographics, sections: readonly ClientFieldSection[]) {

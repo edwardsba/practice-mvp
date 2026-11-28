@@ -3,6 +3,14 @@
  */
 
 import {
+  formatHistoryListEntryLine,
+  formatPersonListEntryLine,
+  parseHistoryListEntry,
+  parsePersonListEntry,
+} from "@/lib/assessments/form-lists"
+import {
+  IN_PERSON_LABEL,
+  IN_PERSON_VALUE,
   questionDisplayLabel,
   visibleElementKeys,
   type FormAnswers,
@@ -90,6 +98,9 @@ function displayAnswer(
     case "radio":
     case "yes_no": {
       const value = values[0]
+      if (value === IN_PERSON_VALUE) {
+        return { kind: "text", value: IN_PERSON_LABEL }
+      }
       const option = element.options.find((o) => o.value === value)
       return { kind: "text", value: option?.label ?? value }
     }
@@ -107,6 +118,25 @@ function displayAnswer(
       return { kind: "text", value: "Yes" }
     case "text_list":
       return { kind: "list", values }
+    case "person_list": {
+      const lines = values
+        .map((raw) => parsePersonListEntry(raw, element.listConfig))
+        .filter((entry): entry is NonNullable<typeof entry> => entry != null)
+        .map((entry) => {
+          const { name, details } = formatPersonListEntryLine(entry, element.listConfig, "readonly")
+          return details ? `${name} · ${details}` : name
+        })
+      if (lines.length === 0) return null
+      return { kind: "list", values: lines }
+    }
+    case "history_list": {
+      const lines = values
+        .map((raw) => parseHistoryListEntry(raw))
+        .filter((entry): entry is NonNullable<typeof entry> => entry != null)
+        .map((entry) => formatHistoryListEntryLine(entry))
+      if (lines.length === 0) return null
+      return { kind: "list", values: lines }
+    }
     case "long_text":
     case "short_text":
       return { kind: "text", value: values[0] }

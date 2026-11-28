@@ -34,8 +34,10 @@ export type InterviewClientChoice = {
 
 export type InterviewValuePart =
   | { kind: "file"; text: string }
-  /** `text` follows "Client: ". */
+  /** `text` follows "Client: ". Use client's / Keep when fieldKey is set. */
   | { kind: "client"; fieldKey: ClientFieldKey; text: string }
+  /** Display-only Client: line (no Use client's / Keep). */
+  | { kind: "client_info"; text: string }
 
 export type InterviewRowModel = {
   choices: InterviewClientChoice[]
@@ -101,7 +103,11 @@ export function interviewRowModel(
 
 /** Visible text of a value, for "Edit [label], [value]". */
 export function valuePartsText(parts: readonly InterviewValuePart[]): string {
-  return parts.map((part) => (part.kind === "client" ? `Client: ${part.text}` : part.text)).join(", ")
+  return parts
+    .map((part) =>
+      part.kind === "client" || part.kind === "client_info" ? `Client: ${part.text}` : part.text
+    )
+    .join(", ")
 }
 
 export function editValueAriaLabel(rowLabel: string, valueText: string): string {

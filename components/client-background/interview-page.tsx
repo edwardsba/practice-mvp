@@ -60,7 +60,7 @@ import {
 } from "@/components/ui/dialog"
 import { isInsurerClaim, isNdisClaim } from "@/lib/funding/format"
 import type { ReferralFundingCardFormOptions } from "@/lib/funding/referral-funding-card-props"
-import { backgroundAnswersToClientBackground } from "@/lib/background-questionnaire/to-client-background"
+import { backgroundSelfReportToClientBackground } from "@/lib/background-questionnaire/to-client-background"
 import type { BackgroundSelfReport } from "@/lib/background-questionnaire/types"
 import { assessAge, displayedAge } from "@/lib/client-background/age"
 import {
@@ -294,7 +294,7 @@ export function InterviewPage({
 
   const age = clientAge(data.dateOfBirth)
   const suggestions = useMemo(
-    () => (selfReport ? backgroundAnswersToClientBackground(selfReport.answers) : null),
+    () => (selfReport ? backgroundSelfReportToClientBackground(selfReport.report) : null),
     [selfReport]
   )
   const clientStates = useMemo(
@@ -826,9 +826,19 @@ export function InterviewPage({
 
   /** On-file lines merged with this item's self-report answers (sections 3 and 7). */
   function rowModel(itemKey: string, lines: readonly InterviewValueLine[]): InterviewRowModel {
-    return interviewRowModel(lines, clientFieldStatesForItem(clientStates, itemKey), (fieldKey) =>
+    const model = interviewRowModel(lines, clientFieldStatesForItem(clientStates, itemKey), (fieldKey) =>
       clientFieldFileText(fieldKey, demographics)
     )
+    if (itemKey === "s7_who" && suggestions?.living.whoLivesWithLabel) {
+      return {
+        ...model,
+        value: [
+          { kind: "client_info", text: suggestions.living.whoLivesWithLabel },
+          ...model.value,
+        ],
+      }
+    }
+    return model
   }
 
   function fileModel(lines: readonly string[]): InterviewRowModel {
@@ -1016,7 +1026,7 @@ export function InterviewPage({
     hideScreeningControls: true,
     onEventsChange: setEvents,
     onIssuesChange: setIssues,
-    historyClient: suggestions?.history,
+    historyClient: undefined,
     renderHeadingAnswer: (screeningKey: HistoryQuestionKey) => headingAnswer({ tree: "history", screeningKey }),
     onHeadingAdd: (screeningKey: HistoryQuestionKey) => headingAddYes({ tree: "history", screeningKey }),
   }
@@ -1028,8 +1038,8 @@ export function InterviewPage({
         <RelationshipBlocksSection
           {...relationshipTreeProps}
           onPhase={onIntimatePhase}
-          relationshipClient={suggestions?.relationshipStatus}
-          childrenPrompt={suggestions?.numberOfChildren?.label ?? null}
+          relationshipClient={undefined}
+          childrenPrompt={null}
           visibleSections={["intimate"]}
         />
       )
@@ -1048,7 +1058,7 @@ export function InterviewPage({
         <HistoryTreeSection
           {...historyTreeProps}
           groupFilter="client"
-          medicationClient={suggestions?.medication}
+          medicationClient={undefined}
         />
       )
     }

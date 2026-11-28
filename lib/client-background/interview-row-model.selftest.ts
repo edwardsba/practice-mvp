@@ -43,9 +43,6 @@ const suggestions: ClientBackgroundSuggestions = {
     housingType: { label: "Private rental", apply: "Private rental" },
     housingStability: { label: "Secure", apply: "Secure" },
   },
-  history: {},
-  medication: {},
-  stressors: {},
 }
 
 function rowFor(
@@ -232,7 +229,7 @@ check(
   formatSection3FactLines(busy)
 )
 check("section 7 who line", section7ValueLines({ ...empty.livingSituation, household: "alone" }).s7_who, [
-  { text: "Lives alone", fields: ["living.livesWith"] },
+  { text: "Lives alone", fields: [] },
 ])
 check(
   "living who fact lines unchanged",

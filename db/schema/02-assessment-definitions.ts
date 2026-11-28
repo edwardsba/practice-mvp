@@ -33,6 +33,8 @@ export const assessmentDefinitions = pgTable('assessment_definitions', {
  * - long_text: one large text box.
  * - short_text: one short text box.
  * - date: a date (YYYY-MM-DD).
+ * - person_list: repeating people (JSON strings in response rows); fields in list_config_json.
+ * - history_list: repeating what/when entries (JSON strings); add label in list_config_json.
  *
  * For new types (everything except existing radio instruments that use integer
  * scores), data_type is `text`.
@@ -44,6 +46,8 @@ export const assessmentDefinitions = pgTable('assessment_definitions', {
  *   (subject to its parent).
  * required_group_key: elements with the same key form an "at least one" group.
  * help_text: optional short guidance under a question.
+ * allow_in_person: on yes_no / radio, append "I'd rather talk about it in person".
+ * list_config_json: person_list / history_list field config (add label, fields, choices).
  */
 export const assessmentElements = pgTable('assessment_elements', {
   assessmentElementId: uuid('assessment_element_id').primaryKey().defaultRandom(),
@@ -64,6 +68,8 @@ export const assessmentElements = pgTable('assessment_elements', {
   showWhenJson: jsonb('show_when_json').$type<{ key: string; in: string[] } | null>(),
   requiredGroupKey: text('required_group_key'),
   helpText: text('help_text'),
+  allowInPerson: boolean('allow_in_person').notNull().default(false),
+  listConfigJson: jsonb('list_config_json'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 })
 

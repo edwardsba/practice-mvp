@@ -6,12 +6,12 @@
 /**
  * Client-completable codes that must not use the shared practitioner form yet.
  * BTP: questions are built from SMART goals at send time.
- * BACKGROUND_SR: own questionnaire / results path.
+ * BACKGROUND_SR is client-only (practitioner_completable false) so it never reaches
+ * canCompleteInSharedForm — listed only if that flag changes.
  * MSE and ASQ are practitioner-only and use the shared form (not listed here).
  */
 const SHARED_FORM_EXCLUDED_CLIENT_CODES = [
   "BTP",
-  "BACKGROUND_SR",
 ] as const
 
 export type SharedFormDefinitionGate = {

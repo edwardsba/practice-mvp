@@ -63,11 +63,11 @@ check(
 )
 
 check(
-  "BACKGROUND_SR → canComplete false (excluded)",
+  "BACKGROUND_SR → canComplete false (client-only)",
   gate({
     assessmentCode: "BACKGROUND_SR",
     clientCompletable: true,
-    practitionerCompletable: true,
+    practitionerCompletable: false,
   }),
   false
 )

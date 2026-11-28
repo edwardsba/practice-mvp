@@ -6,8 +6,7 @@
 
 /** Codes that are client_completable but must not appear on the Send list. */
 export const SEND_LIST_EXCEPTIONS: Readonly<Record<string, string>> = {
-  // Own email template + BackgroundQuestionnaireForm; no battery-chain next link.
-  BACKGROUND_SR: "sent through its own template",
+  // Reserved for future exclusions. BACKGROUND_SR is a normal shared-form assessment.
 }
 
 /** Default pre-session battery set (not “all sendable”). */
@@ -66,7 +65,6 @@ export function qualifiesAsSendable(params: {
 
 /**
  * Single-link createAssessmentLink gate: active + client_completable only.
- * BACKGROUND_SR remains allowed here (own template uses create-link).
  */
 export function canCreateClientAssessmentLink(
   definition: {

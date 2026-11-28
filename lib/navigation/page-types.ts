@@ -36,7 +36,8 @@ export type ParentRule = {
 
 const ENTITY_RULE: ParentRule = {
   defaultParentTypes: ["main-list"],
-  alsoAllowed: ["home", "main-list", "record"],
+  // Entity→entity (NV-2): e.g. professional ↔ organisation, professional → referred client.
+  alsoAllowed: ["home", "main-list", "record", "entity"],
 }
 
 const SUB_LIST_RULE: ParentRule = {
@@ -129,6 +130,32 @@ export function isAllowedParentType(
     rule.defaultParentTypes.includes(openerType) ||
     rule.alsoAllowed.includes(openerType)
   )
+}
+
+/**
+ * NV-7: links into pages with no back arrow are always allowed
+ * (Home, Main lists, Practice details, Practitioner profile).
+ */
+export function isAlwaysAllowedLinkDestination(
+  type: PageType,
+  options?: { menuEntity?: boolean }
+): boolean {
+  return !hasBackArrow(type, options)
+}
+
+/**
+ * NV-7 link check: destination must allow the source as a parent (NV-2),
+ * except links into pages with no back arrow (always allowed).
+ */
+export function isAllowedLink(
+  destinationType: PageType,
+  sourceType: PageType,
+  destinationOptions?: { formMode?: FormMode; menuEntity?: boolean }
+): boolean {
+  if (isAlwaysAllowedLinkDestination(destinationType, destinationOptions)) {
+    return true
+  }
+  return isAllowedParentType(destinationType, sourceType, destinationOptions)
 }
 
 export function hasBackArrow(

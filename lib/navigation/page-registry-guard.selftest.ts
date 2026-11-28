@@ -14,6 +14,8 @@ import {
   type PageRegistryKey,
 } from "@/lib/navigation/page-registry"
 import {
+  isAllowedLink,
+  isAlwaysAllowedLinkDestination,
   parentRuleFor,
   type PageType,
 } from "@/lib/navigation/page-types"
@@ -163,6 +165,60 @@ function findAppPages(): { rel: string; route: string }[] {
       `${entry.route}: label must be "← Back to …" (NV-5), got ${parent.label}`
     )
   }
+}
+
+// --- 3b: NV-7 links into pages with no back arrow are always allowed ---
+{
+  assert.equal(isAlwaysAllowedLinkDestination("home"), true)
+  assert.equal(isAlwaysAllowedLinkDestination("main-list"), true)
+  assert.equal(
+    isAlwaysAllowedLinkDestination("entity", { menuEntity: true }),
+    true
+  )
+  assert.equal(isAlwaysAllowedLinkDestination("entity"), false)
+  assert.equal(isAlwaysAllowedLinkDestination("record"), false)
+
+  // Any source type may link into Home / Main list / menu entity.
+  for (const source of [
+    "entity",
+    "record",
+    "section",
+    "sub-list",
+    "record-form",
+    "guided-form",
+  ] as const) {
+    assert.equal(isAllowedLink("home", source), true, `link ${source}→home`)
+    assert.equal(
+      isAllowedLink("main-list", source),
+      true,
+      `link ${source}→main-list`
+    )
+    assert.equal(
+      isAllowedLink("entity", source, { menuEntity: true }),
+      true,
+      `link ${source}→menu entity`
+    )
+  }
+
+  // Entity→entity still allowed as a parent (NV-2), so as a link too.
+  assert.equal(isAllowedLink("entity", "entity"), true)
+}
+
+// --- 3c: Edit emergency contact defaults to Client (NV-2 Edit / entity) ---
+{
+  const entry = listRegistryEntries().find(
+    (e) =>
+      e.route ===
+      "/clients/[client_id]/emergency-contacts/[contact_id]/edit"
+  )
+  assert.ok(entry)
+  const parent = entry!.defaultParent({
+    clientId: "client-a",
+    clientName: "Ada Client",
+  })
+  assert.equal(parent?.href, "/clients/client-a")
+  const rule = parentRuleFor("record-form", { formMode: "edit" })
+  assert.ok(rule.defaultParentTypes.includes("entity"))
 }
 
 // --- 4: no router.back / history.back / old BackButton props ---

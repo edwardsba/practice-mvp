@@ -1,4 +1,3 @@
-import Link from "next/link"
 import { notFound } from "next/navigation"
 import { and, desc, eq } from "drizzle-orm"
 
@@ -30,14 +29,12 @@ export default async function NewReportPage({
   searchParams: Promise<{
     fundingApprovalId?: string
     reportRequirementId?: string
-    returnTo?: string
   }>
 }) {
   const { client_id: clientId } = await params
   const {
     fundingApprovalId: initialFundingApprovalId,
     reportRequirementId: initialRequirementId,
-    returnTo,
   } = await searchParams
   const context = await requirePractitionerContext()
 
@@ -188,7 +185,9 @@ export default async function NewReportPage({
         assistEnabled={assistEnabled}
         suicideAttempts={suicideAttempts}
         crisisPlanDate={crisisPlanDate}
-        cancelHref={returnTo ?? `/clients/${clientId}`}
+        navPage="/clients/[client_id]/reports/new"
+        navData={{ clientId, clientName }}
+        cancelHref={`/clients/${clientId}/reports`}
       />
     </AppShell>
   )

@@ -271,6 +271,8 @@ export default async function EditReportPage({
         assistEnabled={assistEnabled}
         suicideAttempts={suicideAttempts}
         crisisPlanDate={crisisPlanDate}
+        navPage="/clients/[client_id]/reports/[report_id]/edit"
+        navData={{ clientId, clientName, reportId }}
         cancelHref={`/clients/${clientId}/reports/${reportId}`}
       />
 

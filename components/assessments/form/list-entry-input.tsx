@@ -680,7 +680,7 @@ export function ListEntryInput({
             if (!open) discardOpen()
           }}
         >
-          <DialogContent className="flex max-h-[90vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-lg">
+          <DialogContent className="flex max-h-[90dvh] flex-col gap-0 overflow-hidden p-0 sm:max-w-lg">
             <DialogHeader className="shrink-0 border-b px-4 py-3 pr-12 text-left">
               <DialogTitle>{sheetTitle}</DialogTitle>
             </DialogHeader>

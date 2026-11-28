@@ -206,6 +206,7 @@ Every screen is designed for a 390 px phone first, then widened for desktop.
 - **PH-4 Side panels** take about 88% of the width on a phone, and a fixed width on desktop.
 - **PH-5 Footers.** In side panels and practitioner forms, Save or Confirm stays visible at the bottom. On client forms, Back / Next sits directly under the section, never fixed, so it never rides on top of the keyboard.
 - **PH-6 Typing** never closes the keyboard or moves the page. Fields keep focus while typing.
+- **PH-7 Pop-ups fit the visible screen.** Dialogs and panels use `dvh`, never `vh`, so Safari's toolbars never hide their bottom; they scroll inside, and every button can be reached. The guard `lib/ui/viewport-units.selftest.ts` checks this.
 
 ## 10. Client-facing pages (CP)
 
@@ -430,6 +431,7 @@ This is where the system doesn't match the guide yet. Add a row when a gap is fo
 | NV-1 | Professionals, organisations | Entity details with no Sub-lists, unlike Client | To decide with Ben (e.g. clients referred) |
 | NV-7 | Background interview | Has its own LRAMP button, but the interview is one assessment in a battery | A battery page that launches each assessment (to design with Ben) |
 | NV-7 | Session note | "Schedule appointment" opens the Calendar | Show the next appointment on the note; book in a side panel (mockup first) |
+| PH-7 | Background interview | The interview page and history section still use `vh` heights | Change to `dvh` when the interview is next worked on (with Ben) |
 
 ## Appendix B: Change log
 
@@ -437,6 +439,7 @@ One row per change to the guide, newest first. Retired rules are recorded here a
 
 | Date | Rules | Change | Agreed in |
 | --- | --- | --- | --- |
+| 28 Nov 2026 | PH-7 | Added: pop-ups use dvh so they fit the visible screen on phones | Round PH.1 (phone testing) |
 | 28 Nov 2026 | CP-7 | Sheet buttons sit in the content on phones, not a fixed footer | Round AY.4 (phone testing) |
 | 28 Nov 2026 | CP-7, FM-1, FM-5 | Client-form people and history entries open in a sheet; Age and Passed away share a line; year they passed away added | Round AY.3 (phone testing) |
 | 28 Nov 2026 | NV-2, NV-7, NV-10, 13B | Linked Entity details allowed as parents; links into pages with no back arrow always allowed; Edit form parent when the record has no page; added NV-10 Create and return; 13B parents without a client | Round NV.1 |

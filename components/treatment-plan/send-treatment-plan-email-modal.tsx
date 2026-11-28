@@ -103,7 +103,7 @@ export function SendTreatmentPlanEmailModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
+      <DialogContent className="max-h-[90dvh] max-w-2xl overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Send treatment plan to client</DialogTitle>
           <DialogDescription>

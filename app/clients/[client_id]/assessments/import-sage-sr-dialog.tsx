@@ -216,7 +216,7 @@ export function ImportSageSrDialog({
         </DialogTrigger>
       )}
       <DialogContent
-        className="max-h-[90vh] overflow-y-auto"
+        className="max-h-[90dvh] overflow-y-auto"
         onPointerDownOutside={(event) => {
           // Keep results on screen until Done is clicked — a click-outside would
           // otherwise close the dialog and lose the error text (which is what
